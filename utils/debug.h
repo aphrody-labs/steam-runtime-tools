@@ -39,11 +39,11 @@ enum
 
 #define LDLIB_DEBUG(ldl, flags, fmt, args...)  \
     if( ldl->debug && (ldl->debug & (flags)) ) \
-        capsule_log( LOG_DEBUG, "%s:" fmt, __PRETTY_FUNCTION__, ##args )
+        capsule_log( LOG_DEBUG, "%s: " fmt, __PRETTY_FUNCTION__, ##args )
 
 #define DEBUG(flags, fmt, args...)               \
     if( debug_flags && (debug_flags & (flags)) ) \
-        capsule_log( LOG_DEBUG, "%s:" fmt, __PRETTY_FUNCTION__, ##args )
+        capsule_log( LOG_DEBUG, "%s: " fmt, __PRETTY_FUNCTION__, ##args )
 
 extern unsigned long debug_flags;
 void  set_debug_flags (const char *control);

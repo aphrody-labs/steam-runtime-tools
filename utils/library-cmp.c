@@ -1095,10 +1095,7 @@ library_cmp_filter_list( char ** const filters,
 {
     ptr_list *filtered_list;
     size_t i = 0;
-    size_t j = 0;
-    bool guessing = false;
-    char *buf = NULL;
-    char *token;
+
     filtered_list = ptr_list_alloc( list_number );
 
     assert( filters != NULL );
@@ -1109,10 +1106,12 @@ library_cmp_filter_list( char ** const filters,
 
     for( i = 0; list[i] != NULL; i++ )
     {
+        char *buf;
         char *saveptr = NULL;
-        guessing = false;
+        char *token;
+        bool guessing = false;
+        size_t j = 0;
 
-        free( buf );
         buf = xstrdup( list[i] );
         /* If we have a versioned symbol, like "symbol@version", save a copy
          * without the version part because filters that don't include an "@"
@@ -1165,9 +1164,9 @@ library_cmp_filter_list( char ** const filters,
         if( filters[j] == NULL )
             capsule_warn( "\"%s\" does not have a match in the given filters, treating it as private",
                           token );
-    }
 
-    free( buf );
+        free( buf );
+    }
 
     return (char **) ptr_list_free_to_array( _capsule_steal_pointer( &filtered_list ),
                                             filtered_list_number_out );

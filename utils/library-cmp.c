@@ -1106,7 +1106,7 @@ library_cmp_filter_list( char ** const filters,
 
     for( i = 0; list[i] != NULL; i++ )
     {
-        char *buf;
+        _capsule_autofree char *buf = NULL;
         char *saveptr = NULL;
         char *token;
         bool guessing = false;
@@ -1164,8 +1164,6 @@ library_cmp_filter_list( char ** const filters,
         if( filters[j] == NULL )
             capsule_warn( "\"%s\" does not have a match in the given filters, treating it as private",
                           token );
-
-        free( buf );
     }
 
     return (char **) ptr_list_free_to_array( _capsule_steal_pointer( &filtered_list ),

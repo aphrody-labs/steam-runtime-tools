@@ -977,7 +977,7 @@ ld_libs_init (ld_libs *ldlibs,
 const char *
 ld_libs_get_fallback_paths (ld_libs *ldlibs)
 {
-    if( ldlibs->fallback )
+    if( ldlibs && ldlibs->fallback )
         return ldlibs->fallback;
 
     return "/lib:/usr/lib";

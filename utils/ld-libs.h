@@ -74,6 +74,9 @@ typedef struct
  *  are the libraries in its recursive dependency tree.
  * @not_found: (transfer full): private, used internally by the ld-libs
  *  code. Each item is a copy of the name of a missing dependency.
+ * @fallback: (transfer full) (nullable): Colon-separated search paths
+ *  that we assume are hard-coded into glibc. If %NULL, use a
+ *  hard-coded default.
  * @last_not_found: private, used internally by the ld-libs code.
  *  Number of items in @not_found used.
  * @debug: The debug flags passed to ld_libs_init()
@@ -90,6 +93,7 @@ typedef struct
     const char **exclude;
     dso_needed_t needed[DSO_LIMIT];
     char *not_found[DSO_LIMIT];
+    char *fallback;
     int last_not_found;
     unsigned long debug;
 } ld_libs;
@@ -100,6 +104,9 @@ int   ld_libs_init (ld_libs *ldlibs,
                     unsigned long dbg,
                     int *error,
                     char **message);
+
+const char *ld_libs_get_fallback_paths (ld_libs *ldlibs);
+void        ld_libs_set_fallback_paths (ld_libs *ldlibs, const char *paths);
 
 int   ld_libs_set_target        (ld_libs *ldlibs, const char *target,
                                  int *code, char **message);

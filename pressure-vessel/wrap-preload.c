@@ -487,3 +487,45 @@ pv_wrap_append_preload (PvWrapContext *context,
         break;
     }
 }
+
+/*
+ * pv_wrap_append_preloads:
+ * @context: Context we are running in
+ * @argv: (element-type filename): Array of command-line options to populate
+ * @inputs: (array length=n_inputs): Array of LD_PRELOAD or similar modules
+ * @n_inputs: Number of items in @inputs
+ * @flags: Flags to adjust behaviour
+ *
+ * Adjust each module in @inputs to be valid for the container and append it
+ * to @argv.
+ */
+void
+pv_wrap_append_preloads (PvWrapContext *context,
+                         GPtrArray *argv,
+                         WrapPreloadModule *inputs,
+                         gsize n_inputs,
+                         PvAppendPreloadFlags flags)
+{
+  gsize i;
+
+  g_return_if_fail (PV_IS_WRAP_CONTEXT (context));
+  g_return_if_fail (argv != NULL);
+
+  if (n_inputs == 0)
+    return;
+
+  g_return_if_fail (inputs != NULL);
+
+  g_debug ("Adjusting LD_AUDIT/LD_PRELOAD modules...");
+
+  for (i = 0; i < n_inputs; i++)
+    {
+      const WrapPreloadModule *input = inputs + i;
+
+      pv_wrap_append_preload (context,
+                              argv,
+                              input->which,
+                              input->preload,
+                              flags);
+    }
+}

@@ -35,3 +35,9 @@ void pv_wrap_append_preload (PvWrapContext *context,
                              PvPreloadVariableIndex which,
                              const char *preload,
                              PvAppendPreloadFlags flags);
+
+void pv_wrap_append_preloads (PvWrapContext *context,
+                              GPtrArray *argv,
+                              WrapPreloadModule *inputs,
+                              gsize n_inputs,
+                              PvAppendPreloadFlags flags);

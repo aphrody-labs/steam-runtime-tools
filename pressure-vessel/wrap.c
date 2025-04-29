@@ -770,28 +770,10 @@ main (int argc,
    * used for them, which might be their physical rather than logical
    * locations. Steam doesn't generally use LD_AUDIT, but the Steam app
    * on Flathub does, and it needs similar handling. */
-  do
-    {
-      gsize j;
-
-      g_debug ("Adjusting LD_AUDIT/LD_PRELOAD modules if any...");
-
-      for (j = 0; j < self->options.preload_modules->len; j++)
-        {
-          const WrapPreloadModule *module = &g_array_index (self->options.preload_modules,
-                                                            WrapPreloadModule,
-                                                            j);
-
-          g_assert (module->which >= 0);
-          g_assert (module->which < G_N_ELEMENTS (pv_preload_variables));
-          pv_wrap_append_preload (self,
-                                  adverb_preload_argv,
-                                  module->which,
-                                  module->preload,
-                                  append_preload_flags);
-        }
-    }
-  while (0);
+  pv_wrap_append_preloads (self, adverb_preload_argv,
+                           (WrapPreloadModule *) self->options.preload_modules->data,
+                           self->options.preload_modules->len,
+                           append_preload_flags);
 
   pv_bind_and_propagate_from_environ (self, home_mode, container_env);
 

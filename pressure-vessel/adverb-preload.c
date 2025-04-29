@@ -55,6 +55,7 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
                        PvPerArchDirs *lib_temp_dirs)
 {
   const char *preload = module->name;
+  const PvPreloadVariable *which;
   const char *base;
   gsize abi_index = module->abi_index;
 
@@ -72,6 +73,8 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
       g_ptr_array_add (search_path, g_strdup (preload));
       return;
     }
+
+  which = &pv_preload_variables[module->index_in_preload_variables];
 
   if (abi_index == PV_UNSPECIFIED_ABI
       && module->index_in_preload_variables == PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD
@@ -113,6 +116,7 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
       if (symlink (preload, link) == 0)
         {
           g_debug ("created symlink %s -> %s", link, preload);
+          g_debug ("%s will include %s", which->variable, platform_path);
           ptr_array_add_unique (search_path, platform_path,
                                 g_str_equal, generic_strdup);
           return;
@@ -129,6 +133,7 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
           if (g_strcmp0 (found, preload) == 0)
             {
               g_debug ("Already created symlink %s -> %s", link, preload);
+              g_debug ("%s will include %s", which->variable, platform_path);
               ptr_array_add_unique (search_path, platform_path,
                                     g_str_equal, generic_strdup);
               return;
@@ -138,11 +143,13 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
       /* Use the object as-is instead of trying to do anything clever */
       g_debug ("Unable to create symlink %s -> %s: %s",
                link, preload, g_strerror (saved_errno));
+      g_debug ("%s will include %s", which->variable, preload);
       g_ptr_array_add (search_path, g_strdup (preload));
     }
   else
     {
       g_debug ("Module %s is for all architectures", preload);
+      g_debug ("%s will include %s", which->variable, preload);
       g_ptr_array_add (search_path, g_strdup (preload));
     }
 }

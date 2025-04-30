@@ -51,6 +51,7 @@
 #include "wrap-flatpak.h"
 #include "wrap-home.h"
 #include "wrap-interactive.h"
+#include "wrap-preload.h"
 #include "wrap-setup.h"
 
 typedef enum

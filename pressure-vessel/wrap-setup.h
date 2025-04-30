@@ -27,7 +27,6 @@
 #include "steam-runtime-tools/env-overlay-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
-#include "adverb-preload.h"
 #include "bwrap.h"
 #include "flatpak-bwrap-private.h"
 #include "flatpak-exports-private.h"
@@ -64,32 +63,6 @@ gboolean pv_export_root_dirs_like_filesystem_host (int root_fd,
                                                    GError **error);
 
 void pv_wrap_move_into_scope (const char *steam_app_id);
-
-/**
- * PvAppendPreloadFlags:
- * @PV_APPEND_PRELOAD_FLAGS_FLATPAK_SUBSANDBOX: The game will be run in
- *  a Flatpak subsandbox
- * @PV_APPEND_PRELOAD_FLAGS_IN_UNIT_TESTS: Normalize $LIB and $PLATFORM,
- *  for unit testing
- * @PV_APPEND_PRELOAD_FLAGS_ONE_ARCHITECTURE: Behave as though there is
- *  only one architecture supported, for test coverage
- * @PV_APPEND_PRELOAD_FLAGS_NONE: None of the above
- *
- * Flags affecting the behaviour of pv_wrap_append_preload().
- */
-typedef enum
-{
-  PV_APPEND_PRELOAD_FLAGS_FLATPAK_SUBSANDBOX = (1 << 0),
-  PV_APPEND_PRELOAD_FLAGS_IN_UNIT_TESTS = (1 << 2),
-  PV_APPEND_PRELOAD_FLAGS_ONE_ARCHITECTURE = (1 << 3),
-  PV_APPEND_PRELOAD_FLAGS_NONE = 0
-} PvAppendPreloadFlags;
-
-void pv_wrap_append_preload (PvWrapContext *context,
-                             GPtrArray *argv,
-                             PvPreloadVariableIndex which,
-                             const char *preload,
-                             PvAppendPreloadFlags flags);
 
 gboolean pv_wrap_maybe_load_nvidia_modules (GError **error);
 

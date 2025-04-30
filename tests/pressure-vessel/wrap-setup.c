@@ -307,7 +307,7 @@ typedef enum
 /*
  * ExpectedPreloadExports:
  * @path: An absolute path, or "=" as shorthand for repeating
- *  the @input from #PreloadTest
+ *  the corresponding item of @input in #PreloadTest
  * @flags: The desired behaviour
  *
  * The expected disposition of a path in the #FlatpakExports
@@ -320,17 +320,17 @@ typedef struct
 
 /*
  * PreloadTest:
- * @input: One of the colon-separated items in LD_PRELOAD
+ * @input: Colon-separated items in LD_PRELOAD, or %NULL
  * @warning: (nullable): If not null, expect the item to be ignored
  *  with this warning
- * @touch: (nullable): If not null, create this regular file associated
+ * @touch: (nullable): If not null, create these regular files associated
  *  with the item in the mock sysroot.
- *  "=" may be used as a shorthand for repeating @input.
- * @touch_i386: (nullable): If not null, create this regular file in the
- *  mock sysroot, but only if the i386 architecture is supported.
+ *  "=" may be used as a shorthand as above.
+ * @touch_i386: (nullable): Same as @touch, but only if the i386
+ *  architecture is supported.
  * @expected: The arguments we expect to see passed to
  *  `pv-adverb --ld-preload` as a result, with no /run/host/ prefix.
- *  "=" may be used as a shorthand for repeating @input.
+ *  "=" may be used as a shorthand as above.
  *  If prefixed with "i386:", then we expect the rest of the value as an
  *  argument if and only if the i386 architecture is supported.
  *  %NULL items are ignored.
@@ -341,11 +341,11 @@ typedef struct
  */
 typedef struct
 {
-  const char *input;
-  const char *warning;
-  const char *touch;
-  const char *touch_i386;
   /* Array lengths are arbitrary, expand as required */
+  const char *input[2];
+  const char *warning;
+  const char *touch[2];
+  const char *touch_i386[2];
   const char *expected[2];
   const ExpectedPreloadExports expected_exports[6];
 } PreloadTest;
@@ -353,28 +353,28 @@ typedef struct
 static const PreloadTest ld_preload_tests[] =
 {
   {
-    .input = "",
+    .input = { "" },
     .warning = "Ignoring invalid loadable module \"\"",
   },
   {
-    .input = "",
+    .input = { "" },
     .warning = "Ignoring invalid loadable module \"\"",
   },
   {
-    .input = "/app/lib/libpreloadA.so",
-    .touch = "=",
+    .input = { "/app/lib/libpreloadA.so" },
+    .touch = { "=" },
     .expected = { "=" },
     /* FlatpakExports never exports /app or anything below it. */
     .expected_exports = {
+      { "=", EXPORT_NONE },
       { "/app", EXPORT_NONE },
       { "/app/lib", EXPORT_NONE },
-      { "=", EXPORT_NONE },
     },
   },
   {
-    .input = "/platform/plat-$PLATFORM/libpreloadP.so",
-    .touch = "/platform/plat-" PRIMARY_PLATFORM "/libpreloadP.so",
-    .touch_i386 = "/platform/plat-" MOCK_PLATFORM_32 "/libpreloadP.so",
+    .input = { "/platform/plat-$PLATFORM/libpreloadP.so" },
+    .touch = { "/platform/plat-" PRIMARY_PLATFORM "/libpreloadP.so" },
+    .touch_i386 = { "/platform/plat-" MOCK_PLATFORM_32 "/libpreloadP.so" },
     .expected = {
       "/platform/plat-" PRIMARY_PLATFORM "/libpreloadP.so:abi=" PRIMARY_ABI,
       "i386:/platform/plat-" MOCK_PLATFORM_32 "/libpreloadP.so:abi=" SRT_ABI_I386,
@@ -396,9 +396,9 @@ static const PreloadTest ld_preload_tests[] =
     },
   },
   {
-    .input = "/opt/${LIB}/libpreloadL.so",
-    .touch = "/opt/" PRIMARY_LIB "/libpreloadL.so",
-    .touch_i386 = "/opt/" MOCK_LIB_32 "/libpreloadL.so",
+    .input = { "/opt/${LIB}/libpreloadL.so" },
+    .touch = { "/opt/" PRIMARY_LIB "/libpreloadL.so" },
+    .touch_i386 = { "/opt/" MOCK_LIB_32 "/libpreloadL.so" },
     .expected = {
       "/opt/" PRIMARY_LIB "/libpreloadL.so:abi=" PRIMARY_ABI,
       "i386:/opt/" MOCK_LIB_32 "/libpreloadL.so:abi=" SRT_ABI_I386,
@@ -418,45 +418,46 @@ static const PreloadTest ld_preload_tests[] =
     },
   },
   {
-    .input = "/lib/libpreload-rootfs.so",
-    .touch = "=",
+    .input = { "/lib/libpreload-rootfs.so" },
+    .touch = { "=" },
     .expected = { "=" },
     /* FlatpakExports never exports /lib as /lib */
     .expected_exports = {
-      { "/lib", EXPORT_NONE },
       { "=", EXPORT_NONE },
+      { "/lib", EXPORT_NONE },
     },
   },
   {
-    .input = "/usr/lib/libpreloadU.so",
-    .touch = "=",
+    .input = { "/usr/lib/libpreloadU.so" },
+    .touch = { "=" },
     .expected = { "=" },
     /* FlatpakExports never exports /usr as /usr */
     .expected_exports = {
+      { "=", EXPORT_NONE },
       { "/usr", EXPORT_NONE },
       { "/usr/lib", EXPORT_NONE },
-      { "=", EXPORT_NONE },
     },
   },
   {
-    .input = "/home/me/libpreloadH.so",
-    .touch = "=",
+    .input = { "/home/me/libpreloadH.so" },
+    .touch = { "=" },
     .expected = { "=" },
     /* We don't always export /home etc. so we have to explicitly export
      * this one */
     .expected_exports = {
+      { "=", EXPORT_VISIBLE },
       { "/home", EXPORT_NONE },
       /* We don't want to export $HOME (and overrule --unshare-home) just
        * because it happens to have a LD_PRELOAD module in it */
       { "/home/me", EXPORT_NONE },
-      { "=", EXPORT_VISIBLE },
     },
   },
   {
-    .input = "/home/me/lib64/mangohud/libNotMangoHud.so",
-    .touch = "=",
+    .input = { "/home/me/lib64/mangohud/libNotMangoHud.so" },
+    .touch = { "=" },
     .expected = { "=" },
     .expected_exports = {
+      { "=", EXPORT_VISIBLE },
       { "/home", EXPORT_NONE },
       { "/home/me", EXPORT_NONE },
       { "/home/me/lib64", EXPORT_NONE },
@@ -465,23 +466,22 @@ static const PreloadTest ld_preload_tests[] =
        * /home/me/lib64/mangohud/libImplementation.so.
        * (This mirrors how MangoHud actually works.) */
       { "/home/me/lib64/mangohud", EXPORT_VISIBLE },
-      { "=", EXPORT_VISIBLE },
     },
   },
   {
-    .input = "/steam/lib/gameoverlayrenderer.so",
-    .touch = "=",
+    .input = { "/steam/lib/gameoverlayrenderer.so" },
+    .touch = { "=" },
     .expected = { "=" },
     /* We assume STEAM_COMPAT_CLIENT_INSTALL_PATH is exported separately */
     .expected_exports = {
+      { "=", EXPORT_NONE },
       { "/steam", EXPORT_NONE },
       { "/steam/lib", EXPORT_NONE },
-      { "=", EXPORT_NONE },
     },
   },
   {
-    .input = "/overlay/libs/${ORIGIN}/../lib/libpreloadO.so",
-    .touch = "=",
+    .input = { "/overlay/libs/${ORIGIN}/../lib/libpreloadO.so" },
+    .touch = { "=" },
     .expected = { "=" },
     /* We don't know what ${ORIGIN} will expand to, so we have to cut off at
      * /overlay/libs */
@@ -491,37 +491,37 @@ static const PreloadTest ld_preload_tests[] =
     },
   },
   {
-    .input = "/future/libs-$FUTURE/libpreloadF.so",
-    .touch = "/future/libs-post2038/.exists",
+    .input = { "/future/libs-$FUTURE/libpreloadF.so" },
+    .touch = { "/future/libs-post2038/.exists" },
     .expected = { "=" },
     /* We don't know what ${FUTURE} will expand to, so we have to cut off at
      * /future */
     .expected_exports = { { "/future", EXPORT_VISIBLE } },
   },
   {
-    .input = "/in-root-plat-${PLATFORM}-only-32-bit.so",
-    .touch_i386 = "/in-root-plat-" MOCK_PLATFORM_32 "-only-32-bit.so",
+    .input = { "/in-root-plat-${PLATFORM}-only-32-bit.so" },
+    .touch_i386 = { "/in-root-plat-" MOCK_PLATFORM_32 "-only-32-bit.so" },
     .expected = {
       "i386:/in-root-plat-i686-only-32-bit.so:abi=" SRT_ABI_I386,
     },
   },
   {
-    .input = "/in-root-${FUTURE}.so",
+    .input = { "/in-root-${FUTURE}.so" },
     .expected = { "=" },
   },
   {
-    .input = "./${RELATIVE}.so",
+    .input = { "./${RELATIVE}.so" },
     .expected = { "=" },
   },
   {
-    .input = "./relative.so",
+    .input = { "./relative.so" },
     .expected = { "=" },
   },
   {
     /* Our mock implementation of pv_runtime_has_library() behaves as though
      * libfakeroot is not in the runtime or graphics stack provider, only
      * the current namespace */
-    .input = "libfakeroot.so",
+    .input = { "libfakeroot.so" },
     .expected = {
       "/path/to/" PRIMARY_LIB "/libfakeroot.so:abi=" PRIMARY_ABI,
       "i386:/path/to/" MOCK_LIB_32 "/libfakeroot.so:abi=" SRT_ABI_I386,
@@ -530,16 +530,16 @@ static const PreloadTest ld_preload_tests[] =
   {
     /* Our mock implementation of pv_runtime_has_library() behaves as though
      * libpthread.so.0 *is* in the runtime, as we would expect */
-    .input = "libpthread.so.0",
+    .input = { "libpthread.so.0" },
     .expected = { "=" },
   },
   {
-    .input = "/usr/local/lib/libgtk3-nocsd.so.0",
-    .touch = "=",
+    .input = { "/usr/local/lib/libgtk3-nocsd.so.0" },
+    .touch = { "=" },
     .warning = "Disabling gtk3-nocsd LD_PRELOAD: it is known to cause crashes.",
   },
   {
-    .input = "",
+    .input = { "" },
     .warning = "Ignoring invalid loadable module \"\"",
   },
 };
@@ -576,7 +576,10 @@ assert_exports_match_expectations (Fixture *f,
             continue;
 
           if (g_str_equal (path, "="))
-            path = test->input;
+            {
+              g_assert (j < G_N_ELEMENTS (test->input));
+              path = test->input[j];
+            }
 
           is_visible = flatpak_exports_path_is_visible (exports, path);
           should_be_visible = ((flags & EXPORT_VISIBLE) != 0);
@@ -609,6 +612,28 @@ assert_exports_match_expectations (Fixture *f,
 }
 
 static void
+collect_files_to_touch (GPtrArray *array,
+                        const char * const *touch,
+                        gsize n,
+                        const PreloadTest *test)
+{
+  gsize j;
+
+  for (j = 0; j < n; j++)
+    {
+      if (g_strcmp0 (touch[j], "=") == 0)
+        {
+          g_assert (j < G_N_ELEMENTS (test->input));
+          g_ptr_array_add (array, (char *) test->input[j]);
+        }
+      else if (touch[j] != NULL)
+        {
+          g_ptr_array_add (array, (char *) touch[j]);
+        }
+    }
+}
+
+static void
 setup_ld_preload (Fixture *f,
                   gconstpointer context)
 {
@@ -623,14 +648,13 @@ setup_ld_preload (Fixture *f,
     {
       const PreloadTest *test = &ld_preload_tests[i];
 
-      if (g_strcmp0 (test->touch, "=") == 0)
-        g_ptr_array_add (touch, (char *) test->input);
-      else if (test->touch != NULL)
-        g_ptr_array_add (touch, (char *) test->touch);
-
+      collect_files_to_touch (touch,
+                              test->touch, G_N_ELEMENTS (test->touch),
+                              test);
 #if defined(__i386__) || defined(__x86_64__)
-      if (test->touch_i386 != NULL)
-        g_ptr_array_add (touch_i386, (char *) test->touch_i386);
+      collect_files_to_touch (touch_i386,
+                              test->touch_i386, G_N_ELEMENTS (test->touch_i386),
+                              test);
 #endif
     }
 
@@ -1933,11 +1957,19 @@ populate_ld_preload (Fixture *f,
     {
       const PreloadTest *test = &ld_preload_tests[i];
       GLogLevelFlags old_fatal_mask = G_LOG_FATAL_MASK;
-      WrapPreloadModule module =
+      gsize j;
+      gsize n_modules = 0;
+      WrapPreloadModule modules[G_N_ELEMENTS (test->input)] = {};
+
+      for (j = 0; j < G_N_ELEMENTS (test->input); j++)
         {
-          .which = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
-          .preload = (char *) test->input,
-        };
+          if (test->input[j] == NULL)
+            break;
+
+          modules[j].which = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD;
+          modules[j].preload = (char *) test->input[j];
+          n_modules++;
+        }
 
       /* We expect a warning for libgtk3-nocsd.so.0, but the test framework
        * makes warnings and critical warnings fatal, in addition to the
@@ -1959,8 +1991,8 @@ populate_ld_preload (Fixture *f,
 
       pv_wrap_append_preloads (f->context,
                                argv,
-                               &module,
-                               1,
+                               modules,
+                               n_modules,
                                flags | PV_APPEND_PRELOAD_FLAGS_IN_UNIT_TESTS);
 
       /* If we modified the fatal mask, put back the old value. */
@@ -1988,15 +2020,20 @@ filter_expected_paths (const Config *config)
    * Filter the list accordingly. */
   for (i = 0; i < G_N_ELEMENTS (ld_preload_tests); i++)
     {
-      for (j = 0; j < G_N_ELEMENTS (ld_preload_tests[i].expected); j++)
+      const PreloadTest *test = &ld_preload_tests[i];
+
+      for (j = 0; j < G_N_ELEMENTS (test->expected); j++)
         {
-          const char *path = ld_preload_tests[i].expected[j];
+          const char *path = test->expected[j];
 
           if (path == NULL)
             continue;
 
           if (g_str_equal (path, "="))
-            path = ld_preload_tests[i].input;
+            {
+              g_assert (j < G_N_ELEMENTS (test->input));
+              path = test->input[j];
+            }
 
           if (g_str_has_prefix (path, "i386:"))
             {

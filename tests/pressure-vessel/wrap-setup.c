@@ -442,12 +442,13 @@ static const PreloadTest ld_preload_tests[] =
     },
   },
   {
-    .input = { "/home/me/libpreloadH.so" },
-    .touch = { "=" },
-    .expected = { "=" },
+    .input = { "/home/me/libpreloadH.so", "/home/me/libpreloadH2.so" },
+    .touch = { "=", "=" },
+    .expected = { "=", "=" },
     /* We don't always export /home etc. so we have to explicitly export
      * this one */
     .expected_exports = {
+      { "=", EXPORT_VISIBLE },
       { "=", EXPORT_VISIBLE },
       { "/home", EXPORT_NONE },
       /* We don't want to export $HOME (and overrule --unshare-home) just

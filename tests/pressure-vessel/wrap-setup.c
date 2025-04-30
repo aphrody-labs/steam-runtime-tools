@@ -353,6 +353,9 @@ typedef struct
 static const PreloadTest ld_preload_tests[] =
 {
   {
+    .input = { NULL },
+  },
+  {
     .input = { "" },
     .warning = "Ignoring invalid loadable module \"\"",
   },

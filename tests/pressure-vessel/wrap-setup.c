@@ -494,6 +494,39 @@ static const PreloadTest ld_preload_tests[] =
       { "/steam/lib", EXPORT_NONE },
     },
   },
+#if defined(__i386__) || defined(__x86_64__)
+  {
+    .input = {
+        "/steam/ubuntu12_64/gameoverlayrenderer.so",
+        "/steam/ubuntu12_32/gameoverlayrenderer.so",
+    },
+    .touch = { "=", "=" },
+    .expected = { "=", "=" },
+    .expected_exports = {
+      { "=", EXPORT_NONE },
+      { "=", EXPORT_NONE },
+      { "/steam", EXPORT_NONE },
+      { "/steam/ubuntu12_64", EXPORT_NONE },
+      { "/steam/ubuntu12_32", EXPORT_NONE },
+    },
+  },
+  {
+    .input = {
+        "/steam/ubuntu12_32/gameoverlayrenderer.so",
+        "/steam/ubuntu12_64/gameoverlayrenderer.so",
+    },
+    .touch = { "=", "=" },
+    /* Order is preserved, for now (but this might not always be true) */
+    .expected = { "=", "=" },
+    .expected_exports = {
+      { "=", EXPORT_NONE },
+      { "=", EXPORT_NONE },
+      { "/steam", EXPORT_NONE },
+      { "/steam/ubuntu12_32", EXPORT_NONE },
+      { "/steam/ubuntu12_64", EXPORT_NONE },
+    },
+  },
+#endif
   {
     .input = { "/overlay/libs/${ORIGIN}/../lib/libpreloadO.so" },
     .touch = { "=" },

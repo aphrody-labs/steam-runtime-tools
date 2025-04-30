@@ -2203,6 +2203,7 @@ test_remap_ld_preload_no_runtime (Fixture *f,
   g_autoptr(GPtrArray) filtered = filter_expected_paths (config);
   FlatpakExports *exports;
   gsize i, j;
+  gsize n_gameoverlays = 0;
 
   f->context->options.remove_game_overlay = TRUE;
 
@@ -2213,19 +2214,25 @@ test_remap_ld_preload_no_runtime (Fixture *f,
   g_assert_null (f->context->runtime);
   populate_ld_preload (f, argv, config->preload_flags);
 
-  g_assert_cmpuint (argv->len, ==, filtered->len - 1);
+  for (i = 0; i < filtered->len; i++)
+    {
+      const char *expected = g_ptr_array_index (filtered, i);
+
+      /* /steam/lib/gameoverlayrenderer.so is missing because we used the
+       * equivalent of --remove-game-overlay */
+      if (g_str_has_suffix (expected, "/gameoverlayrenderer.so"))
+        n_gameoverlays++;
+    }
+
+  g_assert_cmpuint (argv->len, ==, filtered->len - n_gameoverlays);
 
   for (i = 0, j = 0; i < argv->len; i++, j++)
     {
       const char *expected = g_ptr_array_index (filtered, j);
       const char *argument = g_ptr_array_index (argv, i);
 
-      /* /steam/lib/gameoverlayrenderer.so is missing because we used the
-       * equivalent of --remove-game-overlay */
-      if (g_str_has_suffix (expected, "/gameoverlayrenderer.so"))
+      while (g_str_has_suffix (expected, "/gameoverlayrenderer.so"))
         {
-          /* We expect to skip only one element */
-          g_assert_cmpint (i, ==, j);
           j++;
           expected = g_ptr_array_index (filtered, j);
         }

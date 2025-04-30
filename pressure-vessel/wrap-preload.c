@@ -245,7 +245,7 @@ append_preload_per_architecture (PvWrapContext *context,
       if (!(flags & PV_APPEND_PRELOAD_FLAGS_IN_UNIT_TESTS))
         {
           srt_system_info_check_library (system_info,
-                                         pv_multiarch_details[i].tuple,
+                                         multiarch_tuple,
                                          preload,
                                          &details);
           path = srt_library_get_absolute_path (details);

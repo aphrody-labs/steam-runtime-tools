@@ -307,7 +307,8 @@ typedef enum
 /*
  * ExpectedPreloadExports:
  * @path: An absolute path, or "=" as shorthand for repeating
- *  the corresponding item of @input in #PreloadTest
+ *  the corresponding item of @input in #PreloadTest,
+ *  with any a: or p: prefix removed.
  * @flags: The desired behaviour
  *
  * The expected disposition of a path in the #FlatpakExports
@@ -320,19 +321,29 @@ typedef struct
 
 /*
  * PreloadTest:
- * @input: Colon-separated items in LD_PRELOAD, or %NULL
+ * @input: Colon-separated items in LD_AUDIT/LD_PRELOAD, or %NULL.
+ *  If prefixed with "a:" they are assumed to be in LD_AUDIT.
+ *  If prefixed with "p:" or not prefixed, they are assumed to be in
+ *  LD_PRELOAD.
  * @warning: (nullable): If not null, expect the item to be ignored
  *  with this warning
  * @touch: (nullable): If not null, create these regular files associated
  *  with the item in the mock sysroot.
- *  "=" may be used as a shorthand as above.
+ *  "=" may be used as a shorthand as above, in which case any a: or p:
+ *  prefix will be removed.
  * @touch_i386: (nullable): Same as @touch, but only if the i386
  *  architecture is supported.
  * @expected: The arguments we expect to see passed to
- *  `pv-adverb --ld-preload` as a result, with no /run/host/ prefix.
- *  "=" may be used as a shorthand as above.
- *  If prefixed with "i386:", then we expect the rest of the value as an
- *  argument if and only if the i386 architecture is supported.
+ *  `pv-adverb --ld-audit` or `--ld-preload` as a result, with no
+ *  /run/host/ prefix.
+ *  "=" may be used as a shorthand as above, in which case any "a:" or "p:"
+ *  prefix will be kept.
+ *  If prefixed with "i386:" (which must come first), then we expect the
+ *  rest of the value as an argument if and only if the i386 architecture
+ *  is supported.
+ *  If prefixed with "a:" they are assumed to be in LD_AUDIT.
+ *  If prefixed with "p:" or not prefixed, they are assumed to be in
+ *  LD_PRELOAD.
  *  %NULL items are ignored.
  * @expected_exports: An array of #FlatpakExports entries somehow related
  *  to this module. Each one indicates a path that is, or is not, required
@@ -442,7 +453,7 @@ static const PreloadTest ld_preload_tests[] =
     },
   },
   {
-    .input = { "/home/me/libpreloadH.so", "/home/me/libpreloadH2.so" },
+    .input = { "p:/home/me/libpreloadH.so", "a:/home/me/libaudit.so" },
     .touch = { "=", "=" },
     .expected = { "=", "=" },
     /* We don't always export /home etc. so we have to explicitly export
@@ -583,6 +594,10 @@ assert_exports_match_expectations (Fixture *f,
             {
               g_assert (j < G_N_ELEMENTS (test->input));
               path = test->input[j];
+
+              if (g_str_has_prefix (path, "a:")
+                  || g_str_has_prefix (path, "p:"))
+                path += 2;
             }
 
           is_visible = flatpak_exports_path_is_visible (exports, path);
@@ -627,8 +642,16 @@ collect_files_to_touch (GPtrArray *array,
     {
       if (g_strcmp0 (touch[j], "=") == 0)
         {
+          const char *path;
+
           g_assert (j < G_N_ELEMENTS (test->input));
-          g_ptr_array_add (array, (char *) test->input[j]);
+          path = test->input[j];
+
+          if (g_str_has_prefix (path, "a:")
+              || g_str_has_prefix (path, "p:"))
+            path += 2;
+
+          g_ptr_array_add (array, (char *) path);
         }
       else if (touch[j] != NULL)
         {
@@ -1967,11 +1990,24 @@ populate_ld_preload (Fixture *f,
 
       for (j = 0; j < G_N_ELEMENTS (test->input); j++)
         {
-          if (test->input[j] == NULL)
+          const char *input = test->input[j];
+
+          if (input == NULL)
             break;
 
           modules[j].which = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD;
-          modules[j].preload = (char *) test->input[j];
+
+          if (g_str_has_prefix (input, "a:"))
+            {
+              modules[j].which = PV_PRELOAD_VARIABLE_INDEX_LD_AUDIT;
+              input += 2;
+            }
+          else if (g_str_has_prefix (input, "p:"))
+            {
+              input += 2;
+            }
+
+          modules[j].preload = (char *) input;
           n_modules++;
         }
 
@@ -2037,6 +2073,7 @@ filter_expected_paths (const Config *config)
             {
               g_assert (j < G_N_ELEMENTS (test->input));
               path = test->input[j];
+              /* keep the a: or p: prefix if any */
             }
 
           if (g_str_has_prefix (path, "i386:"))
@@ -2054,6 +2091,26 @@ filter_expected_paths (const Config *config)
     }
 
   return g_steal_pointer (&filtered);
+}
+
+static void
+assert_and_skip_ld_preload_option (const char **expected,
+                                   const char **argument)
+{
+  const char *expect_prefix = "--ld-preload=";
+
+  if (g_str_has_prefix (*expected, "a:"))
+    {
+      expect_prefix = "--ld-audit=";
+      *expected += 2;
+    }
+  else if (g_str_has_prefix (*expected, "p:"))
+    {
+      *expected += 2;
+    }
+
+  g_assert_true (g_str_has_prefix (*argument, expect_prefix));
+  *argument += strlen (expect_prefix);
 }
 
 static void
@@ -2078,11 +2135,10 @@ test_remap_ld_preload (Fixture *f,
 
   for (i = 0; i < argv->len; i++)
     {
-      char *expected = g_ptr_array_index (filtered, i);
-      char *argument = g_ptr_array_index (argv, i);
+      const char *expected = g_ptr_array_index (filtered, i);
+      const char *argument = g_ptr_array_index (argv, i);
 
-      g_assert_true (g_str_has_prefix (argument, "--ld-preload="));
-      argument += strlen("--ld-preload=");
+      assert_and_skip_ld_preload_option (&expected, &argument);
 
       if (g_str_has_prefix (expected, "/lib/")
           || g_str_has_prefix (expected, "/usr/lib/"))
@@ -2117,11 +2173,10 @@ test_remap_ld_preload_flatpak (Fixture *f,
 
   for (i = 0; i < argv->len; i++)
     {
-      char *expected = g_ptr_array_index (filtered, i);
-      char *argument = g_ptr_array_index (argv, i);
+      const char *expected = g_ptr_array_index (filtered, i);
+      const char *argument = g_ptr_array_index (argv, i);
 
-      g_assert_true (g_str_has_prefix (argument, "--ld-preload="));
-      argument += strlen("--ld-preload=");
+      assert_and_skip_ld_preload_option (&expected, &argument);
 
       if (g_str_has_prefix (expected, "/app/")
           || g_str_has_prefix (expected, "/lib/")
@@ -2162,11 +2217,8 @@ test_remap_ld_preload_no_runtime (Fixture *f,
 
   for (i = 0, j = 0; i < argv->len; i++, j++)
     {
-      char *expected = g_ptr_array_index (filtered, j);
-      char *argument = g_ptr_array_index (argv, i);
-
-      g_assert_true (g_str_has_prefix (argument, "--ld-preload="));
-      argument += strlen("--ld-preload=");
+      const char *expected = g_ptr_array_index (filtered, j);
+      const char *argument = g_ptr_array_index (argv, i);
 
       /* /steam/lib/gameoverlayrenderer.so is missing because we used the
        * equivalent of --remove-game-overlay */
@@ -2178,6 +2230,7 @@ test_remap_ld_preload_no_runtime (Fixture *f,
           expected = g_ptr_array_index (filtered, j);
         }
 
+      assert_and_skip_ld_preload_option (&expected, &argument);
       g_assert_cmpstr (argument, ==, expected);
     }
 
@@ -2203,12 +2256,10 @@ test_remap_ld_preload_flatpak_no_runtime (Fixture *f,
 
   for (i = 0; i < argv->len; i++)
     {
-      char *expected = g_ptr_array_index (filtered, i);
-      char *argument = g_ptr_array_index (argv, i);
+      const char *expected = g_ptr_array_index (filtered, i);
+      const char *argument = g_ptr_array_index (argv, i);
 
-      g_assert_true (g_str_has_prefix (argument, "--ld-preload="));
-      argument += strlen("--ld-preload=");
-
+      assert_and_skip_ld_preload_option (&expected, &argument);
       g_assert_cmpstr (argument, ==, expected);
     }
 }

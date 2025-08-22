@@ -280,3 +280,44 @@ pv_graphics_provider_create_system_info (PvGraphicsProvider *self)
   _srt_system_info_set_check_flags (system_info, flags);
   return g_steal_pointer (&system_info);
 }
+
+gchar *
+pv_graphics_provider_choose_mount_point (const char *path_in_current_ns,
+                                         PvRuntimeFlags flags,
+                                         GError **error)
+{
+  if (flags & PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX)
+    {
+      if (g_strcmp0 (path_in_current_ns, "/") == 0)
+        return g_strdup ("/run/parent");
+
+      if (g_strcmp0 (path_in_current_ns, "/run/host") == 0)
+        {
+          g_warning ("Using host graphics drivers in a Flatpak subsandbox "
+                     "probably won't work");
+          return g_strdup ("/run/host");
+        }
+
+      return glnx_null_throw (error,
+                              "Flatpak subsandboxing can only use / or "
+                              "/run/host to provide graphics drivers");
+    }
+
+  if (flags & PV_RUNTIME_FLAGS_INTERPRETER_ROOT)
+    {
+      /* When using an interpreter root, avoid /run/gfx and instead use a
+       * directory in /var. As much as possible we want each top-level
+       * directory to be either in the rootfs or in the real host system,
+       * not some mixture of the two, and the majority of /run needs to
+       * come from the real host system, for sockets and so on; but when
+       * the rootfs contains a symlink, FEX-Emu interprets it as though
+       * chrooted into the rootfs, so we have to mount the graphics
+       * provider inside the rootfs instead of in the real root. */
+      return g_strdup ("/var/pressure-vessel/gfx");
+    }
+
+  if (g_strcmp0 (path_in_current_ns, "/") == 0)
+    return g_strdup ("/run/host");
+
+  return g_strdup ("/run/gfx");
+}

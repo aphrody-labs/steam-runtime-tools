@@ -2673,7 +2673,7 @@ success:
 }
 
 static gboolean
-bind_gfx_provider (PvRuntime *self,
+bind_gfx_provider (PvGraphicsProvider *provider,
                    FlatpakBwrap *bwrap,
                    const char *prepend_path,
                    GError **error)
@@ -2682,17 +2682,17 @@ bind_gfx_provider (PvRuntime *self,
   g_autofree gchar *mount_point = NULL;
 
   mount_point = g_build_filename (prepend_path,
-                                  self->provider->path_in_container_ns,
+                                  provider->path_in_container_ns,
                                   NULL);
 
   if (!pv_bwrap_bind_usr (bwrap,
-                          self->provider->path_in_host_ns,
-                          self->provider->in_current_ns->fd,
+                          provider->path_in_host_ns,
+                          provider->in_current_ns->fd,
                           mount_point,
                           error))
     return FALSE;
 
-  provider_etc = g_build_filename (self->provider->in_current_ns->path,
+  provider_etc = g_build_filename (provider->in_current_ns->path,
                                    "etc", NULL);
 
   if (g_file_test (provider_etc, G_FILE_TEST_IS_DIR))
@@ -2700,7 +2700,7 @@ bind_gfx_provider (PvRuntime *self,
       g_autofree gchar *in_host = NULL;
       g_autofree gchar *in_container = NULL;
 
-      in_host = g_build_filename (self->provider->path_in_host_ns,
+      in_host = g_build_filename (provider->path_in_host_ns,
                                   "etc", NULL);
       in_container = g_build_filename (mount_point, "etc", NULL);
       /* The caller is expected to handle possible use of an interpreter root
@@ -2998,14 +2998,14 @@ bind_runtime_base (PvRuntime *self,
       && (g_strcmp0 (self->provider->path_in_host_ns, "/") != 0
           || g_strcmp0 (self->provider->path_in_container_ns, "/run/host") != 0))
     {
-      if (!bind_gfx_provider (self, bwrap, "/", error))
+      if (!bind_gfx_provider (self->provider, bwrap, "/", error))
         return FALSE;
 
       /* Symlinks in the FEX-Emu rootfs are resolved as if it was
        * chrooted into that rootfs, so the graphics-stack provider needs
        * to exist inside the rootfs too. */
       if (self->flags & PV_RUNTIME_FLAGS_INTERPRETER_ROOT
-          && !bind_gfx_provider (self, bwrap,
+          && !bind_gfx_provider (self->provider, bwrap,
                                  PV_RUNTIME_PATH_INTERPRETER_ROOT,
                                  error))
         return FALSE;

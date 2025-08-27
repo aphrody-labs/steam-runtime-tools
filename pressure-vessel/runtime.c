@@ -3660,8 +3660,9 @@ typedef enum
  */
 static gboolean
 pv_runtime_take_from_provider (PvRuntime *self,
-                               FlatpakBwrap *bwrap,
+                               PvGraphicsProvider *provider,
                                const char *source_in_provider,
+                               FlatpakBwrap *bwrap,
                                const char *dest_in_container,
                                TakeFromProviderFlags flags,
                                GError **error)
@@ -3672,7 +3673,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
   glnx_autofd int source_fd = -1;
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (provider != NULL, FALSE);
   g_return_val_if_fail (bwrap == NULL || !pv_bwrap_was_finished (bwrap), FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
@@ -3688,7 +3689,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
   if (flags & TAKE_FROM_PROVIDER_FLAGS_IF_REGULAR)
     resolve_flags |= SRT_RESOLVE_FLAGS_MUST_BE_REGULAR;
 
-  source_fd = _srt_sysroot_open (self->provider->in_current_ns,
+  source_fd = _srt_sysroot_open (provider->in_current_ns,
                                  source_in_provider, resolve_flags,
                                  &realpath_in_provider, &resolve_error);
 
@@ -3699,7 +3700,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
           g_debug ("Not replacing \"${container}/%s\" with \"%s/%s\": "
                    "source is not a directory: %s",
                    dest_in_container,
-                   self->provider->in_current_ns->path, source_in_provider,
+                   provider->in_current_ns->path, source_in_provider,
                    resolve_error->message);
           return TRUE;
         }
@@ -3712,7 +3713,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
           g_debug ("Not replacing \"${container}/%s\" with \"%s/%s\": "
                    "source is not a regular file: %s",
                    dest_in_container,
-                   self->provider->in_current_ns->path, source_in_provider,
+                   provider->in_current_ns->path, source_in_provider,
                    resolve_error->message);
           return TRUE;
         }
@@ -3725,7 +3726,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
           g_debug ("Not replacing \"${container}/%s\" with \"%s/%s\": "
                    "source does not exist: %s",
                    dest_in_container,
-                   self->provider->in_current_ns->path, source_in_provider,
+                   provider->in_current_ns->path, source_in_provider,
                    resolve_error->message);
           return TRUE;
         }
@@ -3764,7 +3765,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
        * dangling and this probably isn't going to work. */
       if (path_visible_in_provider_namespace (self->flags, source_in_provider))
         {
-          target = g_build_filename (self->provider->path_in_container_ns,
+          target = g_build_filename (provider->path_in_container_ns,
                                      source_in_provider, NULL);
         }
       /* A few paths are always available as-is in the container, such
@@ -3786,7 +3787,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
 
               g_debug ("Creating \"${container}/%s\" by copying \"%s/%s\"",
                        dest_in_container,
-                       self->provider->in_current_ns->path,
+                       provider->in_current_ns->path,
                        source_in_provider);
 
               if (source_fd < 0)
@@ -3822,7 +3823,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
               if (glnx_regfile_copy_bytes (file_fd, dest_fd, (off_t) -1) < 0)
                 return glnx_throw_errno_prefix (error,
                                                 "Unable to copy contents of \"%s/%s\" to \"%s\"",
-                                                self->provider->in_current_ns->path,
+                                                provider->in_current_ns->path,
                                                 source_in_provider,
                                                 dest_in_container);
 
@@ -3830,7 +3831,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
             }
 
           g_warning ("\"%s\" is unlikely to appear in \"%s\"",
-                     source_in_provider, self->provider->path_in_container_ns);
+                     source_in_provider, provider->path_in_container_ns);
           /* We might as well try *something*.
            * path_visible_in_provider_namespace() covers all the paths
            * that are going to appear in /run/host or similar, so try with
@@ -3872,7 +3873,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
 
       g_debug ("Trying to replace \"${container}/%s\" with \"%s/%s\" via "
                "bind mount",
-               dest_in_container, self->provider->in_current_ns->path,
+               dest_in_container, provider->in_current_ns->path,
                source_in_provider);
 
       if (source_fd < 0)
@@ -3903,7 +3904,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
           if (fstat (source_fd, &stat_buf) != 0)
             return glnx_throw_errno_prefix (error,
                                             "fstat \"%s/%s\"",
-                                            self->provider->in_current_ns->path,
+                                            provider->in_current_ns->path,
                                             realpath_in_provider);
 
           if (S_ISDIR (stat_buf.st_mode))
@@ -3912,7 +3913,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
                 {
                   g_warning ("Not mounting \"%s/%s\" over "
                              "non-directory file or nonexistent path \"%s\"",
-                             self->provider->in_current_ns->path,
+                             provider->in_current_ns->path,
                              source_in_provider, dest);
                   return TRUE;
                 }
@@ -3924,7 +3925,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
                 {
                   g_warning ("Not mounting \"%s/%s\" over directory or "
                              "nonexistent path \"%s\"",
-                             self->provider->in_current_ns->path,
+                             provider->in_current_ns->path,
                              source_in_provider, dest);
                   return TRUE;
                 }
@@ -3933,7 +3934,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
 
       /* This is not 100% robust against the provider sysroot being
        * modified while we're looking at it, but it's the best we can do. */
-      source_in_current_ns = g_build_filename (self->provider->in_current_ns->path,
+      source_in_current_ns = g_build_filename (provider->in_current_ns->path,
                                                realpath_in_provider,
                                                NULL);
       abs_dest = g_build_filename ("/", dest_in_container, NULL);
@@ -4021,8 +4022,10 @@ pv_runtime_take_any_from_provider (PvRuntime *self,
           continue;
         }
 
-      if (!pv_runtime_take_from_provider (self, bwrap, source_in_provider,
-                                          dest_in_container, flags, error))
+      if (!pv_runtime_take_from_provider (self,
+                                          self->provider, source_in_provider,
+                                          bwrap, dest_in_container,
+                                          flags, error))
         return FALSE;
 
       return TRUE;
@@ -4442,8 +4445,9 @@ pv_runtime_take_ld_so_from_provider (PvRuntime *self,
    * having to dereference a long chain of symlinks every time we run
    * an executable. */
   if (self->mutable_sysroot != NULL &&
-      !pv_runtime_take_from_provider (self, bwrap, ld_so_relative_to_provider,
-                                      arch->ld_so,
+      !pv_runtime_take_from_provider (self,
+                                      self->provider, ld_so_relative_to_provider,
+                                      bwrap, arch->ld_so,
                                       TAKE_FROM_PROVIDER_FLAGS_NONE, error))
     return FALSE;
 
@@ -4461,8 +4465,9 @@ pv_runtime_take_ld_so_from_provider (PvRuntime *self,
    * non-standard path), that's pretty much a disaster, because it will
    * just crash. However, all of those (chains of) non-standard symlinks
    * will end up pointing to ld_so_in_runtime. */
-  return pv_runtime_take_from_provider (self, bwrap, ld_so_relative_to_provider,
-                                        ld_so_in_runtime,
+  return pv_runtime_take_from_provider (self,
+                                        self->provider, ld_so_relative_to_provider,
+                                        bwrap, ld_so_in_runtime,
                                         TAKE_FROM_PROVIDER_FLAGS_NONE, error);
 }
 
@@ -4797,9 +4802,9 @@ setup_json_manifest (PvRuntime *self,
       g_debug ("Copying \"%s\" as-is to implement \"%s\" in container",
                json_in_provider, json_in_container);
 
-      if (!pv_runtime_take_from_provider (self, bwrap,
-                                          json_in_provider,
-                                          json_in_container,
+      if (!pv_runtime_take_from_provider (self,
+                                          self->provider, json_in_provider,
+                                          bwrap, json_in_container,
                                           (TAKE_FROM_PROVIDER_FLAGS_COPY_FALLBACK
                                            | TAKE_FROM_PROVIDER_FLAGS_REALPATH),
                                           error))
@@ -6094,8 +6099,9 @@ pv_runtime_finish_lib_data (PvRuntime *self,
       /* If we found a library at foo/lib/libbar.so.0 and then found its
        * data in foo/share/bar, it's reasonable to expect that libbar
        * will still be looking for foo/share/bar in the container. */
-      if (!pv_runtime_take_from_provider (self, bwrap,
-                                          data_path, data_path,
+      if (!pv_runtime_take_from_provider (self,
+                                          self->provider, data_path,
+                                          bwrap, data_path,
                                           (TAKE_FROM_PROVIDER_FLAGS_IF_DIR
                                            | TAKE_FROM_PROVIDER_FLAGS_IF_CONTAINER_COMPATIBLE),
                                           error))
@@ -6115,8 +6121,9 @@ pv_runtime_finish_lib_data (PvRuntime *self,
                                           NULL);
           if (_srt_fstatat_is_same_file (-1, data_path, -1, path_in_usr))
             {
-              if (!pv_runtime_take_from_provider (self, bwrap,
-                                                  data_path, path_in_usr,
+              if (!pv_runtime_take_from_provider (self,
+                                                  self->provider, data_path,
+                                                  bwrap, path_in_usr,
                                                   TAKE_FROM_PROVIDER_FLAGS_IF_DIR,
                                                   error))
                 return FALSE;
@@ -6156,9 +6163,9 @@ pv_runtime_finish_lib_data (PvRuntime *self,
                                            self->arbitrary_str_order);
 
   if (data_path != NULL)
-    return pv_runtime_take_from_provider (self, bwrap,
-                                          data_path,
-                                          canonical_path,
+    return pv_runtime_take_from_provider (self,
+                                          self->provider, data_path,
+                                          bwrap, canonical_path,
                                           TAKE_FROM_PROVIDER_FLAGS_IF_CONTAINER_COMPATIBLE,
                                           error);
   else
@@ -6275,9 +6282,9 @@ pv_runtime_finish_libc_family (PvRuntime *self,
                                               error))
         return FALSE;
 
-      if (!pv_runtime_take_from_provider (self, bwrap,
-                                          "/usr/share/i18n",
-                                          "/usr/share/i18n",
+      if (!pv_runtime_take_from_provider (self,
+                                          self->provider, "/usr/share/i18n",
+                                          bwrap, "/usr/share/i18n",
                                           TAKE_FROM_PROVIDER_FLAGS_IF_EXISTS,
                                           error))
         return FALSE;
@@ -6317,8 +6324,9 @@ pv_runtime_finish_libc_family (PvRuntime *self,
               else
                 g_debug ("Cannot find %s", executable);
             }
-          else if (!pv_runtime_take_from_provider (self, bwrap, provider_impl,
-                                                   target_path,
+          else if (!pv_runtime_take_from_provider (self,
+                                                   self->provider, provider_impl,
+                                                   bwrap, target_path,
                                                    flags,
                                                    &local_error))
             {
@@ -6343,9 +6351,9 @@ pv_runtime_finish_libc_family (PvRuntime *self,
 
       while (_srt_hash_table_iter_next (&iter, &gconv_path, NULL))
         {
-          if (!pv_runtime_take_from_provider (self, bwrap,
-                                              gconv_path,
-                                              gconv_path,
+          if (!pv_runtime_take_from_provider (self,
+                                              self->provider, gconv_path,
+                                              bwrap, gconv_path,
                                               TAKE_FROM_PROVIDER_FLAGS_IF_DIR,
                                               error))
             return FALSE;

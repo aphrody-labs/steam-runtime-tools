@@ -7727,7 +7727,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                                                          g_free, NULL);
   g_autoptr(GHashTable) gconv_in_provider = g_hash_table_new_full (g_str_hash, g_str_equal,
                                                                    g_free, NULL);
-  const gchar *provider = "provider";
+  const gchar *provider_label = "provider";
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
   g_return_val_if_fail (self->provider != NULL, FALSE);
@@ -7758,34 +7758,34 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
         host_system_info = g_object_ref (enumeration_thread_join (&self->host_thread));
     }
 
-  provider_stack->egl_icd_details = pv_enumerate_egl_icds (system_info, provider);
+  provider_stack->egl_icd_details = pv_enumerate_egl_icds (system_info, provider_label);
   provider_stack->egl_ext_platform_details = pv_enumerate_egl_ext_platforms (system_info,
-                                                                             provider);
+                                                                             provider_label);
   provider_stack->vulkan_icd_details = pv_enumerate_vulkan_icds (system_info,
-                                                                 provider);
+                                                                 provider_label);
   if (self->flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
     {
       pv_enumerate_vulkan_layer_details (system_info,
-                                         provider,
+                                         provider_label,
                                          &provider_stack->vulkan_exp_layer_details,
                                          &provider_stack->vulkan_imp_layer_details);
     }
 
   if (self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
     provider_stack->openxr_1_runtime_details = pv_enumerate_openxr_1_runtimes (system_info,
-                                                                               provider);
+                                                                               provider_label);
 
   if (host_system_info != NULL)
     {
-      const gchar *which = "host";
-      host_stack->egl_icd_details = pv_enumerate_egl_icds (host_system_info, which);
+      const gchar *host_label = "host";
+      host_stack->egl_icd_details = pv_enumerate_egl_icds (host_system_info, host_label);
       host_stack->egl_ext_platform_details = pv_enumerate_egl_ext_platforms (host_system_info,
-                                                                             which);
-      host_stack->vulkan_icd_details = pv_enumerate_vulkan_icds (host_system_info, which);
+                                                                             host_label);
+      host_stack->vulkan_icd_details = pv_enumerate_vulkan_icds (host_system_info, host_label);
       if (self->flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
         {
           pv_enumerate_vulkan_layer_details (host_system_info,
-                                             which,
+                                             host_label,
                                              &host_stack->vulkan_exp_layer_details,
                                              &host_stack->vulkan_imp_layer_details);
         }

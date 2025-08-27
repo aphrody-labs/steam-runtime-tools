@@ -597,6 +597,7 @@ main (int argc,
           g_autofree gchar *mount_point = NULL;
 
           mount_point = pv_graphics_provider_choose_mount_point (provider_path,
+                                                                 NULL,
                                                                  flags,
                                                                  error);
 

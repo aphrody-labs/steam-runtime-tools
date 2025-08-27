@@ -85,5 +85,6 @@ SrtSystemInfo *pv_graphics_provider_get_system_info (PvGraphicsProvider *self,
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (PvGraphicsProvider, g_object_unref)
 
 gchar *pv_graphics_provider_choose_mount_point (const char *path_in_current_ns,
+                                                const char *specific_tuple,
                                                 PvRuntimeFlags flags,
                                                 GError **error);

@@ -808,6 +808,7 @@ pv_graphics_provider_get_system_info (PvGraphicsProvider *self,
 
 gchar *
 pv_graphics_provider_choose_mount_point (const char *path_in_current_ns,
+                                         const char *specific_tuple,
                                          PvRuntimeFlags flags,
                                          GError **error)
 {
@@ -838,11 +839,17 @@ pv_graphics_provider_choose_mount_point (const char *path_in_current_ns,
        * the rootfs contains a symlink, FEX-Emu interprets it as though
        * chrooted into the rootfs, so we have to mount the graphics
        * provider inside the rootfs instead of in the real root. */
-      return g_strdup ("/var/pressure-vessel/gfx");
+      if (specific_tuple != NULL)
+        return g_strdup_printf ("/var/pressure-vessel/gfx/%s", specific_tuple);
+
+      return g_strdup ("/var/pressure-vessel/gfx/main");
     }
 
   if (g_strcmp0 (path_in_current_ns, "/") == 0)
     return g_strdup ("/run/host");
 
-  return g_strdup ("/run/gfx");
+  if (specific_tuple != NULL)
+    return g_strdup_printf ("/run/gfx/%s", specific_tuple);
+
+  return g_strdup ("/run/gfx/main");
 }

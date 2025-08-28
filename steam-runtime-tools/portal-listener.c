@@ -502,7 +502,7 @@ _srt_portal_listener_listen (SrtPortalListener *self,
 
   if (opt_bus_names != NULL)
     {
-      guint n = g_strv_length ((gchar **) opt_bus_names);
+      guint n = _srt_strv_length (opt_bus_names);
       guint i;
 
       g_debug ("Connecting to D-Bus session bus...");

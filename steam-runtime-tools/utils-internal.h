@@ -509,6 +509,12 @@ _srt_pipe_clear (SrtPipe *self)
 
 G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (SrtPipe, _srt_pipe_clear)
 
+static inline gsize
+_srt_strv_length (const char * const *strv)
+{
+  return g_strv_length ((gchar **) strv);
+}
+
 /*
  * Cast @strv to `(const char * const *)` without completely losing
  * type-safety.

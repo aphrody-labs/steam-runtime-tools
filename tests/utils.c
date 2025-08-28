@@ -188,7 +188,7 @@ test_compat_flags (Fixture *f,
 
   for (i = 0; i < G_N_ELEMENTS (tests); i++)
     {
-      g_assert_cmpuint (g_strv_length ((gchar **) tests[i].envp),
+      g_assert_cmpuint (_srt_strv_length (tests[i].envp),
                         <, G_N_ELEMENTS (tests[i].envp));
       g_assert_cmphex (_srt_steam_get_compat_flags (tests[i].envp),
                        ==, tests[i].expected);

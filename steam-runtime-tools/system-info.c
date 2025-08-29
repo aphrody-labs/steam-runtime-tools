@@ -3010,13 +3010,10 @@ void
 srt_system_info_set_multiarch_tuples (SrtSystemInfo *self,
                                       const gchar * const *tuples)
 {
+  g_autoptr(GArray) arr = g_array_new (TRUE, TRUE, sizeof (GQuark));
+
   g_return_if_fail (SRT_IS_SYSTEM_INFO (self));
   g_return_if_fail (self->from_report == NULL);
-
-  forget_drivers (self);
-  forget_locales (self);
-
-  g_array_set_size (self->multiarch_tuples, 0);
 
   if (tuples == NULL || *tuples == NULL)
     {
@@ -3027,7 +3024,7 @@ srt_system_info_set_multiarch_tuples (SrtSystemInfo *self,
       primary = g_quark_from_static_string (_SRT_MULTIARCH);
 #endif
 
-      g_array_prepend_val (self->multiarch_tuples, primary);
+      g_array_prepend_val (arr, primary);
     }
 
   for (const gchar * const *tuples_iter = tuples;
@@ -3035,8 +3032,42 @@ srt_system_info_set_multiarch_tuples (SrtSystemInfo *self,
        tuples_iter++)
     {
       GQuark tuple = g_quark_from_string (*tuples_iter);
-      g_array_append_val (self->multiarch_tuples, tuple);
+      g_array_append_val (arr, tuple);
     }
+
+  _srt_system_info_set_multiarch_quarks (self,
+                                         (const GQuark *) arr->data,
+                                         arr->len);
+}
+
+/*
+ * _srt_system_info_set_multiarch_quarks:
+ * @self: The #SrtSystemInfo
+ * @tuples: (nullable) (array length=n):
+ *  An array of Debian-style multiarch tuples such as %SRT_ABI_X86_64
+ *  represented as quarks. The first is the primary architecture.
+ * @n: Number of architectures to support
+ */
+void
+_srt_system_info_set_multiarch_quarks (SrtSystemInfo *self,
+                                       const GQuark *tuples,
+                                       gsize n)
+{
+  gsize i;
+
+  g_return_if_fail (SRT_IS_SYSTEM_INFO (self));
+  g_return_if_fail (self->from_report == NULL);
+  g_return_if_fail (n >= 1);
+  g_return_if_fail (n <= G_MAXUINT);
+
+  for (i = 0; i < n; i++)
+    g_return_if_fail (tuples[i] != 0);
+
+  forget_drivers (self);
+  forget_locales (self);
+
+  g_array_set_size (self->multiarch_tuples, 0);
+  g_array_append_vals (self->multiarch_tuples, tuples, n);
 }
 
 /**

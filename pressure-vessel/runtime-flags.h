@@ -61,3 +61,17 @@ typedef enum
    | PV_RUNTIME_FLAGS_IMPORT_CA_CERTS \
    | PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES \
    )
+
+/**
+ * PvGraphicsProviderFlags:
+ * @PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST: The graphics provider is
+ *  for the host architecture that is running an interpreter such as FEX
+ * @PV_GRAPHICS_PROVIDER_FLAGS_NONE: None of the above
+ *
+ * Flags affecting how a graphics stack provider is used.
+ */
+typedef enum
+{
+  PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST = (1 << 0),
+  PV_GRAPHICS_PROVIDER_FLAGS_NONE = 0
+} PvGraphicsProviderFlags;

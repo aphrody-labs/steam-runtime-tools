@@ -23,13 +23,14 @@
 #include "steam-runtime-tools/system-info-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
+#include "enumtypes.h"
 #include "utils.h"
 
 enum {
   PROP_0,
+  PROP_FLAGS,
   PROP_IN_CURRENT_NS,
   PROP_PATH_IN_CONTAINER_NS,
-  PROP_USE_SRT_HELPERS,
   N_PROPERTIES
 };
 
@@ -52,16 +53,16 @@ pv_graphics_provider_get_property (GObject *object,
 
   switch (prop_id)
     {
+      case PROP_FLAGS:
+        g_value_set_flags (value, self->flags);
+        break;
+
       case PROP_IN_CURRENT_NS:
         g_value_set_object (value, self->in_current_ns);
         break;
 
       case PROP_PATH_IN_CONTAINER_NS:
         g_value_set_string (value, self->path_in_container_ns);
-        break;
-
-      case PROP_USE_SRT_HELPERS:
-        g_value_set_boolean (value, self->use_srt_helpers);
         break;
 
       default:
@@ -79,6 +80,10 @@ pv_graphics_provider_set_property (GObject *object,
 
   switch (prop_id)
     {
+      case PROP_FLAGS:
+        self->flags = g_value_get_flags (value);
+        break;
+
       case PROP_IN_CURRENT_NS:
         /* Construct-only */
         g_return_if_fail (self->in_current_ns == NULL);
@@ -89,11 +94,6 @@ pv_graphics_provider_set_property (GObject *object,
         /* Construct-only */
         g_return_if_fail (self->path_in_container_ns == NULL);
         self->path_in_container_ns = g_value_dup_string (value);
-        break;
-
-      case PROP_USE_SRT_HELPERS:
-        /* Construct-only */
-        self->use_srt_helpers = g_value_get_boolean (value);
         break;
 
       default:
@@ -149,6 +149,14 @@ pv_graphics_provider_class_init (PvGraphicsProviderClass *cls)
   object_class->dispose = pv_graphics_provider_dispose;
   object_class->finalize = pv_graphics_provider_finalize;
 
+  properties[PROP_FLAGS] =
+    g_param_spec_flags ("flags", "Flags",
+                        "Flags describing this graphics provider",
+                        PV_TYPE_GRAPHICS_PROVIDER_FLAGS,
+                        PV_GRAPHICS_PROVIDER_FLAGS_NONE,
+                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                        G_PARAM_STATIC_STRINGS);
+
   properties[PROP_IN_CURRENT_NS] =
     g_param_spec_object ("in-current-ns", "Representation in current namespace",
                          ("Path and file descriptor for this provider in the "
@@ -164,14 +172,6 @@ pv_graphics_provider_class_init (PvGraphicsProviderClass *cls)
                          NULL,
                          (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                           G_PARAM_STATIC_STRINGS));
-
-  properties[PROP_USE_SRT_HELPERS] =
-    g_param_spec_boolean ("use-srt-helpers", "Use SRT helpers?",
-                          "TRUE to use the SRT architecture-specific helpers, or"
-                          "FALSE to assume hard-coded paths instead",
-                          TRUE,
-                          G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
-                          G_PARAM_STATIC_STRINGS);
 
   g_object_class_install_properties (object_class, N_PROPERTIES, properties);
 }
@@ -236,7 +236,7 @@ pv_graphics_provider_search_in_path_and_bin (PvGraphicsProvider *self,
 PvGraphicsProvider *
 pv_graphics_provider_new (const char *path_in_current_ns,
                           const char *path_in_container_ns,
-                          gboolean use_srt_helpers,
+                          PvGraphicsProviderFlags flags,
                           GError **error)
 {
   g_autoptr(SrtSysroot) sysroot = NULL;
@@ -256,7 +256,7 @@ pv_graphics_provider_new (const char *path_in_current_ns,
   return g_object_new (PV_TYPE_GRAPHICS_PROVIDER,
                        "in-current-ns", sysroot,
                        "path-in-container-ns", path_in_container_ns,
-                       "use-srt-helpers", use_srt_helpers,
+                       "flags", flags,
                        NULL);
 }
 
@@ -272,7 +272,10 @@ pv_graphics_provider_create_system_info (PvGraphicsProvider *self)
 
   g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (self), NULL);
 
-  if (!self->use_srt_helpers)
+  /* If we're an x86_64 copy of pressure-vessel running under
+   * FEX emulation, we can't expect to have aarch64-linux-gnu-inspect-library,
+   * etc. available, so we can't use them to inspect graphics drivers. */
+  if (self->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
     flags |= SRT_CHECK_FLAGS_NO_HELPERS;
 
   system_info = srt_system_info_new (NULL);

@@ -183,7 +183,10 @@ test_graphics_provider_search (Fixture *f,
 
   /* Assume the provider path in current ns is the tmpdir. In this way we have
    * a controlled environment that we can edit for our tests. */
-  graphics_provider = pv_graphics_provider_new (f->tmpdir, "/run/host", TRUE, &error);
+  graphics_provider = pv_graphics_provider_new (f->tmpdir,
+                                                "/run/host",
+                                                PV_GRAPHICS_PROVIDER_FLAGS_NONE,
+                                                &error);
   g_assert_no_error (error);
   g_assert_nonnull (graphics_provider);
 

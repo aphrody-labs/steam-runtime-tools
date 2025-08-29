@@ -605,7 +605,8 @@ main (int argc,
 
           graphics_provider = pv_graphics_provider_new (provider_path,
                                                         mount_point,
-                                                        TRUE, error);
+                                                        PV_GRAPHICS_PROVIDER_FLAGS_NONE,
+                                                        error);
 
           if (graphics_provider == NULL)
             goto out;
@@ -623,7 +624,8 @@ main (int argc,
                * it's using the O_NOFOLLOW flag. */
               interpreter_host_provider = pv_graphics_provider_new ("/proc/self/root/",
                                                                     "/proc/self/root/",
-                                                                    FALSE, error);
+                                                                    PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST,
+                                                                    error);
               if (interpreter_host_provider == NULL)
                 goto out;
             }

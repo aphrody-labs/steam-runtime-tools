@@ -47,6 +47,7 @@
 #include "flatpak-run-private.h"
 #include "mtree.h"
 #include "passwd.h"
+#include "runtime-flags.h"
 #include "supported-architectures.h"
 #include "tree-copy.h"
 #include "utils.h"
@@ -1303,7 +1304,7 @@ enumerate_arch (gpointer data)
   /* At the moment the real host is included only when FEX emulator is in use.
    * Skipping VDPAU until there is a real use case for it, because
    * it only supports one search path entry, which is problematic for us. */
-  if (pv_supported_architectures_include_machine_type (inputs->details->machine_type))
+  if (!(inputs->provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST))
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
         _srt_profiling_start ("Enumerating %s VDPAU drivers in thread",

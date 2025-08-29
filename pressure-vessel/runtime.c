@@ -1253,22 +1253,22 @@ pv_runtime_create_copy (PvRuntime *self,
 
 typedef struct
 {
-  const PvMultiarchDetails *details;
   PvGraphicsProvider *provider;
   GCancellable *cancellable;
+  GQuark arch_tuple;
   PvRuntimeFlags runtime_flags;
 } EnumerationThreadInputs;
 
 /* Called in main thread */
 static EnumerationThreadInputs *
-enumeration_thread_inputs_new (const PvMultiarchDetails *details,
+enumeration_thread_inputs_new (GQuark arch_tuple,
                                PvRuntimeFlags runtime_flags,
                                PvGraphicsProvider *provider,
                                GCancellable *cancellable)
 {
   EnumerationThreadInputs *self = g_new0 (EnumerationThreadInputs, 1);
 
-  self->details = details;
+  self->arch_tuple = arch_tuple;
   self->runtime_flags = runtime_flags;
   self->provider = g_object_ref (provider);
   self->cancellable = g_object_ref (cancellable);
@@ -1289,12 +1289,12 @@ static gpointer
 enumerate_arch (gpointer data)
 {
   EnumerationThreadInputs *inputs = data;
+  const char *tuple = g_quark_to_string (inputs->arch_tuple);
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
-    _srt_profiling_start ("Enumerating %s drivers in thread",
-                          inputs->details->tuple);
+    _srt_profiling_start ("Enumerating %s drivers in thread", tuple);
   g_autoptr(SrtSystemInfo) system_info =
     pv_graphics_provider_create_system_info (inputs->provider,
-                                             g_quark_from_static_string (inputs->details->tuple));
+                                             inputs->arch_tuple);
 
   if (g_cancellable_is_cancelled (inputs->cancellable))
     goto out;
@@ -1306,14 +1306,14 @@ enumerate_arch (gpointer data)
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
         _srt_profiling_start ("Enumerating %s VDPAU drivers in thread",
-                              inputs->details->tuple);
+                              tuple);
       G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
 
       /* We ignore the results. system_info will cache them for later
        * calls, so when we're doing the actual work, redoing this call
        * will just retrieve them */
       drivers = srt_system_info_list_vdpau_drivers (system_info,
-                                                    inputs->details->tuple,
+                                                    tuple,
                                                     SRT_DRIVER_FLAGS_NONE);
     }
 
@@ -1324,11 +1324,11 @@ enumerate_arch (gpointer data)
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
         _srt_profiling_start ("Enumerating %s DRI drivers in thread",
-                              inputs->details->tuple);
+                              tuple);
       G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
 
       drivers = srt_system_info_list_dri_drivers (system_info,
-                                                  inputs->details->tuple,
+                                                  tuple,
                                                   SRT_DRIVER_FLAGS_NONE);
     }
 
@@ -1339,19 +1339,18 @@ enumerate_arch (gpointer data)
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
         _srt_profiling_start ("Enumerating %s VA-API drivers in thread",
-                              inputs->details->tuple);
+                              tuple);
       G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
 
       drivers = srt_system_info_list_va_api_drivers (system_info,
-                                                     inputs->details->tuple,
+                                                     tuple,
                                                      SRT_DRIVER_FLAGS_NONE);
     }
 
   if (g_cancellable_is_cancelled (inputs->cancellable))
     goto out;
 
-  g_free (srt_system_info_dup_libdl_platform (system_info,
-                                              inputs->details->tuple, NULL));
+  g_free (srt_system_info_dup_libdl_platform (system_info, tuple, NULL));
 
 out:
   enumeration_thread_inputs_free (inputs);
@@ -1480,17 +1479,18 @@ enumeration_threads_clear (EnumerationThread **arr,
 /* Must be called in main thread */
 static void
 enumeration_thread_start_arch (EnumerationThread *self,
-                               const PvMultiarchDetails *details,
+                               GQuark tuple,
                                PvRuntimeFlags flags,
                                PvGraphicsProvider *provider)
 {
   g_return_if_fail (self->cancellable == NULL);
   g_return_if_fail (self->system_info == NULL);
   g_return_if_fail (self->thread == NULL);
+  g_return_if_fail (tuple != 0);
 
   self->cancellable = g_cancellable_new ();
-  self->thread = g_thread_new (details->tuple, enumerate_arch,
-                               enumeration_thread_inputs_new (details,
+  self->thread = g_thread_new (g_quark_to_string (tuple), enumerate_arch,
+                               enumeration_thread_inputs_new (tuple,
                                                               flags,
                                                               provider,
                                                               self->cancellable));
@@ -1510,7 +1510,7 @@ enumeration_thread_start_indep (EnumerationThread *self,
   self->cancellable = g_cancellable_new ();
   self->thread = g_thread_new (thread_name == NULL ? "cross-architecture" : thread_name,
                                enumerate_indep,
-                               enumeration_thread_inputs_new (NULL,
+                               enumeration_thread_inputs_new (0,
                                                               flags,
                                                               provider,
                                                               self->cancellable));
@@ -1564,7 +1564,7 @@ pv_runtime_initable_init (GInitable *initable,
 
           for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST; i++)
             enumeration_thread_start_arch (&self->arch_host_threads[i],
-                                           &pv_multiarch_as_emulator_details[i],
+                                           g_quark_from_static_string (pv_multiarch_as_emulator_tuples[i]),
                                            self->flags,
                                            self->interpreter_host_provider);
 #endif
@@ -1575,7 +1575,7 @@ pv_runtime_initable_init (GInitable *initable,
 
       for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
         enumeration_thread_start_arch (&self->arch_threads[i],
-                                       &pv_multiarch_details[i],
+                                       g_quark_from_static_string (pv_multiarch_tuples[i]),
                                        self->flags,
                                        self->provider);
     }

@@ -607,6 +607,10 @@ srt_system_info_class_init (SrtSystemInfoClass *cls)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (cls);
 
+  /* Pre-cache known architecture strings as quarks to avoid having to
+   * duplicate and "leak" them */
+  _srt_architecture_init_known ();
+
   object_class->get_property = srt_system_info_get_property;
   object_class->set_property = srt_system_info_set_property;
   object_class->dispose = srt_system_info_dispose;

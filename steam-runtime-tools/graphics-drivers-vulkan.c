@@ -465,7 +465,8 @@ get_vulkan_sysconfdir (void)
 gchar **
 _srt_graphics_get_vulkan_search_paths (SrtSysroot *sysroot,
                                        const char * const *envp,
-                                       const char * const *multiarch_tuples,
+                                       const GQuark *multiarch_tuples,
+                                       gsize n_multiarch_tuples,
                                        const char *suffix)
 {
   GPtrArray *search_paths = g_ptr_array_new_with_free_func (g_free);
@@ -520,17 +521,17 @@ _srt_graphics_get_vulkan_search_paths (SrtSysroot *sysroot,
     {
       g_debug ("Flatpak detected: assuming freedesktop-based runtime");
 
-      for (i = 0; multiarch_tuples != NULL && multiarch_tuples[i] != NULL; i++)
+      for (i = 0; i < n_multiarch_tuples; i++)
         {
           /* GL extensions */
           g_ptr_array_add (search_paths, g_build_filename ("/usr/lib",
-                                                           multiarch_tuples[i],
+                                                           g_quark_to_string (multiarch_tuples[i]),
                                                            "GL",
                                                            suffix,
                                                            NULL));
           /* Built-in Mesa stack */
           g_ptr_array_add (search_paths, g_build_filename ("/usr/lib",
-                                                           multiarch_tuples[i],
+                                                           g_quark_to_string (multiarch_tuples[i]),
                                                            suffix,
                                                            NULL));
         }
@@ -603,13 +604,11 @@ _srt_graphics_get_vulkan_search_paths (SrtSysroot *sysroot,
  * @runner: The execution environment
  * @multiarch_tuples: (nullable): If not %NULL, and a Flatpak environment
  *  is detected, assume a freedesktop-sdk-based runtime and look for
- *  GL extensions for these multiarch tuples
- * @multiarch_tuples: (nullable): If not %NULL, and a Flatpak environment
- *  is detected, assume a freedesktop-sdk-based runtime and look for
  *  GL extensions for these multiarch tuples. Also if not %NULL, duplicated
  *  Vulkan ICDs are searched by their absolute path, obtained using
  *  "inspect-library" in the provided multiarch tuples, instead of just their
  *  resolved library path.
+ * @n_multiarch_tuples: Number of items in @multiarch_tuples
  * @check_flags: Whether to check for problems
  *
  * Implementation of srt_system_info_list_vulkan_icds().
@@ -620,7 +619,8 @@ _srt_graphics_get_vulkan_search_paths (SrtSysroot *sysroot,
 GList *
 _srt_load_vulkan_icds (SrtSysroot *sysroot,
                        SrtSubprocessRunner *runner,
-                       const char * const *multiarch_tuples,
+                       const GQuark *multiarch_tuples,
+                       gsize n_multiarch_tuples,
                        SrtCheckFlags check_flags)
 {
   const char * const *envp;
@@ -664,6 +664,7 @@ _srt_load_vulkan_icds (SrtSysroot *sysroot,
       add = _srt_environ_getenv (envp, "VK_ADD_DRIVER_FILES");
       search_paths = _srt_graphics_get_vulkan_search_paths (sysroot, envp,
                                                             multiarch_tuples,
+                                                            n_multiarch_tuples,
                                                             _SRT_GRAPHICS_VULKAN_ICD_SUFFIX);
 
       if (add != NULL)
@@ -684,7 +685,9 @@ _srt_load_vulkan_icds (SrtSysroot *sysroot,
 
   if (!(check_flags & SRT_CHECK_FLAGS_SKIP_SLOW_CHECKS))
     _srt_loadable_flag_duplicates (SRT_TYPE_VULKAN_ICD, runner,
-                                   multiarch_tuples, ret);
+                                   multiarch_tuples,
+                                   n_multiarch_tuples,
+                                   ret);
 
   return g_list_reverse (ret);
 }
@@ -1450,6 +1453,7 @@ vulkan_layer_load_json_cb (SrtSysroot *sysroot,
  *  Vulkan layers are searched by their absolute path, obtained using
  *  'inspect-library' in the provided multiarch tuples, instead of just their
  *  resolved library path.
+ * @n_multiarch_tuples: Number of items in @multiarch_tuples
  * @explicit: If %TRUE, load explicit layers, otherwise load implicit layers.
  * @check_flags: Whether to check for problems
  *
@@ -1462,7 +1466,8 @@ vulkan_layer_load_json_cb (SrtSysroot *sysroot,
 GList *
 _srt_load_vulkan_layers_extended (SrtSysroot *sysroot,
                                   SrtSubprocessRunner *runner,
-                                  const char * const *multiarch_tuples,
+                                  const GQuark *multiarch_tuples,
+                                  gsize n_multiarch_tuples,
                                   gboolean explicit,
                                   SrtCheckFlags check_flags)
 {
@@ -1513,6 +1518,7 @@ _srt_load_vulkan_layers_extended (SrtSysroot *sysroot,
 
       search_paths = _srt_graphics_get_vulkan_search_paths (sysroot, envp,
                                                             multiarch_tuples,
+                                                            n_multiarch_tuples,
                                                             suffix);
       g_debug ("Using normal Vulkan layer search path");
       g_debug ("SEARCH PATHS %s", search_paths[0]);
@@ -1522,7 +1528,9 @@ _srt_load_vulkan_layers_extended (SrtSysroot *sysroot,
 
   if (!(check_flags & SRT_CHECK_FLAGS_SKIP_SLOW_CHECKS))
     _srt_loadable_flag_duplicates (SRT_TYPE_VULKAN_LAYER, runner,
-                                   multiarch_tuples, ret);
+                                   multiarch_tuples,
+                                   n_multiarch_tuples,
+                                   ret);
 
   return g_list_reverse (ret);
 }
@@ -1564,7 +1572,7 @@ _srt_load_vulkan_layers (const char *sysroot,
                                             NULL,
                                             NULL,
                                             SRT_TEST_FLAGS_NONE);
-  return _srt_load_vulkan_layers_extended (sysroot_object, runner, NULL,
+  return _srt_load_vulkan_layers_extended (sysroot_object, runner, NULL, 0,
                                            explicit, SRT_CHECK_FLAGS_NONE);
 }
 

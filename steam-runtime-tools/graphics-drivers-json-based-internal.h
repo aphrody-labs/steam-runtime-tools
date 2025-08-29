@@ -162,7 +162,8 @@ gboolean _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule
                                                        GError **error);
 void _srt_loadable_flag_duplicates (GType which,
                                     SrtSubprocessRunner *runner,
-                                    const char * const *multiarch_tuples,
+                                    const GQuark *multiarch_tuples,
+                                    gsize n_multiarch_tuples,
                                     GList *loadable);
 void _srt_base_json_graphics_module_set_library_arch (SrtBaseJsonGraphicsModule *self,
                                                       const char *library_arch,

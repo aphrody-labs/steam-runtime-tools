@@ -3301,6 +3301,22 @@ srt_system_info_set_test_flags (SrtSystemInfo *self,
   _srt_system_info_set_subprocess_runner (self, runner);
 }
 
+static GArray *
+tuples_to_quarks (const char * const *multiarch_tuples)
+{
+  g_autoptr(GArray) quarks = g_array_new (TRUE, TRUE, sizeof (GQuark));
+  gsize i;
+
+  for (i = 0; multiarch_tuples[i] != NULL; i++)
+    {
+      GQuark q = g_quark_from_string (multiarch_tuples[i]);
+
+      g_array_append_val (quarks, q);
+    }
+
+  return g_steal_pointer (&quarks);
+}
+
 /**
  * srt_system_info_list_egl_icds:
  * @self: The #SrtSystemInfo object
@@ -3346,19 +3362,26 @@ srt_system_info_list_egl_icds (SrtSystemInfo *self,
 
   if (!self->icds.have_egl && self->from_report == NULL && self->sysroot != NULL)
     {
-      g_assert (self->icds.egl == NULL);
-      g_auto(GStrv) stored_multiarch_tuples = NULL;
+      g_autoptr(GArray) tuples_as_quarks = NULL;
+      const GArray *quarks;
 
-      if (multiarch_tuples == NULL)
+      g_assert (self->icds.egl == NULL);
+
+      if (multiarch_tuples != NULL)
         {
-          stored_multiarch_tuples = srt_system_info_dup_multiarch_tuples (self);
-          multiarch_tuples = (const char * const *) stored_multiarch_tuples;
+          tuples_as_quarks = tuples_to_quarks (multiarch_tuples);
+          quarks = tuples_as_quarks;
+        }
+      else
+        {
+          quarks = self->multiarch_tuples;
         }
 
       self->icds.egl = _srt_load_egl_things (SRT_TYPE_EGL_ICD,
                                              self->sysroot,
                                              self->runner,
-                                             multiarch_tuples,
+                                             (const GQuark *) quarks->data,
+                                             quarks->len,
                                              self->check_flags);
       self->icds.have_egl = TRUE;
     }
@@ -3412,19 +3435,26 @@ srt_system_info_list_egl_external_platforms (SrtSystemInfo *self,
 
   if (!self->egl_ext_platform.have && self->from_report == NULL && self->sysroot != NULL)
     {
-      g_assert (self->egl_ext_platform.list == NULL);
-      g_auto(GStrv) stored_multiarch_tuples = NULL;
+      g_autoptr(GArray) tuples_as_quarks = NULL;
+      const GArray *quarks;
 
-      if (multiarch_tuples == NULL)
+      g_assert (self->egl_ext_platform.list == NULL);
+
+      if (multiarch_tuples != NULL)
         {
-          stored_multiarch_tuples = srt_system_info_dup_multiarch_tuples (self);
-          multiarch_tuples = (const char * const *) stored_multiarch_tuples;
+          tuples_as_quarks = tuples_to_quarks (multiarch_tuples);
+          quarks = tuples_as_quarks;
+        }
+      else
+        {
+          quarks = self->multiarch_tuples;
         }
 
       self->egl_ext_platform.list = _srt_load_egl_things (SRT_TYPE_EGL_EXTERNAL_PLATFORM,
                                                           self->sysroot,
                                                           self->runner,
-                                                          multiarch_tuples,
+                                                          (const GQuark *) quarks->data,
+                                                          quarks->len,
                                                           self->check_flags);
       self->egl_ext_platform.have = TRUE;
     }
@@ -3482,17 +3512,25 @@ srt_system_info_list_vulkan_icds (SrtSystemInfo *self,
 
   if (!self->icds.have_vulkan && self->from_report == NULL && self->sysroot != NULL)
     {
-      g_assert (self->icds.vulkan == NULL);
-      g_auto(GStrv) stored_multiarch_tuples = NULL;
+      g_autoptr(GArray) tuples_as_quarks = NULL;
+      const GArray *quarks;
 
-      if (multiarch_tuples == NULL)
-        stored_multiarch_tuples = srt_system_info_dup_multiarch_tuples (self);
+      g_assert (self->icds.vulkan == NULL);
+
+      if (multiarch_tuples != NULL)
+        {
+          tuples_as_quarks = tuples_to_quarks (multiarch_tuples);
+          quarks = tuples_as_quarks;
+        }
+      else
+        {
+          quarks = self->multiarch_tuples;
+        }
 
       self->icds.vulkan = _srt_load_vulkan_icds (self->sysroot,
                                                  self->runner,
-                                                 multiarch_tuples == NULL ?
-                                                   (const char * const *) stored_multiarch_tuples :
-                                                   multiarch_tuples,
+                                                 (const GQuark *) quarks->data,
+                                                 quarks->len,
                                                  self->check_flags);
       self->icds.have_vulkan = TRUE;
     }
@@ -3540,11 +3578,11 @@ srt_system_info_list_explicit_vulkan_layers (SrtSystemInfo *self)
 
   if (!self->layers.have_vulkan_explicit && self->from_report == NULL && self->sysroot != NULL)
     {
-      g_auto(GStrv) multiarch_tuples = srt_system_info_dup_multiarch_tuples (self);
       g_assert (self->layers.vulkan_explicit == NULL);
       self->layers.vulkan_explicit = _srt_load_vulkan_layers_extended (self->sysroot,
                                                                        self->runner,
-                                                                       (const char * const *) multiarch_tuples,
+                                                                       (const GQuark *) self->multiarch_tuples->data,
+                                                                       self->multiarch_tuples->len,
                                                                        TRUE,
                                                                        self->check_flags);
       self->layers.have_vulkan_explicit = TRUE;
@@ -3593,11 +3631,11 @@ srt_system_info_list_implicit_vulkan_layers (SrtSystemInfo *self)
 
   if (!self->layers.have_vulkan_implicit && self->from_report == NULL && self->sysroot != NULL)
     {
-      g_auto(GStrv) multiarch_tuples = srt_system_info_dup_multiarch_tuples (self);
       g_assert (self->layers.vulkan_implicit == NULL);
       self->layers.vulkan_implicit = _srt_load_vulkan_layers_extended (self->sysroot,
                                                                        self->runner,
-                                                                       (const char * const *) multiarch_tuples,
+                                                                       (const GQuark *) self->multiarch_tuples->data,
+                                                                       self->multiarch_tuples->len,
                                                                        FALSE,
                                                                        self->check_flags);
       self->layers.have_vulkan_implicit = TRUE;

@@ -8459,7 +8459,11 @@ pv_runtime_bind (PvRuntime *self,
           _SRT_GRAPHICS_EXPLICIT_VULKAN_LAYER_SUFFIX,
           _SRT_GRAPHICS_IMPLICIT_VULKAN_LAYER_SUFFIX,
         };
+      GQuark arch_quarks[G_N_ELEMENTS (pv_multiarch_details)];
       gsize i;
+
+      for (i = 0; i < G_N_ELEMENTS (pv_multiarch_details); i++)
+        arch_quarks[i] = g_quark_from_static_string (pv_multiarch_details[i].tuple);
 
       for (i = 0; i < G_N_ELEMENTS (layer_suffixes); i++)
         {
@@ -8469,7 +8473,8 @@ pv_runtime_bind (PvRuntime *self,
 
           search_path = _srt_graphics_get_vulkan_search_paths (self->real_root,
                                                                _srt_const_strv (self->original_environ),
-                                                               pv_multiarch_tuples,
+                                                               arch_quarks,
+                                                               G_N_ELEMENTS (arch_quarks),
                                                                suffix);
 
           for (j = 0; search_path != NULL && search_path[j] != NULL; j++)

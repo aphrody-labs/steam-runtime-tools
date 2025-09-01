@@ -58,6 +58,8 @@ G_GNUC_INTERNAL
 void _srt_system_info_set_check_flags (SrtSystemInfo *self,
                                        SrtCheckFlags flags);
 
+const GQuark *_srt_system_info_get_multiarch_quarks (SrtSystemInfo *self,
+                                                     gsize *n);
 void _srt_system_info_set_multiarch_quarks (SrtSystemInfo *self,
                                             const GQuark *tuples,
                                             gsize n);

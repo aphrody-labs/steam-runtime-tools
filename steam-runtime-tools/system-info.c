@@ -2966,6 +2966,28 @@ srt_system_info_set_primary_multiarch_tuple (SrtSystemInfo *self,
   g_array_prepend_val (self->multiarch_tuples, primary);
 }
 
+/*
+ * _srt_system_info_get_multiarch_quarks:
+ * @self: The #SrtSystemInfo
+ * @n: (out) (optional): Number of quarks in the array
+ *
+ * Returns: (transfer none): An array of @n quarks representing
+ *  Debian-style multiarch tuples such as %SRT_ABI_X86_64,
+ *  followed by a zero-terminator which is not included in @n.
+ *  The first is the primary architecture.
+ */
+const GQuark *
+_srt_system_info_get_multiarch_quarks (SrtSystemInfo *self,
+                                       gsize *n)
+{
+  g_return_val_if_fail (SRT_IS_SYSTEM_INFO (self), NULL);
+
+  if (n != NULL)
+    *n = self->multiarch_tuples->len;
+
+  return (const GQuark *) self->multiarch_tuples->data;
+}
+
 /**
  * srt_system_info_set_multiarch_tuples:
  * @self: The #SrtSystemInfo

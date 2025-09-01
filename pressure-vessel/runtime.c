@@ -3027,21 +3027,37 @@ bind_runtime_base (PvRuntime *self,
 
   _srt_env_overlay_set (container_env, "XDG_RUNTIME_DIR", xrd);
 
-  if (self->provider != NULL
-      && (g_strcmp0 (self->provider->path_in_host_ns, "/") != 0
-          || g_strcmp0 (self->provider->path_in_container_ns, "/run/host") != 0))
+  if (self->providers != NULL)
     {
-      if (!bind_gfx_provider (self->provider, bwrap, "/", error))
-        return FALSE;
+      for (i = 0; i < self->providers->len; i++)
+        {
+          PvGraphicsProvider *provider = g_ptr_array_index (self->providers, i);
 
-      /* Symlinks in the FEX-Emu rootfs are resolved as if it was
-       * chrooted into that rootfs, so the graphics-stack provider needs
-       * to exist inside the rootfs too. */
-      if (self->flags & PV_RUNTIME_FLAGS_INTERPRETER_ROOT
-          && !bind_gfx_provider (self->provider, bwrap,
-                                 PV_RUNTIME_PATH_INTERPRETER_ROOT,
-                                 error))
-        return FALSE;
+          /* The interpreter host graphics provider is mounted at the
+           * real root, so it doesn't need to be bind-mounted specifically */
+          if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+            continue;
+
+          /* We always mount / on /run/host (in main()) so we don't need
+           * to do it here */
+          if (g_strcmp0 (provider->path_in_host_ns, "/") == 0
+              && g_strcmp0 (provider->path_in_container_ns, "/run/host") == 0)
+            continue;
+
+          /* If a graphics provider is mounted at a different mount point
+           * such as /run/gfx, then we do need to mount it specifically */
+          if (!bind_gfx_provider (provider, bwrap, "/", error))
+            return FALSE;
+
+          /* Symlinks in the FEX-Emu rootfs are resolved as if it was
+           * chrooted into that rootfs, so the graphics-stack provider needs
+           * to exist inside the rootfs too. */
+          if (self->flags & PV_RUNTIME_FLAGS_INTERPRETER_ROOT
+              && !bind_gfx_provider (provider, bwrap,
+                                     PV_RUNTIME_PATH_INTERPRETER_ROOT,
+                                     error))
+            return FALSE;
+        }
     }
 
   for (i = 0; i < G_N_ELEMENTS (bind_mutable); i++)

@@ -8769,7 +8769,7 @@ pv_runtime_has_library (PvRuntime *self,
            * it's OK to use libraries from it in LD_PRELOAD, because there
            * is no other version that might have been meant. */
           if (self->provider != NULL
-              && _srt_sysroot_is_direct (self->provider->in_current_ns))
+              && !_srt_sysroot_is_direct (self->provider->in_current_ns))
             {
               if (_srt_sysroot_test (self->provider->in_current_ns, path,
                                      SRT_RESOLVE_FLAGS_NONE, NULL))

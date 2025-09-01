@@ -1064,7 +1064,7 @@ pv_wrap_maybe_load_nvidia_modules (GError **error)
  */
 void
 pv_wrap_detect_virtualization (SrtSysroot **interpreter_root_out,
-                               SrtMachineType *host_machine_out)
+                               const SrtKnownArchitecture **host_machine_out)
 {
   g_autoptr(SrtVirtualizationInfo) virt_info = NULL;
   const char *val;
@@ -1074,10 +1074,7 @@ pv_wrap_detect_virtualization (SrtSysroot **interpreter_root_out,
   /* At the moment we only care about FEX-Emu here, which we happen to
    * know implements CPUID, so it's faster to skip the filesystem-based
    * checks */
-  virt_info = _srt_check_virtualization (NULL, NULL);
-
-  if (host_machine_out != NULL)
-    *host_machine_out = srt_virtualization_info_get_host_machine (virt_info);
+  virt_info = _srt_check_virtualization (NULL, NULL, host_machine_out);
 
   if (interpreter_root_out != NULL)
     {

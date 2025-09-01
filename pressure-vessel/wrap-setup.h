@@ -22,6 +22,7 @@
 
 #include <glib.h>
 
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/bwrap-internal.h"
 #include "steam-runtime-tools/env-overlay-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
@@ -93,7 +94,7 @@ void pv_wrap_append_preload (PvWrapContext *context,
 gboolean pv_wrap_maybe_load_nvidia_modules (GError **error);
 
 void pv_wrap_detect_virtualization (SrtSysroot **interpreter_root_out,
-                                    SrtMachineType *host_machine_out);
+                                    const SrtKnownArchitecture **host_machine_out);
 
 void pv_share_temp_dir (FlatpakExports *exports,
                         SrtEnvOverlay *container_env);

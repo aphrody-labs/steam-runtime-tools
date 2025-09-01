@@ -84,34 +84,6 @@ const PvMultiarchDetails pv_multiarch_details[PV_N_SUPPORTED_ARCHITECTURES] =
 #endif
 };
 
-const char * const pv_multiarch_as_emulator_tuples[PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST + 1] =
-{
-  /* The conditional branches here need to be kept in sync with
-   * pv_multiarch_as_emulator_details and
-   * PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST */
-#if defined(__i386__) || defined(__x86_64__)
-  "aarch64-linux-gnu",
-#else
-  /* No supported architectures as emulator */
-#endif
-  NULL
-};
-
-const PvMultiarchDetails pv_multiarch_as_emulator_details[PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST] =
-{
-#if defined(__i386__) || defined(__x86_64__)
-  {
-    .tuple = "aarch64-linux-gnu",
-    .multilib = { "aarch64-unknown-linux-gnueabi/lib", "lib64", NULL },
-    .other_ld_so_cache = { "ld-aarch64-unknown-linux-gnueabi.cache", NULL },
-    .platforms = { "aarch64", NULL },
-  },
-#else
-  /* No supported architectures as emulator */
-#endif
-};
-
-
 /* Architecture-independent ld.so.cache filenames, other than the
  * conventional filename /etc/ld.so.cache used upstream and in Debian
  * (we assume this is also what's used in our runtimes). */

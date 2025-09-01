@@ -2183,10 +2183,6 @@ test_supported_archs (Fixture *f,
                    SRT_ABI_X86_64);
   g_assert_cmpstr (pv_multiarch_tuples[1], ==, SRT_ABI_I386);
 
-  /* We also support running x86 on an aarch64 emulator host */
-  g_assert_cmpint (PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST, ==, 1);
-  g_assert_cmpstr (pv_multiarch_as_emulator_tuples[0], ==, SRT_ABI_AARCH64);
-
 #else /* !x86 */
 
   /* The only supported architecture is the one we were compiled for */
@@ -2219,21 +2215,6 @@ test_supported_archs (Fixture *f,
 
   /* The array of tuples has one extra element, to make it a GStrv */
   g_assert_cmpstr (pv_multiarch_tuples[i], ==, NULL);
-
-#if PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST > 0
-  /* Emulator host details and tuples are also in the same order */
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST; i++)
-    {
-      const PvMultiarchDetails *details = &pv_multiarch_as_emulator_details[i];
-
-      g_assert_cmpstr (pv_multiarch_as_emulator_tuples[i], ==, details->tuple);
-    }
-#else
-  i = 0;
-#endif
-
-  /* Array of tuples has one extra element, again */
-  g_assert_cmpstr (pv_multiarch_as_emulator_tuples[i], ==, NULL);
 }
 
 /*

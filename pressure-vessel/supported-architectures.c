@@ -56,7 +56,6 @@ const PvMultiarchDetails pv_multiarch_details[PV_N_SUPPORTED_ARCHITECTURES] =
 #if defined(__i386__) || defined(__x86_64__)
   {
     .tuple = "x86_64-linux-gnu",
-    .machine_type = SRT_MACHINE_TYPE_X86_64,
     .multilib = { "x86_64-pc-linux-gnu/lib", "lib64", NULL },
     .other_ld_so_cache = { "ld-x86_64-pc-linux-gnu.cache", NULL },
     .platforms = { "xeon_phi", "haswell", "x86_64", NULL },
@@ -64,7 +63,6 @@ const PvMultiarchDetails pv_multiarch_details[PV_N_SUPPORTED_ARCHITECTURES] =
   },
   {
     .tuple = "i386-linux-gnu",
-    .machine_type = SRT_MACHINE_TYPE_386,
     .multilib = { "i686-pc-linux-gnu/lib", "lib32", NULL },
     .other_ld_so_cache = { "ld-i686-pc-linux-gnu.cache", NULL },
     .platforms = { "i686", "i586", "i486", "i386", NULL },
@@ -73,7 +71,6 @@ const PvMultiarchDetails pv_multiarch_details[PV_N_SUPPORTED_ARCHITECTURES] =
 #elif defined(__aarch64__)
   {
     .tuple = "aarch64-linux-gnu",
-    .machine_type = SRT_MACHINE_TYPE_AARCH64,
     .multilib = { "aarch64-unknown-linux-gnueabi/lib", "lib64", NULL },
     .other_ld_so_cache = { "ld-aarch64-unknown-linux-gnueabi.cache", NULL },
     .platforms = { "aarch64", NULL },
@@ -81,7 +78,6 @@ const PvMultiarchDetails pv_multiarch_details[PV_N_SUPPORTED_ARCHITECTURES] =
 #elif defined(_SRT_MULTIARCH)
   {
     .tuple = _SRT_MULTIARCH,
-    .machine_type = SRT_MACHINE_TYPE_UNKNOWN,
   },
 #else
 #error Architecture not supported by pressure-vessel
@@ -106,7 +102,6 @@ const PvMultiarchDetails pv_multiarch_as_emulator_details[PV_N_SUPPORTED_ARCHITE
 #if defined(__i386__) || defined(__x86_64__)
   {
     .tuple = "aarch64-linux-gnu",
-    .machine_type = SRT_MACHINE_TYPE_AARCH64,
     .multilib = { "aarch64-unknown-linux-gnueabi/lib", "lib64", NULL },
     .other_ld_so_cache = { "ld-aarch64-unknown-linux-gnueabi.cache", NULL },
     .platforms = { "aarch64", NULL },
@@ -189,24 +184,4 @@ pv_multiarch_details_get_libdirs (const PvMultiarchDetails *self,
   g_ptr_array_add (dirs, g_strdup ("/usr/lib"));
 
   return g_steal_pointer (&dirs);
-}
-
-/*
- * Returns: %TRUE if @machine is included in the supported architectures list
- */
-gboolean
-pv_supported_architectures_include_machine_type (SrtMachineType machine)
-{
-  gsize i;
-
-  if (machine == SRT_MACHINE_TYPE_UNKNOWN)
-    return FALSE;
-
-  for (i = 0; i < G_N_ELEMENTS (pv_multiarch_details); i++)
-    {
-      if (machine == pv_multiarch_details[i].machine_type)
-        return TRUE;
-    }
-
-  return FALSE;
 }

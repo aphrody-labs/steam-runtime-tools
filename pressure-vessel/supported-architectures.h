@@ -47,7 +47,6 @@ extern const char * const pv_multiarch_as_emulator_tuples[PV_N_SUPPORTED_ARCHITE
 typedef struct
 {
   const char *tuple;
-  SrtMachineType machine_type;
 
   /* Directories other than /usr/lib that we must search for loadable
    * modules, least-ambiguous first, most-ambiguous last, not including
@@ -93,5 +92,3 @@ typedef enum
 
 GPtrArray *pv_multiarch_details_get_libdirs (const PvMultiarchDetails *self,
                                              PvMultiarchLibdirsFlags flags);
-
-gboolean pv_supported_architectures_include_machine_type (SrtMachineType machine);

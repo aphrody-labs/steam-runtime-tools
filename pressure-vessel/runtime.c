@@ -6383,15 +6383,32 @@ pv_runtime_finish_libc_family (PvRuntime *self,
           g_autofree char *provider_impl = NULL;
           g_autofree char *target_path_alloc = NULL;
           const char *target_path = glibc_executables[i].target_path;
+          PvGraphicsProvider *provider = NULL;
           TakeFromProviderFlags flags;
-          const gchar *search_paths = NULL;
+          gsize provider_index;
 
-          if (_srt_sysroot_is_direct (self->provider->in_current_ns))
-            search_paths = g_environ_getenv (self->original_environ, "PATH");
+          for (provider_index = 0;
+               provider_index < self->providers->len;
+               provider_index++)
+            {
+              const gchar *search_paths = NULL;
 
-          provider_impl = pv_graphics_provider_search_in_path_and_bin (self->provider,
-                                                                       search_paths,
-                                                                       executable);
+              provider = g_ptr_array_index (self->providers, provider_index);
+
+              if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+                continue;
+
+              if (_srt_sysroot_is_direct (provider->in_current_ns))
+                search_paths = g_environ_getenv (self->original_environ, "PATH");
+
+              provider_impl = pv_graphics_provider_search_in_path_and_bin (provider,
+                                                                           search_paths,
+                                                                           executable);
+
+              /* Leaves provider set to this one */
+              if (provider_impl != NULL)
+                break;
+            }
 
           if (target_path == NULL)
             {
@@ -6412,7 +6429,7 @@ pv_runtime_finish_libc_family (PvRuntime *self,
                 g_debug ("Cannot find %s", executable);
             }
           else if (!pv_runtime_take_from_provider (self,
-                                                   self->provider, provider_impl,
+                                                   provider, provider_impl,
                                                    bwrap, target_path,
                                                    flags,
                                                    &local_error))

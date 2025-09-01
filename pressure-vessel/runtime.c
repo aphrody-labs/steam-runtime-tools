@@ -3091,7 +3091,7 @@ bind_runtime_base (PvRuntime *self,
           if (g_strv_contains (from_host, dest))
             continue;
 
-          if (self->provider != NULL && g_strv_contains (from_provider, dest))
+          if (self->providers != NULL && g_strv_contains (from_provider, dest))
             continue;
 
           if ((self->flags & PV_RUNTIME_FLAGS_INTERPRETER_ROOT)
@@ -3213,14 +3213,12 @@ bind_runtime_base (PvRuntime *self,
         return FALSE;
     }
 
-  if (self->provider != NULL)
+  if (self->providers != NULL)
     {
       for (i = 0; from_provider[i] != NULL; i++)
         {
           const char *item = from_provider[i];
-          g_autoptr(GError) local_error = NULL;
-          g_autofree char *path_in_provider = NULL;
-          glnx_autofd int fd = -1;
+          gsize provider_index;
           PvRuntimeEmulationRoots roots;
 
           /* In FEX-Emu or similar, the graphics provider is only used for
@@ -3233,29 +3231,49 @@ bind_runtime_base (PvRuntime *self,
           else
             roots = PV_RUNTIME_EMULATION_ROOTS_REAL_ONLY;
 
-          fd = _srt_sysroot_open (self->provider->in_current_ns, item,
-                                  SRT_RESOLVE_FLAGS_NONE,
-                                  &path_in_provider, &local_error);
-
-          if (fd >= 0)
+          /* We look for /etc/drirc, etc. in each graphics stack provider
+           * in turn, in priority order, stopping if we find them. */
+          for (provider_index = 0;
+               provider_index < self->providers->len;
+               provider_index++)
             {
-              g_autofree char *host_path = NULL;
+              g_autoptr(GError) local_error = NULL;
+              g_autofree char *path_in_provider = NULL;
+              glnx_autofd int fd = -1;
+              PvGraphicsProvider *provider;
 
-              host_path = g_build_filename (self->provider->path_in_host_ns,
-                                            path_in_provider, NULL);
+              provider = g_ptr_array_index (self->providers, provider_index);
 
-              if (!pv_runtime_bind_into_container (self, bwrap,
-                                                   host_path, NULL, 0, item,
-                                                   roots, error))
-                g_return_val_if_reached (FALSE);
+              if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+                continue;
+
+              fd = _srt_sysroot_open (provider->in_current_ns, item,
+                                      SRT_RESOLVE_FLAGS_NONE,
+                                      &path_in_provider, &local_error);
+
+              if (fd >= 0)
+                {
+                  g_autofree char *host_path = NULL;
+
+                  host_path = g_build_filename (provider->path_in_host_ns,
+                                                path_in_provider, NULL);
+
+                  if (!pv_runtime_bind_into_container (self, bwrap,
+                                                       host_path, NULL, 0, item,
+                                                       roots, error))
+                    g_return_val_if_reached (FALSE);
+
+                  break;
+                }
+
+              if (!g_error_matches (local_error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND))
+                g_debug ("Cannot resolve \"%s\" in \"%s\": %s",
+                         item, provider->in_current_ns->path,
+                         local_error->message);
             }
-          else
-            {
-              g_debug ("Cannot resolve \"%s\" in \"%s\": %s",
-                       item, self->provider->in_current_ns->path,
-                       local_error->message);
-              g_clear_error (&local_error);
-            }
+
+          if (provider_index >= self->providers->len)
+            g_debug ("Cannot resolve \"%s\" in any graphics provider", item);
         }
     }
 

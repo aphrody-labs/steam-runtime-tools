@@ -7945,6 +7945,7 @@ pv_runtime_has_library (PvRuntime *self,
   for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
     {
       const PvMultiarchDetails *details = &pv_multiarch_details[i];
+      GQuark arch_quark = g_quark_from_static_string (details->tuple);
       g_autoptr(GPtrArray) dirs = NULL;
       gsize j;
 
@@ -7955,6 +7956,7 @@ pv_runtime_has_library (PvRuntime *self,
         {
           const char *libdir = g_ptr_array_index (dirs, j);
           g_autofree gchar *path = g_build_filename (libdir, library, NULL);
+          PvGraphicsProvider *provider;
 
           if (self->mutable_sysroot != NULL)
             {
@@ -7990,6 +7992,8 @@ pv_runtime_has_library (PvRuntime *self,
                 }
             }
 
+          provider = pv_runtime_get_graphics_provider (self, arch_quark);
+
           /* If the graphics stack provider is not the same as the current
            * namespace (in practice this rarely/never happens), we also
            * want to steer clear of libraries that only exist in the
@@ -7999,10 +8003,11 @@ pv_runtime_has_library (PvRuntime *self,
            * and the library doesn't exist in the container runtime, then
            * it's OK to use libraries from it in LD_PRELOAD, because there
            * is no other version that might have been meant. */
-          if (self->provider != NULL
-              && !_srt_sysroot_is_direct (self->provider->in_current_ns))
+          if (provider != NULL
+              && !(provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+              && !_srt_sysroot_is_direct (provider->in_current_ns))
             {
-              if (_srt_sysroot_test (self->provider->in_current_ns, path,
+              if (_srt_sysroot_test (provider->in_current_ns, path,
                                      SRT_RESOLVE_FLAGS_NONE, NULL))
                 {
                   g_debug ("-> yes, ${provider}/%s", path);

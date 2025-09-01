@@ -303,37 +303,6 @@ pv_run_sync (const char * const * argv,
   return TRUE;
 }
 
-/*
- * Returns: (transfer none): The first key in @table in @cmp order,
- *  or an arbitrary key if @cmp is %NULL, or %NULL if @table is empty.
- */
-gpointer
-pv_hash_table_get_first_key (GHashTable *table,
-                             GCompareFunc cmp)
-{
-  GHashTableIter iter;
-  gpointer key = NULL;
-
-  if (cmp != NULL)
-    {
-      GList *keys = g_list_sort (g_hash_table_get_keys (table), cmp);
-
-      if (keys != NULL)
-        key = keys->data;
-      else
-        key = NULL;
-
-      g_list_free (keys);
-      return key;
-    }
-
-  g_hash_table_iter_init (&iter, table);
-  if (g_hash_table_iter_next (&iter, &key, NULL))
-    return key;
-  else
-    return NULL;
-}
-
 /**
  * pv_current_namespace_path_to_host_path:
  * @current_env_path: a path in the current environment

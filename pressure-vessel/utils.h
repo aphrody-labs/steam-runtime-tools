@@ -77,9 +77,6 @@ gboolean pv_run_sync (const char * const * argv,
                       char **output_out,
                       GError **error);
 
-gpointer pv_hash_table_get_first_key (GHashTable *table,
-                                      GCompareFunc cmp);
-
 gchar *pv_current_namespace_path_to_host_path (const gchar *current_env_path);
 
 void pv_delete_dangling_symlink (int dirfd,

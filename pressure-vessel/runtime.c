@@ -5456,41 +5456,6 @@ collect_core_libraries_patterns (GPtrArray *patterns)
                                       exact_sonames[i]));
 }
 
-/*
- * @arch: The architecture
- * @pathp: (inout): A candidate path for /usr/lib/gconv
- *  or similar in the graphics stack provider, which may be "stolen"
- *  on success
- * @gconv_in_provider: Map { owned string => itself } representing a set
- *  of paths to /usr/lib/gconv or equivalent in the graphics stack provider
- *
- * Returns: %TRUE if the path `*pathp` was suitable
- */
-static gboolean
-pv_runtime_try_gconv_dir (RuntimeArchitecture *arch,
-                          gchar **pathp,
-                          GHashTable *gconv_in_provider)
-{
-  /* Quietly short-circuit if already added, for example in the common case
-   * where the path we derived from the realpath() of libc.so.6 matches
-   * /usr/${LIB}/gconv */
-  if (g_hash_table_contains (gconv_in_provider, *pathp))
-    return TRUE;
-
-  g_debug ("Checking for gconv in %s", *pathp);
-
-  if (_srt_sysroot_test (arch->provider->in_current_ns, *pathp,
-                         SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY, NULL))
-    {
-      g_debug ("... yes");
-      g_hash_table_add (gconv_in_provider, g_steal_pointer (pathp));
-      return TRUE;
-    }
-
-  g_debug ("... no");
-  return FALSE;
-}
-
 typedef struct
 {
   /* SONAME of "main" library.
@@ -5587,8 +5552,7 @@ out:
  *  followed by the path to glibc in the graphics stack provider
  *  namespace, or the path to glibc in a non-standard directory such
  *  as /opt with no special prefix.
- * @gconv_in_provider: Map { owned string => itself } representing a set
- *  of paths to /usr/lib/gconv or equivalent in the graphics stack provider
+ * @gconv_in_provider: Collection of directories like usr/lib/gconv
  * @error: Used to raise an error on failure
  */
 static gboolean
@@ -5598,7 +5562,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
                                 FlatpakBwrap *bwrap,
                                 const char *libc_symlink,
                                 const char *ld_so_in_runtime,
-                                GHashTable *gconv_in_provider,
+                                PvRuntimeLibraryData *gconv_in_provider,
                                 GError **error)
 {
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) libc_timer =
@@ -5626,7 +5590,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
     }
   else
     {
-      g_autofree gchar *dir = g_build_filename ("/usr", libdl_lib, "gconv", NULL);
+      g_autofree gchar *dir = g_build_filename ("usr", libdl_lib, "gconv", NULL);
 
       /* On some host OSs, the hard-coded path used to dlopen gconv modules
        * does not actually match the realpath() of the directory containing
@@ -5637,7 +5601,8 @@ pv_runtime_collect_libc_family (PvRuntime *self,
        * Void Linux, which would mean we mount both /usr/lib64/gconv (here)
        * and /usr/lib/gconv (below), ensuring that whichever one glibc
        * actually wants to load, it'll work. */
-      pv_runtime_try_gconv_dir (arch, &dir, gconv_in_provider);
+      pv_runtime_library_data_try (gconv_in_provider, dir, arch->provider,
+                                   "libdl ${LIB}", libdl_lib, NULL);
     }
 
   libc_target = glnx_readlinkat_malloc (self->overrides_fd, libc_symlink,
@@ -5688,10 +5653,14 @@ pv_runtime_collect_libc_family (PvRuntime *self,
       else
         gconv_prefix = "/";
 
+      /* This always starts with a slash, but pv_runtime_library_data_try()
+       * wants paths with no slash, hence the +1 below. */
       gconv_dir_in_provider = g_build_filename (gconv_prefix, dir, "gconv", NULL);
 
-      if (pv_runtime_try_gconv_dir (arch, &gconv_dir_in_provider,
-                                    gconv_in_provider))
+      if (pv_runtime_library_data_try (gconv_in_provider,
+                                       gconv_dir_in_provider + 1,
+                                       arch->provider,
+                                       "glibc directory", dir, NULL))
         found = TRUE;
 
       if (!found)
@@ -5716,8 +5685,12 @@ pv_runtime_collect_libc_family (PvRuntime *self,
 
           g_clear_pointer (&gconv_dir_in_provider, g_free);
           gconv_dir_in_provider = g_build_filename (gconv_prefix, dir, "gconv", NULL);
-          if (pv_runtime_try_gconv_dir (arch, &gconv_dir_in_provider,
-                                        gconv_in_provider))
+
+          if (pv_runtime_library_data_try (gconv_in_provider,
+                                           gconv_dir_in_provider + 1,
+                                           arch->provider,
+                                           "glibc directory without hwcaps",
+                                           dir, NULL))
             found = TRUE;
         }
 
@@ -6262,10 +6235,10 @@ pv_runtime_take_misc_data_from_provider (PvRuntime *self,
 static gboolean
 pv_runtime_finish_libc_family (PvRuntime *self,
                                FlatpakBwrap *bwrap,
-                               GHashTable *gconv_in_provider,
+                               PvRuntimeLibraryData *gconv_in_provider,
                                GError **error)
 {
-  g_auto(SrtHashTableIter) iter = SRT_HASH_TABLE_ITER_CLEARED;
+  PvGraphicsProvider *gconv_provider;
   const gchar *gconv_path;
   gsize i;
   /* List of paths where we expect to find "locale", sorted by the most
@@ -6431,13 +6404,13 @@ pv_runtime_finish_libc_family (PvRuntime *self,
 
       g_debug ("Making provider gconv modules visible in container");
 
-      _srt_hash_table_iter_init_sorted (&iter, gconv_in_provider,
-                                        self->arbitrary_str_order);
+      pv_runtime_library_data_iter_init (gconv_in_provider, &i);
 
-      while (_srt_hash_table_iter_next (&iter, &gconv_path, NULL))
+      while (pv_runtime_library_data_iter_next (gconv_in_provider, &i,
+                                                &gconv_path, &gconv_provider))
         {
           if (!pv_runtime_take_from_provider (self,
-                                              self->provider, gconv_path,
+                                              gconv_provider, gconv_path,
                                               bwrap, gconv_path,
                                               TAKE_FROM_PROVIDER_FLAGS_IF_DIR,
                                               error))
@@ -6969,8 +6942,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   g_auto(PvRuntimeLibraryData) drirc_data_in_provider = {};
   g_auto(PvRuntimeLibraryData) libdrm_data_in_provider = {};
   g_auto(PvRuntimeLibraryData) nvidia_data_in_provider = {};
-  g_autoptr(GHashTable) gconv_in_provider = g_hash_table_new_full (g_str_hash, g_str_equal,
-                                                                   g_free, NULL);
+  g_auto(PvRuntimeLibraryData) gconv_in_provider = {};
   const gchar *provider_label = "provider";
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
@@ -7014,6 +6986,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   pv_runtime_library_data_init (&drirc_data_in_provider);
   pv_runtime_library_data_init (&libdrm_data_in_provider);
   pv_runtime_library_data_init (&nvidia_data_in_provider);
+  pv_runtime_library_data_init (&gconv_in_provider);
 
   g_assert (pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES] == NULL);
 
@@ -7189,7 +7162,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                                           bwrap,
                                                           soname_symlink,
                                                           ld_so_in_runtime,
-                                                          gconv_in_provider,
+                                                          &gconv_in_provider,
                                                           error))
                     return FALSE;
                 }
@@ -7325,7 +7298,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
       return FALSE;
     }
 
-  if (!pv_runtime_finish_libc_family (self, bwrap, gconv_in_provider, error))
+  if (!pv_runtime_finish_libc_family (self, bwrap, &gconv_in_provider, error))
     return FALSE;
 
   if (!pv_runtime_finish_lib_data (self, bwrap, "libdrm", "libdrm",
@@ -7609,7 +7582,7 @@ pv_runtime_bind (PvRuntime *self,
         return FALSE;
     }
 
-  if (self->provider != NULL)
+  if (self->providers != NULL)
     {
       if (!pv_runtime_use_provider_graphics_stack (self, bwrap,
                                                    container_env,

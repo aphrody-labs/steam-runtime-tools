@@ -4030,6 +4030,9 @@ pv_runtime_take_from_provider (PvRuntime *self,
  * Try to arrange for one of @sources_in_provider to be made available
  * at the path @dest_in_container in the container we are creating.
  *
+ * Unlike pv_runtime_take_from_provider(), all graphics stack providers
+ * are searched.
+ *
  * Note that neither @source_in_provider nor @dest_in_container is
  * guaranteed to be an absolute path.
  *
@@ -4044,10 +4047,10 @@ pv_runtime_take_any_from_provider (PvRuntime *self,
                                    GError **error)
 {
   SrtResolveFlags resolve_flags = SRT_RESOLVE_FLAGS_NONE;
-  gsize i;
+  gsize provider_index;
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (self->providers != NULL, FALSE);
   g_return_val_if_fail (bwrap == NULL || !pv_bwrap_was_finished (bwrap), FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
@@ -4069,37 +4072,52 @@ pv_runtime_take_any_from_provider (PvRuntime *self,
       flags &= ~TAKE_FROM_PROVIDER_FLAGS_IF_REGULAR;
     }
 
-  for (i = 0; sources_in_provider[i] != NULL; i++)
+  for (provider_index = 0;
+       provider_index < self->providers->len;
+       provider_index++)
     {
-      const char *source_in_provider = sources_in_provider[i];
-      glnx_autofd int fd = -1;
-      g_autoptr(GError) local_error = NULL;
+      PvGraphicsProvider *provider;
+      gsize source_index;
 
-      fd = _srt_sysroot_open (self->provider->in_current_ns,
-                              source_in_provider, resolve_flags,
-                              NULL, &local_error);
+      provider = g_ptr_array_index (self->providers, provider_index);
 
-      if (fd < 0)
+      if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+        continue;
+
+      for (source_index = 0;
+           sources_in_provider[source_index] != NULL;
+           source_index++)
         {
-          if (!g_error_matches (local_error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND))
-            g_debug ("\"%s/%s\": %s",
-                     self->provider->in_current_ns->path,
-                     source_in_provider, local_error->message);
+          const char *source_in_provider = sources_in_provider[source_index];
+          glnx_autofd int fd = -1;
+          g_autoptr(GError) local_error = NULL;
 
-          continue;
+          fd = _srt_sysroot_open (provider->in_current_ns,
+                                  source_in_provider, resolve_flags,
+                                  NULL, &local_error);
+
+          if (fd < 0)
+            {
+              if (!g_error_matches (local_error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND))
+                g_debug ("\"%s/%s\": %s",
+                         provider->in_current_ns->path,
+                         source_in_provider, local_error->message);
+
+              continue;
+            }
+
+          if (!pv_runtime_take_from_provider (self,
+                                              provider, source_in_provider,
+                                              bwrap, dest_in_container,
+                                              flags, error))
+            return FALSE;
+
+          return TRUE;
         }
-
-      if (!pv_runtime_take_from_provider (self,
-                                          self->provider, source_in_provider,
-                                          bwrap, dest_in_container,
-                                          flags, error))
-        return FALSE;
-
-      return TRUE;
     }
 
   /* None of the possibilities matched */
-  g_debug ("Did not find a suitable \"%s\" in provider, ignoring",
+  g_debug ("Did not find a suitable \"%s\" in any provider, ignoring",
            dest_in_container);
   return TRUE;
 }
@@ -6285,6 +6303,10 @@ pv_runtime_finish_libc_family (PvRuntime *self,
 #endif
     NULL
   };
+  static const gchar * const share_i18n_path[] = {
+    "/usr/share/i18n",
+    NULL
+  };
   static const struct
   {
     const char *executable;
@@ -6348,11 +6370,10 @@ pv_runtime_finish_libc_family (PvRuntime *self,
                                               error))
         return FALSE;
 
-      if (!pv_runtime_take_from_provider (self,
-                                          self->provider, "/usr/share/i18n",
-                                          bwrap, "/usr/share/i18n",
-                                          TAKE_FROM_PROVIDER_FLAGS_IF_EXISTS,
-                                          error))
+      if (!pv_runtime_take_any_from_provider (self, bwrap, share_i18n_path,
+                                              "/usr/share/i18n",
+                                              TAKE_FROM_PROVIDER_FLAGS_IF_EXISTS,
+                                              error))
         return FALSE;
 
       for (i = 0; i < G_N_ELEMENTS (glibc_executables); i++)

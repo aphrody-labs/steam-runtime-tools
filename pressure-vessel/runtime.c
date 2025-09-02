@@ -4664,7 +4664,7 @@ setup_json_manifest (PvRuntime *self,
   const char *library_arch = NULL;
   gsize i;
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (details->provider != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
   g_return_val_if_fail (sub_dir != NULL, FALSE);
 
@@ -4889,7 +4889,7 @@ setup_json_manifest (PvRuntime *self,
                json_in_provider, json_in_container);
 
       if (!pv_runtime_take_from_provider (self,
-                                          self->provider, json_in_provider,
+                                          details->provider, json_in_provider,
                                           bwrap, json_in_container,
                                           (TAKE_FROM_PROVIDER_FLAGS_COPY_FALLBACK
                                            | TAKE_FROM_PROVIDER_FLAGS_REALPATH),
@@ -4929,7 +4929,7 @@ setup_each_json_manifest (PvRuntime *self,
   g_autoptr(PvManifestDeduplicator) content_seen = NULL;
   int digits = pv_count_decimal_digits (details->len);
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (self->providers != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
 
   json_set = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);

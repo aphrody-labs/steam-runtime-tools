@@ -6943,7 +6943,6 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   g_auto(PvRuntimeLibraryData) libdrm_data_in_provider = {};
   g_auto(PvRuntimeLibraryData) nvidia_data_in_provider = {};
   g_auto(PvRuntimeLibraryData) gconv_in_provider = {};
-  const gchar *provider_label = "provider";
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
   g_return_val_if_fail (self->provider != NULL, FALSE);
@@ -6959,24 +6958,33 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
     return FALSE;
 
   provider_stack = icd_stack_new ();
-  icd_stack_enumerate (provider_stack,
-                       self->flags,
-                       self->provider,
-                       provider_label);
 
-  if (self->interpreter_host_provider != NULL)
+  for (i = 0; i < self->providers->len; i++)
     {
-      const gchar *host_label = "host";
-      PvRuntimeFlags host_flags = self->flags;
+      PvGraphicsProvider *provider = g_ptr_array_index (self->providers, i);
 
-      /* We currently assume there are no FEX thunks for OpenXR */
-      host_flags &= ~PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES;
+      if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+        {
+          PvRuntimeFlags host_flags = self->flags;
 
-      host_stack = icd_stack_new ();
-      icd_stack_enumerate (host_stack,
-                           host_flags,
-                           self->interpreter_host_provider,
-                           host_label);
+          /* We currently assume there are no FEX thunks for OpenXR */
+          host_flags &= ~PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES;
+
+          if (host_stack == NULL)
+            host_stack = icd_stack_new ();
+
+          icd_stack_enumerate (host_stack,
+                               host_flags,
+                               provider,
+                               "host");
+        }
+      else
+        {
+          icd_stack_enumerate (provider_stack,
+                               self->flags,
+                               provider,
+                               "provider");
+        }
     }
 
   /* We set this FALSE later if we decide not to use the provider libc

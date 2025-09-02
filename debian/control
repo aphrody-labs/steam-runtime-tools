@@ -21,7 +21,6 @@ Build-Depends:
  libjson-glib-dev (>= 1.0),
  libsdl2-dev,
  libsdl2-ttf-dev,
- libtheora0 <!nocheck>,
  libudev1 <!nocheck> | libudev0 <!nocheck>,
  libva-dev,
  libvdpau-dev,
@@ -158,9 +157,12 @@ Section: misc
 Depends:
  ${misc:Depends},
  ${shlibs:Depends},
- libtheora0,
  steam-runtime-tools-bin,
  zlib1g,
+Suggests:
+ libtheora0,
+ libtheoradec1,
+ libtheoraenc1,
 Description:
  The Steam Runtime is the library stack used to run the Steam client
  on Linux. The Steam Runtime Tools utility library contains open-source

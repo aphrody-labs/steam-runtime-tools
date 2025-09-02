@@ -1096,16 +1096,6 @@ for abi in supported_abis:
             '''))
 
     symbols = ('fake-steam-runtime/usr/lib/steamrt/expectations/{}/'
-               'libtheora0.symbols').format(abi)
-    with open(symbols, 'w') as writer:
-        writer.write(textwrap.dedent('''\
-            # Cut-down version of libtheora0:amd64.symbols, to illustrate
-            # what we expect to find here
-            libtheoraenc.so.1 libtheora0 #MINVER#
-            # No symbols listed here yet
-            '''))
-
-    symbols = ('fake-steam-runtime/usr/lib/steamrt/expectations/{}/'
                'zlib1g.symbols').format(abi)
     with open(symbols, 'w') as writer:
         writer.write(textwrap.dedent('''\
@@ -1148,14 +1138,6 @@ with open(
    }
   },
   "libacl.so.1",
-  {
-   "libtheoraenc.so.1": {
-    "deb": "libtheora0",
-    "hidden_dependencies": [
-     "libtheoradec.so.1"
-    ]
-   }
-  },
   {
    "libtWithHiddens.so.1": {
     "deb": "libtWithHiddens0",

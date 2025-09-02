@@ -121,7 +121,9 @@ test_utils_static_libsteamrt_dep = declare_dependency(
 
 foreach sub : [
   'expectations',
+  'expectations_libtheora0',
   'expectations_with_missings',
+
   # To avoid being dependent on readdir() order, don't include more
   # than one *.json file in any directory that we are going to scan for
   # Vulkan *.json files. (The order of EGL *.json files is well-defined.)

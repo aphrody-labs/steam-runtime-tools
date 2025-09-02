@@ -184,3 +184,21 @@ icd_details_fill_array_json_based (GPtrArray *details_arr,
       g_ptr_array_add (details_arr, icd_details_new (module));
     }
 }
+
+IcdStack *
+icd_stack_new (void)
+{
+  return g_slice_new0 (IcdStack);
+}
+
+void
+icd_stack_free (IcdStack *self)
+{
+  g_clear_pointer (&self->egl_icd_details, g_ptr_array_unref);
+  g_clear_pointer (&self->egl_ext_platform_details, g_ptr_array_unref);
+  g_clear_pointer (&self->vulkan_icd_details, g_ptr_array_unref);
+  g_clear_pointer (&self->vulkan_exp_layer_details, g_ptr_array_unref);
+  g_clear_pointer (&self->vulkan_imp_layer_details, g_ptr_array_unref);
+  g_clear_pointer (&self->openxr_1_runtime_details, g_hash_table_unref);
+  g_slice_free (IcdStack, self);
+}

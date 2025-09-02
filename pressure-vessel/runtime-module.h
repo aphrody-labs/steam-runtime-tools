@@ -153,3 +153,37 @@ void icd_details_fill_array_single_arch (GPtrArray *details_arr,
 void icd_details_fill_array_json_based (GPtrArray *details_arr,
                                         const char *which,
                                         const GList *drivers);
+
+/*
+ * IcdStack:
+ * @egl_icd_details: (element-type IcdDetails): Array of details each
+ *  based on a #SrtEglIcd
+ * @egl_ext_platform_details: (element-type IcdDetails): Array of details each
+ *  based on a #SrtEglExternalPlatform
+ * @vulkan_icd_details: (element-type IcdDetails): Array of details each
+ *  based on a #SrtVulkanIcd
+ * @vulkan_exp_layer_details: (element-type IcdDetails): Array of details each
+ *  based on a #SrtVulkanLayer representing an explicit layer
+ * @vulkan_imp_layer_details: (element-type IcdDetails): Array of details each
+ *  based on a #SrtVulkanLayer representing an implicit layer
+ * @openxr_1_runtime_details: (element-type utf8 IcdDetails): Map with
+ *  owned string multiarch tuples as keys and owned IcdDetails as values
+ *
+ * Details of all drivers, Vulkan layers or similar things discovered in the
+ * graphics provider via a JSON manifest.
+ */
+typedef struct
+{
+  GPtrArray *egl_icd_details;
+  GPtrArray *egl_ext_platform_details;
+  GPtrArray *vulkan_icd_details;
+  GPtrArray *vulkan_exp_layer_details;
+  GPtrArray *vulkan_imp_layer_details;
+  GHashTable *openxr_1_runtime_details;
+} IcdStack;
+
+IcdStack *icd_stack_new (void);
+
+void icd_stack_free (IcdStack *self);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdStack, icd_stack_free)

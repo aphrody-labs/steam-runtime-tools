@@ -40,26 +40,28 @@ icd_details_new (gpointer icd)
   gsize i;
   const char *name;
 
-  g_return_val_if_fail (G_IS_OBJECT (icd), NULL);
+  g_return_val_if_fail (SRT_IS_BASE_GRAPHICS_MODULE (icd), NULL);
 
-  if (SRT_IS_DRI_DRIVER (icd))
-    name = srt_dri_driver_get_library_path (icd);
-  else if (SRT_IS_EGL_ICD (icd))
-    name = srt_egl_icd_get_json_path (icd);
-  else if (SRT_IS_EGL_EXTERNAL_PLATFORM (icd))
-    name = srt_egl_external_platform_get_json_path (icd);
-  else if (SRT_IS_VULKAN_ICD (icd))
-    name = srt_vulkan_icd_get_json_path (icd);
-  else if (SRT_IS_VULKAN_LAYER (icd))
-    name = srt_vulkan_layer_get_json_path (icd);
-  else if (SRT_IS_VDPAU_DRIVER (icd))
-    name = srt_vdpau_driver_get_library_path (icd);
-  else if (SRT_IS_VA_API_DRIVER (icd))
-    name = srt_va_api_driver_get_library_path (icd);
-  else if (SRT_IS_OPENXR_1_RUNTIME (icd))
-    name = srt_openxr_1_runtime_get_json_path (icd);
+  if (SRT_IS_BASE_JSON_GRAPHICS_MODULE (icd))
+    {
+      SrtBaseJsonGraphicsModule *j = SRT_BASE_JSON_GRAPHICS_MODULE (icd);
+
+      g_return_val_if_fail (j->json_path != NULL, NULL);
+      name = j->json_path;
+    }
+  else if (SRT_IS_DRI_DRIVER (icd)
+           || SRT_IS_VA_API_DRIVER (icd)
+           || SRT_IS_VDPAU_DRIVER (icd))
+    {
+      SrtBaseGraphicsModule *base = SRT_BASE_GRAPHICS_MODULE (icd);
+
+      g_return_val_if_fail (base->library_path != NULL, NULL);
+      name = base->library_path;
+    }
   else
-    g_return_val_if_reached (NULL);
+    {
+      g_return_val_if_reached (NULL);
+    }
 
   self = g_slice_new0 (IcdDetails);
   self->icd = g_object_ref (icd);

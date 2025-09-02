@@ -122,8 +122,6 @@ struct _PvRuntime
   gchar *runtime_files_on_host;
   const gchar *adverb_in_container;
   GPtrArray *providers;
-  PvGraphicsProvider *provider;
-  PvGraphicsProvider *interpreter_host_provider;
   SrtDirentCompareFunc arbitrary_dirent_order;
   GCompareFunc arbitrary_str_order;
 
@@ -841,36 +839,6 @@ pv_runtime_set_property (GObject *object,
         /* Construct-only */
         g_return_if_fail (self->providers == NULL);
         self->providers = g_value_dup_boxed (value);
-
-        if (self->providers != NULL)
-          {
-            gsize i;
-
-            for (i = 0; i < self->providers->len; i++)
-              {
-                PvGraphicsProvider *provider = g_ptr_array_index (self->providers, i);
-
-                /* For now, we only support having one graphics stack
-                 * provider for our own architectures (normally x86),
-                 * and one for the host of an interpreter like FEX
-                 * (normally aarch64). */
-                if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
-                  {
-                    if (self->interpreter_host_provider == NULL)
-                      self->interpreter_host_provider = g_object_ref (provider);
-                    else
-                      g_warning ("Only one interpreter host provider can be used");
-                  }
-                else
-                  {
-                    if (self->provider == NULL)
-                      self->provider = g_object_ref (provider);
-                    else
-                      g_warning ("Only one graphics stack provider can be used");
-                  }
-              }
-          }
-
         break;
 
       case PROP_ORIGINAL_ENVIRON:
@@ -1632,8 +1600,6 @@ pv_runtime_dispose (GObject *object)
   if (self->providers != NULL)
     g_ptr_array_set_size (self->providers, 0);
 
-  g_clear_object (&self->provider);
-  g_clear_object (&self->interpreter_host_provider);
   g_clear_object (&self->mutable_sysroot);
   g_clear_object (&self->real_root);
   g_clear_object (&self->host_root);
@@ -6293,7 +6259,7 @@ pv_runtime_finish_libc_family (PvRuntime *self,
      * /usr/sbin/zic from libc-bin. */
   };
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (self->providers != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
 
   if (self->any_libc_from_provider && !self->all_libc_from_provider)
@@ -6945,14 +6911,13 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   g_auto(PvRuntimeLibraryData) gconv_in_provider = {};
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (self->providers != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
   g_return_val_if_fail (bwrap == NULL || !pv_bwrap_was_finished (bwrap), FALSE);
   g_return_val_if_fail (container_env != NULL, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
-  timer = _srt_profiling_start ("Using graphics stack from %s",
-                                self->provider->in_current_ns->path);
+  timer = _srt_profiling_start ("Using graphics stack from provider(s)");
 
   if (!pv_runtime_provide_container_access (self, error))
     return FALSE;

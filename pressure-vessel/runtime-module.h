@@ -149,3 +149,7 @@ icd_details_array_sized_new (gsize n)
 void icd_details_fill_array_single_arch (GPtrArray *details_arr,
                                          const GList *drivers,
                                          gsize multiarch_index);
+
+void icd_details_fill_array_json_based (GPtrArray *details_arr,
+                                        const char *which,
+                                        const GList *drivers);

@@ -130,3 +130,55 @@ icd_details_fill_array_single_arch (GPtrArray *details_arr,
       g_ptr_array_add (details_arr, g_steal_pointer (&details));
     }
 }
+
+/*
+ * icd_details_fill_array_json_based:
+ * @details_arr: (element-type IcdDetails): The array to populate,
+ *  as returned by icd_details_array_sized_new()
+ * @which: A description of the kind of driver, for example
+ *  "Vulkan implicit layer"
+ * @drivers: (element-type SrtBaseJsonGraphicsModule): The drivers as
+ *  discovered by #SrtSystemInfo, which must be based on a JSON manifest
+ *
+ * Build an array of those @drivers that are not in an error state.
+ *
+ * Returns: (transfer container) (element-type IcdDetails): An array of
+ *  representations of the drivers
+ */
+void
+icd_details_fill_array_json_based (GPtrArray *details_arr,
+                                   const char *which,
+                                   const GList *drivers)
+{
+  gsize i;
+  const GList *icd_i;
+
+  for (icd_i = drivers, i = 0; icd_i != NULL; icd_i = icd_i->next, i++)
+    {
+      SrtBaseJsonGraphicsModule *module = icd_i->data;
+      SrtBaseGraphicsModule *base = &module->parent;
+      const gchar *path;
+      GError *local_error = NULL;
+
+      g_return_if_fail (SRT_IS_BASE_JSON_GRAPHICS_MODULE (module));
+      path = module->json_path;
+
+      if (!_srt_base_graphics_module_check_error (base, &local_error))
+        {
+          g_warning ("Failed to load %s #%" G_GSIZE_FORMAT " from %s: %s",
+                     which, i, path, local_error->message);
+          g_clear_error (&local_error);
+          continue;
+        }
+
+      const gchar *description = base->library_path;
+
+      if (description == NULL)
+        description = "meta-layer";
+
+      g_info ("%s #%" G_GSIZE_FORMAT " at %s: %s",
+              which, i, path, description);
+
+      g_ptr_array_add (details_arr, icd_details_new (module));
+    }
+}

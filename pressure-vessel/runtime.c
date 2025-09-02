@@ -6917,37 +6917,15 @@ pv_enumerate_egl_ext_platforms (SrtSystemInfo *system_info,
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
   g_autoptr(SrtObjectList) egl_ext_platforms = NULL;
   g_autoptr(GPtrArray) egl_ext_platform_details = NULL;
-  gsize i;
-  const GList *icd_iter;
 
   timer = _srt_profiling_start ("Enumerating EGL external platforms on %s system",
                                 which_system);
   g_debug ("Enumerating EGL external platforms on %s system...", which_system);
   egl_ext_platforms = srt_system_info_list_egl_external_platforms (system_info, NULL);
   egl_ext_platform_details = icd_details_array_sized_new (g_list_length (egl_ext_platforms));
-
-  for (icd_iter = egl_ext_platforms, i = 0;
-       icd_iter != NULL;
-       icd_iter = icd_iter->next, i++)
-    {
-      SrtEglExternalPlatform *ext = icd_iter->data;
-      const gchar *path = srt_egl_external_platform_get_json_path (ext);
-      GError *local_error = NULL;
-
-      if (!srt_egl_external_platform_check_error (ext, &local_error))
-        {
-          g_warning ("Failed to load EGL external platform #%" G_GSIZE_FORMAT  " from %s: %s",
-                     i, path, local_error->message);
-          g_clear_error (&local_error);
-          continue;
-        }
-
-      g_info ("EGL external platform #%" G_GSIZE_FORMAT " at %s: %s",
-              i, path, srt_egl_external_platform_get_library_path (ext));
-
-      g_ptr_array_add (egl_ext_platform_details, icd_details_new (ext));
-    }
-
+  icd_details_fill_array_json_based (egl_ext_platform_details,
+                                     "EGL external platform",
+                                     egl_ext_platforms);
   return g_steal_pointer (&egl_ext_platform_details);
 }
 
@@ -6961,36 +6939,12 @@ pv_enumerate_egl_icds (SrtSystemInfo *system_info,
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
   g_autoptr(SrtObjectList) egl_icds = NULL;
   g_autoptr(GPtrArray) egl_icd_details = NULL;
-  gsize i;
-  const GList *icd_iter;
 
   timer = _srt_profiling_start ("Enumerating EGL ICDs on %s system", which_system);
   g_debug ("Enumerating EGL ICDs on %s system...", which_system);
   egl_icds = srt_system_info_list_egl_icds (system_info, NULL);
   egl_icd_details = icd_details_array_sized_new (g_list_length (egl_icds));
-
-  for (icd_iter = egl_icds, i = 0;
-       icd_iter != NULL;
-       icd_iter = icd_iter->next, i++)
-    {
-      SrtEglIcd *icd = icd_iter->data;
-      const gchar *path = srt_egl_icd_get_json_path (icd);
-      GError *local_error = NULL;
-
-      if (!srt_egl_icd_check_error (icd, &local_error))
-        {
-          g_warning ("Failed to load EGL ICD #%" G_GSIZE_FORMAT  " from %s: %s",
-                     i, path, local_error->message);
-          g_clear_error (&local_error);
-          continue;
-        }
-
-      g_info ("EGL ICD #%" G_GSIZE_FORMAT " at %s: %s",
-              i, path, srt_egl_icd_get_library_path (icd));
-
-      g_ptr_array_add (egl_icd_details, icd_details_new (icd));
-    }
-
+  icd_details_fill_array_json_based (egl_icd_details, "EGL ICD", egl_icds);
   return g_steal_pointer (&egl_icd_details);
 }
 
@@ -7004,36 +6958,14 @@ pv_enumerate_vulkan_icds (SrtSystemInfo *system_info,
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
   g_autoptr(SrtObjectList) vulkan_icds = NULL;
   g_autoptr(GPtrArray) vulkan_icd_details = NULL;
-  gsize i;
-  const GList *icd_iter;
 
   timer = _srt_profiling_start ("Enumerating Vulkan ICDs on %s system", which_system);
   g_debug ("Enumerating Vulkan ICDs on %s system...", which_system);
   vulkan_icds = srt_system_info_list_vulkan_icds (system_info, NULL);
   vulkan_icd_details = icd_details_array_sized_new (g_list_length (vulkan_icds));
-
-  for (icd_iter = vulkan_icds, i = 0;
-       icd_iter != NULL;
-       icd_iter = icd_iter->next, i++)
-    {
-      SrtVulkanIcd *icd = icd_iter->data;
-      const gchar *path = srt_vulkan_icd_get_json_path (icd);
-      GError *local_error = NULL;
-
-      if (!srt_vulkan_icd_check_error (icd, &local_error))
-        {
-          g_warning ("Failed to load Vulkan ICD #%" G_GSIZE_FORMAT " from %s: %s",
-                     i, path, local_error->message);
-          g_clear_error (&local_error);
-          continue;
-        }
-
-      g_info ("Vulkan ICD #%" G_GSIZE_FORMAT " at %s: %s",
-              i, path, srt_vulkan_icd_get_library_path (icd));
-
-      g_ptr_array_add (vulkan_icd_details, icd_details_new (icd));
-    }
-
+  icd_details_fill_array_json_based (vulkan_icd_details,
+                                     "Vulkan ICD",
+                                     vulkan_icds);
   return g_steal_pointer (&vulkan_icd_details);
 }
 
@@ -7086,43 +7018,6 @@ pv_enumerate_openxr_1_runtimes (SrtSystemInfo *system_info,
 }
 
 /*
- * @vulkan_layer_details: (inout) (element-type IcdDetails):
- */
-static void
-pv_append_vulkan_layers_details (GList *vulkan_layers,
-                                 const gchar *which,
-                                 GPtrArray *vulkan_layer_details)
-{
-  gsize i;
-  const GList *icd_i;
-
-  for (icd_i = vulkan_layers, i = 0; icd_i != NULL; icd_i = icd_i->next, i++)
-    {
-      SrtVulkanLayer *layer = icd_i->data;
-      const gchar *path = srt_vulkan_layer_get_json_path (layer);
-      GError *local_error = NULL;
-
-      if (!srt_vulkan_layer_check_error (layer, &local_error))
-        {
-          g_warning ("Failed to load Vulkan %s layer #%" G_GSIZE_FORMAT
-                     " from %s: %s", which, i, path, local_error->message);
-          g_clear_error (&local_error);
-          continue;
-        }
-
-      const gchar *description = srt_vulkan_layer_get_library_path (layer);
-
-      if (description == NULL)
-        description = "meta-layer";
-
-      g_info ("Vulkan %s layer #%" G_GSIZE_FORMAT " at %s: %s",
-              which, i, path, description);
-
-      g_ptr_array_add (vulkan_layer_details, icd_details_new (layer));
-    }
-}
-
-/*
  * @vulkan_exp_layer_details: (out) (element-type IcdDetails):
  * @vulkan_imp_layer_details: (out) (element-type IcdDetails):
  */
@@ -7146,12 +7041,16 @@ pv_enumerate_vulkan_layer_details (SrtSystemInfo *system_info,
   g_debug ("Enumerating Vulkan explicit layers on %s system...", which_system);
   vulkan_exp_layers = srt_system_info_list_explicit_vulkan_layers (system_info);
   *vulkan_exp_layer_details = icd_details_array_sized_new (g_list_length (vulkan_exp_layers));
-  pv_append_vulkan_layers_details (vulkan_exp_layers, "explicit", *vulkan_exp_layer_details);
+  icd_details_fill_array_json_based (*vulkan_exp_layer_details,
+                                     "Vulkan explicit layer",
+                                     vulkan_exp_layers);
 
   g_debug ("Enumerating Vulkan implicit layers on %s system...", which_system);
   vulkan_imp_layers = srt_system_info_list_implicit_vulkan_layers (system_info);
   *vulkan_imp_layer_details = icd_details_array_sized_new (g_list_length (vulkan_imp_layers));
-  pv_append_vulkan_layers_details (vulkan_imp_layers, "implicit", *vulkan_imp_layer_details);
+  icd_details_fill_array_json_based (*vulkan_imp_layer_details,
+                                     "Vulkan implicit layer",
+                                     vulkan_imp_layers);
 }
 
 typedef struct

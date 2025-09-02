@@ -186,6 +186,8 @@ pressure_vessel_wrap_lib = static_library(
     'passwd.h',
     'runtime.c',
     'runtime.h',
+    'runtime-module.c',
+    'runtime-module.h',
     'wrap-context.c',
     'wrap-context.h',
     'wrap-discord.c',

@@ -145,3 +145,7 @@ icd_details_array_sized_new (gsize n)
 {
   return g_ptr_array_new_full (n, (GDestroyNotify) G_CALLBACK (icd_details_free));
 }
+
+void icd_details_fill_array_single_arch (GPtrArray *details_arr,
+                                         const GList *drivers,
+                                         gsize multiarch_index);

@@ -6702,7 +6702,6 @@ collect_vdpau_drivers (PvRuntime *self,
   /* The VDPAU loader looks up drivers by name, not by readdir(),
    * so order doesn't matter unless there are name collisions. */
   gboolean use_numbered_subdirs = FALSE;
-  const GList *icd_iter;
   gsize j;
   const gsize multiarch_index = arch->multiarch_index;
 
@@ -6721,17 +6720,7 @@ collect_vdpau_drivers (PvRuntime *self,
 
   self->any_vdpau_drivers = TRUE;
   details_arr = icd_details_array_sized_new (g_list_length (vdpau_drivers));
-
-  for (icd_iter = vdpau_drivers, j = 0; icd_iter != NULL; icd_iter = icd_iter->next, j++)
-    {
-      g_autoptr(IcdDetails) details = icd_details_new (icd_iter->data);
-
-      g_assert (details->resolved_libraries[multiarch_index] == NULL);
-      details->resolved_libraries[multiarch_index] = srt_vdpau_driver_resolve_library_path (details->icd);
-      g_assert (details->resolved_libraries[multiarch_index] != NULL);
-      g_assert (g_path_is_absolute (details->resolved_libraries[multiarch_index]));
-      g_ptr_array_add (details_arr, g_steal_pointer (&details));
-    }
+  icd_details_fill_array_single_arch (details_arr, vdpau_drivers, multiarch_index);
 
   /* In practice we won't actually use the sequence number for VDPAU
    * because they can only be located in a single directory,
@@ -6774,7 +6763,6 @@ collect_dri_drivers (PvRuntime *self,
   /* The DRI loader looks up drivers by name, not by readdir(),
    * so order doesn't matter unless there are name collisions. */
   gboolean use_numbered_subdirs = FALSE;
-  const GList *icd_iter;
   gsize j;
   const gsize multiarch_index = arch->multiarch_index;
 
@@ -6802,32 +6790,8 @@ collect_dri_drivers (PvRuntime *self,
 
   details_arr = icd_details_array_sized_new (g_list_length (dri_drivers)
                                              + g_list_length (va_api_drivers));
-
-  for (icd_iter = dri_drivers, j = 0; icd_iter != NULL; icd_iter = icd_iter->next, j++)
-    {
-      g_autoptr(IcdDetails) details = icd_details_new (icd_iter->data);
-
-      g_assert (details->resolved_libraries[multiarch_index] == NULL);
-      details->resolved_libraries[multiarch_index] = srt_dri_driver_resolve_library_path (details->icd);
-      g_assert (details->resolved_libraries[multiarch_index] != NULL);
-      g_assert (g_path_is_absolute (details->resolved_libraries[multiarch_index]));
-      g_ptr_array_add (details_arr, g_steal_pointer (&details));
-    }
-
-  for (icd_iter = va_api_drivers, j = 0; icd_iter != NULL; icd_iter = icd_iter->next, j++)
-    {
-      g_autoptr(IcdDetails) details = NULL;
-      g_autofree gchar *resolved = NULL;
-
-      resolved = srt_va_api_driver_resolve_library_path (icd_iter->data);
-      details = icd_details_new (icd_iter->data);
-      g_assert (details->resolved_libraries[multiarch_index] == NULL);
-      details->resolved_libraries[multiarch_index] = g_steal_pointer (&resolved);
-      g_assert (details->resolved_libraries[multiarch_index] != NULL);
-      g_assert (g_path_is_absolute (details->resolved_libraries[multiarch_index]));
-      g_ptr_array_add (details_arr, g_steal_pointer (&details));
-    }
-
+  icd_details_fill_array_single_arch (details_arr, dri_drivers, multiarch_index);
+  icd_details_fill_array_single_arch (details_arr, va_api_drivers, multiarch_index);
   j = 0;
 
   while (j < details_arr->len)

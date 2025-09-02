@@ -69,11 +69,7 @@ icd_details_new (gpointer icd)
   self->debug_name = name;
 
   for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-    {
-      self->resolved_libraries[i] = NULL;
-      self->kinds[i] = ICD_KIND_NONEXISTENT;
-      self->paths_in_container[i] = NULL;
-    }
+    pv_module_per_arch_init (&self->archs[i]);
 
   return self;
 }
@@ -86,10 +82,7 @@ icd_details_free (IcdDetails *self)
   g_object_unref (self->icd);
 
   for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-    {
-      g_free (self->resolved_libraries[i]);
-      g_free (self->paths_in_container[i]);
-    }
+    pv_module_per_arch_clear (&self->archs[i]);
 
   g_slice_free (IcdDetails, self);
 }
@@ -102,7 +95,7 @@ icd_details_free (IcdDetails *self)
  *  by #SrtSystemInfo, which must be DRI, VA-API or VDPAU
  * @multiarch_index: An index into @pv_multiarch_tuples
  *
- * Build an array of #IcdDetails, and fill in the @resolved_libraries,
+ * Build an array of #IcdDetails, and fill in the @resolved_library
  * for architecture @multiarch_index only.
  *
  * Returns: (transfer container) (element-type IcdDetails): An array of
@@ -120,16 +113,17 @@ icd_details_fill_array_single_arch (GPtrArray *details_arr,
     {
       SrtBaseGraphicsModule *module = icd_iter->data;
       g_autoptr(IcdDetails) details = icd_details_new (module);
+      PvModulePerArch *arch = &details->archs[multiarch_index];
 
       g_assert (SRT_IS_DRI_DRIVER (module)
                 || SRT_IS_VA_API_DRIVER (module)
                 || SRT_IS_VDPAU_DRIVER (module));
       g_assert (!SRT_IS_BASE_JSON_GRAPHICS_MODULE (module));
 
-      g_assert (details->resolved_libraries[multiarch_index] == NULL);
-      details->resolved_libraries[multiarch_index] = _srt_base_graphics_module_resolve_library_path (module);
-      g_assert (details->resolved_libraries[multiarch_index] != NULL);
-      g_assert (g_path_is_absolute (details->resolved_libraries[multiarch_index]));
+      g_assert (arch->resolved_library == NULL);
+      arch->resolved_library = _srt_base_graphics_module_resolve_library_path (module);
+      g_assert (arch->resolved_library != NULL);
+      g_assert (g_path_is_absolute (arch->resolved_library));
       g_ptr_array_add (details_arr, g_steal_pointer (&details));
     }
 }

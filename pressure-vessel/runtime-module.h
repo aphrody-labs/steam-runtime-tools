@@ -40,6 +40,50 @@ typedef enum
 const char *icd_kind_to_string (IcdKind kind);
 
 /*
+ * PvModulePerArch:
+ * @resolved_library: The resolved name or path of the library
+ *  for this architecture. Depends on the @kind:
+ *  for %ICD_KIND_SONAME it is the basename of the library,
+ *  for %ICD_KIND_ABSOLUTE it is the absolute path in the provider's
+ *  namespace (but possibly contains libdl dynamic string tokens),
+ *  and for other kinds it is %NULL.
+ * @path_in_container: If the @kind is %ICD_KIND_ABSOLUTE, then this is
+ *  a concrete, absolute path accessible in the container from which the
+ *  library will be loadable, with no libdl dynamic string tokens,
+ *  for example "/run/host/usr/lib/.../libfoo.so" or
+ *  "/overrides/lib/.../libfoo.so". Otherwise it is %NULL.
+ * @kind: The disposition of this library on this architecture.
+ *
+ * Details of a driver, Vulkan layer or similar thing discovered in a
+ * graphics provider, for one specific architecture.
+ * ```
+ */
+typedef struct
+{
+  gchar *resolved_library;
+  gchar *path_in_container;
+  IcdKind kind;
+} PvModulePerArch;
+
+static inline void
+pv_module_per_arch_init (PvModulePerArch *self)
+{
+  self->resolved_library = NULL;
+  self->path_in_container = NULL;
+  self->kind = ICD_KIND_NONEXISTENT;
+}
+
+static inline void
+pv_module_per_arch_clear (PvModulePerArch *self)
+{
+  g_clear_pointer (&self->resolved_library, g_free);
+  g_clear_pointer (&self->path_in_container, g_free);
+  self->kind = ICD_KIND_NONEXISTENT;
+}
+
+G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (PvModulePerArch, pv_module_per_arch_clear)
+
+/*
  * IcdDetails:
  * @icd: (type SrtBaseGraphicsModule): The module object.
  *  Its type can be any of:
@@ -49,19 +93,8 @@ const char *icd_kind_to_string (IcdKind kind);
  *  #SrtOpenxr1Runtime
  * @debug_name: Some sort of name for the module, to be used in diagnostic
  *  messages only. Assumed to be owned by @icd.
- * @resolved_libraries: A per-architecture array keyed by the index of
- *  a multiarch tuple in @pv_multiarch_tuples. Each item depends on
- *  the #IcdKind: for %ICD_KIND_SONAME it is the basename of the library,
- *  for %ICD_KIND_ABSOLUTE it is the absolute path in the provider's
- *  namespace (but possibly contains libdl dynamic string tokens),
- *  and for other kinds it is %NULL.
- * @kinds: A per-architecture array as above, indicating the disposition
- *  of this library on each architecture.
- * @paths_in_container: If the kind is %ICD_KIND_ABSOLUTE, then this is
- *  a concrete, absolute path accessible in the container from which the
- *  library will be loadable, with no libdl dynamic string tokens,
- *  for example "/run/host/usr/lib/.../libfoo.so" or
- *  "/overrides/lib/.../libfoo.so". Otherwise it is %NULL.
+ * @archs: A per-architecture array of details keyed by the index of
+ *  a multiarch tuple in @pv_multiarch_tuples
  *
  * Details of a driver, Vulkan layer or similar thing discovered in a
  * graphics provider.
@@ -84,39 +117,43 @@ const char *icd_kind_to_string (IcdKind kind);
  * {
  *   icd: <SrtVulkanLayer for libVkLayer_MESA_device_select.so>,
  *   debug_name: ".../VkLayer_MESA_device_select.json",
- *   kinds: [
- *     [x86_64]: ICD_KIND_SONAME,
- *     [i386]: ICD_KIND_SONAME,
- *     [aarch64]: ICD_KIND_NONEXISTENT,
- *   ],
- *   resolved_libraries: [
- *     [x86_64]: "libVkLayer...",
- *     [i386]: "libVkLayer...",
- *     [aarch64]: NULL,
- *   ],
- *   paths_in_container: [
- *     [x86_64]: NULL,
- *     [i386]: NULL,
- *     [aarch64]: NULL,
+ *   archs: [
+ *     [x86_64]: {
+ *       resolved_library: "libVkLayer...",
+ *       path_in_container: NULL,
+ *       kind: ICD_KIND_SONAME,
+ *     },
+ *     [i386]: {
+ *       resolved_library: "libVkLayer...",
+ *       path_in_container: NULL,
+ *       kind: ICD_KIND_SONAME,
+ *     },
+ *     [aarch64]: {
+ *       resolved_library: NULL,
+ *       path_in_container: NULL,
+ *       kind: ICD_KIND_NONEXISTENT,
+ *     },
  *   ],
  * },
  * {
  *   icd: <SrtVulkanLayer for libMangoHud.so>,
  *   debug_name: ".../MangoHud.json",
- *   kinds: [
- *     [x86_64]: ICD_KIND_ABSOLUTE,
- *     [i386]: ICD_KIND_NONEXISTENT,
- *     [aarch64]: ICD_KIND_NONEXISTENT,
- *   ],
- *   resolved_libraries: [
- *     [x86_64]: "/usr/lib/$LIB/mangohud/libMangoHud.so",
- *     [i386]: NULL,
- *     [aarch64]: NULL,
- *   ],
- *   paths_in_container: [
- *     [x86_64]: "/run/host/usr/lib/x86_64-.../libMangoHud.so",
- *     [i386]: NULL,
- *     [aarch64]: NULL,
+ *   archs: [
+ *     [x86_64]: {
+ *       resolved_library: "/usr/lib/$LIB/mangohud/libMangoHud.so",
+ *       path_in_container: "/run/host/usr/lib/x86_64-.../libMangoHud.so",
+ *       kind: ICD_KIND_ABSOLUTE,
+ *     },
+ *     [i386]: {
+ *       resolved_library: NULL,
+ *       path_in_container: NULL,
+ *       kind: ICD_KIND_NONEXISTENT,
+ *     },
+ *     [aarch64]: {
+ *       resolved_library: NULL,
+ *       path_in_container: NULL,
+ *       kind: ICD_KIND_NONEXISTENT,
+ *     },
  *   ],
  * },
  * ```
@@ -125,9 +162,7 @@ typedef struct
 {
   gpointer icd;
   const char *debug_name;
-  gchar *resolved_libraries[PV_N_SUPPORTED_ARCHITECTURES];
-  IcdKind kinds[PV_N_SUPPORTED_ARCHITECTURES];
-  gchar *paths_in_container[PV_N_SUPPORTED_ARCHITECTURES];
+  PvModulePerArch archs[PV_N_SUPPORTED_ARCHITECTURES];
 } IcdDetails;
 
 IcdDetails *icd_details_new (gpointer icd);

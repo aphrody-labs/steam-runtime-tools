@@ -131,3 +131,17 @@ IcdDetails *icd_details_new (gpointer icd);
 void icd_details_free (IcdDetails *self);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdDetails, icd_details_free)
+
+/*
+ * icd_details_array_sized_new:
+ * @n: Number of entries to allocate space for. This is only an
+ *  optimization and it's safe to pass 0.
+ *
+ * Returns: (transfer container) (element-type IcdDetails): An empty array of
+ *  representations of drivers, to which more can be added
+ */
+static inline GPtrArray *
+icd_details_array_sized_new (gsize n)
+{
+  return g_ptr_array_new_full (n, (GDestroyNotify) G_CALLBACK (icd_details_free));
+}

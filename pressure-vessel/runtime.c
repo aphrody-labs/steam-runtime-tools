@@ -6720,8 +6720,7 @@ collect_vdpau_drivers (PvRuntime *self,
     return TRUE;
 
   self->any_vdpau_drivers = TRUE;
-  details_arr = g_ptr_array_new_full (g_list_length (vdpau_drivers),
-                                      (GDestroyNotify) G_CALLBACK (icd_details_free));
+  details_arr = icd_details_array_sized_new (g_list_length (vdpau_drivers));
 
   for (icd_iter = vdpau_drivers, j = 0; icd_iter != NULL; icd_iter = icd_iter->next, j++)
     {
@@ -6801,8 +6800,8 @@ collect_dri_drivers (PvRuntime *self,
                                                             SRT_DRIVER_FLAGS_NONE);
     }
 
-  details_arr = g_ptr_array_new_full (g_list_length (dri_drivers) + g_list_length (va_api_drivers),
-                                      (GDestroyNotify) G_CALLBACK (icd_details_free));
+  details_arr = icd_details_array_sized_new (g_list_length (dri_drivers)
+                                             + g_list_length (va_api_drivers));
 
   for (icd_iter = dri_drivers, j = 0; icd_iter != NULL; icd_iter = icd_iter->next, j++)
     {
@@ -6961,8 +6960,7 @@ pv_enumerate_egl_ext_platforms (SrtSystemInfo *system_info,
                                 which_system);
   g_debug ("Enumerating EGL external platforms on %s system...", which_system);
   egl_ext_platforms = srt_system_info_list_egl_external_platforms (system_info, NULL);
-  egl_ext_platform_details = g_ptr_array_new_full (g_list_length (egl_ext_platforms),
-                                                   (GDestroyNotify) G_CALLBACK (icd_details_free));
+  egl_ext_platform_details = icd_details_array_sized_new (g_list_length (egl_ext_platforms));
 
   for (icd_iter = egl_ext_platforms, i = 0;
        icd_iter != NULL;
@@ -7005,8 +7003,7 @@ pv_enumerate_egl_icds (SrtSystemInfo *system_info,
   timer = _srt_profiling_start ("Enumerating EGL ICDs on %s system", which_system);
   g_debug ("Enumerating EGL ICDs on %s system...", which_system);
   egl_icds = srt_system_info_list_egl_icds (system_info, NULL);
-  egl_icd_details = g_ptr_array_new_full (g_list_length (egl_icds),
-                                          (GDestroyNotify) G_CALLBACK (icd_details_free));
+  egl_icd_details = icd_details_array_sized_new (g_list_length (egl_icds));
 
   for (icd_iter = egl_icds, i = 0;
        icd_iter != NULL;
@@ -7049,8 +7046,7 @@ pv_enumerate_vulkan_icds (SrtSystemInfo *system_info,
   timer = _srt_profiling_start ("Enumerating Vulkan ICDs on %s system", which_system);
   g_debug ("Enumerating Vulkan ICDs on %s system...", which_system);
   vulkan_icds = srt_system_info_list_vulkan_icds (system_info, NULL);
-  vulkan_icd_details = g_ptr_array_new_full (g_list_length (vulkan_icds),
-                                             (GDestroyNotify) G_CALLBACK (icd_details_free));
+  vulkan_icd_details = icd_details_array_sized_new (g_list_length (vulkan_icds));
 
   for (icd_iter = vulkan_icds, i = 0;
        icd_iter != NULL;
@@ -7185,14 +7181,12 @@ pv_enumerate_vulkan_layer_details (SrtSystemInfo *system_info,
 
   g_debug ("Enumerating Vulkan explicit layers on %s system...", which_system);
   vulkan_exp_layers = srt_system_info_list_explicit_vulkan_layers (system_info);
-  *vulkan_exp_layer_details = g_ptr_array_new_full (g_list_length (vulkan_exp_layers),
-                                                    (GDestroyNotify) G_CALLBACK (icd_details_free));
+  *vulkan_exp_layer_details = icd_details_array_sized_new (g_list_length (vulkan_exp_layers));
   pv_append_vulkan_layers_details (vulkan_exp_layers, "explicit", *vulkan_exp_layer_details);
 
   g_debug ("Enumerating Vulkan implicit layers on %s system...", which_system);
   vulkan_imp_layers = srt_system_info_list_implicit_vulkan_layers (system_info);
-  *vulkan_imp_layer_details = g_ptr_array_new_full (g_list_length (vulkan_imp_layers),
-                                                    (GDestroyNotify) G_CALLBACK (icd_details_free));
+  *vulkan_imp_layer_details = icd_details_array_sized_new (g_list_length (vulkan_imp_layers));
   pv_append_vulkan_layers_details (vulkan_imp_layers, "implicit", *vulkan_imp_layer_details);
 }
 

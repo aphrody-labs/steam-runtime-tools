@@ -205,6 +205,7 @@ libsteam-runtime-tools-0.so.0 libsteam-runtime-tools-0-0 #MINVER#
  srt_system_info_dup_libdl_lib@Base 0.20210430.0
  srt_system_info_dup_libdl_platform@Base 0.20210430.0
  srt_system_info_dup_multiarch_tuples@Base 0.20210305.0
+ srt_system_info_dup_openxr_1_runtime@Base 0.20250820.0
  srt_system_info_dup_os_build_id@Base 0.20190926.1
  srt_system_info_dup_os_id@Base 0.20190926.1
  srt_system_info_dup_os_id_like@Base 0.20190926.1
@@ -241,6 +242,7 @@ libsteam-runtime-tools-0.so.0 libsteam-runtime-tools-0-0 #MINVER#
  srt_system_info_list_explicit_vulkan_layers@Base 0.20201124.0
  srt_system_info_list_glx_icds@Base 0.20200306.0
  srt_system_info_list_implicit_vulkan_layers@Base 0.20201124.0
+ srt_system_info_list_inactive_openxr_1_runtimes@Base 0.20250820.0
  srt_system_info_list_pinned_libs_32@Base 0.20191024.0
  srt_system_info_list_pinned_libs_64@Base 0.20191024.0
  srt_system_info_list_pressure_vessel_overrides@Base 0.20191024.0

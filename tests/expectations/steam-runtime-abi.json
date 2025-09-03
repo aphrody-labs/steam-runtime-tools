@@ -28,14 +28,6 @@
   },
   "libacl.so.1",
   {
-   "libtheoraenc.so.1": {
-    "deb": "libtheora0",
-    "hidden_dependencies": [
-     "libtheoradec.so.1"
-    ]
-   }
-  },
-  {
    "libtWithHiddens.so.1": {
     "deb": "libtWithHiddens0",
     "hidden_dependencies": [

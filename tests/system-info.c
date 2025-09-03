@@ -562,36 +562,6 @@ check_libraries_result (GList *libraries)
 
   g_assert_true (seen_libc);
 
-  /* Test third library */
-  l = g_list_next (l);
-  library = l->data;
-  g_assert_nonnull (library);
-  g_assert_cmpstr (srt_library_get_requested_name (library), ==, "libtheoraenc.so.1");
-  missing_symbols = srt_library_get_missing_symbols (library);
-  g_assert_nonnull (missing_symbols);
-  g_assert_cmpstr (missing_symbols[0], ==, NULL);
-
-  g_assert_cmpint (srt_library_get_issues (library), ==, SRT_LIBRARY_ISSUES_NONE);
-
-  misversioned_symbols = srt_library_get_misversioned_symbols (library);
-  g_assert_nonnull (misversioned_symbols);
-  g_assert_cmpstr (misversioned_symbols[0], ==, NULL);
-
-  dependencies = srt_library_get_dependencies (library);
-  g_assert_nonnull (dependencies);
-  g_assert_cmpstr (dependencies[0], !=, NULL);
-  seen_libc = FALSE;
-
-  for (gsize i = 0; dependencies[i] != NULL; i++)
-    {
-      g_debug ("libtheoraenc.so.1 depends on %s", dependencies[i]);
-
-      if (strstr (dependencies[i], "/libc.so.") != NULL)
-        seen_libc = TRUE;
-    }
-
-  g_assert_true (seen_libc);
-
   /* Test last library */
   l = g_list_next (l);
   library = l->data;
@@ -786,6 +756,88 @@ library_presence (Fixture *f,
   g_object_unref (library);
   g_free (expectations_in);
   g_object_unref (info);
+}
+
+/*
+ * Exercise handling of libraries with hidden dependencies:
+ * in other words, libraries that can only be loaded if some other
+ * library was loaded first.
+ *
+ * We can only meaningfully test this if libtheoraenc.so.1 from Debian 12
+ * or older is available, because this is one of the few examples we know
+ * of a library with hidden dependencies: <https://bugs.debian.org/923940>.
+ * The bug was fixed in Debian 13, so on Debian 13, this test will pass
+ * but is not really testing what we intend it to. On Debian 14,
+ * libtheora{dec,enc}.so.1 are no longer present so this test will be skipped.
+ */
+static void
+hidden_dependencies (Fixture *f,
+                     gconstpointer context)
+{
+  g_autoptr(SrtSystemInfo) info = NULL;
+  g_autofree gchar *expectations_in = NULL;
+  g_autoptr(SrtLibrary) library = NULL;
+  SrtLibraryIssues issues;
+  const char *multiarch_tuple = NULL;
+  const char * const *missing_symbols;
+  const char * const *misversioned_symbols;
+  const char * const *dependencies;
+  gboolean seen_libc;
+
+#if defined(_SRT_MULTIARCH)
+  multiarch_tuple = _SRT_MULTIARCH;
+#else
+  g_test_skip ("Unsupported architecture for this test");
+  return;
+#endif
+
+  expectations_in = g_build_filename (f->srcdir, "expectations_libtheora0", NULL);
+  info = srt_system_info_new (expectations_in);
+
+  issues = srt_system_info_check_library (info,
+                                          multiarch_tuple,
+                                          "libtheoradec.so.1",
+                                          NULL);
+
+  if (issues & SRT_LIBRARY_ISSUES_CANNOT_LOAD)
+    {
+      g_test_skip ("libtheoradec.so.1 not found, can only test on Debian <= 12");
+      return;
+    }
+
+  issues = srt_system_info_check_library (info,
+                                          multiarch_tuple,
+                                          "libtheoraenc.so.1",
+                                          &library);
+  g_assert_cmpint (issues, ==, SRT_LIBRARY_ISSUES_NONE);
+
+  g_assert_nonnull (library);
+  g_assert_cmpstr (srt_library_get_requested_name (library), ==,
+                   "libtheoraenc.so.1");
+  missing_symbols = srt_library_get_missing_symbols (library);
+  g_assert_nonnull (missing_symbols);
+  g_assert_cmpstr (missing_symbols[0], ==, NULL);
+
+  g_assert_cmpint (srt_library_get_issues (library), ==, SRT_LIBRARY_ISSUES_NONE);
+
+  misversioned_symbols = srt_library_get_misversioned_symbols (library);
+  g_assert_nonnull (misversioned_symbols);
+  g_assert_cmpstr (misversioned_symbols[0], ==, NULL);
+
+  dependencies = srt_library_get_dependencies (library);
+  g_assert_nonnull (dependencies);
+  g_assert_cmpstr (dependencies[0], !=, NULL);
+  seen_libc = FALSE;
+
+  for (gsize i = 0; dependencies[i] != NULL; i++)
+    {
+      g_debug ("libtheoraenc.so.1 depends on %s", dependencies[i]);
+
+      if (strstr (dependencies[i], "/libc.so.") != NULL)
+        seen_libc = TRUE;
+    }
+
+  g_assert_true (seen_libc);
 }
 
 static void
@@ -4698,6 +4750,8 @@ main (int argc,
               setup, auto_expectations, teardown);
   g_test_add ("/system-info/library_presence", Fixture, NULL,
               setup, library_presence, teardown);
+  g_test_add ("/system-info/hidden_dependencies", Fixture, NULL,
+              setup, hidden_dependencies, teardown);
   g_test_add ("/system-info/libraries_missing", Fixture, NULL,
               setup, libraries_missing, teardown);
   g_test_add ("/system-info/library_missing", Fixture, NULL,

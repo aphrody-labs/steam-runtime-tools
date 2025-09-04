@@ -2183,6 +2183,15 @@ srt_system_info_set_environ (SrtSystemInfo *self,
   _srt_system_info_set_subprocess_runner (self, runner);
 }
 
+const char *
+_srt_system_info_get_sysroot_path (SrtSystemInfo *self)
+{
+  if (self->sysroot == NULL)
+    return NULL;
+
+  return self->sysroot->path;
+}
+
 /**
  * srt_system_info_set_sysroot:
  * @self: The #SrtSystemInfo

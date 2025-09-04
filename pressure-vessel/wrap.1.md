@@ -157,7 +157,7 @@ behaviour of **pv-adverb**(1).
 </dd>
 <dt>
 
-**--graphics-provider** *DIR*
+**--graphics-provider** *DIR*, **--graphics-provider** *TUPLE=DIR*
 
 </dt><dd>
 
@@ -171,6 +171,14 @@ be done for development or debugging.
 Otherwise, *DIR* must be the absolute path to a directory that is
 the root of an operating system installation (a "sysroot"). The
 default is `/`.
+
+If prefixed with a multiarch tuple such as **x86_64-linux-gnu**,
+use *DIR* for graphics drivers for that architecture only,
+overriding any non-architecture-specific choice.
+For example,
+`--graphics-provider=/ --graphics-provider=i386-linux-gnu=/opt/32`
+would take `i386` graphics drivers from the sysroot `/opt/32`,
+but `x86_64` graphics drivers from the root directory,
 
 </dd>
 <dt>
@@ -744,6 +752,17 @@ If set to `0`, equivalent to `--no-generate-locales`.
 </dt><dd>
 
 Equivalent to `--graphics-provider="$PRESSURE_VESSEL_GRAPHICS_PROVIDER"`.
+
+</dd>
+<dt>
+
+`PRESSURE_VESSEL_GRAPHICS_PROVIDER_x86_64_linux_gnu`, etc.
+
+</dt><dd>
+
+Equivalent to
+`--graphics-provider="x86_64-linux-gnu=$PRESSURE_VESSEL_GRAPHICS_PROVIDER"`
+and so on.
 
 </dd>
 <dt>

@@ -53,6 +53,7 @@ typedef struct
   GStrv filesystems;
   gchar *freedesktop_app_id;
   gchar *graphics_provider;
+  GHashTable *arch_graphics_providers;
   gchar *home;
   GArray *pass_fds;
   GArray *preload_modules;

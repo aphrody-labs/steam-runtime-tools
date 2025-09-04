@@ -48,6 +48,7 @@ pv_wrap_options_init (PvWrapOptions *self)
   g_array_set_clear_func (self->preload_modules, wrap_preload_module_clear);
 
   /* Set defaults */
+  self->arch_graphics_providers = NULL;
   self->batch = FALSE;
   self->copy_runtime = FALSE;
   self->deterministic = FALSE;
@@ -56,7 +57,7 @@ pv_wrap_options_init (PvWrapOptions *self)
   self->filesystems = NULL;
   self->gc_runtimes = TRUE;
   self->generate_locales = TRUE;
-  self->graphics_provider = FALSE;
+  self->graphics_provider = NULL;
   self->import_ca_certs = FALSE;
   self->import_openxr_1_runtimes = FALSE;
   self->import_vulkan_layers = TRUE;
@@ -84,6 +85,7 @@ pv_wrap_options_init (PvWrapOptions *self)
 static void
 pv_wrap_options_clear (PvWrapOptions *self)
 {
+  g_clear_pointer (&self->arch_graphics_providers, g_hash_table_unref);
   g_clear_pointer (&self->env_if_host, g_strfreev);
   g_clear_pointer (&self->filesystems, g_strfreev);
   g_clear_pointer (&self->freedesktop_app_id, g_free);
@@ -618,6 +620,67 @@ opt_with_host_graphics_cb (const gchar *option_name,
   return TRUE;
 }
 
+/*
+ * @self: The pv-wrap(1) options
+ * @tuple: A multiarch tuple such as `g_quark_from_static_string (SRT_ABI_I386)`
+ * @path: (transfer full): An absolute filesystem path
+ *
+ * Record @path as the implementation of the graphics stack for the
+ * architecture/ABI identified by @tuple, taking ownership of the strings.
+ */
+static void
+pv_wrap_options_take_arch_graphics_provider (PvWrapOptions *self,
+                                             GQuark tuple,
+                                             gchar *path)
+{
+  if (self->arch_graphics_providers == NULL)
+    self->arch_graphics_providers = g_hash_table_new_full (g_direct_hash,
+                                                           g_direct_equal,
+                                                           NULL,
+                                                           g_free);
+
+  g_hash_table_replace (self->arch_graphics_providers,
+                        GUINT_TO_POINTER (tuple),
+                        path);
+}
+
+static gboolean
+opt_graphics_provider_cb (const gchar *option_name,
+                          const gchar *value,
+                          gpointer data,
+                          GError **error)
+{
+  PvWrapOptions *self = data;
+  const char *equals;
+
+  g_return_val_if_fail (value != NULL, FALSE);
+
+  /* --graphics-provider=/path/to/somewhere */
+  if (value != NULL
+      && value[0] != '/'
+      && (equals = strchr (value, '=')) != NULL)
+    {
+      g_autofree gchar *tuple = g_strndup (value, equals - value);
+      const char *path = equals + 1;
+
+      if (!pv_supported_architectures_include_tuple (tuple))
+        {
+          g_warning ("Not a supported multiarch tuple: %s", tuple);
+          return TRUE;
+        }
+
+      pv_wrap_options_take_arch_graphics_provider (self,
+                                                   g_quark_from_string (tuple),
+                                                   g_strdup (path));
+      return TRUE;
+    }
+
+  /* --graphics-provider=/path/to/somewhere */
+  g_clear_pointer (&self->graphics_provider, g_free);
+  self->graphics_provider = g_strdup (value);
+  return TRUE;
+}
+
 gboolean
 pv_wrap_options_parse_environment (PvWrapOptions *self,
                                    GError **error)
@@ -788,13 +851,13 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
       "does not necessarily take the module from the host system",
       "MODULE" },
     { "graphics-provider", '\0',
-      G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME, &self->graphics_provider,
+      G_OPTION_FLAG_FILENAME, G_OPTION_ARG_CALLBACK, opt_graphics_provider_cb,
       "If using --runtime, use PATH as the graphics provider. "
       "The path is assumed to be relative to the current namespace, "
       "and will be adjusted for use on the host system if pressure-vessel "
       "is run in a container. The empty string means use the graphics "
       "stack from container."
-      "[Default: $PRESSURE_VESSEL_GRAPHICS_PROVIDER or '/']", "PATH" },
+      "[Default: $PRESSURE_VESSEL_GRAPHICS_PROVIDER or '/']", "[TUPLE=]PATH" },
     { "launcher", '\0',
       G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &self->launcher,
       "Instead of specifying a command with its arguments to execute, all the "
@@ -1033,6 +1096,8 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
                                               SrtSysroot *interpreter_root,
                                               GError **error)
 {
+  gsize i;
+
   if (self->runtime == NULL)
     {
       self->runtime = g_strdup (g_getenv ("PRESSURE_VESSEL_RUNTIME"));
@@ -1085,6 +1150,50 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
                    "--graphics-provider path must be absolute, not \"%s\"",
                    self->graphics_provider);
       return FALSE;
+    }
+
+  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+    {
+      GQuark tuple = g_quark_from_static_string (pv_multiarch_tuples[i]);
+      gconstpointer key = GUINT_TO_POINTER (tuple);
+      gpointer value;
+
+      if (self->arch_graphics_providers == NULL
+          || !g_hash_table_contains (self->arch_graphics_providers, key))
+        {
+          g_autofree gchar *var = NULL;
+          const char *path;
+
+          var = g_strdup_printf ("PRESSURE_VESSEL_GRAPHICS_PROVIDER_%s",
+                                 g_quark_to_string (tuple));
+          g_strdelimit (var, "-", '_');
+          path = g_getenv (var);
+
+          if (path != NULL)
+            pv_wrap_options_take_arch_graphics_provider (self,
+                                                         tuple,
+                                                         g_strdup (path));
+        }
+
+      if (self->arch_graphics_providers != NULL
+          && g_hash_table_lookup_extended (self->arch_graphics_providers,
+                                           key,
+                                           NULL,
+                                           &value))
+        {
+          const char *path = value;
+
+          if (path[0] != '/')
+            {
+              g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE,
+                           "--graphics-provider path must be absolute, not \"%s\"",
+                           (const char *) value);
+              return FALSE;
+            }
+
+          g_debug ("Architecture-specific graphics provider for %s: %s",
+                   g_quark_to_string (tuple), path);
+        }
     }
 
   return TRUE;

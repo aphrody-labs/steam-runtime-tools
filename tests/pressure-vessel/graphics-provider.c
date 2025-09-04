@@ -188,6 +188,7 @@ test_graphics_provider_search (Fixture *f,
    * graphics driver enumeration immediately. */
   graphics_providers = pv_graphics_provider_build_array (f->tmpdir,
                                                          NULL,
+                                                         NULL,
                                                          PV_RUNTIME_FLAGS_SINGLE_THREAD,
                                                          &error);
   g_assert_no_error (error);

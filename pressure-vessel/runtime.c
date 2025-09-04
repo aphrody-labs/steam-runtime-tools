@@ -4867,56 +4867,71 @@ setup_each_json_manifest (PvRuntime *self,
   return TRUE;
 }
 
+/*
+ * @details_arr: (element-type IcdDetails):
+ * @patterns: (element-type filename):
+ */
 static gboolean
-collect_vulkan_layers (PvRuntime *self,
-                       const GPtrArray *layer_details,
-                       GPtrArray *libdir_patterns,
-                       RuntimeArchitecture *arch,
-                       const gchar *dir_name,
-                       GError **error)
+collect_json_based_drivers (PvRuntime *self,
+                            RuntimeArchitecture *arch,
+                            const char *description,
+                            const GPtrArray *details_arr,
+                            const gchar *bind_icds_subdir,
+                            GPtrArray *libdir_patterns,
+                            GError **error)
 {
   /* We don't have to use multiple directories unless there are
    * filename collisions, because the order of the JSON manifests
-   * might matter, but the order of the actual libraries does not. */
+   * might matter, but the order of the actual libraries does not
+   * (this is true for all the JSON-based driver families we currently
+   * support). */
   gboolean use_numbered_subdirs = FALSE;
   gsize j;
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
-    _srt_profiling_start ("Collecting Vulkan %s layers", dir_name);
+    _srt_profiling_start ("Collecting %s", description);
+  const gsize multiarch_index = arch->multiarch_index;
 
   g_return_val_if_fail (self->provider != NULL, FALSE);
-  g_return_val_if_fail (layer_details != NULL, FALSE);
+  g_return_val_if_fail (details_arr != NULL, FALSE);
   g_return_val_if_fail (libdir_patterns != NULL, FALSE);
-  g_return_val_if_fail (dir_name != NULL, FALSE);
+  g_return_val_if_fail (bind_icds_subdir != NULL, FALSE);
 
-  for (j = 0; j < layer_details->len; j++)
+  g_debug ("Collecting %s %s from provider...",
+           arch->details->tuple, description);
+
+  for (j = 0; j < details_arr->len; j++)
     {
-      g_autoptr(SrtLibrary) library = NULL;
-      SrtLibraryIssues issues;
-      IcdDetails *details = g_ptr_array_index (layer_details, j);
-      SrtVulkanLayer *layer = SRT_VULKAN_LAYER (details->icd);
+      IcdDetails *details = g_ptr_array_index (details_arr, j);
+      SrtBaseGraphicsModule *base = SRT_BASE_GRAPHICS_MODULE (details->icd);
       const char *resolved_library;
-      const gsize multiarch_index = arch->multiarch_index;
 
       g_assert (details->resolved_libraries[multiarch_index] == NULL);
 
-      if (!srt_vulkan_layer_check_error (layer, NULL))
+      if (!_srt_base_graphics_module_check_error (base, NULL))
         continue;
 
       /* For meta-layers we don't have a library path */
-      if (srt_vulkan_layer_get_library_path(layer) == NULL)
+      if (SRT_IS_VULKAN_LAYER (base) && base->library_path == NULL)
         {
           details->kinds[multiarch_index] = ICD_KIND_META_LAYER;
           continue;
+        }
+      else
+        {
+          g_assert (base->library_path != NULL);
         }
 
       /* If the library_path is relative to the JSON file, turn it into an
        * absolute path. If it's already absolute, or if it's a basename to be
        * looked up in the system library search path, use it as-is. */
-      details->resolved_libraries[multiarch_index] = srt_vulkan_layer_resolve_library_path (layer);
+      details->resolved_libraries[multiarch_index] = _srt_base_graphics_module_resolve_library_path (base);
       resolved_library = details->resolved_libraries[multiarch_index];
       g_assert (details->resolved_libraries[multiarch_index] != NULL);
 
-      if (strchr (resolved_library, '/') != NULL &&
+      /* TODO: Previously we only did this for Vulkan layers, but is it
+       * applicable to all file types? */
+      if (SRT_IS_VULKAN_LAYER (base) &&
+          strchr (resolved_library, '/') != NULL &&
           (strstr (resolved_library, "$ORIGIN/") != NULL ||
            strstr (resolved_library, "${ORIGIN}") != NULL ||
            strstr (resolved_library, "$LIB/") != NULL ||
@@ -4934,6 +4949,9 @@ collect_vulkan_layers (PvRuntime *self,
            * see what the resulting path is. */
           if (_srt_sysroot_is_direct (self->provider->in_current_ns))
             {
+              g_autoptr(SrtLibrary) library = NULL;
+              SrtLibraryIssues issues;
+
               /* It's in our current namespace, so we can dlopen it. */
               g_info ("Evaluating dynamic string tokens in \"%s\"", resolved_library);
               issues = srt_check_library_presence (resolved_library,
@@ -4971,9 +4989,9 @@ collect_vulkan_layers (PvRuntime *self,
         }
     }
 
-  if (!bind_icds (self, arch, dir_name,
-                  (IcdDetails **) layer_details->pdata,
-                  layer_details->len,
+  if (!bind_icds (self, arch, bind_icds_subdir,
+                  (IcdDetails **) details_arr->pdata,
+                  details_arr->len,
                   &use_numbered_subdirs, libdir_patterns, NULL, error))
     return FALSE;
 
@@ -6551,141 +6569,6 @@ pv_runtime_create_aliases (PvRuntime *self,
 }
 
 /*
- * @egl_icd_details: (element-type IcdDetails):
- * @patterns: (element-type filename):
- */
-static gboolean
-collect_egl_drivers (PvRuntime *self,
-                     RuntimeArchitecture *arch,
-                     GPtrArray *egl_icd_details,
-                     GPtrArray *patterns,
-                     GError **error)
-{
-  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
-    _srt_profiling_start ("Collecting EGL drivers");
-  gsize j;
-  /* As with Vulkan layers, the order of the manifests matters
-   * but the order of the actual libraries does not. */
-  gboolean use_numbered_subdirs = FALSE;
-  const gsize multiarch_index = arch->multiarch_index;
-
-  g_debug ("Collecting %s EGL drivers from provider...",
-           arch->details->tuple);
-
-  for (j = 0; j < egl_icd_details->len; j++)
-    {
-      IcdDetails *details = g_ptr_array_index (egl_icd_details, j);
-      SrtEglIcd *icd = SRT_EGL_ICD (details->icd);
-
-      g_assert (details->resolved_libraries[multiarch_index] == NULL);
-
-      if (!srt_egl_icd_check_error (icd, NULL))
-        continue;
-
-      details->resolved_libraries[multiarch_index] = srt_egl_icd_resolve_library_path (icd);
-      g_assert (details->resolved_libraries[multiarch_index] != NULL);
-    }
-
-  if (!bind_icds (self, arch, "glvnd",
-                  (IcdDetails **) egl_icd_details->pdata,
-                  egl_icd_details->len,
-                  &use_numbered_subdirs, patterns, NULL, error))
-    return FALSE;
-
-  return TRUE;
-}
-
-/*
- * @egl_ext_platform_details: (element-type IcdDetails):
- * @patterns: (element-type filename):
- */
-static gboolean
-collect_egl_ext_platforms (PvRuntime *self,
-                           RuntimeArchitecture *arch,
-                           GPtrArray *egl_ext_platform_details,
-                           GPtrArray *patterns,
-                           GError **error)
-{
-  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
-    _srt_profiling_start ("Collecting EGL external platforms");
-  gsize j;
-  /* As with Vulkan layers, the order of the manifests matters
-   * but the order of the actual libraries does not. */
-  gboolean use_numbered_subdirs = FALSE;
-  const gsize multiarch_index = arch->multiarch_index;
-
-  g_debug ("Collecting %s EGL external platforms from provider...",
-           arch->details->tuple);
-
-  for (j = 0; j < egl_ext_platform_details->len; j++)
-    {
-      IcdDetails *details = g_ptr_array_index (egl_ext_platform_details, j);
-      SrtEglExternalPlatform *ext = SRT_EGL_EXTERNAL_PLATFORM (details->icd);
-
-      g_assert (details->resolved_libraries[multiarch_index] == NULL);
-
-      if (!srt_egl_external_platform_check_error (ext, NULL))
-        continue;
-
-      details->resolved_libraries[multiarch_index] = srt_egl_external_platform_resolve_library_path (ext);
-      g_assert (details->resolved_libraries[multiarch_index] != NULL);
-    }
-
-  if (!bind_icds (self, arch, "egl_external_platform",
-                  (IcdDetails **) egl_ext_platform_details->pdata,
-                  egl_ext_platform_details->len,
-                  &use_numbered_subdirs, patterns, NULL, error))
-    return FALSE;
-
-  return TRUE;
-}
-
-/*
- * @vulkan_icd_details: (element-type IcdDetails):
- * @patterns: (element-type filename):
- */
-static gboolean
-collect_vulkan_icds (PvRuntime *self,
-                     RuntimeArchitecture *arch,
-                     GPtrArray *vulkan_icd_details,
-                     GPtrArray *patterns,
-                     GError **error)
-{
-  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
-    _srt_profiling_start ("Collecting Vulkan ICDs");
-  gsize j;
-  /* As with Vulkan layers, the order of the manifests matters
-   * but the order of the actual libraries does not. */
-  gboolean use_numbered_subdirs = FALSE;
-  const gsize multiarch_index = arch->multiarch_index;
-
-  g_debug ("Collecting %s Vulkan drivers from provider...",
-           arch->details->tuple);
-
-  for (j = 0; j < vulkan_icd_details->len; j++)
-    {
-      IcdDetails *details = g_ptr_array_index (vulkan_icd_details, j);
-      SrtVulkanIcd *icd = SRT_VULKAN_ICD (details->icd);
-
-      g_assert (details->resolved_libraries[multiarch_index] == NULL);
-
-      if (!srt_vulkan_icd_check_error (icd, NULL))
-        continue;
-
-      details->resolved_libraries[multiarch_index] = srt_vulkan_icd_resolve_library_path (icd);
-      g_assert (details->resolved_libraries[multiarch_index] != NULL);
-    }
-
-  if (!bind_icds (self, arch, "vulkan",
-                  (IcdDetails **) vulkan_icd_details->pdata,
-                  vulkan_icd_details->len,
-                  &use_numbered_subdirs, patterns, NULL, error))
-    return FALSE;
-
-  return TRUE;
-}
-
-/*
  * @patterns: (element-type filename):
  */
 static gboolean
@@ -7304,29 +7187,51 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           collect_core_libraries_patterns (patterns);
           collect_graphics_libraries_patterns (patterns);
 
-          if (!collect_egl_drivers (self, arch, provider_stack->egl_icd_details,
-                                    patterns, error))
+          if (!collect_json_based_drivers (self,
+                                           arch,
+                                           "EGL drivers",
+                                           provider_stack->egl_icd_details,
+                                           "glvnd",
+                                           patterns,
+                                           error))
             return FALSE;
 
-          if (!collect_egl_ext_platforms (self, arch,
-                                          provider_stack->egl_ext_platform_details,
-                                          patterns, error))
+          if (!collect_json_based_drivers (self,
+                                           arch,
+                                           "EGL external platforms",
+                                           provider_stack->egl_ext_platform_details,
+                                           "egl_external_platform",
+                                           patterns,
+                                           error))
             return FALSE;
 
-          if (!collect_vulkan_icds (self, arch, provider_stack->vulkan_icd_details,
-                                    patterns, error))
+          if (!collect_json_based_drivers (self,
+                                           arch,
+                                           "Vulkan drivers",
+                                           provider_stack->vulkan_icd_details,
+                                           "vulkan",
+                                           patterns,
+                                           error))
             return FALSE;
 
           if (self->flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
             {
-              g_debug ("Collecting Vulkan explicit layers from provider...");
-              if (!collect_vulkan_layers (self, provider_stack->vulkan_exp_layer_details,
-                                          patterns, arch, "vulkan_exp_layer", error))
+              if (!collect_json_based_drivers (self,
+                                               arch,
+                                               "Vulkan explicit layers",
+                                               provider_stack->vulkan_exp_layer_details,
+                                               "vulkan_exp_layer",
+                                               patterns,
+                                               error))
                 return FALSE;
 
-              g_debug ("Collecting Vulkan implicit layers from provider...");
-              if (!collect_vulkan_layers (self, provider_stack->vulkan_imp_layer_details,
-                                          patterns, arch, "vulkan_imp_layer", error))
+              if (!collect_json_based_drivers (self,
+                                               arch,
+                                               "Vulkan implicit layers",
+                                               provider_stack->vulkan_imp_layer_details,
+                                               "vulkan_imp_layer",
+                                               patterns,
+                                               error))
                 return FALSE;
             }
 

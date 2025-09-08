@@ -6376,7 +6376,7 @@ collect_mesa_drirc (PvRuntime *self,
                     RuntimeArchitecture *arch,
                     GPtrArray *egl_icd_details,
                     GPtrArray *vulkan_icd_details,
-                    SrtSystemInfo *system_info,
+                    SrtSystemInfo *arch_system_info,
                     GHashTable *drirc_data_in_provider)
 {
   g_autoptr(SrtObjectList) dri_drivers = NULL;
@@ -6420,7 +6420,7 @@ collect_mesa_drirc (PvRuntime *self,
   /* We assume that by the time we get here, this is already cached,
    * so its time cost will be trivial and therefore there's no need to
    * do additional profiling */
-  dri_drivers = srt_system_info_list_dri_drivers (system_info,
+  dri_drivers = srt_system_info_list_dri_drivers (arch_system_info,
                                                   arch->details->tuple,
                                                   SRT_DRIVER_FLAGS_NONE);
 
@@ -7996,7 +7996,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
             }
 
           collect_mesa_drirc (self, arch, provider_stack->egl_icd_details,
-                              provider_stack->vulkan_icd_details, system_info,
+                              provider_stack->vulkan_icd_details,
+                              arch_system_info,
                               drirc_data_in_provider);
 
           libglx_nvidia = g_build_filename (arch->libdir_relative_to_overrides,

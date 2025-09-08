@@ -839,7 +839,7 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
       NULL },
     { "no-import-openxr-1-runtimes", '\0',
       G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &self->import_openxr_1_runtimes,
-      "Do not import OpenXR 1 runtimes from the host system. Plase note that "
+      "Do not import OpenXR 1 runtimes from the host system. Please note that "
       "certain OpenXR 1 runtimes might still continue to be reachable from "
       "inside the container. This could be the case for runtimes located in "
       "`~/.config/openxr/1` for example, because we usually share the real "

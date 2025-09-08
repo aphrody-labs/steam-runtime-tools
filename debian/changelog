@@ -1,5 +1,11 @@
-steam-runtime-tools (0.20250903.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20250908.0) UNRELEASED; urgency=medium
 
+  * pressure-vessel:
+    - Fix sense of check for root as graphics stack provider when deciding
+      how to handle LD_PRELOAD=libfoo.so.0
+      (steam-runtime-tools!830)
+    - Make better use of cached information about DRI drivers
+      (steam-runtime-tools!832)
   * Packaging:
     - d/libsteam-runtime-tools-0-0.symbols:
       Belatedly update for 0.20250820.0
@@ -7,7 +13,7 @@ steam-runtime-tools (0.20250903.0) UNRELEASED; urgency=medium
     - Fix unit test regression on Debian 14 prereleases
       (steamrt/tasks#796)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 03 Sep 2025 19:25:40 +0100
+ -- Simon McVittie <smcv@collabora.com>  Mon, 08 Sep 2025 16:55:36 +0100
 
 steam-runtime-tools (0.20250820.0) steamrt; urgency=medium
 

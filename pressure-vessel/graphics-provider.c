@@ -34,13 +34,24 @@ enum {
   N_PROPERTIES
 };
 
+typedef struct
+{
+  GArray *tuples;
+} PvGraphicsProviderPrivate;
+
 static GParamSpec *properties[N_PROPERTIES] = { NULL };
 
-G_DEFINE_TYPE (PvGraphicsProvider, pv_graphics_provider, G_TYPE_OBJECT)
+G_DEFINE_TYPE_WITH_CODE (PvGraphicsProvider,
+                         pv_graphics_provider,
+                         G_TYPE_OBJECT,
+                         G_ADD_PRIVATE (PvGraphicsProvider))
 
 static void
 pv_graphics_provider_init (PvGraphicsProvider *self)
 {
+  PvGraphicsProviderPrivate *priv = pv_graphics_provider_get_instance_private (self);
+
+  priv->tuples = g_array_new (TRUE, TRUE, sizeof (GQuark));
 }
 
 static void
@@ -131,6 +142,9 @@ static void
 pv_graphics_provider_finalize (GObject *object)
 {
   PvGraphicsProvider *self = PV_GRAPHICS_PROVIDER (object);
+  PvGraphicsProviderPrivate *priv = pv_graphics_provider_get_instance_private (self);
+
+  g_clear_pointer (&priv->tuples, g_array_unref);
 
   g_free (self->path_in_host_ns);
   g_free (self->path_in_container_ns);
@@ -282,6 +296,75 @@ pv_graphics_provider_create_system_info (PvGraphicsProvider *self)
   _srt_system_info_set_sysroot (system_info, self->in_current_ns);
   _srt_system_info_set_check_flags (system_info, flags);
   return g_steal_pointer (&system_info);
+}
+
+/*
+ * Returns: %TRUE if @tuple is in pv_graphics_provider_get_architectures()
+ */
+gboolean
+pv_graphics_provider_has_architecture (PvGraphicsProvider *self,
+                                       GQuark tuple)
+{
+  PvGraphicsProviderPrivate *priv = pv_graphics_provider_get_instance_private (self);
+  gsize i;
+
+  for (i = 0; i < priv->tuples->len; i++)
+    {
+      GQuark other = g_array_index (priv->tuples, GQuark, i);
+
+      if (tuple == other)
+        return TRUE;
+    }
+
+  return FALSE;
+}
+
+/*
+ * pv_graphics_provider_get_architectures:
+ * @self: The graphics stack provider
+ * @n: (out) (optional): Number of nonzero items in the result
+ *
+ * Returns: (transfer none) (array zero-terminated=1): An array of `*n` quarks
+ *  representing multiarch tuples, followed by `0`
+ */
+const GQuark *
+pv_graphics_provider_get_architectures (PvGraphicsProvider *self,
+                                       gsize *n)
+{
+  PvGraphicsProviderPrivate *priv = pv_graphics_provider_get_instance_private (self);
+
+  if (n != NULL)
+    *n = priv->tuples->len;
+
+  return (const GQuark *) priv->tuples->data;
+}
+
+/*
+ * pv_graphics_provider_add_architecture:
+ * @self: The graphics stack provider
+ * @tuple: Quark representing a multiarch tuple
+ *
+ * Add @tuple to the list of architectures, if not already present.
+ */
+void
+pv_graphics_provider_add_architecture (PvGraphicsProvider *self,
+                                       GQuark tuple)
+{
+  PvGraphicsProviderPrivate *priv = pv_graphics_provider_get_instance_private (self);
+  gsize i;
+
+  g_return_if_fail (PV_IS_GRAPHICS_PROVIDER (self));
+  g_return_if_fail (tuple != 0);
+
+  for (i = 0; i < priv->tuples->len; i++)
+    {
+      GQuark other = g_array_index (priv->tuples, GQuark, i);
+
+      if (tuple == other)
+        return;
+    }
+
+  g_array_append_val (priv->tuples, tuple);
 }
 
 gchar *

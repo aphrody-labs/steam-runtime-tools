@@ -64,6 +64,13 @@ PvGraphicsProvider *pv_graphics_provider_new (const char *path_in_current_ns,
                                               PvGraphicsProviderFlags flags,
                                               GError **error);
 
+gboolean pv_graphics_provider_has_architecture (PvGraphicsProvider *self,
+                                                GQuark tuple);
+void pv_graphics_provider_add_architecture (PvGraphicsProvider *self,
+                                            GQuark tuple);
+const GQuark *pv_graphics_provider_get_architectures (PvGraphicsProvider *self,
+                                                      gsize *n);
+
 gchar *pv_graphics_provider_search_in_path_and_bin (PvGraphicsProvider *self,
                                                     const gchar *search_paths,
                                                     const gchar *program_name);

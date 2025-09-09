@@ -610,6 +610,13 @@ main (int argc,
 
           if (graphics_provider == NULL)
             goto out;
+
+          for (i = 0; i < G_N_ELEMENTS (pv_multiarch_details); i++)
+            {
+              GQuark q = g_quark_from_static_string (pv_multiarch_details[i].tuple);
+
+              pv_graphics_provider_add_architecture (graphics_provider, q);
+            }
         }
 
       if (interpreter_root != NULL)
@@ -620,6 +627,8 @@ main (int argc,
           if (host_machine != NULL
               && !pv_supported_architectures_include_machine_type (host_machine->machine_type))
             {
+              GQuark q;
+
               /* The trailing slash is needed to allow open(2) to work even if
                * it's using the O_NOFOLLOW flag. */
               interpreter_host_provider = pv_graphics_provider_new ("/proc/self/root/",
@@ -628,6 +637,9 @@ main (int argc,
                                                                     error);
               if (interpreter_host_provider == NULL)
                 goto out;
+
+              q = g_quark_from_static_string (host_machine->multiarch_tuple);
+              pv_graphics_provider_add_architecture (interpreter_host_provider, q);
             }
         }
 

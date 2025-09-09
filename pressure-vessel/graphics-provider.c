@@ -275,10 +275,26 @@ pv_graphics_provider_new (const char *path_in_current_ns,
 }
 
 /*
+ * pv_graphics_provider_create_system_info:
+ * @self: The graphics provider
+ * @single_arch: A single architecture to support, or zero
  * Create a new SrtSystemInfo, suitable for use in a separate thread.
+ *
+ * If @single_arch is nonzero, the returned #SrtSystemInfo will be
+ * specific to that single architecture, suitable for enumerating
+ * DRI drivers, VA-API drivers and similar modules whose search path
+ * is architecture-dependent.
+ *
+ * If @single_arch is zero, the returned #SrtSystemInfo will inherit
+ * its architecture(s) from @self, suitable for enumerating EGL drivers,
+ * Vulkan layers and similar things that have a single search path shared
+ * by all architectures.
+ *
+ * Returns: (transfer full): A new #SrtSystemInfo object
  */
 SrtSystemInfo *
-pv_graphics_provider_create_system_info (PvGraphicsProvider *self)
+pv_graphics_provider_create_system_info (PvGraphicsProvider *self,
+                                         GQuark single_arch)
 {
   g_autoptr(SrtSystemInfo) system_info = NULL;
   SrtCheckFlags flags = SRT_CHECK_FLAGS_SKIP_SLOW_CHECKS
@@ -293,6 +309,22 @@ pv_graphics_provider_create_system_info (PvGraphicsProvider *self)
     flags |= SRT_CHECK_FLAGS_NO_HELPERS;
 
   system_info = srt_system_info_new (NULL);
+
+  if (single_arch != 0)
+    {
+      _srt_system_info_set_multiarch_quarks (system_info, &single_arch, 1);
+    }
+  else
+    {
+      gsize n = 0;
+      const GQuark *archs = pv_graphics_provider_get_architectures (self, &n);
+
+      if (n > 0)
+        _srt_system_info_set_multiarch_quarks (system_info, archs, n);
+      /* else (unlikely) fall back to using the native architecture of
+       * libsteam-runtime-tools */
+    }
+
   _srt_system_info_set_sysroot (system_info, self->in_current_ns);
   _srt_system_info_set_check_flags (system_info, flags);
   return g_steal_pointer (&system_info);

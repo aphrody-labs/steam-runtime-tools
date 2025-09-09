@@ -1292,11 +1292,9 @@ enumerate_arch (gpointer data)
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
     _srt_profiling_start ("Enumerating %s drivers in thread",
                           inputs->details->tuple);
-  const char * const tuples[] = { inputs->details->tuple, NULL };
   g_autoptr(SrtSystemInfo) system_info =
-    pv_graphics_provider_create_system_info (inputs->provider);
-
-  srt_system_info_set_multiarch_tuples (system_info, tuples);
+    pv_graphics_provider_create_system_info (inputs->provider,
+                                             g_quark_from_static_string (inputs->details->tuple));
 
   if (g_cancellable_is_cancelled (inputs->cancellable))
     goto out;
@@ -1424,9 +1422,8 @@ enumerate_indep (gpointer data)
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
     _srt_profiling_start ("Enumerating cross-architecture ICDs in thread");
   g_autoptr(SrtSystemInfo) system_info =
-    pv_graphics_provider_create_system_info (inputs->provider);
+    pv_graphics_provider_create_system_info (inputs->provider, 0);
 
-  srt_system_info_set_multiarch_tuples (system_info, pv_multiarch_tuples);
   cache_indep_graphics_stack (system_info,
                               inputs->runtime_flags,
                               inputs->cancellable);
@@ -1493,7 +1490,8 @@ enumeration_thread_start_arch (EnumerationThread *self,
 
   self->cancellable = g_cancellable_new ();
   self->thread = g_thread_new (details->tuple, enumerate_arch,
-                               enumeration_thread_inputs_new (details, flags,
+                               enumeration_thread_inputs_new (details,
+                                                              flags,
                                                               provider,
                                                               self->cancellable));
 }
@@ -1512,7 +1510,8 @@ enumeration_thread_start_indep (EnumerationThread *self,
   self->cancellable = g_cancellable_new ();
   self->thread = g_thread_new (thread_name == NULL ? "cross-architecture" : thread_name,
                                enumerate_indep,
-                               enumeration_thread_inputs_new (NULL, flags,
+                               enumeration_thread_inputs_new (NULL,
+                                                              flags,
                                                               provider,
                                                               self->cancellable));
 }
@@ -7747,11 +7746,10 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
   if (self->flags & PV_RUNTIME_FLAGS_SINGLE_THREAD)
     {
-      system_info = pv_graphics_provider_create_system_info (self->provider);
-      srt_system_info_set_multiarch_tuples (system_info, pv_multiarch_tuples);
+      system_info = pv_graphics_provider_create_system_info (self->provider, 0);
 
       if (self->interpreter_host_provider != NULL)
-        host_system_info = pv_graphics_provider_create_system_info (self->interpreter_host_provider);
+        host_system_info = pv_graphics_provider_create_system_info (self->interpreter_host_provider, 0);
     }
   else
     {

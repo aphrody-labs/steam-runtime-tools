@@ -74,7 +74,8 @@ const GQuark *pv_graphics_provider_get_architectures (PvGraphicsProvider *self,
 gchar *pv_graphics_provider_search_in_path_and_bin (PvGraphicsProvider *self,
                                                     const gchar *search_paths,
                                                     const gchar *program_name);
-SrtSystemInfo *pv_graphics_provider_create_system_info (PvGraphicsProvider *self);
+SrtSystemInfo *pv_graphics_provider_create_system_info (PvGraphicsProvider *self,
+                                                        GQuark single_arch);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (PvGraphicsProvider, g_object_unref)
 

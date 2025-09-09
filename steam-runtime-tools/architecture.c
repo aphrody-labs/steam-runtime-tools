@@ -245,7 +245,7 @@ srt_architecture_get_expected_runtime_linker (const char *multiarch_tuple)
 #ifdef _SRT_MULTIARCH
 const SrtKnownArchitecture this_abi =
 {
-  .multiarch_tuple = SRT_ABI_X86_64,
+  .multiarch_tuple = _SRT_MULTIARCH,
   .sizeof_pointer = sizeof (void *),
 };
 #endif

@@ -1254,22 +1254,22 @@ pv_runtime_create_copy (PvRuntime *self,
 typedef struct
 {
   const PvMultiarchDetails *details;
-  PvRuntimeFlags flags;
   PvGraphicsProvider *provider;
   GCancellable *cancellable;
+  PvRuntimeFlags runtime_flags;
 } EnumerationThreadInputs;
 
 /* Called in main thread */
 static EnumerationThreadInputs *
 enumeration_thread_inputs_new (const PvMultiarchDetails *details,
-                               PvRuntimeFlags flags,
+                               PvRuntimeFlags runtime_flags,
                                PvGraphicsProvider *provider,
                                GCancellable *cancellable)
 {
   EnumerationThreadInputs *self = g_new0 (EnumerationThreadInputs, 1);
 
   self->details = details;
-  self->flags = flags;
+  self->runtime_flags = runtime_flags;
   self->provider = g_object_ref (provider);
   self->cancellable = g_object_ref (cancellable);
   return self;
@@ -1427,7 +1427,9 @@ enumerate_indep (gpointer data)
     pv_graphics_provider_create_system_info (inputs->provider);
 
   srt_system_info_set_multiarch_tuples (system_info, pv_multiarch_tuples);
-  cache_indep_graphics_stack (system_info, inputs->flags, inputs->cancellable);
+  cache_indep_graphics_stack (system_info,
+                              inputs->runtime_flags,
+                              inputs->cancellable);
 
   enumeration_thread_inputs_free (inputs);
   return g_steal_pointer (&system_info);

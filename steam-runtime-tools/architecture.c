@@ -106,6 +106,29 @@ static const SrtKnownArchitecture known_architectures[] =
 };
 
 /*
+ * _srt_architecture_init_known:
+ *
+ * Ensure that each known architecture is cached as an interned string
+ * (a #GQuark).
+ */
+void
+_srt_architecture_init_known (void)
+{
+  /* Note that this cannot be a library constructor: GQuark functions are
+   * documented with "must not be used before library constructors have
+   * finished running". It's OK to call from class_init or similar
+   * places, though. */
+  size_t i;
+
+  for (i = 0; i < G_N_ELEMENTS (known_architectures); i++)
+    (void) g_quark_from_static_string (known_architectures[i].multiarch_tuple);
+
+#ifdef _SRT_MULTIARCH
+  (void) g_quark_from_static_string (_SRT_MULTIARCH);
+#endif
+}
+
+/*
  * Returns: A table of known architectures, terminated by one
  *  with @multiarch_tuple set to %NULL.
  */

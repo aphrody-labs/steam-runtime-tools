@@ -44,6 +44,8 @@ typedef struct
   guint8 sizeof_pointer;
 } SrtKnownArchitecture;
 
+void _srt_architecture_init_known (void);
+
 G_GNUC_INTERNAL const SrtKnownArchitecture *_srt_architecture_get_known (void);
 G_GNUC_INTERNAL const SrtKnownArchitecture *_srt_architecture_get_by_tuple (const char *multiarch_tuple);
 

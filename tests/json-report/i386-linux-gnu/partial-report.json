@@ -19,9 +19,6 @@
     "MESA_LOADER_DRIVER_OVERRIDE=radeonsi"
   ],
   "architectures" : {
-    "i386-linux-gnu" : {
-      "can-run" : true
-    },
     "x86_64-linux-gnu" : {
       "can-run" : false,
       "runtime-linker": {
@@ -55,6 +52,9 @@
         }
       },
       "openxr-1-runtime" : {}
+    },
+    "i386-linux-gnu" : {
+      "can-run" : true
     }
   },
   "locales" : {

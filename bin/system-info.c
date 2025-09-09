@@ -1093,12 +1093,12 @@ main (int argc,
   int opt;
 
 #if defined(__i386__) || defined(__x86_64__)
-  static const char * const multiarch_tuples[] = { SRT_ABI_I386, SRT_ABI_X86_64, NULL };
+  static const char * const multiarch_tuples[] = { SRT_ABI_X86_64, SRT_ABI_I386, NULL };
 #elif defined(_SRT_MULTIARCH)
   static const char * const multiarch_tuples[] = { _SRT_MULTIARCH, NULL };
 #else
 #warning Unknown architecture, steam-runtime-system-info will assume x86
-  static const char * const multiarch_tuples[] = { SRT_ABI_I386, SRT_ABI_X86_64, NULL };
+  static const char * const multiarch_tuples[] = { SRT_ABI_X86_64, SRT_ABI_I386, NULL };
 #endif
 
   GList *icds;

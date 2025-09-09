@@ -1291,8 +1291,11 @@ enumerate_arch (gpointer data)
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
     _srt_profiling_start ("Enumerating %s drivers in thread",
                           inputs->details->tuple);
+  const char * const tuples[] = { inputs->details->tuple, NULL };
   g_autoptr(SrtSystemInfo) system_info =
     pv_graphics_provider_create_system_info (inputs->provider);
+
+  srt_system_info_set_multiarch_tuples (system_info, tuples);
 
   if (g_cancellable_is_cancelled (inputs->cancellable))
     goto out;

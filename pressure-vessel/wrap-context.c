@@ -6,6 +6,7 @@
 
 #include "pressure-vessel/wrap-context.h"
 
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
@@ -235,6 +236,10 @@ static void
 pv_wrap_context_class_init (PvWrapContextClass *cls)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (cls);
+
+  /* Pre-cache known architecture strings as quarks, early in process
+   * startup, to avoid having to duplicate and "leak" them */
+  _srt_architecture_init_known ();
 
   object_class->get_property = pv_wrap_context_get_property;
   object_class->set_property = pv_wrap_context_set_property;

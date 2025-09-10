@@ -6984,7 +6984,6 @@ collect_dri_drivers (PvRuntime *self,
   return TRUE;
 }
 
-#if PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST > 0
 /*
  * @search_path: (inout):
  */
@@ -7058,7 +7057,6 @@ pv_append_host_dri_library_paths (PvRuntime *self,
   while (_srt_hash_table_iter_next (&iter, &drivers_path, NULL))
     pv_search_path_append (search_path, drivers_path);
 }
-#endif
 
 /*
  * Returns: (element-type IcdDetails):
@@ -7733,24 +7731,25 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
   if (self->interpreter_host_provider != NULL)
     {
-      g_assert (pv_multiarch_as_emulator_tuples[PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST] == NULL);
+      gsize n;
+      const GQuark *host_tuples;
 
-#if PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST > 0
-      for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST; i++)
+      host_tuples = pv_graphics_provider_get_architectures (self->interpreter_host_provider, &n);
+
+      for (i = 0; i < n; i++)
         {
-          GQuark arch_quark;
+          GQuark arch_quark = host_tuples[i];
           SrtSystemInfo *arch_system_info;
+          const char *tuple = g_quark_to_string (arch_quark);
 
-          arch_quark = g_quark_from_static_string (pv_multiarch_as_emulator_tuples[i]);
           arch_system_info = pv_graphics_provider_get_system_info (self->interpreter_host_provider,
                                                                    arch_quark);
 
           pv_append_host_dri_library_paths (self,
                                             arch_system_info,
-                                            pv_multiarch_as_emulator_tuples[i],
+                                            tuple,
                                             dri_path);
-       }
-#endif
+        }
     }
 
   part_timer = _srt_profiling_start ("Finishing graphics stack capture");

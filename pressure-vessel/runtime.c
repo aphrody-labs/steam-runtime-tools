@@ -7060,7 +7060,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                 return FALSE;
             }
 
-          arch_system_info = pv_graphics_provider_get_system_info (self->provider,
+          arch_system_info = pv_graphics_provider_get_system_info (arch->provider,
                                                                    arch_quark);
 
           if ((self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)

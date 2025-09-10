@@ -1281,22 +1281,6 @@ pv_runtime_initable_init (GInitable *initable,
   if (self->pv_prefix == NULL)
     return FALSE;
 
-  /* Enumerating the graphics provider's drivers only requires things
-   * we already know, so start this first, and let it run in parallel
-   * with other setup. The results go in the SrtSystemInfo's cache
-   * for future use. */
-  if (self->providers != NULL)
-    {
-      pv_graphics_provider_start_enumeration (self->provider,
-                                              self->flags,
-                                              NULL);
-
-      if (self->interpreter_host_provider != NULL)
-        pv_graphics_provider_start_enumeration (self->interpreter_host_provider,
-                                                self->flags,
-                                                "real-host");
-    }
-
   /* If we are in Flatpak container we don't expect to have a working bwrap */
   if (self->bubblewrap != NULL
       && !g_file_test (self->bubblewrap, G_FILE_TEST_IS_EXECUTABLE))

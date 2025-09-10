@@ -183,10 +183,12 @@ test_graphics_provider_search (Fixture *f,
   gsize i;
 
   /* Assume the provider path in current ns is the tmpdir. In this way we have
-   * a controlled environment that we can edit for our tests. */
+   * a controlled environment that we can edit for our tests.
+   * To keep things simple in this unit test, don't start multi-threaded
+   * graphics driver enumeration immediately. */
   graphics_providers = pv_graphics_provider_build_array (f->tmpdir,
                                                          NULL,
-                                                         PV_RUNTIME_FLAGS_NONE,
+                                                         PV_RUNTIME_FLAGS_SINGLE_THREAD,
                                                          &error);
   g_assert_no_error (error);
   g_assert_nonnull (graphics_providers);

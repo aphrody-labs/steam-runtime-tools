@@ -686,7 +686,7 @@ pv_graphics_provider_add_architecture (PvGraphicsProvider *self,
  * This function must be called in the main thread.
  * Calling this function more than once is not useful.
  */
-void
+static void
 pv_graphics_provider_start_enumeration (PvGraphicsProvider *self,
                                         PvRuntimeFlags flags,
                                         const char *label)
@@ -901,6 +901,11 @@ pv_graphics_provider_build_array (const char *provider_path,
         }
     }
 
+  /* Enumerating the graphics provider's drivers only requires things
+   * we already know, so start this first, and let it run in parallel
+   * with other setup. The results go in the SrtSystemInfo's cache
+   * for future use. */
+  pv_graphics_provider_start_enumeration (graphics_provider, flags, NULL);
   g_ptr_array_add (ret, g_steal_pointer (&graphics_provider));
 
   if (flags & PV_RUNTIME_FLAGS_INTERPRETER_ROOT)
@@ -927,6 +932,12 @@ pv_graphics_provider_build_array (const char *provider_path,
 
           q = g_quark_from_static_string (host_machine->multiarch_tuple);
           pv_graphics_provider_add_architecture (graphics_provider, q);
+          /* As with the graphics providers for the runtime's architectures,
+           * we can start enumeration immediately and let it run in
+           * parallel. */
+          pv_graphics_provider_start_enumeration (graphics_provider,
+                                                  flags,
+                                                  "real-host");
           g_ptr_array_add (ret, g_steal_pointer (&graphics_provider));
         }
     }

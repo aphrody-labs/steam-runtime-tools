@@ -72,9 +72,6 @@ gchar *pv_graphics_provider_search_in_path_and_bin (PvGraphicsProvider *self,
                                                     const gchar *search_paths,
                                                     const gchar *program_name);
 
-void pv_graphics_provider_start_enumeration (PvGraphicsProvider *self,
-                                             PvRuntimeFlags flags,
-                                             const char *label);
 SrtSystemInfo *pv_graphics_provider_get_system_info (PvGraphicsProvider *self,
                                                      GQuark arch_specific);
 

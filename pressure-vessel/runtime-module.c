@@ -10,6 +10,7 @@
 
 #include "steam-runtime-tools/graphics-drivers-internal.h"
 #include "steam-runtime-tools/graphics-drivers-json-based-internal.h"
+#include "steam-runtime-tools/profiling-internal.h"
 
 const char *
 icd_kind_to_string (IcdKind kind)
@@ -189,6 +190,164 @@ IcdStack *
 icd_stack_new (void)
 {
   return g_slice_new0 (IcdStack);
+}
+
+static void
+icd_stack_enumerate_egl_icds (IcdStack *self,
+                              SrtSystemInfo *system_info,
+                              const gchar *which_system)
+{
+  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
+  g_autoptr(SrtObjectList) egl_icds = NULL;
+
+  timer = _srt_profiling_start ("Enumerating EGL ICDs on %s system", which_system);
+  g_debug ("Enumerating EGL ICDs on %s system...", which_system);
+  egl_icds = srt_system_info_list_egl_icds (system_info, NULL);
+
+  if (self->egl_icd_details == NULL)
+    self->egl_icd_details = icd_details_array_sized_new (g_list_length (egl_icds));
+
+  icd_details_fill_array_json_based (self->egl_icd_details, "EGL ICD", egl_icds);
+}
+
+static void
+icd_stack_enumerate_egl_ext_platforms (IcdStack *self,
+                                       SrtSystemInfo *system_info,
+                                       const gchar *which_system)
+{
+  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
+  g_autoptr(SrtObjectList) egl_ext_platforms = NULL;
+
+  timer = _srt_profiling_start ("Enumerating EGL external platforms on %s system",
+                                which_system);
+  g_debug ("Enumerating EGL external platforms on %s system...", which_system);
+  egl_ext_platforms = srt_system_info_list_egl_external_platforms (system_info,
+                                                                   NULL);
+
+  if (self->egl_ext_platform_details == NULL)
+    self->egl_ext_platform_details = icd_details_array_sized_new (g_list_length (egl_ext_platforms));
+
+  icd_details_fill_array_json_based (self->egl_ext_platform_details,
+                                     "EGL external platform",
+                                     egl_ext_platforms);
+}
+
+static void
+icd_stack_enumerate_vulkan_icds (IcdStack *self,
+                                 SrtSystemInfo *system_info,
+                                 const gchar *which_system)
+{
+  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
+  g_autoptr(SrtObjectList) vulkan_icds = NULL;
+
+  timer = _srt_profiling_start ("Enumerating Vulkan ICDs on %s system", which_system);
+  g_debug ("Enumerating Vulkan ICDs on %s system...", which_system);
+  vulkan_icds = srt_system_info_list_vulkan_icds (system_info, NULL);
+
+  if (self->vulkan_icd_details == NULL)
+    self->vulkan_icd_details = icd_details_array_sized_new (g_list_length (vulkan_icds));
+
+  icd_details_fill_array_json_based (self->vulkan_icd_details,
+                                     "Vulkan ICD",
+                                     vulkan_icds);
+}
+
+static void
+icd_stack_enumerate_vulkan_layers (IcdStack *self,
+                                   SrtSystemInfo *system_info,
+                                   const gchar *which_system)
+{
+  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
+  g_autoptr(SrtObjectList) vulkan_exp_layers = NULL;
+  g_autoptr(SrtObjectList) vulkan_imp_layers = NULL;
+
+  timer = _srt_profiling_start ("Enumerating Vulkan layers on %s system", which_system);
+
+  g_debug ("Enumerating Vulkan explicit layers on %s system...", which_system);
+  vulkan_exp_layers = srt_system_info_list_explicit_vulkan_layers (system_info);
+
+  if (self->vulkan_exp_layer_details == NULL)
+    self->vulkan_exp_layer_details = icd_details_array_sized_new (g_list_length (vulkan_exp_layers));
+
+  icd_details_fill_array_json_based (self->vulkan_exp_layer_details,
+                                     "Vulkan explicit layer",
+                                     vulkan_exp_layers);
+
+  g_debug ("Enumerating Vulkan implicit layers on %s system...", which_system);
+  vulkan_imp_layers = srt_system_info_list_implicit_vulkan_layers (system_info);
+
+  if (self->vulkan_imp_layer_details == NULL)
+    self->vulkan_imp_layer_details = icd_details_array_sized_new (g_list_length (vulkan_imp_layers));
+
+  icd_details_fill_array_json_based (self->vulkan_imp_layer_details,
+                                     "Vulkan implicit layer",
+                                     vulkan_imp_layers);
+}
+
+static void
+icd_stack_enumerate_openxr_1_runtimes (IcdStack *self,
+                                       SrtSystemInfo *system_info,
+                                       const gchar *which_system)
+{
+  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
+  gsize i;
+
+  timer = _srt_profiling_start ("Enumerating OpenXR 1 runtimes on %s system",
+                                which_system);
+  g_debug ("Enumerating OpenXR 1 runtimes on %s system...", which_system);
+
+  if (self->openxr_1_runtime_details == NULL)
+    self->openxr_1_runtime_details = g_hash_table_new_full (g_str_hash,
+                                                            g_str_equal,
+                                                            g_free,
+                                                            (GDestroyNotify) icd_details_free);
+
+  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+    {
+      g_autoptr(SrtOpenXr1Runtime) rt = NULL;
+      g_autoptr(GError) local_error = NULL;
+      const char *multiarch_tuple = pv_multiarch_tuples[i];
+      const char *path;
+
+      rt = srt_system_info_dup_openxr_1_runtime (system_info, multiarch_tuple);
+      if (rt == NULL)
+        continue;
+
+      path = srt_openxr_1_runtime_get_json_path (rt);
+
+      if (!srt_openxr_1_runtime_check_error (rt, &local_error))
+        {
+          g_warning ("Failed to load OpenXR 1 runtime for %s from %s: %s",
+                     multiarch_tuple, path, local_error->message);
+          g_clear_error (&local_error);
+          continue;
+        }
+
+      g_info ("OpenXR 1 runtime for %s at %s: %s",
+              multiarch_tuple, path,
+              srt_openxr_1_runtime_get_library_path (rt));
+
+      g_hash_table_insert (self->openxr_1_runtime_details,
+                           g_strdup (multiarch_tuple),
+                           icd_details_new (rt));
+    }
+}
+
+void
+icd_stack_enumerate (IcdStack *self,
+                     PvRuntimeFlags runtime_flags,
+                     SrtSystemInfo *system_info,
+                     const char *which_system)
+{
+  icd_stack_enumerate_egl_icds (self, system_info, which_system);
+  icd_stack_enumerate_egl_ext_platforms (self, system_info, which_system);
+  icd_stack_enumerate_vulkan_icds (self, system_info, which_system);
+
+  if (runtime_flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
+    icd_stack_enumerate_vulkan_layers (self, system_info, which_system);
+
+  if (runtime_flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
+    icd_stack_enumerate_openxr_1_runtimes (self, system_info, which_system);
 }
 
 void

@@ -9,6 +9,9 @@
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "libglnx.h"
 
+#include <steam-runtime-tools/steam-runtime-tools.h>
+
+#include "runtime-flags.h"
 #include "supported-architectures.h"
 
 /*
@@ -183,6 +186,11 @@ typedef struct
 } IcdStack;
 
 IcdStack *icd_stack_new (void);
+
+void icd_stack_enumerate (IcdStack *self,
+                          PvRuntimeFlags runtime_flags,
+                          SrtSystemInfo *system_info,
+                          const char *which_system);
 
 void icd_stack_free (IcdStack *self);
 

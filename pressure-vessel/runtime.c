@@ -5379,7 +5379,7 @@ collect_core_libraries_patterns (GPtrArray *patterns)
 }
 
 /*
- * @self: The runtime
+ * @arch: The architecture
  * @pathp: (inout): A candidate path for /usr/lib/gconv
  *  or similar in the graphics stack provider, which may be "stolen"
  *  on success
@@ -5389,7 +5389,7 @@ collect_core_libraries_patterns (GPtrArray *patterns)
  * Returns: %TRUE if the path `*pathp` was suitable
  */
 static gboolean
-pv_runtime_try_gconv_dir (PvRuntime *self,
+pv_runtime_try_gconv_dir (RuntimeArchitecture *arch,
                           gchar **pathp,
                           GHashTable *gconv_in_provider)
 {
@@ -5401,7 +5401,7 @@ pv_runtime_try_gconv_dir (PvRuntime *self,
 
   g_debug ("Checking for gconv in %s", *pathp);
 
-  if (_srt_sysroot_test (self->provider->in_current_ns, *pathp,
+  if (_srt_sysroot_test (arch->provider->in_current_ns, *pathp,
                          SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY, NULL))
     {
       g_debug ("... yes");
@@ -5505,7 +5505,7 @@ out:
  * @bwrap:
  * @libc_symlink: The symlink created by capsule-capture-libs,
  *  relative to /overrides.
- *  Its target is either `self->provider->path_in_container_ns`
+ *  Its target is either `arch->provider->path_in_container_ns`
  *  followed by the path to glibc in the graphics stack provider
  *  namespace, or the path to glibc in a non-standard directory such
  *  as /opt with no special prefix.
@@ -5529,7 +5529,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
   g_autofree char *libc_target = NULL;
   g_autofree char *libdl_lib = NULL;
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (arch->provider != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
 
   if (!pv_runtime_take_ld_so_from_provider (self, arch,
@@ -5559,7 +5559,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
        * Void Linux, which would mean we mount both /usr/lib64/gconv (here)
        * and /usr/lib/gconv (below), ensuring that whichever one glibc
        * actually wants to load, it'll work. */
-      pv_runtime_try_gconv_dir (self, &dir, gconv_in_provider);
+      pv_runtime_try_gconv_dir (arch, &dir, gconv_in_provider);
     }
 
   libc_target = glnx_readlinkat_malloc (self->overrides_fd, libc_symlink,
@@ -5577,7 +5577,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
        * provider prefix if present. Note that after this, target_in_provider
        * can either be absolute, or relative to the root of the provider. */
       target_in_provider = _srt_get_path_after (libc_target,
-                                                self->provider->path_in_container_ns);
+                                                arch->provider->path_in_container_ns);
 
       if (target_in_provider == NULL)
         target_in_provider = libc_target;
@@ -5612,7 +5612,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
 
       gconv_dir_in_provider = g_build_filename (gconv_prefix, dir, "gconv", NULL);
 
-      if (pv_runtime_try_gconv_dir (self, &gconv_dir_in_provider,
+      if (pv_runtime_try_gconv_dir (arch, &gconv_dir_in_provider,
                                     gconv_in_provider))
         found = TRUE;
 
@@ -5638,7 +5638,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
 
           g_clear_pointer (&gconv_dir_in_provider, g_free);
           gconv_dir_in_provider = g_build_filename (gconv_prefix, dir, "gconv", NULL);
-          if (pv_runtime_try_gconv_dir (self, &gconv_dir_in_provider,
+          if (pv_runtime_try_gconv_dir (arch, &gconv_dir_in_provider,
                                         gconv_in_provider))
             found = TRUE;
         }

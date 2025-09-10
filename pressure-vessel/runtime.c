@@ -2142,9 +2142,9 @@ collect_s2tc (PvRuntime *self,
   g_autofree gchar *s2tc = g_build_filename (libdir, "libtxc_dxtn.so", NULL);
   g_autofree gchar *s2tc_in_current_namespace = NULL;
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (arch->provider != NULL, FALSE);
 
-  s2tc_in_current_namespace = g_build_filename (self->provider->in_current_ns->path,
+  s2tc_in_current_namespace = g_build_filename (arch->provider->in_current_ns->path,
                                                 s2tc, NULL);
 
   if (g_file_test (s2tc_in_current_namespace, G_FILE_TEST_EXISTS))

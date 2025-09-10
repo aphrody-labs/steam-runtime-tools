@@ -5116,21 +5116,21 @@ pv_runtime_get_ld_so (PvRuntime *self,
                               "/etc",
                               NULL);
 
-      if (self->provider != NULL)
+      if (arch->provider != NULL)
         {
           g_autofree gchar *provider_etc = NULL;
           g_autofree gchar *provider_etc_dest = NULL;
 
           if (!pv_bwrap_bind_usr (temp_bwrap,
-                                  self->provider->path_in_host_ns,
-                                  self->provider->in_current_ns->fd,
-                                  self->provider->path_in_container_ns,
+                                  arch->provider->path_in_host_ns,
+                                  arch->provider->in_current_ns->fd,
+                                  arch->provider->path_in_container_ns,
                                   error))
             return FALSE;
 
-          provider_etc = g_build_filename (self->provider->path_in_host_ns,
+          provider_etc = g_build_filename (arch->provider->path_in_host_ns,
                                            "etc", NULL);
-          provider_etc_dest = g_build_filename (self->provider->path_in_container_ns,
+          provider_etc_dest = g_build_filename (arch->provider->path_in_container_ns,
                                                 "etc", NULL);
           /* Using --ro-bind directly, as above */
           flatpak_bwrap_add_args (temp_bwrap,

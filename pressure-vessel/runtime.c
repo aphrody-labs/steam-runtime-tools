@@ -85,14 +85,6 @@
  */
 #define PV_ADVERB_WITHOUT_MUTABLE_SYSROOT PV_FROM_HOST_WITHOUT_MUTABLE_SYSROOT "/" PKGLIBEXECDIR "/pv-adverb"
 
-typedef struct
-{
-  GQuark arch_tuple;
-  GCancellable *cancellable;
-  GThread *thread;
-  SrtSystemInfo *system_info;
-} EnumerationThread;
-
 /*
  * PvRuntime:
  *
@@ -129,12 +121,6 @@ struct _PvRuntime
   const gchar *adverb_in_container;
   PvGraphicsProvider *provider;
   PvGraphicsProvider *interpreter_host_provider;
-  EnumerationThread indep_thread;
-  EnumerationThread host_thread;
-#if PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST > 0
-  EnumerationThread *arch_host_threads;
-#endif
-  EnumerationThread *arch_threads;
   SrtDirentCompareFunc arbitrary_dirent_order;
   GCompareFunc arbitrary_str_order;
 
@@ -1252,272 +1238,6 @@ pv_runtime_create_copy (PvRuntime *self,
   return TRUE;
 }
 
-typedef struct
-{
-  SrtSystemInfo *system_info;
-  GCancellable *cancellable;
-  GQuark arch_tuple;
-  PvRuntimeFlags runtime_flags;
-  PvGraphicsProviderFlags provider_flags;
-} EnumerationThreadInputs;
-
-/* Called in main thread */
-static EnumerationThreadInputs *
-enumeration_thread_inputs_new (GQuark arch_tuple,
-                               PvRuntimeFlags runtime_flags,
-                               PvGraphicsProvider *provider,
-                               GCancellable *cancellable)
-{
-  EnumerationThreadInputs *self = g_new0 (EnumerationThreadInputs, 1);
-
-  self->arch_tuple = arch_tuple;
-  self->runtime_flags = runtime_flags;
-  self->provider_flags = provider->flags;
-  self->system_info = pv_graphics_provider_create_system_info (provider,
-                                                               arch_tuple);
-  self->cancellable = g_object_ref (cancellable);
-  return self;
-}
-
-/* Called in enumeration thread */
-static void
-enumeration_thread_inputs_free (EnumerationThreadInputs *self)
-{
-  g_object_unref (self->cancellable);
-  g_clear_object (&self->system_info);
-  g_free (self);
-}
-
-/* Called in enumeration thread */
-static gpointer
-enumerate_arch (gpointer data)
-{
-  EnumerationThreadInputs *inputs = data;
-  const char *tuple = g_quark_to_string (inputs->arch_tuple);
-  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
-    _srt_profiling_start ("Enumerating %s drivers in thread", tuple);
-  g_autoptr(SrtSystemInfo) system_info = g_steal_pointer (&inputs->system_info);
-
-  if (g_cancellable_is_cancelled (inputs->cancellable))
-    goto out;
-
-  /* At the moment the real host is included only when FEX emulator is in use.
-   * Skipping VDPAU until there is a real use case for it, because
-   * it only supports one search path entry, which is problematic for us. */
-  if (!(inputs->provider_flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST))
-    {
-      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating %s VDPAU drivers in thread",
-                              tuple);
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
-
-      /* We ignore the results. system_info will cache them for later
-       * calls, so when we're doing the actual work, redoing this call
-       * will just retrieve them */
-      drivers = srt_system_info_list_vdpau_drivers (system_info,
-                                                    tuple,
-                                                    SRT_DRIVER_FLAGS_NONE);
-    }
-
-  if (g_cancellable_is_cancelled (inputs->cancellable))
-    goto out;
-
-  if (TRUE)
-    {
-      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating %s DRI drivers in thread",
-                              tuple);
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
-
-      drivers = srt_system_info_list_dri_drivers (system_info,
-                                                  tuple,
-                                                  SRT_DRIVER_FLAGS_NONE);
-    }
-
-  if (g_cancellable_is_cancelled (inputs->cancellable))
-    goto out;
-
-  if (TRUE)
-    {
-      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating %s VA-API drivers in thread",
-                              tuple);
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
-
-      drivers = srt_system_info_list_va_api_drivers (system_info,
-                                                     tuple,
-                                                     SRT_DRIVER_FLAGS_NONE);
-    }
-
-  if (g_cancellable_is_cancelled (inputs->cancellable))
-    goto out;
-
-  g_free (srt_system_info_dup_libdl_platform (system_info, tuple, NULL));
-
-out:
-  enumeration_thread_inputs_free (inputs);
-  return g_steal_pointer (&system_info);
-}
-
-static void
-cache_indep_graphics_stack (SrtSystemInfo *system_info,
-                            PvRuntimeFlags flags,
-                            GCancellable *cancellable)
-{
-  if (g_cancellable_is_cancelled (cancellable))
-    return;
-
-  if (TRUE)
-    {
-      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating EGL ICDs in thread");
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
-
-      drivers = srt_system_info_list_egl_icds (system_info, NULL);
-    }
-
-  if (g_cancellable_is_cancelled (cancellable))
-    return;
-
-  if (TRUE)
-    {
-      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating EGL external platforms in thread");
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
-
-      drivers = srt_system_info_list_egl_external_platforms (system_info, NULL);
-    }
-
-  if (g_cancellable_is_cancelled (cancellable))
-    return;
-
-  if (TRUE)
-    {
-      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating Vulkan ICDs in thread");
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
-
-      drivers = srt_system_info_list_vulkan_icds (system_info, NULL);
-    }
-
-  if (g_cancellable_is_cancelled (cancellable))
-    return;
-
-  if (flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
-    {
-      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating Vulkan layers in thread");
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) exp_layers = NULL;
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) imp_layers = NULL;
-
-      exp_layers = srt_system_info_list_explicit_vulkan_layers (system_info);
-      imp_layers = srt_system_info_list_implicit_vulkan_layers (system_info);
-    }
-}
-
-/* Called in enumeration thread */
-static gpointer
-enumerate_indep (gpointer data)
-{
-  EnumerationThreadInputs *inputs = data;
-  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
-    _srt_profiling_start ("Enumerating cross-architecture ICDs in thread");
-  g_autoptr(SrtSystemInfo) system_info = g_steal_pointer (&inputs->system_info);
-
-  cache_indep_graphics_stack (system_info,
-                              inputs->runtime_flags,
-                              inputs->cancellable);
-
-  enumeration_thread_inputs_free (inputs);
-  return g_steal_pointer (&system_info);
-}
-
-/*
- * Must be called from same thread as enumeration_thread_start_arch()
- * or enumeration_thread_start_indep().
- *
- * Returns: (transfer none):
- */
-static SrtSystemInfo *
-enumeration_thread_join (EnumerationThread *self)
-{
-  if (self->thread != NULL)
-    {
-      g_assert (self->system_info == NULL);
-      g_cancellable_cancel (self->cancellable);
-      self->system_info = g_thread_join (g_steal_pointer (&self->thread));
-    }
-
-  return self->system_info;
-}
-
-static void
-enumeration_thread_clear (EnumerationThread *self)
-{
-  enumeration_thread_join (self);
-  g_clear_object (&self->system_info);
-  g_clear_object (&self->cancellable);
-}
-
-static void
-enumeration_threads_clear (EnumerationThread **arr,
-                           gsize n)
-{
-  EnumerationThread *threads = *arr;
-  gsize i;
-
-  *arr = NULL;
-
-  if (threads == NULL)
-    return;
-
-  for (i = 0; i < n; i++)
-    enumeration_thread_clear (threads + i);
-
-  g_free (threads);
-}
-
-/* Must be called in main thread */
-static void
-enumeration_thread_start_arch (EnumerationThread *self,
-                               GQuark tuple,
-                               PvRuntimeFlags flags,
-                               PvGraphicsProvider *provider)
-{
-  g_return_if_fail (self->cancellable == NULL);
-  g_return_if_fail (self->system_info == NULL);
-  g_return_if_fail (self->thread == NULL);
-  g_return_if_fail (tuple != 0);
-
-  self->arch_tuple = tuple;
-  self->cancellable = g_cancellable_new ();
-  self->thread = g_thread_new (g_quark_to_string (tuple), enumerate_arch,
-                               enumeration_thread_inputs_new (tuple,
-                                                              flags,
-                                                              provider,
-                                                              self->cancellable));
-}
-
-/* Must be called in main thread */
-static void
-enumeration_thread_start_indep (EnumerationThread *self,
-                                PvRuntimeFlags flags,
-                                PvGraphicsProvider *provider,
-                                const gchar *thread_name)
-{
-  g_return_if_fail (self->cancellable == NULL);
-  g_return_if_fail (self->system_info == NULL);
-  g_return_if_fail (self->thread == NULL);
-
-  self->cancellable = g_cancellable_new ();
-  self->thread = g_thread_new (thread_name == NULL ? "cross-architecture" : thread_name,
-                               enumerate_indep,
-                               enumeration_thread_inputs_new (0,
-                                                              flags,
-                                                              provider,
-                                                              self->cancellable));
-}
-
 static gboolean
 pv_runtime_initable_init (GInitable *initable,
                           GCancellable *cancellable G_GNUC_UNUSED,
@@ -1544,42 +1264,16 @@ pv_runtime_initable_init (GInitable *initable,
    * we already know, so start this first, and let it run in parallel
    * with other setup. The results go in the SrtSystemInfo's cache
    * for future use. */
-  if (self->provider != NULL
-      && !(self->flags & PV_RUNTIME_FLAGS_SINGLE_THREAD))
+  if (self->provider != NULL)
     {
-      gsize i;
-
-      enumeration_thread_start_indep (&self->indep_thread,
-                                      self->flags,
-                                      self->provider, NULL);
+      pv_graphics_provider_start_enumeration (self->provider,
+                                              self->flags,
+                                              NULL);
 
       if (self->interpreter_host_provider != NULL)
-        {
-          enumeration_thread_start_indep (&self->host_thread,
-                                          self->flags,
-                                          self->interpreter_host_provider,
-                                          "real-host");
-
-#if PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST > 0
-          self->arch_host_threads = g_new0 (EnumerationThread,
-                                            PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST);
-
-          for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST; i++)
-            enumeration_thread_start_arch (&self->arch_host_threads[i],
-                                           g_quark_from_static_string (pv_multiarch_as_emulator_tuples[i]),
-                                           self->flags,
-                                           self->interpreter_host_provider);
-#endif
-        }
-
-      self->arch_threads = g_new0 (EnumerationThread,
-                                   PV_N_SUPPORTED_ARCHITECTURES);
-
-      for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-        enumeration_thread_start_arch (&self->arch_threads[i],
-                                       g_quark_from_static_string (pv_multiarch_tuples[i]),
-                                       self->flags,
-                                       self->provider);
+        pv_graphics_provider_start_enumeration (self->interpreter_host_provider,
+                                                self->flags,
+                                                "real-host");
     }
 
   /* If we are in Flatpak container we don't expect to have a working bwrap */
@@ -1898,14 +1592,6 @@ pv_runtime_dispose (GObject *object)
   g_clear_object (&self->mutable_sysroot);
   g_clear_object (&self->real_root);
   g_clear_object (&self->host_root);
-  enumeration_thread_clear (&self->indep_thread);
-  enumeration_thread_clear (&self->host_thread);
-#if PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST > 0
-  enumeration_threads_clear (&self->arch_host_threads,
-                             PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST);
-#endif
-  enumeration_threads_clear (&self->arch_threads,
-                             PV_N_SUPPORTED_ARCHITECTURES);
 
   G_OBJECT_CLASS (pv_runtime_parent_class)->dispose (object);
 }
@@ -7712,8 +7398,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   g_autoptr(GString) openxr_1_runtime_path = g_string_new ("");
   g_autoptr(GString) va_api_path = g_string_new ("");
   gboolean any_architecture_works = FALSE;
-  g_autoptr(SrtSystemInfo) system_info = NULL;
-  g_autoptr(SrtSystemInfo) host_system_info = NULL;
+  SrtSystemInfo *system_info;
+  SrtSystemInfo *host_system_info = NULL;
   g_autoptr(IcdStack) provider_stack = icd_stack_new ();
   g_autoptr(IcdStack) host_stack = icd_stack_new ();
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
@@ -7746,20 +7432,11 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   if (!pv_runtime_provide_container_access (self, error))
     return FALSE;
 
-  if (self->flags & PV_RUNTIME_FLAGS_SINGLE_THREAD)
-    {
-      system_info = pv_graphics_provider_create_system_info (self->provider, 0);
+  system_info = pv_graphics_provider_get_system_info (self->provider, 0);
 
-      if (self->interpreter_host_provider != NULL)
-        host_system_info = pv_graphics_provider_create_system_info (self->interpreter_host_provider, 0);
-    }
-  else
-    {
-      system_info = g_object_ref (enumeration_thread_join (&self->indep_thread));
-
-      if (self->interpreter_host_provider != NULL)
-        host_system_info = g_object_ref (enumeration_thread_join (&self->host_thread));
-    }
+  if (self->interpreter_host_provider != NULL)
+    host_system_info = pv_graphics_provider_get_system_info (self->interpreter_host_provider,
+                                                             0);
 
   provider_stack->egl_icd_details = pv_enumerate_egl_icds (system_info, provider_label);
   provider_stack->egl_ext_platform_details = pv_enumerate_egl_ext_platforms (system_info,
@@ -7811,6 +7488,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
       if (runtime_architecture_init (arch, self))
         {
+          GQuark arch_quark = g_quark_from_static_string (arch->details->tuple);
           g_autoptr(GPtrArray) dirs = NULL;
           g_autofree gchar *this_dri_path_in_container = g_build_filename (arch->libdir_in_container,
                                                                            "dri", NULL);
@@ -7896,10 +7574,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                 return FALSE;
             }
 
-          if (self->flags & PV_RUNTIME_FLAGS_SINGLE_THREAD)
-            arch_system_info = system_info;
-          else
-            arch_system_info = enumeration_thread_join (&self->arch_threads[i]);
+          arch_system_info = pv_graphics_provider_get_system_info (self->provider,
+                                                                   arch_quark);
 
           if ((self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
               && !collect_openxr_1_runtime (self, arch, provider_stack->openxr_1_runtime_details,
@@ -8047,18 +7723,18 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 #if PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST > 0
       for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST; i++)
         {
+          GQuark arch_quark;
           SrtSystemInfo *arch_system_info;
 
-          if (self->flags & PV_RUNTIME_FLAGS_SINGLE_THREAD)
-            arch_system_info = host_system_info;
-          else
-            arch_system_info = enumeration_thread_join (&self->arch_host_threads[i]);
+          arch_quark = g_quark_from_static_string (pv_multiarch_as_emulator_tuples[i]);
+          arch_system_info = pv_graphics_provider_get_system_info (self->interpreter_host_provider,
+                                                                   arch_quark);
 
           pv_append_host_dri_library_paths (self,
                                             arch_system_info,
                                             pv_multiarch_as_emulator_tuples[i],
                                             dri_path);
-        }
+       }
 #endif
     }
 

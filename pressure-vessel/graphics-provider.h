@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2021 Collabora Ltd.
+ * Copyright © 2020-2025 Collabora Ltd.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -30,6 +30,7 @@
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
 
 #include "runtime-flags.h"
+#include "supported-architectures.h"
 
 typedef struct _PvGraphicsProvider PvGraphicsProvider;
 typedef struct _PvGraphicsProviderClass PvGraphicsProviderClass;
@@ -38,8 +39,8 @@ struct _PvGraphicsProvider
 {
   GObject parent;
 
-  /* All members are read-only after initable_init(), which means it's
-   * OK to access this object from more than one thread. */
+  /* All public members are read-only after initable_init(), which means
+   * it's OK to access this object from more than one thread. */
   SrtSysroot *in_current_ns;
   gchar *path_in_container_ns;
   gchar *path_in_host_ns;
@@ -74,8 +75,12 @@ const GQuark *pv_graphics_provider_get_architectures (PvGraphicsProvider *self,
 gchar *pv_graphics_provider_search_in_path_and_bin (PvGraphicsProvider *self,
                                                     const gchar *search_paths,
                                                     const gchar *program_name);
-SrtSystemInfo *pv_graphics_provider_create_system_info (PvGraphicsProvider *self,
-                                                        GQuark single_arch);
+
+void pv_graphics_provider_start_enumeration (PvGraphicsProvider *self,
+                                             PvRuntimeFlags flags,
+                                             const char *label);
+SrtSystemInfo *pv_graphics_provider_get_system_info (PvGraphicsProvider *self,
+                                                     GQuark arch_specific);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (PvGraphicsProvider, g_object_unref)
 

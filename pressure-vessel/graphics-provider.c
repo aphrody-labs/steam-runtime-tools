@@ -883,9 +883,22 @@ pv_graphics_provider_build_array (const char *provider_path,
 
   for (i = 0; i < G_N_ELEMENTS (pv_multiarch_details); i++)
     {
-      GQuark q = g_quark_from_static_string (pv_multiarch_details[i].tuple);
+      const char *tuple = pv_multiarch_details[i].tuple;
+      GQuark q = g_quark_from_static_string (tuple);
+
+      g_debug ("Architecture %s graphics stack provided by %s",
+               tuple, provider_path);
 
       pv_graphics_provider_add_architecture (graphics_provider, q);
+
+      if (host_machine != NULL
+          && g_str_equal (tuple, host_machine->multiarch_tuple))
+        {
+          g_debug ("Will not enumerate drivers for interpreter host %s "
+                   "because it duplicates supported architecture %s",
+                   host_machine->multiarch_tuple, tuple);
+          host_machine = NULL;
+        }
     }
 
   g_ptr_array_add (ret, g_steal_pointer (&graphics_provider));
@@ -895,10 +908,12 @@ pv_graphics_provider_build_array (const char *provider_path,
       /* Also include the real host graphics stack to allow thunking.
        * To avoid enumerating the same DRIs/layers twice, we only do
        * this if the host is not a supported architecture. */
-      if (host_machine != NULL
-          && !pv_supported_architectures_include_machine_type (host_machine->machine_type))
+      if (host_machine != NULL)
         {
           GQuark q;
+
+          g_debug ("Interpreter host %s graphics stack provided by /proc/self/root",
+                   host_machine->multiarch_tuple);
 
           /* The trailing slash is needed to allow open(2) to work even if
            * it's using the O_NOFOLLOW flag. */

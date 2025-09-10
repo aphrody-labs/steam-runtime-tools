@@ -5711,7 +5711,7 @@ pv_runtime_collect_lib_data (PvRuntime *self,
   g_autofree gchar *dir_in_provider_usr_share = NULL;
 
   g_return_if_fail (PV_IS_RUNTIME (self));
-  g_return_if_fail (self->provider != NULL);
+  g_return_if_fail (arch->provider != NULL);
   g_return_if_fail (runtime_architecture_check_valid (arch));
   g_return_if_fail (dir_basename != NULL);
   g_return_if_fail (lib_in_provider != NULL);
@@ -5729,7 +5729,7 @@ pv_runtime_collect_lib_data (PvRuntime *self,
   dir_in_provider_usr_share = g_build_filename ("usr", "share", dir_basename, NULL);
 
   if ((flags & PV_RUNTIME_DATA_FLAGS_USR_SHARE_FIRST)
-      && _srt_sysroot_test (self->provider->in_current_ns,
+      && _srt_sysroot_test (arch->provider->in_current_ns,
                             dir_in_provider_usr_share,
                             SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY, NULL))
     {
@@ -5805,7 +5805,7 @@ pv_runtime_collect_lib_data (PvRuntime *self,
 
   g_return_if_fail (dir_in_provider[0] != '/');
 
-  if (_srt_sysroot_test (self->provider->in_current_ns,
+  if (_srt_sysroot_test (arch->provider->in_current_ns,
                          dir_in_provider,
                          SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY, NULL))
     {
@@ -5818,7 +5818,7 @@ pv_runtime_collect_lib_data (PvRuntime *self,
 
   if (!(flags & PV_RUNTIME_DATA_FLAGS_USR_SHARE_FIRST)
       && strcmp (dir_in_provider, dir_in_provider_usr_share) != 0
-      && _srt_sysroot_test (self->provider->in_current_ns,
+      && _srt_sysroot_test (arch->provider->in_current_ns,
                             dir_in_provider_usr_share,
                             SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY, NULL))
     {
@@ -5856,7 +5856,7 @@ pv_runtime_collect_lib_data (PvRuntime *self,
  * @dir_basename: Directory in ${datadir}, e.g. `drirc.d`
  * @lib_symlink: The symlink created by capsule-capture-libs,
  *  relative to /overrides.
- *  Its target is either `self->provider->path_in_container_ns`
+ *  Its target is either `arch->provider->path_in_container_ns`
  *  followed by the path to a library in the graphics stack provider
  *  namespace, or the path to a library in a non-standard directory such
  *  as /opt with no special prefix.
@@ -5878,7 +5878,6 @@ pv_runtime_collect_lib_symlink_data (PvRuntime *self,
   const char *target_in_provider;
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
-  g_return_val_if_fail (self->provider != NULL, FALSE);
   g_return_val_if_fail (runtime_architecture_check_valid (arch), FALSE);
   g_return_val_if_fail (dir_basename != NULL, FALSE);
   g_return_val_if_fail (lib_symlink != NULL, FALSE);
@@ -5911,7 +5910,7 @@ pv_runtime_collect_lib_symlink_data (PvRuntime *self,
    * or relative to the root of the provider. */
 
   target_in_provider = _srt_get_path_after (target,
-                                            self->provider->path_in_container_ns);
+                                            arch->provider->path_in_container_ns);
 
   if (target_in_provider == NULL)
     target_in_provider = target;

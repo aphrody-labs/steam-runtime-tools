@@ -551,8 +551,7 @@ main (int argc,
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
         _srt_profiling_start ("Setting up runtime");
-      g_autoptr(PvGraphicsProvider) graphics_provider = NULL;
-      g_autoptr(PvGraphicsProvider) interpreter_host_provider = NULL;
+      g_autoptr(GPtrArray) graphics_providers = NULL;
       PvRuntimeFlags flags = PV_RUNTIME_FLAGS_NONE;
       g_autofree gchar *runtime_resolved = NULL;
       const char *runtime_path = NULL;
@@ -593,55 +592,13 @@ main (int argc,
       if (self->options.graphics_provider != NULL
           && self->options.graphics_provider[0] != '\0')
         {
-          const char *provider_path = self->options.graphics_provider;
-          g_autofree gchar *mount_point = NULL;
-
-          mount_point = pv_graphics_provider_choose_mount_point (provider_path,
-                                                                 NULL,
+          graphics_providers = pv_graphics_provider_build_array (self->options.graphics_provider,
+                                                                 host_machine,
                                                                  flags,
                                                                  error);
 
-          if (mount_point == NULL)
+          if (graphics_providers == NULL)
             goto out;
-
-          graphics_provider = pv_graphics_provider_new (provider_path,
-                                                        mount_point,
-                                                        PV_GRAPHICS_PROVIDER_FLAGS_NONE,
-                                                        error);
-
-          if (graphics_provider == NULL)
-            goto out;
-
-          for (i = 0; i < G_N_ELEMENTS (pv_multiarch_details); i++)
-            {
-              GQuark q = g_quark_from_static_string (pv_multiarch_details[i].tuple);
-
-              pv_graphics_provider_add_architecture (graphics_provider, q);
-            }
-        }
-
-      if (interpreter_root != NULL)
-        {
-          /* Also include the real host graphics stack to allow thunking.
-           * To avoid enumerating the same DRIs/layers twice, we only do
-           * this if the host is not a supported architecture. */
-          if (host_machine != NULL
-              && !pv_supported_architectures_include_machine_type (host_machine->machine_type))
-            {
-              GQuark q;
-
-              /* The trailing slash is needed to allow open(2) to work even if
-               * it's using the O_NOFOLLOW flag. */
-              interpreter_host_provider = pv_graphics_provider_new ("/proc/self/root/",
-                                                                    "/proc/self/root/",
-                                                                    PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST,
-                                                                    error);
-              if (interpreter_host_provider == NULL)
-                goto out;
-
-              q = g_quark_from_static_string (host_machine->multiarch_tuple);
-              pv_graphics_provider_add_architecture (interpreter_host_provider, q);
-            }
         }
 
       runtime_path = self->options.runtime;
@@ -668,8 +625,7 @@ main (int argc,
       self->runtime = pv_runtime_new (runtime_path,
                                       self->options.variable_dir,
                                       bwrap_executable,
-                                      graphics_provider,
-                                      interpreter_host_provider,
+                                      graphics_providers,
                                       _srt_const_strv (self->original_environ),
                                       flags,
                                       workarounds,

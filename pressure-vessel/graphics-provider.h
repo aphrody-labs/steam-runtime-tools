@@ -27,6 +27,7 @@
 
 #include <steam-runtime-tools/steam-runtime-tools.h>
 
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
 
 #include "runtime-flags.h"
@@ -60,11 +61,6 @@ struct _PvGraphicsProviderClass
 #define PV_GRAPHICS_PROVIDER_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), PV_TYPE_GRAPHICS_PROVIDER, PvGraphicsProviderClass)
 GType pv_graphics_provider_get_type (void);
 
-PvGraphicsProvider *pv_graphics_provider_new (const char *path_in_current_ns,
-                                              const char *path_in_container_ns,
-                                              PvGraphicsProviderFlags flags,
-                                              GError **error);
-
 gboolean pv_graphics_provider_has_architecture (PvGraphicsProvider *self,
                                                 GQuark tuple);
 void pv_graphics_provider_add_architecture (PvGraphicsProvider *self,
@@ -84,7 +80,7 @@ SrtSystemInfo *pv_graphics_provider_get_system_info (PvGraphicsProvider *self,
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (PvGraphicsProvider, g_object_unref)
 
-gchar *pv_graphics_provider_choose_mount_point (const char *path_in_current_ns,
-                                                const char *specific_tuple,
-                                                PvRuntimeFlags flags,
-                                                GError **error);
+GPtrArray *pv_graphics_provider_build_array (const char *provider_path,
+                                             const SrtKnownArchitecture *host_machine,
+                                             PvRuntimeFlags flags,
+                                             GError **error);

@@ -519,7 +519,7 @@ pv_graphics_provider_search_in_path_and_bin (PvGraphicsProvider *self,
   return NULL;
 }
 
-PvGraphicsProvider *
+static PvGraphicsProvider *
 pv_graphics_provider_new (const char *path_in_current_ns,
                           const char *path_in_container_ns,
                           PvGraphicsProviderFlags flags,
@@ -806,7 +806,7 @@ pv_graphics_provider_get_system_info (PvGraphicsProvider *self,
   return priv->system_info;
 }
 
-gchar *
+static gchar *
 pv_graphics_provider_choose_mount_point (const char *path_in_current_ns,
                                          const char *specific_tuple,
                                          PvRuntimeFlags flags,
@@ -852,4 +852,69 @@ pv_graphics_provider_choose_mount_point (const char *path_in_current_ns,
     return g_strdup_printf ("/run/gfx/%s", specific_tuple);
 
   return g_strdup ("/run/gfx/main");
+}
+
+GPtrArray *
+pv_graphics_provider_build_array (const char *provider_path,
+                                  const SrtKnownArchitecture *host_machine,
+                                  PvRuntimeFlags flags,
+                                  GError **error)
+{
+  g_autoptr(GPtrArray) ret = g_ptr_array_new_with_free_func (g_object_unref);
+  g_autoptr(PvGraphicsProvider) graphics_provider = NULL;
+  g_autofree gchar *mount_point = NULL;
+  gsize i;
+
+  mount_point = pv_graphics_provider_choose_mount_point (provider_path,
+                                                         NULL,
+                                                         flags,
+                                                         error);
+
+  if (mount_point == NULL)
+    return NULL;
+
+  graphics_provider = pv_graphics_provider_new (provider_path,
+                                                mount_point,
+                                                PV_GRAPHICS_PROVIDER_FLAGS_NONE,
+                                                error);
+
+  if (graphics_provider == NULL)
+    return NULL;
+
+  for (i = 0; i < G_N_ELEMENTS (pv_multiarch_details); i++)
+    {
+      GQuark q = g_quark_from_static_string (pv_multiarch_details[i].tuple);
+
+      pv_graphics_provider_add_architecture (graphics_provider, q);
+    }
+
+  g_ptr_array_add (ret, g_steal_pointer (&graphics_provider));
+
+  if (flags & PV_RUNTIME_FLAGS_INTERPRETER_ROOT)
+    {
+      /* Also include the real host graphics stack to allow thunking.
+       * To avoid enumerating the same DRIs/layers twice, we only do
+       * this if the host is not a supported architecture. */
+      if (host_machine != NULL
+          && !pv_supported_architectures_include_machine_type (host_machine->machine_type))
+        {
+          GQuark q;
+
+          /* The trailing slash is needed to allow open(2) to work even if
+           * it's using the O_NOFOLLOW flag. */
+          graphics_provider = pv_graphics_provider_new ("/proc/self/root/",
+                                                        "/proc/self/root/",
+                                                        PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST,
+                                                        error);
+
+          if (graphics_provider == NULL)
+            return NULL;
+
+          q = g_quark_from_static_string (host_machine->multiarch_tuple);
+          pv_graphics_provider_add_architecture (graphics_provider, q);
+          g_ptr_array_add (ret, g_steal_pointer (&graphics_provider));
+        }
+    }
+
+  return g_steal_pointer (&ret);
 }

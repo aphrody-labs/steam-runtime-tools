@@ -119,6 +119,7 @@ struct _PvRuntime
   gchar *runtime_app;           /* runtime_files + "/app" */
   gchar *runtime_files_on_host;
   const gchar *adverb_in_container;
+  GPtrArray *providers;
   PvGraphicsProvider *provider;
   PvGraphicsProvider *interpreter_host_provider;
   SrtDirentCompareFunc arbitrary_dirent_order;
@@ -146,8 +147,7 @@ struct _PvRuntimeClass
 enum {
   PROP_0,
   PROP_BUBBLEWRAP,
-  PROP_GRAPHICS_PROVIDER,
-  PROP_INTERPRETER_HOST_PROVIDER,
+  PROP_GRAPHICS_PROVIDERS,
   PROP_SOURCE,
   PROP_ORIGINAL_ENVIRON,
   PROP_FLAGS,
@@ -754,12 +754,8 @@ pv_runtime_get_property (GObject *object,
         g_value_set_string (value, self->bubblewrap);
         break;
 
-      case PROP_GRAPHICS_PROVIDER:
-        g_value_set_object (value, self->provider);
-        break;
-
-      case PROP_INTERPRETER_HOST_PROVIDER:
-        g_value_set_object (value, self->interpreter_host_provider);
+      case PROP_GRAPHICS_PROVIDERS:
+        g_value_set_boxed (value, self->providers);
         break;
 
       case PROP_ORIGINAL_ENVIRON:
@@ -804,16 +800,40 @@ pv_runtime_set_property (GObject *object,
         self->bubblewrap = g_value_dup_string (value);
         break;
 
-      case PROP_GRAPHICS_PROVIDER:
+      case PROP_GRAPHICS_PROVIDERS:
         /* Construct-only */
-        g_return_if_fail (self->provider == NULL);
-        self->provider = g_value_dup_object (value);
-        break;
+        g_return_if_fail (self->providers == NULL);
+        self->providers = g_value_dup_boxed (value);
 
-      case PROP_INTERPRETER_HOST_PROVIDER:
-        /* Construct-only */
-        g_return_if_fail (self->interpreter_host_provider == NULL);
-        self->interpreter_host_provider = g_value_dup_object (value);
+        if (self->providers != NULL)
+          {
+            gsize i;
+
+            for (i = 0; i < self->providers->len; i++)
+              {
+                PvGraphicsProvider *provider = g_ptr_array_index (self->providers, i);
+
+                /* For now, we only support having one graphics stack
+                 * provider for our own architectures (normally x86),
+                 * and one for the host of an interpreter like FEX
+                 * (normally aarch64). */
+                if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+                  {
+                    if (self->interpreter_host_provider == NULL)
+                      self->interpreter_host_provider = g_object_ref (provider);
+                    else
+                      g_warning ("Only one interpreter host provider can be used");
+                  }
+                else
+                  {
+                    if (self->provider == NULL)
+                      self->provider = g_object_ref (provider);
+                    else
+                      g_warning ("Only one graphics stack provider can be used");
+                  }
+              }
+          }
+
         break;
 
       case PROP_ORIGINAL_ENVIRON:
@@ -1265,7 +1285,7 @@ pv_runtime_initable_init (GInitable *initable,
    * we already know, so start this first, and let it run in parallel
    * with other setup. The results go in the SrtSystemInfo's cache
    * for future use. */
-  if (self->provider != NULL)
+  if (self->providers != NULL)
     {
       pv_graphics_provider_start_enumeration (self->provider,
                                               self->flags,
@@ -1588,6 +1608,9 @@ pv_runtime_dispose (GObject *object)
   /* This is borrowed from mutable_sysroot, so must be cleared here */
   self->runtime_files = NULL;
 
+  if (self->providers != NULL)
+    g_ptr_array_set_size (self->providers, 0);
+
   g_clear_object (&self->provider);
   g_clear_object (&self->interpreter_host_provider);
   g_clear_object (&self->mutable_sysroot);
@@ -1607,6 +1630,7 @@ pv_runtime_finalize (GObject *object)
   g_free (self->libcapsule_knowledge);
   g_strfreev (self->original_environ);
   glnx_close_fd (&self->overrides_fd);
+  g_clear_pointer (&self->providers, g_ptr_array_unref);
   g_free (self->runtime_abi_json);
   g_free (self->runtime_app);
   glnx_close_fd (&self->runtime_files_fd);
@@ -1639,21 +1663,13 @@ pv_runtime_class_init (PvRuntimeClass *cls)
                          (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                           G_PARAM_STATIC_STRINGS));
 
-  properties[PROP_GRAPHICS_PROVIDER] =
-    g_param_spec_object ("graphics-provider",
-                         "Graphics provider",
-                         "Sysroot used for graphics stack, or NULL",
-                         PV_TYPE_GRAPHICS_PROVIDER,
-                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
-                          G_PARAM_STATIC_STRINGS));
-
-  properties[PROP_INTERPRETER_HOST_PROVIDER] =
-    g_param_spec_object ("interpreter-host-provider",
-                         "Interpreter host graphics provider",
-                         "Sysroot used for the interpreter host graphics stack, or NULL",
-                         PV_TYPE_GRAPHICS_PROVIDER,
-                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
-                          G_PARAM_STATIC_STRINGS));
+  properties[PROP_GRAPHICS_PROVIDERS] =
+    g_param_spec_boxed ("graphics-providers",
+                        "Graphics providers",
+                        "Sysroots used for graphics stack, or NULL",
+                        G_TYPE_PTR_ARRAY,
+                        (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS));
 
   properties[PROP_ORIGINAL_ENVIRON] =
     g_param_spec_boxed ("original-environ", "Original environ",
@@ -1698,8 +1714,7 @@ PvRuntime *
 pv_runtime_new (const char *source,
                 const char *variable_dir,
                 const char *bubblewrap,
-                PvGraphicsProvider *provider,
-                PvGraphicsProvider *interpreter_host_provider,
+                GPtrArray *providers,
                 const char * const *original_environ,
                 PvRuntimeFlags flags,
                 PvWorkaroundFlags workarounds,
@@ -1712,8 +1727,7 @@ pv_runtime_new (const char *source,
                          NULL,
                          error,
                          "bubblewrap", bubblewrap,
-                         "graphics-provider", provider,
-                         "interpreter-host-provider", interpreter_host_provider,
+                         "graphics-providers", providers,
                          "original-environ", original_environ,
                          "variable-dir", variable_dir,
                          "source", source,

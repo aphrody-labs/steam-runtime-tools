@@ -195,32 +195,38 @@ fixture_create_runtime (Fixture *f,
                         PvRuntimeFlags flags)
 {
   g_autoptr(GError) local_error = NULL;
-  g_autoptr(PvGraphicsProvider) graphics_provider = NULL;
-  const char *gfx_in_container;
+  g_autoptr(GPtrArray) graphics_providers = NULL;
+  PvGraphicsProvider *graphics_provider;
+  const char *expected_gfx_in_container;
 
   g_assert_null (f->context->runtime);
 
-  if (flags & PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX)
-    gfx_in_container = "/run/parent";
-  else
-    gfx_in_container = "/run/host";
+  flags |= (PV_RUNTIME_FLAGS_VERBOSE | PV_RUNTIME_FLAGS_SINGLE_THREAD);
 
-  graphics_provider = pv_graphics_provider_new ("/",
-                                                gfx_in_container,
-                                                PV_GRAPHICS_PROVIDER_FLAGS_NONE,
-                                                &local_error);
+  if (flags & PV_RUNTIME_FLAGS_INTERPRETER_ROOT)
+    expected_gfx_in_container = "/var/pressure-vessel/gfx/main";
+  else if (flags & PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX)
+    expected_gfx_in_container = "/run/parent";
+  else
+    expected_gfx_in_container = "/run/host";
+
+  graphics_providers = pv_graphics_provider_build_array ("/",
+                                                         NULL,
+                                                         flags,
+                                                         &local_error);
   g_assert_no_error (local_error);
-  g_assert_nonnull (graphics_provider);
+  g_assert_nonnull (graphics_providers);
+  g_assert_cmpuint (graphics_providers->len, ==, 1);
+  graphics_provider = g_ptr_array_index (graphics_providers, 0);
+  g_assert_cmpstr (graphics_provider->path_in_container_ns,
+                   ==, expected_gfx_in_container);
 
   f->context->runtime = pv_runtime_new (f->mock_runtime,
                                         f->var,
                                         NULL,
-                                        graphics_provider,
-                                        NULL,
+                                        graphics_providers,
                                         _srt_peek_environ_nonnull (),
-                                        (flags
-                                         | PV_RUNTIME_FLAGS_VERBOSE
-                                         | PV_RUNTIME_FLAGS_SINGLE_THREAD),
+                                        flags,
                                         PV_WORKAROUND_FLAGS_NONE,
                                         &local_error);
   g_assert_no_error (local_error);

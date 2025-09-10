@@ -649,11 +649,36 @@ typedef struct
   gchar *ld_so;
 } RuntimeArchitecture;
 
+static PvGraphicsProvider *
+pv_runtime_get_graphics_provider (PvRuntime *self,
+                                  GQuark multiarch_tuple)
+{
+  gsize i;
+
+  if (self->providers == NULL)
+    return NULL;
+
+  if (multiarch_tuple == 0)
+    return NULL;
+
+  for (i = 0; i < self->providers->len; i++)
+    {
+      PvGraphicsProvider *provider = g_ptr_array_index (self->providers, i);
+
+      if (pv_graphics_provider_has_architecture (provider, multiarch_tuple))
+        return provider;
+    }
+
+  return NULL;
+}
+
 static gboolean
 runtime_architecture_init (RuntimeArchitecture *self,
                            PvRuntime *runtime)
 {
   const gchar *argv[] = { NULL, "--print-ld.so", NULL };
+  PvGraphicsProvider *provider;
+  GQuark tuple_quark;
 
   g_return_val_if_fail (self->multiarch_index < PV_N_SUPPORTED_ARCHITECTURES,
                         FALSE);
@@ -665,10 +690,11 @@ runtime_architecture_init (RuntimeArchitecture *self,
   g_return_val_if_fail (g_strcmp0 (pv_multiarch_tuples[self->multiarch_index],
                                    self->details->tuple) == 0, FALSE);
 
-  /* TODO: Choose an appropriate graphics stack provider for the architecture,
-   * if configured */
-  self->provider = g_object_ref (runtime->provider);
-  g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (self->provider), FALSE);
+  tuple_quark = g_quark_from_static_string (self->details->tuple);
+  g_return_val_if_fail (tuple_quark != 0, FALSE);
+  provider = pv_runtime_get_graphics_provider (runtime, tuple_quark);
+  g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (provider), FALSE);
+  self->provider = g_object_ref (provider);
 
   self->capsule_capture_libs_basename = g_strdup_printf ("%s-capsule-capture-libs",
                                                          self->details->tuple);

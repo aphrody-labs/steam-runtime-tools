@@ -4893,7 +4893,7 @@ collect_json_based_drivers (PvRuntime *self,
     _srt_profiling_start ("Collecting %s", description);
   const gsize multiarch_index = arch->multiarch_index;
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (arch->provider != NULL, FALSE);
   g_return_val_if_fail (details_arr != NULL, FALSE);
   g_return_val_if_fail (libdir_patterns != NULL, FALSE);
   g_return_val_if_fail (bind_icds_subdir != NULL, FALSE);
@@ -4950,7 +4950,7 @@ collect_json_based_drivers (PvRuntime *self,
            * no API to tell us. The only way we can find out the library's
            * real location is to tell libdl to load (dlopen) the library, and
            * see what the resulting path is. */
-          if (_srt_sysroot_is_direct (self->provider->in_current_ns))
+          if (_srt_sysroot_is_direct (arch->provider->in_current_ns))
             {
               g_autoptr(SrtLibrary) library = NULL;
               SrtLibraryIssues issues;

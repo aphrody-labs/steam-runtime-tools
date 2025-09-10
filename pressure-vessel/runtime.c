@@ -2296,7 +2296,6 @@ bind_icds (PvRuntime *self,
   gsize i;
   int digits = pv_count_decimal_digits (n_details);
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
   g_return_val_if_fail (runtime_architecture_check_valid (arch), FALSE);
   g_return_val_if_fail (subdir != NULL, FALSE);
   g_return_val_if_fail (n_details == 0 || details_arr != NULL, FALSE);
@@ -2442,7 +2441,7 @@ bind_icds (PvRuntime *self,
           if (details_arch->kind != ICD_KIND_ABSOLUTE)
             continue;
 
-          fd = _srt_sysroot_open (self->provider->in_current_ns,
+          fd = _srt_sysroot_open (arch->provider->in_current_ns,
                                   details_arch->resolved_library,
                                   SRT_RESOLVE_FLAGS_NONE,
                                   NULL, NULL);

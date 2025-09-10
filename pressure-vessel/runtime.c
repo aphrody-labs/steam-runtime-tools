@@ -2058,7 +2058,7 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
   g_autoptr(FlatpakBwrap) ret = NULL;
   glnx_autofd int runtime_files_fd = -1;
 
-  g_return_val_if_fail (self->provider != NULL, NULL);
+  g_return_val_if_fail (arch->provider != NULL, NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
   ret = pv_bwrap_copy (self->container_access_adverb);
@@ -2071,17 +2071,17 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
 
   /* Every symlink that starts with exactly /app/ (for Flatpak) */
   remap_app = g_strjoin (NULL, "/app/", "=",
-                         self->provider->path_in_container_ns,
+                         arch->provider->path_in_container_ns,
                          "/app/", NULL);
 
   /* Every symlink that starts with exactly /usr/ */
   remap_usr = g_strjoin (NULL, "/usr/", "=",
-                         self->provider->path_in_container_ns,
+                         arch->provider->path_in_container_ns,
                          "/usr/", NULL);
 
   /* Every symlink that starts with /lib, e.g. /lib64 */
   remap_lib = g_strjoin (NULL, "/lib", "=",
-                         self->provider->path_in_container_ns,
+                         arch->provider->path_in_container_ns,
                          "/lib", NULL);
 
   runtime_files_fd = dup (self->runtime_files_fd);
@@ -2103,7 +2103,7 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
                           "--remap-link-prefix", remap_app,
                           "--remap-link-prefix", remap_usr,
                           "--remap-link-prefix", remap_lib,
-                          "--provider", self->provider->in_current_ns->path,
+                          "--provider", arch->provider->in_current_ns->path,
                           "--container",
                           NULL);
 

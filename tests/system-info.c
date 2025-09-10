@@ -1129,20 +1129,27 @@ multiarch_tuples_handling (Fixture *f,
   GStrv tuples_list;
   SrtSystemInfo *info;
   const gchar *multiarches[] = {"foo8000", "bar9000", NULL};
+  const GQuark *quarks;
+  gsize n;
 
   info = srt_system_info_new (NULL);
 
   tuples_list = srt_system_info_dup_multiarch_tuples (info);
+  quarks = _srt_system_info_get_multiarch_quarks (info, &n);
+  g_assert_cmpuint (n, ==, 1);
 
   g_assert_cmpstr (srt_system_info_get_primary_multiarch_tuple (info), ==, tuples_list[0]);
 
 #ifndef _SRT_MULTIARCH
   g_assert_cmpstr (tuples_list[0], ==, "UNKNOWN");
+  g_assert_cmpstr (g_quark_to_string (quarks[0]), ==, "UNKNOWN");
 #else
   g_assert_cmpstr (tuples_list[0], ==, _SRT_MULTIARCH);
+  g_assert_cmpstr (g_quark_to_string (quarks[0]), ==, _SRT_MULTIARCH);
 #endif
 
   g_assert_cmpstr (tuples_list[1], ==, NULL);
+  g_assert_cmpuint (quarks[1], ==, 0);
 
   g_strfreev (tuples_list);
 
@@ -1152,6 +1159,17 @@ multiarch_tuples_handling (Fixture *f,
   g_assert_cmpstr (tuples_list[1], ==, multiarches[1]);
   g_assert_cmpstr (tuples_list[2], ==, multiarches[2]);
   g_assert_cmpstr (srt_system_info_get_primary_multiarch_tuple (info), ==, multiarches[0]);
+
+  quarks = _srt_system_info_get_multiarch_quarks (info, &n);
+  g_assert_cmpuint (n, ==, 2);
+  g_assert_cmpstr (g_quark_to_string (quarks[0]), ==, multiarches[0]);
+  g_assert_cmpstr (g_quark_to_string (quarks[1]), ==, multiarches[1]);
+  g_assert_cmpuint (quarks[2], ==, 0);
+
+  quarks = _srt_system_info_get_multiarch_quarks (info, NULL);
+  g_assert_cmpstr (g_quark_to_string (quarks[0]), ==, multiarches[0]);
+  g_assert_cmpstr (g_quark_to_string (quarks[1]), ==, multiarches[1]);
+  g_assert_cmpuint (quarks[2], ==, 0);
 
   g_object_unref (info);
   g_strfreev (tuples_list);

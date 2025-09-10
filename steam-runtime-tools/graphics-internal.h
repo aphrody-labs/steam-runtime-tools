@@ -289,12 +289,14 @@ G_GNUC_INTERNAL
 GList *_srt_load_egl_things (GType which,
                              SrtSysroot *sysroot,
                              SrtSubprocessRunner *runner,
-                             const char * const *multiarch_tuples,
+                             const GQuark *multiarch_tuples,
+                             gsize n_multiarch_tuples,
                              SrtCheckFlags check_flags);
 G_GNUC_INTERNAL
 GList *_srt_load_vulkan_icds (SrtSysroot *sysroot,
                               SrtSubprocessRunner *runner,
-                              const char * const *multiarch_tuples,
+                              const GQuark *multiarch_tuples,
+                              gsize n_multiarch_tuples,
                               SrtCheckFlags check_flags);
 
 G_GNUC_INTERNAL
@@ -314,7 +316,8 @@ GList *_srt_list_graphics_modules (SrtSysroot *sysroot,
 G_GNUC_INTERNAL
 GList *_srt_load_vulkan_layers_extended (SrtSysroot *sysroot,
                                          SrtSubprocessRunner *runner,
-                                         const char * const *multiarch_tuples,
+                                         const GQuark *multiarch_tuples,
+                                         gsize n_multiarch_tuples,
                                          gboolean explicit,
                                          SrtCheckFlags check_flags);
 
@@ -338,7 +341,8 @@ void _srt_openxr_1_runtimes_get_from_report (JsonObject *json_obj,
 G_GNUC_INTERNAL
 gchar ** _srt_graphics_get_vulkan_search_paths (SrtSysroot *sysroot,
                                                 const char * const *envp,
-                                                const char * const *multiarch_tuples,
+                                                const GQuark *multiarch_tuples,
+                                                gsize n_multiarch_tuples,
                                                 const char *suffix);
 
 G_GNUC_INTERNAL

@@ -582,6 +582,7 @@ get_glvnd_datadir (void)
  *  EGL ICDs are searched by their absolute path, obtained using
  *  "inspect-library" in the provided multiarch tuples, instead of just their
  *  resolved library path.
+ * @n_multiarch_tuples: Number of items in @multiarch_tuples
  * @check_flags: Whether to check for problems
  *
  * Implementation of srt_system_info_list_egl_icds()
@@ -594,7 +595,8 @@ GList *
 _srt_load_egl_things (GType which,
                       SrtSysroot *sysroot,
                       SrtSubprocessRunner *runner,
-                      const char * const *multiarch_tuples,
+                      const GQuark *multiarch_tuples,
+                      gsize n_multiarch_tuples,
                       SrtCheckFlags check_flags)
 {
   const gchar *value;
@@ -673,18 +675,17 @@ _srt_load_egl_things (GType which,
         }
       else if (which == SRT_TYPE_EGL_ICD
                && _srt_sysroot_test (sysroot, "/.flatpak-info",
-                                     SRT_RESOLVE_FLAGS_NONE, NULL)
-               && multiarch_tuples != NULL)
+                                     SRT_RESOLVE_FLAGS_NONE, NULL))
         {
           g_debug ("Flatpak detected: assuming freedesktop-based runtime");
 
-          for (i = 0; multiarch_tuples[i] != NULL; i++)
+          for (i = 0; i < n_multiarch_tuples; i++)
             {
               g_autofree gchar *tmp = NULL;
 
               /* freedesktop-sdk reconfigures the EGL loader to look here. */
               tmp = g_strdup_printf ("/usr/lib/%s/GL/" EGL_VENDOR_SUFFIX,
-                                     multiarch_tuples[i]);
+                                     g_quark_to_string (multiarch_tuples[i]));
               load_json_dir (sysroot, tmp, NULL, _srt_indirect_strcmp0,
                              loader_cb, &ret);
             }
@@ -699,7 +700,11 @@ _srt_load_egl_things (GType which,
     }
 
   if (!(check_flags & SRT_CHECK_FLAGS_SKIP_SLOW_CHECKS))
-    _srt_loadable_flag_duplicates (which, runner, multiarch_tuples, ret);
+    _srt_loadable_flag_duplicates (which,
+                                   runner,
+                                   multiarch_tuples,
+                                   n_multiarch_tuples,
+                                   ret);
 
   return g_list_reverse (ret);
 }

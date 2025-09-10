@@ -596,7 +596,8 @@ _update_duplicated_value (SrtBaseGraphicsModule *self,
 void
 _srt_loadable_flag_duplicates (GType which,
                                SrtSubprocessRunner *runner,
-                               const char * const *multiarch_tuples,
+                               const GQuark *multiarch_tuples,
+                               gsize n_multiarch_tuples,
                                GList *loadable)
 {
   g_autoptr(GHashTable) loadable_seen = NULL;
@@ -628,7 +629,7 @@ _srt_loadable_flag_duplicates (GType which,
           if (resolved_path == NULL)
             continue;
 
-          if (multiarch_tuples == NULL)
+          if (n_multiarch_tuples == 0)
             {
               /* If we don't have the multiarch_tuples just use the
                * resolved_path as is */
@@ -636,11 +637,11 @@ _srt_loadable_flag_duplicates (GType which,
             }
           else
             {
-              for (i = 0; multiarch_tuples[i] != NULL; i++)
+              for (i = 0; i < n_multiarch_tuples; i++)
                 {
                   g_autofree gchar *canonical_path = NULL;
                   canonical_path = _get_library_canonical_path (runner,
-                                                                multiarch_tuples[i],
+                                                                g_quark_to_string (multiarch_tuples[i]),
                                                                 resolved_path);
 
                   if (canonical_path == NULL)
@@ -662,7 +663,7 @@ _srt_loadable_flag_duplicates (GType which,
           if (resolved_path == NULL && name == NULL)
             continue;
 
-          if (multiarch_tuples == NULL || resolved_path == NULL)
+          if (n_multiarch_tuples == 0 || resolved_path == NULL)
             {
               g_autofree gchar *hash_key = NULL;
               /* We need a key for the hashtable that includes the name and
@@ -676,12 +677,12 @@ _srt_loadable_flag_duplicates (GType which,
             }
           else
             {
-              for (i = 0; multiarch_tuples[i] != NULL; i++)
+              for (i = 0; i < n_multiarch_tuples; i++)
                 {
                   g_autofree gchar *canonical_path = NULL;
                   g_autofree gchar *hash_key = NULL;
                   canonical_path = _get_library_canonical_path (runner,
-                                                                multiarch_tuples[i],
+                                                                g_quark_to_string (multiarch_tuples[i]),
                                                                 resolved_path);
 
                   if (canonical_path == NULL)

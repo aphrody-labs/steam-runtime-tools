@@ -11,6 +11,7 @@
 
 #include <steam-runtime-tools/steam-runtime-tools.h>
 
+#include "graphics-provider.h"
 #include "runtime-flags.h"
 #include "supported-architectures.h"
 
@@ -93,6 +94,7 @@ G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (PvModulePerArch, pv_module_per_arch_clear)
  *  #SrtOpenxr1Runtime
  * @debug_name: Some sort of name for the module, to be used in diagnostic
  *  messages only. Assumed to be owned by @icd.
+ * @provider: The graphics stack provider where we found this driver
  * @archs: A per-architecture array of details keyed by the index of
  *  a multiarch tuple in @pv_multiarch_tuples
  *
@@ -162,10 +164,10 @@ typedef struct
 {
   gpointer icd;
   const char *debug_name;
+  PvGraphicsProvider *provider;
   PvModulePerArch archs[PV_N_SUPPORTED_ARCHITECTURES];
 } IcdDetails;
 
-IcdDetails *icd_details_new (gpointer icd);
 void icd_details_free (IcdDetails *self);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdDetails, icd_details_free)
@@ -185,12 +187,9 @@ icd_details_array_sized_new (gsize n)
 }
 
 void icd_details_fill_array_single_arch (GPtrArray *details_arr,
+                                         PvGraphicsProvider *provider,
                                          const GList *drivers,
                                          gsize multiarch_index);
-
-void icd_details_fill_array_json_based (GPtrArray *details_arr,
-                                        const char *which,
-                                        const GList *drivers);
 
 /*
  * IcdStack:
@@ -224,7 +223,7 @@ IcdStack *icd_stack_new (void);
 
 void icd_stack_enumerate (IcdStack *self,
                           PvRuntimeFlags runtime_flags,
-                          SrtSystemInfo *system_info,
+                          PvGraphicsProvider *provider,
                           const char *which_system);
 
 void icd_stack_free (IcdStack *self);

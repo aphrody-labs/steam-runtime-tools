@@ -34,8 +34,9 @@ icd_kind_to_string (IcdKind kind)
     }
 }
 
-IcdDetails *
-icd_details_new (gpointer icd)
+static IcdDetails *
+icd_details_new (PvGraphicsProvider *provider,
+                 gpointer icd)
 {
   IcdDetails *self;
   gsize i;
@@ -65,6 +66,7 @@ icd_details_new (gpointer icd)
     }
 
   self = g_slice_new0 (IcdDetails);
+  self->provider = g_object_ref (provider);
   self->icd = g_object_ref (icd);
   self->debug_name = name;
 
@@ -103,6 +105,7 @@ icd_details_free (IcdDetails *self)
  */
 void
 icd_details_fill_array_single_arch (GPtrArray *details_arr,
+                                    PvGraphicsProvider *provider,
                                     const GList *drivers,
                                     gsize multiarch_index)
 {
@@ -112,7 +115,7 @@ icd_details_fill_array_single_arch (GPtrArray *details_arr,
   for (icd_iter = drivers, j = 0; icd_iter != NULL; icd_iter = icd_iter->next, j++)
     {
       SrtBaseGraphicsModule *module = icd_iter->data;
-      g_autoptr(IcdDetails) details = icd_details_new (module);
+      g_autoptr(IcdDetails) details = icd_details_new (provider, module);
       PvModulePerArch *arch = &details->archs[multiarch_index];
 
       g_assert (SRT_IS_DRI_DRIVER (module)
@@ -142,8 +145,9 @@ icd_details_fill_array_single_arch (GPtrArray *details_arr,
  * Returns: (transfer container) (element-type IcdDetails): An array of
  *  representations of the drivers
  */
-void
+static void
 icd_details_fill_array_json_based (GPtrArray *details_arr,
+                                   PvGraphicsProvider *provider,
                                    const char *which,
                                    const GList *drivers)
 {
@@ -176,7 +180,7 @@ icd_details_fill_array_json_based (GPtrArray *details_arr,
       g_info ("%s #%" G_GSIZE_FORMAT " at %s: %s",
               which, i, path, description);
 
-      g_ptr_array_add (details_arr, icd_details_new (module));
+      g_ptr_array_add (details_arr, icd_details_new (provider, module));
     }
 }
 
@@ -188,6 +192,7 @@ icd_stack_new (void)
 
 static void
 icd_stack_enumerate_egl_icds (IcdStack *self,
+                              PvGraphicsProvider *provider,
                               SrtSystemInfo *system_info,
                               const gchar *which_system)
 {
@@ -201,11 +206,15 @@ icd_stack_enumerate_egl_icds (IcdStack *self,
   if (self->egl_icd_details == NULL)
     self->egl_icd_details = icd_details_array_sized_new (g_list_length (egl_icds));
 
-  icd_details_fill_array_json_based (self->egl_icd_details, "EGL ICD", egl_icds);
+  icd_details_fill_array_json_based (self->egl_icd_details,
+                                     provider,
+                                     "EGL ICD",
+                                     egl_icds);
 }
 
 static void
 icd_stack_enumerate_egl_ext_platforms (IcdStack *self,
+                                       PvGraphicsProvider *provider,
                                        SrtSystemInfo *system_info,
                                        const gchar *which_system)
 {
@@ -222,12 +231,14 @@ icd_stack_enumerate_egl_ext_platforms (IcdStack *self,
     self->egl_ext_platform_details = icd_details_array_sized_new (g_list_length (egl_ext_platforms));
 
   icd_details_fill_array_json_based (self->egl_ext_platform_details,
+                                     provider,
                                      "EGL external platform",
                                      egl_ext_platforms);
 }
 
 static void
 icd_stack_enumerate_vulkan_icds (IcdStack *self,
+                                 PvGraphicsProvider *provider,
                                  SrtSystemInfo *system_info,
                                  const gchar *which_system)
 {
@@ -242,12 +253,14 @@ icd_stack_enumerate_vulkan_icds (IcdStack *self,
     self->vulkan_icd_details = icd_details_array_sized_new (g_list_length (vulkan_icds));
 
   icd_details_fill_array_json_based (self->vulkan_icd_details,
+                                     provider,
                                      "Vulkan ICD",
                                      vulkan_icds);
 }
 
 static void
 icd_stack_enumerate_vulkan_layers (IcdStack *self,
+                                   PvGraphicsProvider *provider,
                                    SrtSystemInfo *system_info,
                                    const gchar *which_system)
 {
@@ -264,6 +277,7 @@ icd_stack_enumerate_vulkan_layers (IcdStack *self,
     self->vulkan_exp_layer_details = icd_details_array_sized_new (g_list_length (vulkan_exp_layers));
 
   icd_details_fill_array_json_based (self->vulkan_exp_layer_details,
+                                     provider,
                                      "Vulkan explicit layer",
                                      vulkan_exp_layers);
 
@@ -274,12 +288,14 @@ icd_stack_enumerate_vulkan_layers (IcdStack *self,
     self->vulkan_imp_layer_details = icd_details_array_sized_new (g_list_length (vulkan_imp_layers));
 
   icd_details_fill_array_json_based (self->vulkan_imp_layer_details,
+                                     provider,
                                      "Vulkan implicit layer",
                                      vulkan_imp_layers);
 }
 
 static void
 icd_stack_enumerate_openxr_1_runtimes (IcdStack *self,
+                                       PvGraphicsProvider *provider,
                                        SrtSystemInfo *system_info,
                                        const gchar *which_system)
 {
@@ -323,25 +339,28 @@ icd_stack_enumerate_openxr_1_runtimes (IcdStack *self,
 
       g_hash_table_insert (self->openxr_1_runtime_details,
                            g_strdup (multiarch_tuple),
-                           icd_details_new (rt));
+                           icd_details_new (provider, rt));
     }
 }
 
 void
 icd_stack_enumerate (IcdStack *self,
                      PvRuntimeFlags runtime_flags,
-                     SrtSystemInfo *system_info,
+                     PvGraphicsProvider *provider,
                      const char *which_system)
 {
-  icd_stack_enumerate_egl_icds (self, system_info, which_system);
-  icd_stack_enumerate_egl_ext_platforms (self, system_info, which_system);
-  icd_stack_enumerate_vulkan_icds (self, system_info, which_system);
+  SrtSystemInfo *system_info;
+
+  system_info = pv_graphics_provider_get_system_info (provider, 0);
+  icd_stack_enumerate_egl_icds (self, provider, system_info, which_system);
+  icd_stack_enumerate_egl_ext_platforms (self, provider, system_info, which_system);
+  icd_stack_enumerate_vulkan_icds (self, provider, system_info, which_system);
 
   if (runtime_flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
-    icd_stack_enumerate_vulkan_layers (self, system_info, which_system);
+    icd_stack_enumerate_vulkan_layers (self, provider, system_info, which_system);
 
   if (runtime_flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
-    icd_stack_enumerate_openxr_1_runtimes (self, system_info, which_system);
+    icd_stack_enumerate_openxr_1_runtimes (self, provider, system_info, which_system);
 }
 
 void

@@ -6614,7 +6614,10 @@ collect_vdpau_drivers (PvRuntime *self,
 
   self->any_vdpau_drivers = TRUE;
   details_arr = icd_details_array_sized_new (g_list_length (vdpau_drivers));
-  icd_details_fill_array_single_arch (details_arr, vdpau_drivers, multiarch_index);
+  icd_details_fill_array_single_arch (details_arr,
+                                      self->provider,
+                                      vdpau_drivers,
+                                      multiarch_index);
 
   /* In practice we won't actually use the sequence number for VDPAU
    * because they can only be located in a single directory,
@@ -6685,8 +6688,14 @@ collect_dri_drivers (PvRuntime *self,
 
   details_arr = icd_details_array_sized_new (g_list_length (dri_drivers)
                                              + g_list_length (va_api_drivers));
-  icd_details_fill_array_single_arch (details_arr, dri_drivers, multiarch_index);
-  icd_details_fill_array_single_arch (details_arr, va_api_drivers, multiarch_index);
+  icd_details_fill_array_single_arch (details_arr,
+                                      self->provider,
+                                      dri_drivers,
+                                      multiarch_index);
+  icd_details_fill_array_single_arch (details_arr,
+                                      self->provider,
+                                      va_api_drivers,
+                                      multiarch_index);
   j = 0;
 
   while (j < details_arr->len)
@@ -6875,8 +6884,6 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   g_autoptr(GString) openxr_1_runtime_path = g_string_new ("");
   g_autoptr(GString) va_api_path = g_string_new ("");
   gboolean any_architecture_works = FALSE;
-  SrtSystemInfo *system_info;
-  SrtSystemInfo *host_system_info = NULL;
   g_autoptr(IcdStack) provider_stack = NULL;
   g_autoptr(IcdStack) host_stack = NULL;
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
@@ -6909,11 +6916,10 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   if (!pv_runtime_provide_container_access (self, error))
     return FALSE;
 
-  system_info = pv_graphics_provider_get_system_info (self->provider, 0);
   provider_stack = icd_stack_new ();
   icd_stack_enumerate (provider_stack,
                        self->flags,
-                       system_info,
+                       self->provider,
                        provider_label);
 
   if (self->interpreter_host_provider != NULL)
@@ -6924,12 +6930,10 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
       /* We currently assume there are no FEX thunks for OpenXR */
       host_flags &= ~PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES;
 
-      host_system_info = pv_graphics_provider_get_system_info (self->interpreter_host_provider,
-                                                               0);
       host_stack = icd_stack_new ();
       icd_stack_enumerate (host_stack,
                            host_flags,
-                           host_system_info,
+                           self->interpreter_host_provider,
                            host_label);
     }
 

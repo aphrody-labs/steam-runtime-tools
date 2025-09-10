@@ -4426,12 +4426,12 @@ pv_runtime_take_ld_so_from_provider (PvRuntime *self,
   glnx_autofd int path_fd = -1;
   g_autofree gchar *ld_so_relative_to_provider = NULL;
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (arch->provider != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
 
   g_debug ("Making provider's ld.so visible in container");
 
-  path_fd = _srt_sysroot_open (self->provider->in_current_ns, arch->ld_so,
+  path_fd = _srt_sysroot_open (arch->provider->in_current_ns, arch->ld_so,
                                SRT_RESOLVE_FLAGS_READABLE,
                                &ld_so_relative_to_provider, error);
 
@@ -4454,7 +4454,7 @@ pv_runtime_take_ld_so_from_provider (PvRuntime *self,
    * an executable. */
   if (self->mutable_sysroot != NULL &&
       !pv_runtime_take_from_provider (self,
-                                      self->provider, ld_so_relative_to_provider,
+                                      arch->provider, ld_so_relative_to_provider,
                                       bwrap, arch->ld_so,
                                       TAKE_FROM_PROVIDER_FLAGS_NONE, error))
     return FALSE;
@@ -4474,7 +4474,7 @@ pv_runtime_take_ld_so_from_provider (PvRuntime *self,
    * just crash. However, all of those (chains of) non-standard symlinks
    * will end up pointing to ld_so_in_runtime. */
   return pv_runtime_take_from_provider (self,
-                                        self->provider, ld_so_relative_to_provider,
+                                        arch->provider, ld_so_relative_to_provider,
                                         bwrap, ld_so_in_runtime,
                                         TAKE_FROM_PROVIDER_FLAGS_NONE, error);
 }

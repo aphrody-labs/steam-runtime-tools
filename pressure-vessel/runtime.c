@@ -627,6 +627,8 @@ typedef struct
   gsize multiarch_index;
   /* Always &pv_multiarch_details[self->multiarch_index] */
   const PvMultiarchDetails *details;
+  /* Graphics stack provider to use */
+  PvGraphicsProvider *provider;
   /* "lib/TUPLE/aliases", so that for example
    * /overrides/${aliases_relative_to_overrides}/libbz2.so.1 might exist
    * inside the final container */
@@ -663,6 +665,11 @@ runtime_architecture_init (RuntimeArchitecture *self,
   g_return_val_if_fail (g_strcmp0 (pv_multiarch_tuples[self->multiarch_index],
                                    self->details->tuple) == 0, FALSE);
 
+  /* TODO: Choose an appropriate graphics stack provider for the architecture,
+   * if configured */
+  self->provider = g_object_ref (runtime->provider);
+  g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (self->provider), FALSE);
+
   self->capsule_capture_libs_basename = g_strdup_printf ("%s-capsule-capture-libs",
                                                          self->details->tuple);
   self->capsule_capture_libs = g_build_filename (runtime->helpers_path,
@@ -697,6 +704,7 @@ runtime_architecture_check_valid (RuntimeArchitecture *self)
 {
   g_return_val_if_fail (self->multiarch_index < PV_N_SUPPORTED_ARCHITECTURES, FALSE);
   g_return_val_if_fail (self->details == &pv_multiarch_details[self->multiarch_index], FALSE);
+  g_return_val_if_fail (self->provider != NULL, FALSE);
   g_return_val_if_fail (self->capsule_capture_libs_basename != NULL, FALSE);
   g_return_val_if_fail (self->capsule_capture_libs != NULL, FALSE);
   g_return_val_if_fail (self->libdir_relative_to_overrides != NULL, FALSE);
@@ -711,6 +719,7 @@ runtime_architecture_clear (RuntimeArchitecture *self)
 {
   self->multiarch_index = G_MAXSIZE;
   self->details = NULL;
+  g_clear_object (&self->provider);
   g_clear_pointer (&self->capsule_capture_libs_basename, g_free);
   g_clear_pointer (&self->capsule_capture_libs, g_free);
   g_clear_pointer (&self->libdir_relative_to_overrides, g_free);

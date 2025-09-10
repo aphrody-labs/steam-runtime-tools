@@ -6613,7 +6613,7 @@ collect_vdpau_drivers (PvRuntime *self,
   self->any_vdpau_drivers = TRUE;
   details_arr = icd_details_array_sized_new (g_list_length (vdpau_drivers));
   icd_details_fill_array_single_arch (details_arr,
-                                      self->provider,
+                                      arch->provider,
                                       vdpau_drivers,
                                       multiarch_index);
 
@@ -6687,11 +6687,11 @@ collect_dri_drivers (PvRuntime *self,
   details_arr = icd_details_array_sized_new (g_list_length (dri_drivers)
                                              + g_list_length (va_api_drivers));
   icd_details_fill_array_single_arch (details_arr,
-                                      self->provider,
+                                      arch->provider,
                                       dri_drivers,
                                       multiarch_index);
   icd_details_fill_array_single_arch (details_arr,
-                                      self->provider,
+                                      arch->provider,
                                       va_api_drivers,
                                       multiarch_index);
   j = 0;

@@ -87,6 +87,7 @@
 
 typedef struct
 {
+  GQuark arch_tuple;
   GCancellable *cancellable;
   GThread *thread;
   SrtSystemInfo *system_info;
@@ -1488,6 +1489,7 @@ enumeration_thread_start_arch (EnumerationThread *self,
   g_return_if_fail (self->thread == NULL);
   g_return_if_fail (tuple != 0);
 
+  self->arch_tuple = tuple;
   self->cancellable = g_cancellable_new ();
   self->thread = g_thread_new (g_quark_to_string (tuple), enumerate_arch,
                                enumeration_thread_inputs_new (tuple,

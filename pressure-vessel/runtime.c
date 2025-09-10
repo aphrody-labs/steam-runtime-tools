@@ -1253,10 +1253,11 @@ pv_runtime_create_copy (PvRuntime *self,
 
 typedef struct
 {
-  PvGraphicsProvider *provider;
+  SrtSystemInfo *system_info;
   GCancellable *cancellable;
   GQuark arch_tuple;
   PvRuntimeFlags runtime_flags;
+  PvGraphicsProviderFlags provider_flags;
 } EnumerationThreadInputs;
 
 /* Called in main thread */
@@ -1270,7 +1271,9 @@ enumeration_thread_inputs_new (GQuark arch_tuple,
 
   self->arch_tuple = arch_tuple;
   self->runtime_flags = runtime_flags;
-  self->provider = g_object_ref (provider);
+  self->provider_flags = provider->flags;
+  self->system_info = pv_graphics_provider_create_system_info (provider,
+                                                               arch_tuple);
   self->cancellable = g_object_ref (cancellable);
   return self;
 }
@@ -1280,7 +1283,7 @@ static void
 enumeration_thread_inputs_free (EnumerationThreadInputs *self)
 {
   g_object_unref (self->cancellable);
-  g_object_unref (self->provider);
+  g_clear_object (&self->system_info);
   g_free (self);
 }
 
@@ -1292,9 +1295,7 @@ enumerate_arch (gpointer data)
   const char *tuple = g_quark_to_string (inputs->arch_tuple);
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
     _srt_profiling_start ("Enumerating %s drivers in thread", tuple);
-  g_autoptr(SrtSystemInfo) system_info =
-    pv_graphics_provider_create_system_info (inputs->provider,
-                                             inputs->arch_tuple);
+  g_autoptr(SrtSystemInfo) system_info = g_steal_pointer (&inputs->system_info);
 
   if (g_cancellable_is_cancelled (inputs->cancellable))
     goto out;
@@ -1302,7 +1303,7 @@ enumerate_arch (gpointer data)
   /* At the moment the real host is included only when FEX emulator is in use.
    * Skipping VDPAU until there is a real use case for it, because
    * it only supports one search path entry, which is problematic for us. */
-  if (!(inputs->provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST))
+  if (!(inputs->provider_flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST))
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
         _srt_profiling_start ("Enumerating %s VDPAU drivers in thread",
@@ -1420,8 +1421,7 @@ enumerate_indep (gpointer data)
   EnumerationThreadInputs *inputs = data;
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
     _srt_profiling_start ("Enumerating cross-architecture ICDs in thread");
-  g_autoptr(SrtSystemInfo) system_info =
-    pv_graphics_provider_create_system_info (inputs->provider, 0);
+  g_autoptr(SrtSystemInfo) system_info = g_steal_pointer (&inputs->system_info);
 
   cache_indep_graphics_stack (system_info,
                               inputs->runtime_flags,

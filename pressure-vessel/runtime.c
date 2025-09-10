@@ -2194,7 +2194,6 @@ pv_runtime_capture_libraries (PvRuntime *self,
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
   gsize i;
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
   g_return_val_if_fail (runtime_architecture_check_valid (arch), FALSE);
   g_return_val_if_fail (destination != NULL, FALSE);
   g_return_val_if_fail (n_patterns > 0, FALSE);

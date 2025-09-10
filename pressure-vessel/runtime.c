@@ -1268,7 +1268,7 @@ enumeration_thread_inputs_new (const PvMultiarchDetails *details,
   EnumerationThreadInputs *self = g_new0 (EnumerationThreadInputs, 1);
 
   self->details = details;
-  self->flags = self->flags;
+  self->flags = flags;
   self->provider = g_object_ref (provider);
   self->cancellable = g_object_ref (cancellable);
   return self;

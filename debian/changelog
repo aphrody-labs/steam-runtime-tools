@@ -10,6 +10,8 @@ steam-runtime-tools (0.20250910.0) UNRELEASED; urgency=medium
   * Library code:
     - Fix fallback multiarch tuple for otherwise unsupported architectures
       (steam-runtime-tools!836)
+    - Refactoring to architecture handling
+      (steam-runtime-tools!837)
   * Packaging:
     - d/libsteam-runtime-tools-0-0.symbols:
       Belatedly update for 0.20250820.0
@@ -20,7 +22,7 @@ steam-runtime-tools (0.20250910.0) UNRELEASED; urgency=medium
   [ Timo Witte ]
   * Fix a typo (ValveSoftware/steam-runtime#775)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 10 Sep 2025 19:14:20 +0100
+ -- Simon McVittie <smcv@collabora.com>  Wed, 10 Sep 2025 20:10:20 +0100
 
 steam-runtime-tools (0.20250820.0) steamrt; urgency=medium
 

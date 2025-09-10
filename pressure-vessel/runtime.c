@@ -7259,12 +7259,18 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
       g_clear_pointer (&part_timer, _srt_profiling_end);
     }
 
-  if (self->interpreter_host_provider != NULL)
+  /* In practice we will only have one graphics stack provider for the
+   * interpreter host, but for completeness, iterate through 0 or more */
+  for (j = 0; j < self->providers->len; j++)
     {
+      PvGraphicsProvider *provider = g_ptr_array_index (self->providers, j);
       gsize n;
       const GQuark *host_tuples;
 
-      host_tuples = pv_graphics_provider_get_architectures (self->interpreter_host_provider, &n);
+      if (!(provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST))
+        continue;
+
+      host_tuples = pv_graphics_provider_get_architectures (provider, &n);
 
       for (i = 0; i < n; i++)
         {
@@ -7272,9 +7278,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           SrtSystemInfo *arch_system_info;
           const char *tuple = g_quark_to_string (arch_quark);
 
-          arch_system_info = pv_graphics_provider_get_system_info (self->interpreter_host_provider,
+          arch_system_info = pv_graphics_provider_get_system_info (provider,
                                                                    arch_quark);
-
           pv_append_host_dri_library_paths (self,
                                             arch_system_info,
                                             tuple,

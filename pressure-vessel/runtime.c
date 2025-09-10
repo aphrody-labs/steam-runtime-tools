@@ -49,6 +49,7 @@
 #include "passwd.h"
 #include "runtime-module.h"
 #include "runtime-flags.h"
+#include "runtime-library-data.h"
 #include "supported-architectures.h"
 #include "tree-copy.h"
 #include "utils.h"
@@ -5761,10 +5762,7 @@ typedef enum
  * @extra_suffix: (nullable): Subdirectory of ${libdir} where we expect
  *  the library to be located, e.g. `/dri`, or %NULL if none
  * @flags: Flags
- * @data_in_provider: (element-type filename ignored): A map
- *  `{ owned string => itself }` representing the set
- *  of data directories discovered. Each directory is represented
- *  as relative to the root of the provider, e.g. `usr/share/drirc.d`.
+ * @data_in_provider: Collection of data directories to update
  */
 static void
 pv_runtime_collect_lib_data (PvRuntime *self,
@@ -5773,7 +5771,7 @@ pv_runtime_collect_lib_data (PvRuntime *self,
                              const char *lib_in_provider,
                              const char *extra_suffix,
                              PvRuntimeDataFlags flags,
-                             GHashTable *data_in_provider)
+                             PvRuntimeLibraryData *data_in_provider)
 {
   const char *libdir_suffixes[] =
   {
@@ -5806,16 +5804,11 @@ pv_runtime_collect_lib_data (PvRuntime *self,
   dir_in_provider_usr_share = g_build_filename ("usr", "share", dir_basename, NULL);
 
   if ((flags & PV_RUNTIME_DATA_FLAGS_USR_SHARE_FIRST)
-      && _srt_sysroot_test (arch->provider->in_current_ns,
-                            dir_in_provider_usr_share,
-                            SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY, NULL))
-    {
-      g_debug ("Using \"/%s\" based on hard-coded /usr/share",
-               dir_in_provider_usr_share);
-      g_hash_table_add (data_in_provider,
-                        g_steal_pointer (&dir_in_provider_usr_share));
-      return;
-    }
+      && pv_runtime_library_data_try (data_in_provider,
+                                      dir_in_provider_usr_share,
+                                      arch->provider,
+                                      "hard-coded", "/usr/share", NULL))
+    return;
 
   /* lib_in_provider can either be absolute, or relative to the root of
    * the provider: normalize it to relative so we only have to deal with
@@ -5882,29 +5875,25 @@ pv_runtime_collect_lib_data (PvRuntime *self,
 
   g_return_if_fail (dir_in_provider[0] != '/');
 
-  if (_srt_sysroot_test (arch->provider->in_current_ns,
-                         dir_in_provider,
-                         SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY, NULL))
-    {
-      g_debug ("Using \"/%s\" based on library path \"/%s\"",
-               dir_in_provider, lib_in_provider);
-      g_hash_table_add (data_in_provider,
-                        g_steal_pointer (&dir_in_provider));
-      return;
-    }
+  if (pv_runtime_library_data_try (data_in_provider, dir_in_provider,
+                                   arch->provider,
+                                   "library path", lib_in_provider, NULL))
+    return;
 
   if (!(flags & PV_RUNTIME_DATA_FLAGS_USR_SHARE_FIRST)
-      && strcmp (dir_in_provider, dir_in_provider_usr_share) != 0
-      && _srt_sysroot_test (arch->provider->in_current_ns,
-                            dir_in_provider_usr_share,
-                            SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY, NULL))
+      && strcmp (dir_in_provider, dir_in_provider_usr_share) != 0)
     {
-      g_debug ("Using \"/%s\" based on fallback to /usr/share, because "
-               "\"/%s\" based on \"/%s\" is not a directory",
-               dir_in_provider_usr_share, dir_in_provider, lib_in_provider);
-      g_hash_table_add (data_in_provider,
-                        g_steal_pointer (&dir_in_provider_usr_share));
-      return;
+      g_autofree gchar *because = NULL;
+
+      because = g_strdup_printf (", because \"/%s\" based on \"/%s\" is not a directory",
+                                 dir_in_provider,
+                                 lib_in_provider);
+
+      if (pv_runtime_library_data_try (data_in_provider,
+                                       dir_in_provider_usr_share,
+                                       arch->provider,
+                                       "fallback to", "usr/share", because))
+        return;
     }
 
   if (flags & PV_RUNTIME_DATA_FLAGS_IGNORE_MISSING)
@@ -5938,8 +5927,7 @@ pv_runtime_collect_lib_data (PvRuntime *self,
  *  namespace, or the path to a library in a non-standard directory such
  *  as /opt with no special prefix.
  * @flags: Flags
- * @data_in_provider: Map { owned string => itself } representing the set
- *  of data directories discovered
+ * @data_in_provider: Collection of data directories to update
  *
  * Returns: %TRUE if @lib_symlink exists and is a symlink
  */
@@ -5949,7 +5937,7 @@ pv_runtime_collect_lib_symlink_data (PvRuntime *self,
                                      const char *dir_basename,
                                      const char *lib_symlink,
                                      PvRuntimeDataFlags flags,
-                                     GHashTable *data_in_provider)
+                                     PvRuntimeLibraryData *data_in_provider)
 {
   g_autofree char *target = NULL;
   const char *target_in_provider;
@@ -6003,7 +5991,7 @@ collect_one_mesa_drirc (PvRuntime *self,
                         RuntimeArchitecture *arch,
                         const IcdDetails *details,
                         PvRuntimeDataFlags flags,
-                        GHashTable *drirc_data_in_provider)
+                        PvRuntimeLibraryData *drirc_data_in_provider)
 {
   g_autofree gchar *symlink = NULL;
   const gsize multiarch_index = arch->multiarch_index;
@@ -6058,7 +6046,7 @@ collect_mesa_drirc (PvRuntime *self,
                     GPtrArray *egl_icd_details,
                     GPtrArray *vulkan_icd_details,
                     SrtSystemInfo *arch_system_info,
-                    GHashTable *drirc_data_in_provider)
+                    PvRuntimeLibraryData *drirc_data_in_provider)
 {
   g_autoptr(SrtObjectList) dri_drivers = NULL;
 
@@ -6130,15 +6118,14 @@ collect_mesa_drirc (PvRuntime *self,
  *  in diagnostic messages
  * @all_from_provider: %TRUE if the instances of @lib_name for all
  *  architectures came from the graphics stack provider
- * @data_in_provider: (element-type filename ignored): A set of
- *  filenames for @dir_basename relative to the root of the graphics
- *  stack provider, for example `{ "usr/share/drirc.d", "app/share/drirc.d" }`
+ * @data_in_provider: Data directories we previously collected
  * @error: Used to raise an error on failure
  *
  * Make each path in @data_in_provider available in the final container
  * at the same path.
  *
- * Additionally, make one of them available at `usr/share/` + @dir_basename.
+ * Additionally, make the highest-precedence of them available at
+ * `usr/share/` + @dir_basename.
  *
  * Returns: %TRUE on success
  */
@@ -6148,20 +6135,21 @@ pv_runtime_finish_lib_data (PvRuntime *self,
                             const gchar *dir_basename,
                             const gchar *lib_name,
                             gboolean all_from_provider,
-                            GHashTable *data_in_provider,
+                            PvRuntimeLibraryData *data_in_provider,
                             GError **error)
 {
   g_autofree gchar *canonical_path = NULL;
-  g_auto(SrtHashTableIter) iter = SRT_HASH_TABLE_ITER_CLEARED;
   const gchar *data_path = NULL;
+  PvGraphicsProvider *provider = NULL;
+  gsize iter;
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (self->providers != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
   g_return_val_if_fail (dir_basename != NULL, FALSE);
 
   canonical_path = g_build_filename ("usr", "share", dir_basename, NULL);
 
-  if (g_hash_table_size (data_in_provider) > 0 && !all_from_provider)
+  if (data_in_provider->paths->len > 0 && !all_from_provider)
     {
       /* See the explanation in the similar
        * "any_libc_from_provider && !all_libc_from_provider" case, above */
@@ -6171,12 +6159,14 @@ pv_runtime_finish_lib_data (PvRuntime *self,
     }
 
   /* We might have more than one data directory in the provider,
-   * e.g. one for each supported multiarch tuple */
+   * e.g. one for each supported multiarch tuple - and in more complex
+   * scenarios, each one might come from a different graphics stack
+   * provider. We prefer the one that was found first, which will have
+   * come from the highest-precedence architecture. */
+  pv_runtime_library_data_iter_init (data_in_provider, &iter);
 
-  _srt_hash_table_iter_init_sorted (&iter, data_in_provider,
-                                    self->arbitrary_str_order);
-
-  while (_srt_hash_table_iter_next (&iter, &data_path, NULL))
+  while (pv_runtime_library_data_iter_next (data_in_provider, &iter,
+                                            &data_path, &provider))
     {
       g_warn_if_fail (data_path != NULL && data_path[0] != '/');
 
@@ -6184,7 +6174,7 @@ pv_runtime_finish_lib_data (PvRuntime *self,
        * data in foo/share/bar, it's reasonable to expect that libbar
        * will still be looking for foo/share/bar in the container. */
       if (!pv_runtime_take_from_provider (self,
-                                          self->provider, data_path,
+                                          provider, data_path,
                                           bwrap, data_path,
                                           (TAKE_FROM_PROVIDER_FLAGS_IF_DIR
                                            | TAKE_FROM_PROVIDER_FLAGS_IF_CONTAINER_COMPATIBLE),
@@ -6206,7 +6196,7 @@ pv_runtime_finish_lib_data (PvRuntime *self,
           if (_srt_fstatat_is_same_file (-1, data_path, -1, path_in_usr))
             {
               if (!pv_runtime_take_from_provider (self,
-                                                  self->provider, data_path,
+                                                  provider, data_path,
                                                   bwrap, path_in_usr,
                                                   TAKE_FROM_PROVIDER_FLAGS_IF_DIR,
                                                   error))
@@ -6218,7 +6208,7 @@ pv_runtime_finish_lib_data (PvRuntime *self,
   /* In the common case where data_in_provider contains canonical_path,
    * we have already made it available at canonical_path in the container.
    * Nothing more to do here. */
-  if (g_hash_table_contains (data_in_provider, canonical_path))
+  if (pv_runtime_library_data_contains (data_in_provider, canonical_path))
     return TRUE;
 
   /* In the uncommon case where data_in_provider *does not* contain
@@ -6231,24 +6221,15 @@ pv_runtime_finish_lib_data (PvRuntime *self,
    * found the x86_64 library in usr/lib/x86_64-linux-gnu but the
    * i386 library in app/lib/i386-linux-gnu, as we do in Flatpak -
    * then we don't have a great way to choose between them, so just
-   * pick one and hope for the best. In Flatpak, it is normal for
-   * this to happen because of the way multiarch has been implemented,
-   * but we know that both are very likely to be up-to-date, so we
-   * can pick either one and be happy. Otherwise, we'll warn in this
-   * case. */
-  if (!self->is_flatpak_env
-      && g_hash_table_size (data_in_provider) > 1)
-    {
-      g_warning ("Found more than one possible %s data directory from provider",
-                 dir_basename);
-    }
+   * pick the one associated with the highest-priority architecture
+   * and hope for the best. */
 
-  data_path = pv_hash_table_get_first_key (data_in_provider,
-                                           self->arbitrary_str_order);
+  pv_runtime_library_data_iter_init (data_in_provider, &iter);
 
-  if (data_path != NULL)
+  if (pv_runtime_library_data_iter_next (data_in_provider, &iter,
+                                         &data_path, &provider))
     return pv_runtime_take_from_provider (self,
-                                          self->provider, data_path,
+                                          provider, data_path,
                                           bwrap, canonical_path,
                                           TAKE_FROM_PROVIDER_FLAGS_IF_CONTAINER_COMPATIBLE,
                                           error);
@@ -6985,15 +6966,9 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   g_autoptr(SrtProfilingTimer) part_timer = NULL;
   gboolean all_libglx_from_provider = TRUE;
   gboolean all_libdrm_from_provider = TRUE;
-  g_autoptr(GHashTable) drirc_data_in_provider = g_hash_table_new_full (g_str_hash,
-                                                                        g_str_equal,
-                                                                        g_free, NULL);
-  g_autoptr(GHashTable) libdrm_data_in_provider = g_hash_table_new_full (g_str_hash,
-                                                                         g_str_equal,
-                                                                         g_free, NULL);
-  g_autoptr(GHashTable) nvidia_data_in_provider = g_hash_table_new_full (g_str_hash,
-                                                                         g_str_equal,
-                                                                         g_free, NULL);
+  g_auto(PvRuntimeLibraryData) drirc_data_in_provider = {};
+  g_auto(PvRuntimeLibraryData) libdrm_data_in_provider = {};
+  g_auto(PvRuntimeLibraryData) nvidia_data_in_provider = {};
   g_autoptr(GHashTable) gconv_in_provider = g_hash_table_new_full (g_str_hash, g_str_equal,
                                                                    g_free, NULL);
   const gchar *provider_label = "provider";
@@ -7035,6 +7010,10 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   /* We set this FALSE later if we decide not to use the provider libc
    * for some architecture. */
   self->all_libc_from_provider = TRUE;
+
+  pv_runtime_library_data_init (&drirc_data_in_provider);
+  pv_runtime_library_data_init (&libdrm_data_in_provider);
+  pv_runtime_library_data_init (&nvidia_data_in_provider);
 
   g_assert (pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES] == NULL);
 
@@ -7227,11 +7206,11 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           if (!pv_runtime_collect_lib_symlink_data (self, arch, "libdrm",
                                                     libdrm_amdgpu,
                                                     PV_RUNTIME_DATA_FLAGS_NONE,
-                                                    libdrm_data_in_provider)
+                                                    &libdrm_data_in_provider)
               && !pv_runtime_collect_lib_symlink_data (self, arch, "libdrm",
                                                        libdrm,
                                                        PV_RUNTIME_DATA_FLAGS_NONE,
-                                                       libdrm_data_in_provider))
+                                                       &libdrm_data_in_provider))
             {
               /* For at least a single architecture, libdrm is newer in the container */
               all_libdrm_from_provider = FALSE;
@@ -7246,7 +7225,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           if (!pv_runtime_collect_lib_symlink_data (self, arch, "drirc.d",
                                                     libglx_mesa,
                                                     PV_RUNTIME_DATA_FLAGS_NONE,
-                                                    drirc_data_in_provider))
+                                                    &drirc_data_in_provider))
             {
               /* For at least a single architecture, libGLX_mesa is newer in the container */
               all_libglx_from_provider = FALSE;
@@ -7255,7 +7234,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           collect_mesa_drirc (self, arch, provider_stack->egl_icd_details,
                               provider_stack->vulkan_icd_details,
                               arch_system_info,
-                              drirc_data_in_provider);
+                              &drirc_data_in_provider);
 
           libglx_nvidia = g_build_filename (arch->libdir_relative_to_overrides,
                                             "libGLX_nvidia.so.0", NULL);
@@ -7267,7 +7246,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           pv_runtime_collect_lib_symlink_data (self, arch, "nvidia",
                                                libglx_nvidia,
                                                PV_RUNTIME_DATA_FLAGS_USR_SHARE_FIRST,
-                                               nvidia_data_in_provider);
+                                               &nvidia_data_in_provider);
 
           dirs = pv_multiarch_details_get_libdirs (arch->details,
                                                    PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
@@ -7351,16 +7330,16 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
   if (!pv_runtime_finish_lib_data (self, bwrap, "libdrm", "libdrm",
                                    all_libdrm_from_provider,
-                                   libdrm_data_in_provider, error))
+                                   &libdrm_data_in_provider, error))
     return FALSE;
 
   if (!pv_runtime_finish_lib_data (self, bwrap, "drirc.d", "libGLX_mesa.so.0",
                                    all_libglx_from_provider,
-                                   drirc_data_in_provider, error))
+                                   &drirc_data_in_provider, error))
     return FALSE;
 
   if (!pv_runtime_finish_lib_data (self, bwrap, "nvidia", "libGLX_nvidia.so.0",
-                                   TRUE, nvidia_data_in_provider, error))
+                                   TRUE, &nvidia_data_in_provider, error))
     return FALSE;
 
   if (!pv_runtime_take_misc_data_from_provider (self, bwrap, error))

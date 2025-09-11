@@ -5,6 +5,7 @@
 
 #include <steam-runtime-tools/steam-runtime-tools.h>
 #include "steam-runtime-tools/architecture-internal.h"
+#include "steam-runtime-tools/utils-internal.h"
 
 #include <gelf.h>
 #include <libelf.h>
@@ -35,6 +36,26 @@ teardown (Fixture *f,
           gconstpointer context)
 {
   G_GNUC_UNUSED const Config *config = context;
+}
+
+static void
+dump_strv (const char *title,
+           const char * const *items)
+{
+  size_t i;
+
+  if (items == NULL)
+    {
+      g_test_message ("\t%s: (none)", title);
+      return;
+    }
+
+  g_test_message ("\t%s: %zu item(s)", title, _srt_strv_length (items));
+
+  for (i = 0; items[i] != NULL; i++)
+    g_test_message ("\t\t\"%s\"", items[i]);
+
+  g_test_message ("\t\t.");
 }
 
 static void
@@ -95,6 +116,14 @@ dump_architecture (const SrtKnownArchitecture *arch)
   g_test_message ("\tELF encoding: 0x%x: %s", arch->elf_encoding, description);
 
   g_test_message ("\tsizeof(void *): %u bytes", arch->sizeof_pointer);
+
+  g_test_message ("\tSteam gameoverlayrenderer.so directory: %s",
+                  arch->steam_gameoverlayrenderer_dir ?: "(unknown/none)");
+
+  dump_strv ("Multilib suffixes", arch->multilib_suffixes);
+  dump_strv ("Extra ld.so.cache filenames", arch->extra_ld_so_caches);
+  dump_strv ("libdl ${PLATFORM} can expand to",
+             arch->libdl_platform_expansions);
 }
 
 static void
@@ -105,6 +134,7 @@ test_architecture_get_by_tuple (Fixture *f,
   const SrtKnownArchitecture *i386_arch;
   const SrtKnownArchitecture *aarch64_arch;
   const SrtKnownArchitecture *arch;
+  size_t i;
 
   arch = x86_64_arch = _srt_architecture_get_by_tuple (SRT_ABI_X86_64);
   g_assert_nonnull (x86_64_arch);
@@ -113,6 +143,31 @@ test_architecture_get_by_tuple (Fixture *f,
   g_assert_cmpstr (x86_64_arch->interoperable_runtime_linker, ==,
                    "/lib64/ld-linux-x86-64.so.2");
   g_assert_cmpstr (x86_64_arch->openxr_1_architecture, ==, "x86_64");
+
+  g_assert_nonnull (arch->multilib_suffixes);
+
+  for (i = 0; arch->multilib_suffixes[i] != NULL; i++)
+    g_assert_false (g_path_is_absolute (arch->multilib_suffixes[i]));
+
+  g_assert_true (g_strv_contains (arch->multilib_suffixes, "lib64"));
+  g_assert_true (g_strv_contains (arch->multilib_suffixes, "x86_64-pc-linux-gnu/lib"));
+  g_assert_false (g_strv_contains (arch->multilib_suffixes, "lib/x86_64-linux-gnu"));
+  g_assert_false (g_strv_contains (arch->multilib_suffixes, "lib"));
+
+  g_assert_nonnull (arch->extra_ld_so_caches);
+
+  for (i = 0; arch->extra_ld_so_caches[i] != NULL; i++)
+    g_assert_false (g_path_is_absolute (arch->extra_ld_so_caches[i]));
+
+  g_assert_true (g_strv_contains (arch->extra_ld_so_caches,
+                                  "ld-x86_64-pc-linux-gnu.cache"));
+
+  g_assert_nonnull (arch->libdl_platform_expansions);
+  g_assert_true (g_strv_contains (arch->libdl_platform_expansions, "xeon_phi"));
+  g_assert_true (g_strv_contains (arch->libdl_platform_expansions, "haswell"));
+  g_assert_true (g_strv_contains (arch->libdl_platform_expansions, "x86_64"));
+
+  g_assert_cmpstr (arch->steam_gameoverlayrenderer_dir, ==, "ubuntu12_64");
   g_assert_cmpint (x86_64_arch->machine_type, ==, SRT_MACHINE_TYPE_X86_64);
   g_assert_cmpint (x86_64_arch->elf_class, ==, ELFCLASS64);
   g_assert_cmpint (x86_64_arch->elf_encoding, ==, ELFDATA2LSB);
@@ -125,6 +180,31 @@ test_architecture_get_by_tuple (Fixture *f,
   g_assert_cmpstr (i386_arch->interoperable_runtime_linker, ==,
                    "/lib/ld-linux.so.2");
   g_assert_cmpstr (i386_arch->openxr_1_architecture, ==, "i686");
+  g_assert_nonnull (arch->multilib_suffixes);
+
+  for (i = 0; arch->multilib_suffixes[i] != NULL; i++)
+    g_assert_false (g_path_is_absolute (arch->multilib_suffixes[i]));
+
+  g_assert_true (g_strv_contains (arch->multilib_suffixes, "lib32"));
+  g_assert_true (g_strv_contains (arch->multilib_suffixes, "i686-pc-linux-gnu/lib"));
+  g_assert_false (g_strv_contains (arch->multilib_suffixes, "lib/i386-linux-gnu"));
+  g_assert_false (g_strv_contains (arch->multilib_suffixes, "lib"));
+
+  g_assert_nonnull (arch->extra_ld_so_caches);
+
+  for (i = 0; arch->extra_ld_so_caches[i] != NULL; i++)
+    g_assert_false (g_path_is_absolute (arch->extra_ld_so_caches[i]));
+
+  g_assert_true (g_strv_contains (arch->extra_ld_so_caches,
+                                  "ld-i686-pc-linux-gnu.cache"));
+
+  g_assert_nonnull (arch->libdl_platform_expansions);
+  g_assert_true (g_strv_contains (arch->libdl_platform_expansions, "i686"));
+  g_assert_true (g_strv_contains (arch->libdl_platform_expansions, "i586"));
+  g_assert_true (g_strv_contains (arch->libdl_platform_expansions, "i486"));
+  g_assert_true (g_strv_contains (arch->libdl_platform_expansions, "i386"));
+
+  g_assert_cmpstr (arch->steam_gameoverlayrenderer_dir, ==, "ubuntu12_32");
   g_assert_cmpint (i386_arch->machine_type, ==, SRT_MACHINE_TYPE_386);
   g_assert_cmpint (i386_arch->elf_class, ==, ELFCLASS32);
   g_assert_cmpint (i386_arch->elf_encoding, ==, ELFDATA2LSB);
@@ -137,6 +217,27 @@ test_architecture_get_by_tuple (Fixture *f,
   g_assert_cmpstr (arch->interoperable_runtime_linker, ==,
                    "/lib/ld-linux-aarch64.so.1");
   g_assert_cmpstr (arch->openxr_1_architecture, ==, "aarch64");
+  g_assert_nonnull (arch->multilib_suffixes);
+
+  for (i = 0; arch->multilib_suffixes[i] != NULL; i++)
+    g_assert_false (g_path_is_absolute (arch->multilib_suffixes[i]));
+
+  g_assert_true (g_strv_contains (arch->multilib_suffixes, "aarch64-unknown-linux-gnueabi/lib"));
+  g_assert_false (g_strv_contains (arch->multilib_suffixes, "lib/aarch64-linux-gnu"));
+  g_assert_false (g_strv_contains (arch->multilib_suffixes, "lib"));
+
+  g_assert_nonnull (arch->extra_ld_so_caches);
+
+  for (i = 0; arch->extra_ld_so_caches[i] != NULL; i++)
+    g_assert_false (g_path_is_absolute (arch->extra_ld_so_caches[i]));
+
+  g_assert_true (g_strv_contains (arch->extra_ld_so_caches,
+                                  "ld-aarch64-unknown-linux-gnueabi.cache"));
+
+  g_assert_nonnull (arch->libdl_platform_expansions);
+  g_assert_true (g_strv_contains (arch->libdl_platform_expansions, "aarch64"));
+
+  g_assert_cmpstr (arch->steam_gameoverlayrenderer_dir, ==, NULL);
   g_assert_cmpint (arch->machine_type, ==, SRT_MACHINE_TYPE_AARCH64);
   g_assert_cmpint (arch->elf_class, ==, ELFCLASS64);
   g_assert_cmpint (arch->elf_encoding, ==, ELFDATA2LSB);
@@ -149,6 +250,10 @@ test_architecture_get_by_tuple (Fixture *f,
   g_assert_cmpstr (arch->multiarch_tuple, ==, "x86_64-mock-abi");
   g_assert_cmpstr (arch->interoperable_runtime_linker, ==, NULL);
   g_assert_cmpstr (arch->openxr_1_architecture, ==, NULL);
+  g_assert_null (arch->multilib_suffixes);
+  g_assert_null (arch->extra_ld_so_caches);
+  g_assert_null (arch->libdl_platform_expansions);
+  g_assert_cmpstr (arch->steam_gameoverlayrenderer_dir, ==, NULL);
   g_assert_cmpint (arch->machine_type, ==, SRT_MACHINE_TYPE_UNKNOWN);
   g_assert_cmpint (arch->elf_class, ==, ELFCLASSNONE);
   g_assert_cmpint (arch->sizeof_pointer, ==, 8);

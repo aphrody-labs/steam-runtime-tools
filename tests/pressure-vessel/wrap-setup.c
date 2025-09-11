@@ -2341,6 +2341,7 @@ test_supported_archs (Fixture *f,
     {
       const PvMultiarchDetails *details = &pv_multiarch_details[i];
       const SrtKnownArchitecture *known;
+      gsize j;
 
       /* multiarch_details and multiarch_tuples are in the same order */
       g_assert_cmpstr (pv_multiarch_tuples[i], ==, details->tuple);
@@ -2350,6 +2351,66 @@ test_supported_archs (Fixture *f,
       known = _srt_architecture_get_by_tuple (details->tuple);
       g_assert_nonnull (known);
       g_assert_nonnull (known->openxr_1_architecture);
+
+      for (j = 0; j < G_N_ELEMENTS (details->multilib); j++)
+        {
+          if (details->multilib[j] == NULL)
+            {
+              if (j == 0)
+                g_assert_null (known->multilib_suffixes);
+              else
+                g_assert_null (known->multilib_suffixes[j]);
+
+              break;
+            }
+          else
+            {
+              g_assert_nonnull (known->multilib_suffixes);
+              g_assert_cmpstr (known->multilib_suffixes[j],
+                               ==, details->multilib[j]);
+            }
+        }
+
+      for (j = 0; j < G_N_ELEMENTS (details->other_ld_so_cache); j++)
+        {
+          if (details->other_ld_so_cache[j] == NULL)
+            {
+              if (j == 0)
+                g_assert_null (known->extra_ld_so_caches);
+              else
+                g_assert_null (known->extra_ld_so_caches[j]);
+
+              break;
+            }
+          else
+            {
+              g_assert_nonnull (known->extra_ld_so_caches);
+              g_assert_cmpstr (known->extra_ld_so_caches[j],
+                               ==, details->other_ld_so_cache[j]);
+            }
+        }
+
+      for (j = 0; j < G_N_ELEMENTS (details->platforms); j++)
+        {
+          if (details->platforms[j] == NULL)
+            {
+              if (j == 0)
+                g_assert_null (known->libdl_platform_expansions);
+              else
+                g_assert_null (known->libdl_platform_expansions[j]);
+
+              break;
+            }
+          else
+            {
+              g_assert_nonnull (known->libdl_platform_expansions);
+              g_assert_cmpstr (known->libdl_platform_expansions[j],
+                               ==, details->platforms[j]);
+            }
+        }
+
+      g_assert_cmpstr (details->gameoverlayrenderer_dir,
+                       ==, known->steam_gameoverlayrenderer_dir);
     }
 
   /* The array of tuples has one extra element, to make it a GStrv */

@@ -38,6 +38,20 @@ typedef struct
    * https://registry.khronos.org/OpenXR/specs/1.1/loader.html#architecture-identifiers
    */
   const char *openxr_1_architecture;
+  /* Directories relative to ${prefix} other than lib that we must search
+   * for loadable modules, least-ambiguous first, most-ambiguous last,
+   * not including Debian-style multiarch directories which are
+   * automatically derived from @multiarch_tuple:
+   * - Exherbo <GNU-tuple>/lib
+   * - Red-Hat- or Arch-style lib<QUAL>
+   * - etc. */
+  const char * const *multilib_suffixes;
+  /* Alternative paths for ld.so.cache, other than ld.so.cache itself. */
+  const char * const *extra_ld_so_caches;
+  /* Known values that ${PLATFORM} can expand to. */
+  const char * const *libdl_platform_expansions;
+  /* Directory used in Steam for gameoverlayrenderer.so. */
+  const char *steam_gameoverlayrenderer_dir;
   guint16 machine_type;
   guint8 elf_class;
   guint8 elf_encoding;

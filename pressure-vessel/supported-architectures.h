@@ -42,10 +42,6 @@ typedef struct
 {
   const char *tuple;
 
-  /* Alternative paths for ld.so.cache, other than ld.so.cache itself.
-   * Size is completely arbitrary, expand as needed */
-  const char *other_ld_so_cache[2];
-
   /* Known values that ${PLATFORM} can expand to.
    * Refer to sysdeps/x86/cpu-features.c and sysdeps/x86/dl-procinfo.c
    * in glibc.

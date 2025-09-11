@@ -56,20 +56,17 @@ const PvMultiarchDetails pv_multiarch_details[PV_N_SUPPORTED_ARCHITECTURES] =
 #if defined(__i386__) || defined(__x86_64__)
   {
     .tuple = "x86_64-linux-gnu",
-    .other_ld_so_cache = { "ld-x86_64-pc-linux-gnu.cache", NULL },
     .platforms = { "xeon_phi", "haswell", "x86_64", NULL },
     .gameoverlayrenderer_dir = "ubuntu12_64",
   },
   {
     .tuple = "i386-linux-gnu",
-    .other_ld_so_cache = { "ld-i686-pc-linux-gnu.cache", NULL },
     .platforms = { "i686", "i586", "i486", "i386", NULL },
     .gameoverlayrenderer_dir = "ubuntu12_32",
   },
 #elif defined(__aarch64__)
   {
     .tuple = "aarch64-linux-gnu",
-    .other_ld_so_cache = { "ld-aarch64-unknown-linux-gnueabi.cache", NULL },
     .platforms = { "aarch64", NULL },
   },
 #elif defined(_SRT_MULTIARCH)

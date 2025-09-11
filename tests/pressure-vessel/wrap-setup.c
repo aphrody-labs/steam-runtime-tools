@@ -2352,25 +2352,6 @@ test_supported_archs (Fixture *f,
       g_assert_nonnull (known);
       g_assert_nonnull (known->openxr_1_architecture);
 
-      for (j = 0; j < G_N_ELEMENTS (details->other_ld_so_cache); j++)
-        {
-          if (details->other_ld_so_cache[j] == NULL)
-            {
-              if (j == 0)
-                g_assert_null (known->extra_ld_so_caches);
-              else
-                g_assert_null (known->extra_ld_so_caches[j]);
-
-              break;
-            }
-          else
-            {
-              g_assert_nonnull (known->extra_ld_so_caches);
-              g_assert_cmpstr (known->extra_ld_so_caches[j],
-                               ==, details->other_ld_so_cache[j]);
-            }
-        }
-
       for (j = 0; j < G_N_ELEMENTS (details->platforms); j++)
         {
           if (details->platforms[j] == NULL)

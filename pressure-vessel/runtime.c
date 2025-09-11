@@ -3612,11 +3612,16 @@ bind_runtime_ld_so (PvRuntime *self,
        * as done in upstream glibc (and Debian, Arch, etc.). */
       for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
         {
-          const PvMultiarchDetails *details = &pv_multiarch_details[i];
+          const SrtKnownArchitecture *known;
 
-          for (j = 0; j < G_N_ELEMENTS (details->other_ld_so_cache); j++)
+          known = _srt_architecture_get_by_tuple (pv_multiarch_tuples[i]);
+
+          if (known == NULL || known->extra_ld_so_caches == NULL)
+            continue;
+
+          for (j = 0; known->extra_ld_so_caches[j] != NULL; j++)
             {
-              const char *base = details->other_ld_so_cache[j];
+              const char *base = known->extra_ld_so_caches[j];
               g_autoptr(GError) local_error = NULL;
               g_autofree gchar *path = NULL;
 

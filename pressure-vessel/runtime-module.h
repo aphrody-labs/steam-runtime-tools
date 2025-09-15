@@ -229,3 +229,28 @@ void icd_stack_enumerate (IcdStack *self,
 void icd_stack_free (IcdStack *self);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdStack, icd_stack_free)
+
+/*
+ * PvManifestDeduplicator:
+ *
+ * A map representing JSON manifests with unique content, used to detect
+ * and suppress exact duplicates.
+ *
+ * Keys are unowned strings with JSON manifest content, borrowed from the
+ * #SrtBaseJsonGraphicsModule in the #IcdDetails.
+ *
+ * Values are unowned paths within the #PvGraphicsProvider sysroot,
+ * borrowed from the #SrtBaseJsonGraphicsModule in the #IcdDetails.
+ */
+typedef GHashTable PvManifestDeduplicator;
+
+static inline PvManifestDeduplicator *
+pv_manifest_deduplicator_new (void)
+{
+  return g_hash_table_new_full (g_str_hash, g_str_equal, NULL, NULL);
+}
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (PvManifestDeduplicator, g_hash_table_unref)
+
+gboolean pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
+                                                 IcdDetails *details);

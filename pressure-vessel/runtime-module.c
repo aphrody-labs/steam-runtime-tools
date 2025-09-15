@@ -374,3 +374,48 @@ icd_stack_free (IcdStack *self)
   g_clear_pointer (&self->openxr_1_runtime_details, g_hash_table_unref);
   g_slice_free (IcdStack, self);
 }
+
+/*
+ * pv_manifest_deduplicator_add_if_unique:
+ * @self: The deduplicator
+ * @details: An #IcdDetails based on a #SrtBaseJsonGraphicsModule
+ *
+ * Returns: %TRUE if the JSON manifest appears to be unique, or %FALSE
+ *  if it was a duplicate of one that we already saw.
+ */
+gboolean
+pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
+                                        IcdDetails *details)
+{
+  SrtBaseJsonGraphicsModule *module;
+  const char *path_in_provider;
+  const char *original_json;
+  void *other_voidp;
+
+  g_return_val_if_fail (SRT_IS_BASE_JSON_GRAPHICS_MODULE (details->icd), FALSE);
+
+  module = details->icd;
+  path_in_provider = module->json_path;
+  original_json = module->original_json;
+
+  /* We don't track the original content of layer manifests to save some
+   * memory, because Vulkan-Loader will deduplicate them anyway */
+  if (original_json == NULL)
+    return TRUE;
+
+  if (g_hash_table_lookup_extended (self, original_json, NULL, &other_voidp))
+    {
+      const char *other_path = other_voidp;
+
+      g_info ("Ignoring \"%s\" because it has the same content as \"%s\"",
+              path_in_provider, other_path);
+      return FALSE;
+    }
+
+  /* Remember it so we can ignore any subsequent duplicates.
+   * Casts are required because GHashTable is not const-correct for
+   * "borrowed" keys and values. */
+  g_hash_table_replace (self, (void *) original_json,
+                        (void *) path_in_provider);
+  return TRUE;
+}

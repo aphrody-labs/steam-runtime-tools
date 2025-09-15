@@ -409,8 +409,10 @@ pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
       SrtBaseJsonGraphicsModule *other_module = other->icd;
       const char *other_path = other_module->json_path;
 
-      g_info ("Ignoring \"%s\" because it has the same content as \"%s\"",
-              path_in_provider, other_path);
+      g_info ("Ignoring \"%s\" in \"%s\" "
+              "because it has the same content as \"%s\" in \"%s\"",
+              path_in_provider, details->provider->in_current_ns->path,
+              other_path, other->provider->in_current_ns->path);
       return FALSE;
     }
 

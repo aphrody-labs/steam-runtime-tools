@@ -782,7 +782,8 @@ _srt_steam_get_compat_flags (const char * const *envp)
     {
       if (g_strcmp0 (value, "1") == 0)
         ret |= SRT_STEAM_COMPAT_FLAGS_RUNTIME_SDL2;
-      else if (g_strcmp0 (value, "sdl2-compat") == 0)
+      else if (g_strcmp0 (value, "sdl2-compat") == 0
+               || g_strcmp0 (value, "compat") == 0)
         ret |= SRT_STEAM_COMPAT_FLAGS_RUNTIME_SDL2_COMPAT;
       else if (value[0] == '\0' || g_strcmp0 (value, "0") == 0)
         ret &= ~(SRT_STEAM_COMPAT_FLAGS_RUNTIME_SDL2

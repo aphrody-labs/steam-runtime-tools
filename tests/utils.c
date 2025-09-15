@@ -178,6 +178,10 @@ test_compat_flags (Fixture *f,
             { "STEAM_COMPAT_RUNTIME_SDL2=sdl2-compat", NULL },
             SRT_STEAM_COMPAT_FLAGS_RUNTIME_SDL2_COMPAT,
         },
+        {
+            { "STEAM_COMPAT_RUNTIME_SDL2=compat", NULL },
+            SRT_STEAM_COMPAT_FLAGS_RUNTIME_SDL2_COMPAT,
+        },
         { { "STEAM_COMPAT_RUNTIME_SDL3=1", NULL }, SRT_STEAM_COMPAT_FLAGS_RUNTIME_SDL3 },
         { { NULL }, SRT_STEAM_COMPAT_FLAGS_NONE }
     };

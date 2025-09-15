@@ -401,6 +401,15 @@ Some environment variables are set by Steam, including:
     (For example, a game's Launch Options can be set to
     `STEAM_COMPAT_RUNTIME_SDL2=sdl2-compat %command%`)
 
+    May also be set to `classic` to attempt to use the "classic" SDL2 library,
+    if available,
+    even if sdl2-compat is the default.
+    This will only work if the container runtime actually contains a copy of
+    "classic" SDL2,
+    and only with newer Steam Linux Runtime releases.
+    (For example, a game's Launch Options can be set to
+    `STEAM_COMPAT_RUNTIME_SDL2=classic %command%`)
+
 * `STEAM_COMPAT_RUNTIME_SDL3`:
 
     May be set to 1 for the same effect as adding `runtime-sdl3` to

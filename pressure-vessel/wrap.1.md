@@ -1125,7 +1125,7 @@ be made available read/write in the container.
 </dd>
 <dt>
 
-`STEAM_COMPAT_RUNTIME_SDL2` (`0`, `1` or `sdl2-compat`)
+`STEAM_COMPAT_RUNTIME_SDL2` (`0`, `1`, `sdl2-compat` or `classic`)
 
 </dt><dd>
 
@@ -1143,6 +1143,11 @@ If set to `sdl2-compat`,
 and the runtime contains a copy of `sdl2-compat` as a non-default
 implementation of SDL,
 do the same for that.
+
+If set to `classic`,
+and the runtime contains `sdl2-compat` as the default implementation of
+SDL 2 but also has a copy of "classic" SDL 2 as a non-default implementation,
+do the same for "classic" SDL 2.
 
 </dd>
 <dt>

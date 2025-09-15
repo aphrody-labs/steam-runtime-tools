@@ -138,6 +138,11 @@ pv_adverb_set_up_dynamic_sdls (FlatpakBwrap *wrapped_command,
         },
         {
             "SDL_DYNAMIC_API",
+            "sdl2-classic/libSDL2-2.0.so.0",
+            SRT_STEAM_COMPAT_FLAGS_RUNTIME_SDL2_CLASSIC
+        },
+        {
+            "SDL_DYNAMIC_API",
             "libSDL2-2.0.so.0",
             SRT_STEAM_COMPAT_FLAGS_RUNTIME_SDL2
         },

@@ -38,10 +38,12 @@ except ImportError:
     pass
 
 import gi
+gi.require_version('Gdk', '3.0')
 gi.require_version('Gtk', '3.0')
 
 # Ignore E402: import not at top of file. gi.require_version() must come first
 from gi.repository import GLib      # noqa: E402
+from gi.repository import Gdk       # noqa: E402
 from gi.repository import Gtk       # noqa: E402
 
 logger = logging.getLogger('steam-runtime-launch-options')
@@ -63,6 +65,14 @@ RUNTIMES = [
 # and native Linux (whatever the host system happens to be running, e.g.
 # SteamOS, Debian, Arch, Fedora).
 COMPAT_TARGETS = RUNTIMES + ['windows', 'host']
+
+# Keys treated as "Enter" by GTK
+ENTER_KEYS = [
+    # Main keyboard Enter key, below Backspace
+    Gdk.KEY_Return,
+    # Numeric keypad Enter key
+    Gdk.KEY_KP_Enter,
+]
 
 
 def tristate_environment(name):
@@ -526,6 +536,7 @@ class Gui:
         self._ldlp_runtime_changed_id = 0
         self._proton_changed_id = 0
         self._response_id = 0
+        self._key_release_event_id = 0
 
         self.window = Gtk.Dialog()
         self.window.set_default_size(720, 480)
@@ -919,6 +930,11 @@ class Gui:
         self._response_id = self.window.connect(
             'response',
             self._dialog_response_cb,
+        )
+
+        self._key_release_event_id = self.window.connect(
+            'key-release-event',
+            self._key_release_event_cb,
         )
 
     def parse_args(
@@ -1955,6 +1971,18 @@ class Gui:
 
         if self.failed:
             sys.exit(126)
+
+    def _key_release_event_cb(
+        self,
+        window,     # type: typing.Any
+        event,      # type: typing.Any
+    ):
+        # type: (...) -> None
+        if (
+            event.state & Gdk.ModifierType.CONTROL_MASK
+            and event.keyval in ENTER_KEYS
+        ):
+            self.window.response(Gtk.ResponseType.OK)
 
 
 if __name__ == '__main__':

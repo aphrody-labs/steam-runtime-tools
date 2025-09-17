@@ -532,8 +532,8 @@ class Gui:
         self.window.connect('delete-event', Gtk.main_quit)
         self.window.set_title('Launch options')
 
-        self.window.add_button("Cancel", Gtk.ButtonsType.CANCEL)
-        ok_button = self.window.add_button("Run", Gtk.ButtonsType.OK)
+        self.window.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        ok_button = self.window.add_button("Run", Gtk.ResponseType.OK)
         # Note that grab_default() is not enough here: if the focus is on
         # a combo box, Enter will go to the combo box, not the default button.
         ok_button.grab_focus()
@@ -1678,10 +1678,10 @@ class Gui:
     def _dialog_response_cb(
         self,
         dialog,     # type: typing.Any
-        response,   # type: typing.Any
+        response,   # type: int
     ):
         # type: (...) -> None
-        if response != Gtk.ButtonsType.OK:
+        if response != Gtk.ResponseType.OK:
             Gtk.main_quit()
             return
 

@@ -525,6 +525,7 @@ class Gui:
         self._pressure_vessel_changed_id = 0
         self._ldlp_runtime_changed_id = 0
         self._proton_changed_id = 0
+        self._response_id = 0
 
         self.window = Gtk.Dialog()
         self.window.set_default_size(720, 480)
@@ -536,7 +537,6 @@ class Gui:
         # Note that grab_default() is not enough here: if the focus is on
         # a combo box, Enter will go to the combo box, not the default button.
         ok_button.grab_focus()
-        self.window.connect('response', (lambda _, resp: self.run_cb() if resp == Gtk.ButtonsType.OK else None))
 
         self.vbox = self.window.get_content_area()
 
@@ -909,6 +909,11 @@ class Gui:
                 'changed',
                 self._proton_changed,
             )
+        )
+
+        self._response_id = self.window.connect(
+            'response',
+            self._dialog_response_cb,
         )
 
     def parse_args(
@@ -1670,8 +1675,15 @@ class Gui:
             logger.debug('Command parsed to %r', argv)
             self.app.argv = argv
 
-    def run_cb(self, _ignored=None):
-        # type: (typing.Any) -> None
+    def _dialog_response_cb(
+        self,
+        dialog,     # type: typing.Any
+        response,   # type: typing.Any
+    ):
+        # type: (...) -> None
+        if response != Gtk.ButtonsType.OK:
+            Gtk.main_quit()
+            return
 
         shell, argv, environ = self.build_argv()
 

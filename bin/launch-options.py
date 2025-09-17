@@ -533,6 +533,8 @@ class Gui:
 
         self.window.add_button("Cancel", Gtk.ButtonsType.CANCEL)
         ok_button = self.window.add_button("Run", Gtk.ButtonsType.OK)
+        # Note that grab_default() is not enough here: if the focus is on
+        # a combo box, Enter will go to the combo box, not the default button.
         ok_button.grab_focus()
         self.window.connect('response', (lambda _, resp: self.run_cb() if resp == Gtk.ButtonsType.OK else None))
 

@@ -97,7 +97,6 @@ main (int argc,
   g_autofree gchar *tools_dir = NULL;
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
-  const char *graphics_provider_mount_point = NULL;
   const char *pkglibexecdir = NULL;
   const char *steam_app_id;
   g_autoptr(GPtrArray) adverb_preload_argv = NULL;
@@ -482,21 +481,6 @@ main (int argc,
           && (bwrap_flags & SRT_BWRAP_FLAGS_HAS_LEVEL_PREFIX))
         flatpak_bwrap_add_arg (bwrap, "--level-prefix");
 
-      /* When using an interpreter root, avoid /run/gfx and instead use a
-       * directory in /var. As much as possible we want each top-level
-       * directory to be either in the rootfs or in the real host system,
-       * not some mixture of the two, and the majority of /run needs to
-       * come from the real host system, for sockets and so on; but when
-       * the rootfs contains a symlink, FEX-Emu interprets it as though
-       * chrooted into the rootfs, so we have to mount the graphics
-       * provider inside the rootfs instead of in the real root. */
-      if (interpreter_root != NULL)
-        graphics_provider_mount_point = "/var/pressure-vessel/gfx";
-      else if (g_strcmp0 (self->options.graphics_provider, "/") == 0)
-        graphics_provider_mount_point = "/run/host";
-      else
-        graphics_provider_mount_point = "/run/gfx";
-
       /* Protect the controlling terminal from the app/game, unless we are
        * running an interactive shell in which case that would break its
        * job control. */
@@ -562,28 +546,6 @@ main (int argc,
                               "/run/pressure-vessel",
                               NULL);
     }
-  else
-    {
-      g_assert (flatpak_subsandbox != NULL);
-
-      if (g_strcmp0 (self->options.graphics_provider, "/") == 0)
-        {
-          graphics_provider_mount_point = "/run/parent";
-        }
-      else if (g_strcmp0 (self->options.graphics_provider, "/run/host") == 0)
-        {
-          g_warning ("Using host graphics drivers in a Flatpak subsandbox "
-                     "probably won't work");
-          graphics_provider_mount_point = "/run/host";
-        }
-      else
-        {
-          glnx_throw (error,
-                      "Flatpak subsandboxing can only use / or /run/host "
-                      "to provide graphics drivers");
-          goto out;
-        }
-    }
 
   if (self->options.runtime != NULL)
     {
@@ -603,18 +565,6 @@ main (int argc,
 
       if (self->options.generate_locales)
         flags |= PV_RUNTIME_FLAGS_GENERATE_LOCALES;
-
-      if (self->options.graphics_provider != NULL
-          && self->options.graphics_provider[0] != '\0')
-        {
-          g_assert (graphics_provider_mount_point != NULL);
-          graphics_provider = pv_graphics_provider_new (self->options.graphics_provider,
-                                                        graphics_provider_mount_point,
-                                                        TRUE, error);
-
-          if (graphics_provider == NULL)
-            goto out;
-        }
 
       if (_srt_util_is_debugging ())
         flags |= PV_RUNTIME_FLAGS_VERBOSE;
@@ -638,9 +588,32 @@ main (int argc,
         flags |= PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX;
 
       if (interpreter_root != NULL)
-        {
-          flags |= PV_RUNTIME_FLAGS_INTERPRETER_ROOT;
+        flags |= PV_RUNTIME_FLAGS_INTERPRETER_ROOT;
 
+      if (self->options.graphics_provider != NULL
+          && self->options.graphics_provider[0] != '\0')
+        {
+          const char *provider_path = self->options.graphics_provider;
+          g_autofree gchar *mount_point = NULL;
+
+          mount_point = pv_graphics_provider_choose_mount_point (provider_path,
+                                                                 flags,
+                                                                 error);
+
+          if (mount_point == NULL)
+            goto out;
+
+          graphics_provider = pv_graphics_provider_new (provider_path,
+                                                        mount_point,
+                                                        PV_GRAPHICS_PROVIDER_FLAGS_NONE,
+                                                        error);
+
+          if (graphics_provider == NULL)
+            goto out;
+        }
+
+      if (interpreter_root != NULL)
+        {
           /* Also include the real host graphics stack to allow thunking.
            * To avoid enumerating the same DRIs/layers twice, we only do
            * this if the host is not a supported architecture. */
@@ -651,7 +624,8 @@ main (int argc,
                * it's using the O_NOFOLLOW flag. */
               interpreter_host_provider = pv_graphics_provider_new ("/proc/self/root/",
                                                                     "/proc/self/root/",
-                                                                    FALSE, error);
+                                                                    PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST,
+                                                                    error);
               if (interpreter_host_provider == NULL)
                 goto out;
             }

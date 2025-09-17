@@ -205,8 +205,10 @@ fixture_create_runtime (Fixture *f,
   else
     gfx_in_container = "/run/host";
 
-  graphics_provider = pv_graphics_provider_new ("/", gfx_in_container,
-                                                TRUE, &local_error);
+  graphics_provider = pv_graphics_provider_new ("/",
+                                                gfx_in_container,
+                                                PV_GRAPHICS_PROVIDER_FLAGS_NONE,
+                                                &local_error);
   g_assert_no_error (local_error);
   g_assert_nonnull (graphics_provider);
 

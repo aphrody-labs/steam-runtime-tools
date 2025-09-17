@@ -47,6 +47,7 @@
 #include "flatpak-run-private.h"
 #include "mtree.h"
 #include "passwd.h"
+#include "runtime-flags.h"
 #include "supported-architectures.h"
 #include "tree-copy.h"
 #include "utils.h"
@@ -1253,22 +1254,22 @@ pv_runtime_create_copy (PvRuntime *self,
 typedef struct
 {
   const PvMultiarchDetails *details;
-  PvRuntimeFlags flags;
   PvGraphicsProvider *provider;
   GCancellable *cancellable;
+  PvRuntimeFlags runtime_flags;
 } EnumerationThreadInputs;
 
 /* Called in main thread */
 static EnumerationThreadInputs *
 enumeration_thread_inputs_new (const PvMultiarchDetails *details,
-                               PvRuntimeFlags flags,
+                               PvRuntimeFlags runtime_flags,
                                PvGraphicsProvider *provider,
                                GCancellable *cancellable)
 {
   EnumerationThreadInputs *self = g_new0 (EnumerationThreadInputs, 1);
 
   self->details = details;
-  self->flags = flags;
+  self->runtime_flags = runtime_flags;
   self->provider = g_object_ref (provider);
   self->cancellable = g_object_ref (cancellable);
   return self;
@@ -1303,7 +1304,7 @@ enumerate_arch (gpointer data)
   /* At the moment the real host is included only when FEX emulator is in use.
    * Skipping VDPAU until there is a real use case for it, because
    * it only supports one search path entry, which is problematic for us. */
-  if (pv_supported_architectures_include_machine_type (inputs->details->machine_type))
+  if (!(inputs->provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST))
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
         _srt_profiling_start ("Enumerating %s VDPAU drivers in thread",
@@ -1426,7 +1427,9 @@ enumerate_indep (gpointer data)
     pv_graphics_provider_create_system_info (inputs->provider);
 
   srt_system_info_set_multiarch_tuples (system_info, pv_multiarch_tuples);
-  cache_indep_graphics_stack (system_info, inputs->flags, inputs->cancellable);
+  cache_indep_graphics_stack (system_info,
+                              inputs->runtime_flags,
+                              inputs->cancellable);
 
   enumeration_thread_inputs_free (inputs);
   return g_steal_pointer (&system_info);
@@ -7727,7 +7730,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                                                          g_free, NULL);
   g_autoptr(GHashTable) gconv_in_provider = g_hash_table_new_full (g_str_hash, g_str_equal,
                                                                    g_free, NULL);
-  const gchar *provider = "provider";
+  const gchar *provider_label = "provider";
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
   g_return_val_if_fail (self->provider != NULL, FALSE);
@@ -7758,34 +7761,34 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
         host_system_info = g_object_ref (enumeration_thread_join (&self->host_thread));
     }
 
-  provider_stack->egl_icd_details = pv_enumerate_egl_icds (system_info, provider);
+  provider_stack->egl_icd_details = pv_enumerate_egl_icds (system_info, provider_label);
   provider_stack->egl_ext_platform_details = pv_enumerate_egl_ext_platforms (system_info,
-                                                                             provider);
+                                                                             provider_label);
   provider_stack->vulkan_icd_details = pv_enumerate_vulkan_icds (system_info,
-                                                                 provider);
+                                                                 provider_label);
   if (self->flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
     {
       pv_enumerate_vulkan_layer_details (system_info,
-                                         provider,
+                                         provider_label,
                                          &provider_stack->vulkan_exp_layer_details,
                                          &provider_stack->vulkan_imp_layer_details);
     }
 
   if (self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
     provider_stack->openxr_1_runtime_details = pv_enumerate_openxr_1_runtimes (system_info,
-                                                                               provider);
+                                                                               provider_label);
 
   if (host_system_info != NULL)
     {
-      const gchar *which = "host";
-      host_stack->egl_icd_details = pv_enumerate_egl_icds (host_system_info, which);
+      const gchar *host_label = "host";
+      host_stack->egl_icd_details = pv_enumerate_egl_icds (host_system_info, host_label);
       host_stack->egl_ext_platform_details = pv_enumerate_egl_ext_platforms (host_system_info,
-                                                                             which);
-      host_stack->vulkan_icd_details = pv_enumerate_vulkan_icds (host_system_info, which);
+                                                                             host_label);
+      host_stack->vulkan_icd_details = pv_enumerate_vulkan_icds (host_system_info, host_label);
       if (self->flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
         {
           pv_enumerate_vulkan_layer_details (host_system_info,
-                                             which,
+                                             host_label,
                                              &host_stack->vulkan_exp_layer_details,
                                              &host_stack->vulkan_imp_layer_details);
         }

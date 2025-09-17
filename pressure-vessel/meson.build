@@ -70,6 +70,7 @@ endforeach
 headers = [
   'mtree.h',
   'runtime.h',
+  'runtime-flags.h',
   'utils.h',
 ]
 

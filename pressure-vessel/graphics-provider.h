@@ -29,6 +29,8 @@
 
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
 
+#include "runtime-flags.h"
+
 typedef struct _PvGraphicsProvider PvGraphicsProvider;
 typedef struct _PvGraphicsProviderClass PvGraphicsProviderClass;
 
@@ -41,7 +43,7 @@ struct _PvGraphicsProvider
   SrtSysroot *in_current_ns;
   gchar *path_in_container_ns;
   gchar *path_in_host_ns;
-  gboolean use_srt_helpers;
+  PvGraphicsProviderFlags flags;
 };
 
 struct _PvGraphicsProviderClass
@@ -59,7 +61,7 @@ GType pv_graphics_provider_get_type (void);
 
 PvGraphicsProvider *pv_graphics_provider_new (const char *path_in_current_ns,
                                               const char *path_in_container_ns,
-                                              gboolean use_srt_helpers,
+                                              PvGraphicsProviderFlags flags,
                                               GError **error);
 
 gchar *pv_graphics_provider_search_in_path_and_bin (PvGraphicsProvider *self,
@@ -68,3 +70,7 @@ gchar *pv_graphics_provider_search_in_path_and_bin (PvGraphicsProvider *self,
 SrtSystemInfo *pv_graphics_provider_create_system_info (PvGraphicsProvider *self);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (PvGraphicsProvider, g_object_unref)
+
+gchar *pv_graphics_provider_choose_mount_point (const char *path_in_current_ns,
+                                                PvRuntimeFlags flags,
+                                                GError **error);

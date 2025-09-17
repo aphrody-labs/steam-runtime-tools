@@ -7,11 +7,17 @@ steam-runtime-tools (0.20250910.0) UNRELEASED; urgency=medium
       (steam-runtime-tools!830)
     - Make better use of cached information about drivers
       (steam-runtime-tools!831, steam-runtime-tools!832)
+    - Refactoring to make architecture support more flexible
+      (steam-runtime-tools!840)
+  * Diagnostic tools:
+    - x86_64 is now sorted before i386 in steam-runtime-system-info output
   * Library code:
     - Fix fallback multiarch tuple for otherwise unsupported architectures
       (steam-runtime-tools!836)
-    - Refactoring to architecture handling
-      (steam-runtime-tools!837)
+    - More internal utility functions
+      (steam-runtime-tools!839)
+    - Refactoring in architecture handling
+      (steam-runtime-tools!837, steam-runtime-tools!838)
   * Packaging:
     - d/libsteam-runtime-tools-0-0.symbols:
       Belatedly update for 0.20250820.0
@@ -22,7 +28,7 @@ steam-runtime-tools (0.20250910.0) UNRELEASED; urgency=medium
   [ Timo Witte ]
   * Fix a typo (ValveSoftware/steam-runtime#775)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 10 Sep 2025 20:10:20 +0100
+ -- Simon McVittie <smcv@collabora.com>  Wed, 17 Sep 2025 11:41:55 +0100
 
 steam-runtime-tools (0.20250820.0) steamrt; urgency=medium
 

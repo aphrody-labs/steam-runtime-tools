@@ -538,6 +538,11 @@ class Gui:
         # a combo box, Enter will go to the combo box, not the default button.
         ok_button.grab_focus()
 
+        if hasattr(Gtk, 'STYLE_CLASS_SUGGESTED_ACTION'):
+            ok_button.get_style_context().add_class(
+                Gtk.STYLE_CLASS_SUGGESTED_ACTION,
+            )
+
         self.vbox = self.window.get_content_area()
 
         row = 0

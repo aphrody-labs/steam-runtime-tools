@@ -300,6 +300,7 @@ test_null_sysroot (Fixture *f,
   info = srt_system_info_new (NULL);
   g_assert_nonnull (info);
   _srt_system_info_set_sysroot (info, NULL);
+  g_assert_cmpstr (_srt_system_info_get_sysroot_path (info), ==, NULL);
 
     {
       static const char * const expected[] = { "Unable to open sysroot", NULL };
@@ -2159,11 +2160,26 @@ os_no_os_release (Fixture *f,
   gchar **strv;
   gchar *sysroot;
   gchar *s;
+  const char *path;
 
   sysroot = g_build_filename (f->sysroots, "no-os-release", NULL);
 
   info = srt_system_info_new (NULL);
   srt_system_info_set_sysroot (info, sysroot);
+  path = _srt_system_info_get_sysroot_path (info);
+  g_assert_nonnull (path);
+
+  /* The path might be normalized by SrtSysroot, so we can't assert that
+   * it's exactly the same string. */
+    {
+      g_autofree char *expected = realpath (sysroot, NULL);
+      g_autofree char *actual = realpath (path, NULL);
+
+      g_assert_nonnull (expected);
+      g_assert_nonnull (actual);
+      g_assert_cmpstr (actual, ==, expected);
+    }
+
   check_os_release (info);
 
   s = srt_system_info_dup_os_build_id (info);
@@ -2219,6 +2235,7 @@ os_real (Fixture *f,
   gchar *s;
 
   info = srt_system_info_new (NULL);
+  g_assert_cmpstr (_srt_system_info_get_sysroot_path (info), ==, "/");
   check_os_release (info);
 
   /* We expect the ID and NAME to be present on any reasonable OS. */

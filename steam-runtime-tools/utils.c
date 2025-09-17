@@ -859,7 +859,7 @@ _srt_steam_command_via_pipe (const char * const *arguments,
   if (n_arguments >= 0)
     length = n_arguments;
   else
-    length = g_strv_length ((gchar **) arguments);
+    length = _srt_strv_length (arguments);
 
   steampipe = g_build_filename (g_get_home_dir (), ".steam", "steam.pipe", NULL);
 

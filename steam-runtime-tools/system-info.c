@@ -628,6 +628,41 @@ srt_system_info_class_init (SrtSystemInfoClass *cls)
   g_object_class_install_properties (object_class, N_PROPERTIES, properties);
 }
 
+/*
+ * Same as srt_system_info_set_primary_multiarch_tuple(), but
+ * completely replace the array of architectures instead of
+ * shifting non-primary architectures downward.
+ */
+static void
+_srt_system_info_set_only_multiarch_tuple (SrtSystemInfo *self,
+                                           const char *tuple)
+{
+  const char * const tuples[] = { tuple, NULL };
+
+  srt_system_info_set_multiarch_tuples (self, tuples);
+}
+
+/*
+ * Same as srt_system_info_set_primary_multiarch_tuple(), but
+ * add to the end of the array instead of the beginning.
+ */
+static void
+_srt_system_info_add_multiarch_tuple (SrtSystemInfo *self,
+                                      const char *tuple)
+{
+  GQuark new_tuple = g_quark_from_string (tuple);
+
+  for (gsize i = 0; i < self->multiarch_tuples->len; i++)
+    {
+      GQuark stored_tuple = g_array_index (self->multiarch_tuples, GQuark, i);
+
+      if (stored_tuple == new_tuple)
+        return;
+    }
+
+  g_array_append_val (self->multiarch_tuples, new_tuple);
+}
+
 /**
  * srt_system_info_new:
  * @expectations: (nullable) (type filename): Path to a directory
@@ -885,6 +920,7 @@ srt_system_info_new_from_json (const char *path,
   JsonObject *json_sub_obj = NULL;
   JsonParser *parser = NULL;
   JsonNode *node = NULL;
+  gboolean have_architectures = FALSE;
 
   g_return_val_if_fail (_srt_check_not_setuid (), NULL);
   g_return_val_if_fail (path != NULL, NULL);
@@ -912,6 +948,28 @@ srt_system_info_new_from_json (const char *path,
     }
 
   json_obj = json_node_get_object (node);
+
+  if (json_object_has_member (json_obj, "architectures"))
+    {
+      /* The list itself is owned, the contents are not */
+      g_autoptr(GList) multiarch_tuples = NULL;
+
+      json_sub_obj = json_object_get_object_member (json_obj, "architectures");
+      multiarch_tuples = json_object_get_members (json_sub_obj);
+
+      for (GList *l = multiarch_tuples; l != NULL; l = l->next)
+        {
+          if (have_architectures)
+            {
+              _srt_system_info_add_multiarch_tuple (info, l->data);
+            }
+          else
+            {
+              _srt_system_info_set_only_multiarch_tuple (info, l->data);
+              have_architectures = TRUE;
+            }
+        }
+    }
 
   info->can_write_uinput = json_object_get_boolean_member_with_default (json_obj,
                                                                         "can-write-uinput",
@@ -1001,6 +1059,9 @@ srt_system_info_new_from_json (const char *path,
                                    g_strdup (l->data), xr_rt);
         }
     }
+
+  if (!have_architectures)
+    srt_system_info_set_multiarch_tuples (info, NULL);
 
   info->locales.have_issues = TRUE;
   info->locales.issues = _srt_locale_get_issues_from_report (json_obj);
@@ -4318,7 +4379,8 @@ srt_system_info_check_virtualization (SrtSystemInfo *self)
         self->virtualization_info = _srt_virtualization_info_new_empty ();
       else
         self->virtualization_info = _srt_check_virtualization (NULL,
-                                                               self->sysroot);
+                                                               self->sysroot,
+                                                               NULL);
     }
 
   return g_object_ref (self->virtualization_info);

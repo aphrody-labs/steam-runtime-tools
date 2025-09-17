@@ -1093,12 +1093,12 @@ main (int argc,
   int opt;
 
 #if defined(__i386__) || defined(__x86_64__)
-  static const char * const multiarch_tuples[] = { SRT_ABI_I386, SRT_ABI_X86_64, NULL };
+  static const char * const multiarch_tuples[] = { SRT_ABI_X86_64, SRT_ABI_I386, NULL };
 #elif defined(_SRT_MULTIARCH)
   static const char * const multiarch_tuples[] = { _SRT_MULTIARCH, NULL };
 #else
 #warning Unknown architecture, steam-runtime-system-info will assume x86
-  static const char * const multiarch_tuples[] = { SRT_ABI_I386, SRT_ABI_X86_64, NULL };
+  static const char * const multiarch_tuples[] = { SRT_ABI_X86_64, SRT_ABI_I386, NULL };
 #endif
 
   GList *icds;
@@ -1200,6 +1200,7 @@ main (int argc,
   else
     {
       info = srt_system_info_new (expectations);
+      srt_system_info_set_multiarch_tuples (info, multiarch_tuples);
 
       /* For unit testing */
       srt_system_info_set_sysroot (info, g_getenv ("SRT_TEST_SYSROOT"));
@@ -1532,7 +1533,7 @@ main (int argc,
   json_builder_begin_object (builder);
   json_builder_set_member_name (builder, "icds");
   json_builder_begin_array (builder);
-  icds = srt_system_info_list_egl_icds (info, multiarch_tuples);
+  icds = srt_system_info_list_egl_icds (info, NULL);
 
   for (icd_iter = icds; icd_iter != NULL; icd_iter = icd_iter->next)
     {
@@ -1579,7 +1580,7 @@ main (int argc,
   json_builder_end_array (builder);   // egl.icds
   json_builder_set_member_name (builder, "external_platforms");
   json_builder_begin_array (builder);
-  icds = srt_system_info_list_egl_external_platforms (info, multiarch_tuples);
+  icds = srt_system_info_list_egl_external_platforms (info, NULL);
 
   for (icd_iter = icds; icd_iter != NULL; icd_iter = icd_iter->next)
     {
@@ -1630,7 +1631,7 @@ main (int argc,
   json_builder_begin_object (builder);
   json_builder_set_member_name (builder, "icds");
   json_builder_begin_array (builder);
-  icds = srt_system_info_list_vulkan_icds (info, multiarch_tuples);
+  icds = srt_system_info_list_vulkan_icds (info, NULL);
 
   for (icd_iter = icds; icd_iter != NULL; icd_iter = icd_iter->next)
     {
@@ -1712,6 +1713,10 @@ main (int argc,
   json_builder_set_member_name (builder, "inactive");
   json_builder_begin_array (builder);
 
+  /* srt_system_info_list_inactive_openxr_1_runtimes() doesn't support
+   * the shorthand of passing in NULL to mean all of the SrtSystemInfo's
+   * architectures, because it can't know whether we already called
+   * srt_system_info_dup_openxr_1_runtime() for all of them */
   icds = srt_system_info_list_inactive_openxr_1_runtimes (info, multiarch_tuples);
   for (icd_iter = icds; icd_iter != NULL; icd_iter = icd_iter->next)
     print_openxr_1_runtime_details (builder, icd_iter->data);

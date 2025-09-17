@@ -1291,8 +1291,11 @@ enumerate_arch (gpointer data)
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
     _srt_profiling_start ("Enumerating %s drivers in thread",
                           inputs->details->tuple);
+  const char * const tuples[] = { inputs->details->tuple, NULL };
   g_autoptr(SrtSystemInfo) system_info =
     pv_graphics_provider_create_system_info (inputs->provider);
+
+  srt_system_info_set_multiarch_tuples (system_info, tuples);
 
   if (g_cancellable_is_cancelled (inputs->cancellable))
     goto out;
@@ -1359,7 +1362,6 @@ out:
 static void
 cache_indep_graphics_stack (SrtSystemInfo *system_info,
                             PvRuntimeFlags flags,
-                            const char * const *multiarch_tuples,
                             GCancellable *cancellable)
 {
   if (g_cancellable_is_cancelled (cancellable))
@@ -1371,7 +1373,7 @@ cache_indep_graphics_stack (SrtSystemInfo *system_info,
         _srt_profiling_start ("Enumerating EGL ICDs in thread");
       G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
 
-      drivers = srt_system_info_list_egl_icds (system_info, multiarch_tuples);
+      drivers = srt_system_info_list_egl_icds (system_info, NULL);
     }
 
   if (g_cancellable_is_cancelled (cancellable))
@@ -1383,7 +1385,7 @@ cache_indep_graphics_stack (SrtSystemInfo *system_info,
         _srt_profiling_start ("Enumerating EGL external platforms in thread");
       G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
 
-      drivers = srt_system_info_list_egl_external_platforms (system_info, multiarch_tuples);
+      drivers = srt_system_info_list_egl_external_platforms (system_info, NULL);
     }
 
   if (g_cancellable_is_cancelled (cancellable))
@@ -1395,7 +1397,7 @@ cache_indep_graphics_stack (SrtSystemInfo *system_info,
         _srt_profiling_start ("Enumerating Vulkan ICDs in thread");
       G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
 
-      drivers = srt_system_info_list_vulkan_icds (system_info, multiarch_tuples);
+      drivers = srt_system_info_list_vulkan_icds (system_info, NULL);
     }
 
   if (g_cancellable_is_cancelled (cancellable))
@@ -1423,8 +1425,8 @@ enumerate_indep (gpointer data)
   g_autoptr(SrtSystemInfo) system_info =
     pv_graphics_provider_create_system_info (inputs->provider);
 
-  cache_indep_graphics_stack (system_info, inputs->flags, pv_multiarch_tuples,
-                              inputs->cancellable);
+  srt_system_info_set_multiarch_tuples (system_info, pv_multiarch_tuples);
+  cache_indep_graphics_stack (system_info, inputs->flags, inputs->cancellable);
 
   enumeration_thread_inputs_free (inputs);
   return g_steal_pointer (&system_info);
@@ -7358,7 +7360,6 @@ pv_append_host_dri_library_paths (PvRuntime *self,
  */
 static GPtrArray *
 pv_enumerate_egl_ext_platforms (SrtSystemInfo *system_info,
-                                const char * const *multiarch_tuples,
                                 const gchar *which_system)
 {
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
@@ -7370,8 +7371,7 @@ pv_enumerate_egl_ext_platforms (SrtSystemInfo *system_info,
   timer = _srt_profiling_start ("Enumerating EGL external platforms on %s system",
                                 which_system);
   g_debug ("Enumerating EGL external platforms on %s system...", which_system);
-  egl_ext_platforms = srt_system_info_list_egl_external_platforms (system_info,
-                                                                   multiarch_tuples);
+  egl_ext_platforms = srt_system_info_list_egl_external_platforms (system_info, NULL);
   egl_ext_platform_details = g_ptr_array_new_full (g_list_length (egl_ext_platforms),
                                                    (GDestroyNotify) G_CALLBACK (icd_details_free));
 
@@ -7405,7 +7405,6 @@ pv_enumerate_egl_ext_platforms (SrtSystemInfo *system_info,
  */
 static GPtrArray *
 pv_enumerate_egl_icds (SrtSystemInfo *system_info,
-                       const char * const *multiarch_tuples,
                        const gchar *which_system)
 {
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
@@ -7416,7 +7415,7 @@ pv_enumerate_egl_icds (SrtSystemInfo *system_info,
 
   timer = _srt_profiling_start ("Enumerating EGL ICDs on %s system", which_system);
   g_debug ("Enumerating EGL ICDs on %s system...", which_system);
-  egl_icds = srt_system_info_list_egl_icds (system_info, multiarch_tuples);
+  egl_icds = srt_system_info_list_egl_icds (system_info, NULL);
   egl_icd_details = g_ptr_array_new_full (g_list_length (egl_icds),
                                           (GDestroyNotify) G_CALLBACK (icd_details_free));
 
@@ -7450,7 +7449,6 @@ pv_enumerate_egl_icds (SrtSystemInfo *system_info,
  */
 static GPtrArray *
 pv_enumerate_vulkan_icds (SrtSystemInfo *system_info,
-                          const char * const *multiarch_tuples,
                           const gchar *which_system)
 {
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
@@ -7461,8 +7459,7 @@ pv_enumerate_vulkan_icds (SrtSystemInfo *system_info,
 
   timer = _srt_profiling_start ("Enumerating Vulkan ICDs on %s system", which_system);
   g_debug ("Enumerating Vulkan ICDs on %s system...", which_system);
-  vulkan_icds = srt_system_info_list_vulkan_icds (system_info,
-                                                  multiarch_tuples);
+  vulkan_icds = srt_system_info_list_vulkan_icds (system_info, NULL);
   vulkan_icd_details = g_ptr_array_new_full (g_list_length (vulkan_icds),
                                              (GDestroyNotify) G_CALLBACK (icd_details_free));
 
@@ -7748,6 +7745,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   if (self->flags & PV_RUNTIME_FLAGS_SINGLE_THREAD)
     {
       system_info = pv_graphics_provider_create_system_info (self->provider);
+      srt_system_info_set_multiarch_tuples (system_info, pv_multiarch_tuples);
 
       if (self->interpreter_host_provider != NULL)
         host_system_info = pv_graphics_provider_create_system_info (self->interpreter_host_provider);
@@ -7760,13 +7758,10 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
         host_system_info = g_object_ref (enumeration_thread_join (&self->host_thread));
     }
 
-  provider_stack->egl_icd_details = pv_enumerate_egl_icds (system_info,
-                                                           pv_multiarch_tuples, provider);
+  provider_stack->egl_icd_details = pv_enumerate_egl_icds (system_info, provider);
   provider_stack->egl_ext_platform_details = pv_enumerate_egl_ext_platforms (system_info,
-                                                                             pv_multiarch_tuples,
                                                                              provider);
   provider_stack->vulkan_icd_details = pv_enumerate_vulkan_icds (system_info,
-                                                                 pv_multiarch_tuples,
                                                                  provider);
   if (self->flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
     {
@@ -7783,10 +7778,10 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   if (host_system_info != NULL)
     {
       const gchar *which = "host";
-      host_stack->egl_icd_details = pv_enumerate_egl_icds (host_system_info, NULL, which);
+      host_stack->egl_icd_details = pv_enumerate_egl_icds (host_system_info, which);
       host_stack->egl_ext_platform_details = pv_enumerate_egl_ext_platforms (host_system_info,
-                                                                             NULL, which);
-      host_stack->vulkan_icd_details = pv_enumerate_vulkan_icds (host_system_info, NULL, which);
+                                                                             which);
+      host_stack->vulkan_icd_details = pv_enumerate_vulkan_icds (host_system_info, which);
       if (self->flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
         {
           pv_enumerate_vulkan_layer_details (host_system_info,

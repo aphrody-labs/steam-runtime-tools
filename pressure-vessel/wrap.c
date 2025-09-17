@@ -103,7 +103,7 @@ main (int argc,
   g_autoptr(GPtrArray) adverb_preload_argv = NULL;
   int result;
   PvAppendPreloadFlags append_preload_flags = PV_APPEND_PRELOAD_FLAGS_NONE;
-  SrtMachineType host_machine = SRT_MACHINE_TYPE_UNKNOWN;
+  const SrtKnownArchitecture *host_machine = NULL;
   SrtLogFlags log_flags;
   PvWrapLogFlags pv_log_flags = PV_WRAP_LOG_FLAGS_NONE;
   SrtSteamCompatFlags compat_flags;
@@ -644,7 +644,8 @@ main (int argc,
           /* Also include the real host graphics stack to allow thunking.
            * To avoid enumerating the same DRIs/layers twice, we only do
            * this if the host is not a supported architecture. */
-          if (!pv_supported_architectures_include_machine_type (host_machine))
+          if (host_machine != NULL
+              && !pv_supported_architectures_include_machine_type (host_machine->machine_type))
             {
               /* The trailing slash is needed to allow open(2) to work even if
                * it's using the O_NOFOLLOW flag. */

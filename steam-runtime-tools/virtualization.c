@@ -255,11 +255,14 @@ static const struct
 };
 #endif
 
-/**
+/*
  * _srt_check_virtualization:
  * @mock_cpuid: (nullable) (element-type SrtCpuidKey SrtCpuidData): mock data
  *  to use instead of the real CPUID instruction
  * @sysroot: Sysroot, or %NULL to avoid accessing the filesystem at all
+ * @host_out: (out) (optional): Set to the #SrtKnownArchitecture of the
+ *  host machine that is running an emulator, %NULL if unknown or
+ *  not applicable
  *
  * Gather and return information about the hypervisor or emulator that
  * this code is running under.
@@ -269,7 +272,8 @@ static const struct
  */
 SrtVirtualizationInfo *
 _srt_check_virtualization (GHashTable *mock_cpuid,
-                           SrtSysroot *sysroot)
+                           SrtSysroot *sysroot,
+                           const SrtKnownArchitecture **host_out)
 {
   SrtVirtualizationType type = SRT_VIRTUALIZATION_TYPE_NONE;
   gsize i;
@@ -283,8 +287,14 @@ _srt_check_virtualization (GHashTable *mock_cpuid,
   guint32 edx = 0;
   gboolean hypervisor_present = FALSE;
   SrtCpuidData signature = {};
-  SrtMachineType host_machine = SRT_MACHINE_TYPE_UNKNOWN;
+  const SrtKnownArchitecture *host_machine = NULL;
+  SrtMachineType host_machine_type = SRT_MACHINE_TYPE_UNKNOWN;
+#endif
 
+  if (host_out != NULL)
+    *host_out = NULL;
+
+#if defined(__x86_64__) || defined(__i386__)
   /* CPUID leaf 1, bit 31 is the Hypervisor Present Bit.
    * https://lwn.net/Articles/301888/ */
   if (_srt_x86_cpuid (mock_cpuid, FALSE, _SRT_CPUID_LEAF_PROCESSOR_INFO, 0,
@@ -357,11 +367,11 @@ _srt_check_virtualization (GHashTable *mock_cpuid,
           switch (eax & _SRT_CPUID_MASK_FEX_INFO_EAX_HOST_MACHINE)
             {
               case _SRT_CPUID_FEX_HOST_MACHINE_X86_64:
-                host_machine = SRT_MACHINE_TYPE_X86_64;
+                host_machine = _srt_architecture_get_by_tuple (SRT_ABI_X86_64);
                 break;
 
               case _SRT_CPUID_FEX_HOST_MACHINE_AARCH64:
-                host_machine = SRT_MACHINE_TYPE_AARCH64;
+                host_machine = _srt_architecture_get_by_tuple (SRT_ABI_AARCH64);
                 break;
 
               default:
@@ -482,7 +492,16 @@ _srt_check_virtualization (GHashTable *mock_cpuid,
 #endif
 
 #if defined(__x86_64__) || defined(__i386__)
-  return _srt_virtualization_info_new (host_machine, host_os_info,
+  if (host_machine != NULL)
+    {
+      host_machine_type = host_machine->machine_type;
+
+      if (host_out != NULL)
+        *host_out = host_machine;
+    }
+
+  return _srt_virtualization_info_new (host_machine_type,
+                                       host_os_info,
                                        host_root != NULL ? host_root->path : NULL,
                                        interpreter_root, type);
 #else

@@ -77,96 +77,6 @@
   "driver_environment" : [
   ],
   "architectures" : {
-    "i386-linux-gnu" : {
-      "can-run" : false,
-      "libdl-LIB" : "lib32",
-      "libdl-PLATFORM" : {
-        "error-domain" : "g-io-error-quark",
-        "error-code" : 1,
-        "error" : "Unable to find the library: ${ORIGIN}/i386-linux-gnu/${PLATFORM}/libidentify-platform.so: cannot open shared object file: No such file or directory"
-      },
-      "runtime-linker": {
-        "path" : "/lib/ld-linux.so.2",
-        "error-domain" : "g-io-error-quark",
-        "error-code" : 1,
-        "error" : "No such file or directory"
-      },
-      "graphics-details" : {
-        "x11/vulkan" : {
-          "messages" : [
-            "ERROR: [Loader Message] Code 0 : /usr/lib/amdvlk64.so: wrong ELF class: ELFCLASS64",
-            "Cannot create Vulkan instance."
-          ],
-          "renderer" : null,
-          "version" : null,
-          "issues" : [
-            "cannot-load",
-            "cannot-draw"
-          ],
-          "exit-status" : 1,
-          "devices" : []
-        },
-        "x11/vdpau" : {
-          "renderer" : "G3DVL VDPAU Driver Shared Library version 1.0\n",
-          "version" : null
-        },
-        "x11/vaapi" : {
-          "renderer" : "Mesa Gallium driver 20.0.5 for AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)\n",
-          "version" : null
-        },
-        "glx/gl" : {
-          "renderer" : "AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)",
-          "version" : "4.6 (Compatibility Profile) Mesa 20.0.5",
-          "library-vendor" : "glvnd"
-        },
-        "egl_x11/gl" : {
-          "renderer" : "AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)",
-          "version" : "4.6 (Compatibility Profile) Mesa 20.0.5",
-          "library-vendor" : "glvnd"
-        },
-        "egl_x11/glesv2" : {
-          "renderer" : "AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)",
-          "version" : "OpenGL ES 3.2 Mesa 20.0.5",
-          "library-vendor" : "glvnd"
-        }
-      },
-      "dri_drivers" : [
-        {
-          "library_path" : "/usr/lib32/dri/radeonsi_dri.so"
-        },
-        {
-          "library_path" : "/usr/lib32/dri/vmwgfx_dri.so"
-        }
-      ],
-      "va-api_drivers" : [
-        {
-          "library_path" : "/home/me/.local/share/Steam/ubuntu12_32/steam-runtime/usr/lib/i386-linux-gnu/dri/dummy_drv_video.so"
-        }
-      ],
-      "vdpau_drivers" : [
-        {
-          "library_path" : "/home/me/.local/share/Steam/ubuntu12_32/steam-runtime/usr/lib/i386-linux-gnu/vdpau/libvdpau_trace.so.1",
-          "library_link" : "libvdpau_trace.so.1.0.0"
-        }
-      ],
-      "glx_drivers" : [
-        {
-          "library_soname" : "libGLX_indirect.so.0",
-          "library_path" : "/usr/lib32/libGLX_mesa.so.0.0.0"
-        },
-        {
-          "library_soname" : "libGLX_mesa.so.0",
-          "library_path" : "/usr/lib32/libGLX_mesa.so.0.0.0"
-        }
-      ],
-      "openxr-1-runtime" : {
-        "json_path" : "/usr/share/openxr/1/openxr_monado.json",
-        "json_origin" : "/home/me/.config/openxr/1/active_runtime.i686.json",
-        "library_path" : "/usr/lib/libopenxr_monado.so",
-        "name" : "Monado",
-        "issues" : []
-      }
-    },
     "x86_64-linux-gnu" : {
       "can-run" : true,
       "libdl-LIB" : "lib",
@@ -276,6 +186,96 @@
       "openxr-1-runtime" : {
         "json_path" : "/usr/share/openxr/1/openxr_monado.json",
         "json_origin" : "/home/me/.config/openxr/1/active_runtime.x86_64.json",
+        "library_path" : "/usr/lib/libopenxr_monado.so",
+        "name" : "Monado",
+        "issues" : []
+      }
+    },
+    "i386-linux-gnu" : {
+      "can-run" : false,
+      "libdl-LIB" : "lib32",
+      "libdl-PLATFORM" : {
+        "error-domain" : "g-io-error-quark",
+        "error-code" : 1,
+        "error" : "Unable to find the library: ${ORIGIN}/i386-linux-gnu/${PLATFORM}/libidentify-platform.so: cannot open shared object file: No such file or directory"
+      },
+      "runtime-linker": {
+        "path" : "/lib/ld-linux.so.2",
+        "error-domain" : "g-io-error-quark",
+        "error-code" : 1,
+        "error" : "No such file or directory"
+      },
+      "graphics-details" : {
+        "x11/vulkan" : {
+          "messages" : [
+            "ERROR: [Loader Message] Code 0 : /usr/lib/amdvlk64.so: wrong ELF class: ELFCLASS64",
+            "Cannot create Vulkan instance."
+          ],
+          "renderer" : null,
+          "version" : null,
+          "issues" : [
+            "cannot-load",
+            "cannot-draw"
+          ],
+          "exit-status" : 1,
+          "devices" : []
+        },
+        "x11/vdpau" : {
+          "renderer" : "G3DVL VDPAU Driver Shared Library version 1.0\n",
+          "version" : null
+        },
+        "x11/vaapi" : {
+          "renderer" : "Mesa Gallium driver 20.0.5 for AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)\n",
+          "version" : null
+        },
+        "glx/gl" : {
+          "renderer" : "AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)",
+          "version" : "4.6 (Compatibility Profile) Mesa 20.0.5",
+          "library-vendor" : "glvnd"
+        },
+        "egl_x11/gl" : {
+          "renderer" : "AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)",
+          "version" : "4.6 (Compatibility Profile) Mesa 20.0.5",
+          "library-vendor" : "glvnd"
+        },
+        "egl_x11/glesv2" : {
+          "renderer" : "AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)",
+          "version" : "OpenGL ES 3.2 Mesa 20.0.5",
+          "library-vendor" : "glvnd"
+        }
+      },
+      "dri_drivers" : [
+        {
+          "library_path" : "/usr/lib32/dri/radeonsi_dri.so"
+        },
+        {
+          "library_path" : "/usr/lib32/dri/vmwgfx_dri.so"
+        }
+      ],
+      "va-api_drivers" : [
+        {
+          "library_path" : "/home/me/.local/share/Steam/ubuntu12_32/steam-runtime/usr/lib/i386-linux-gnu/dri/dummy_drv_video.so"
+        }
+      ],
+      "vdpau_drivers" : [
+        {
+          "library_path" : "/home/me/.local/share/Steam/ubuntu12_32/steam-runtime/usr/lib/i386-linux-gnu/vdpau/libvdpau_trace.so.1",
+          "library_link" : "libvdpau_trace.so.1.0.0"
+        }
+      ],
+      "glx_drivers" : [
+        {
+          "library_soname" : "libGLX_indirect.so.0",
+          "library_path" : "/usr/lib32/libGLX_mesa.so.0.0.0"
+        },
+        {
+          "library_soname" : "libGLX_mesa.so.0",
+          "library_path" : "/usr/lib32/libGLX_mesa.so.0.0.0"
+        }
+      ],
+      "openxr-1-runtime" : {
+        "json_path" : "/usr/share/openxr/1/openxr_monado.json",
+        "json_origin" : "/home/me/.config/openxr/1/active_runtime.i686.json",
         "library_path" : "/usr/lib/libopenxr_monado.so",
         "name" : "Monado",
         "issues" : []

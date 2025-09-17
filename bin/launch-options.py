@@ -640,6 +640,7 @@ class Gui:
         self.sdl2_dynapi_combo.append(None, "Don't override")
         self.sdl2_dynapi_combo.append('1', 'Use runtime copy')
         self.sdl2_dynapi_combo.append('sdl2-compat', 'Use sdl2-compat')
+        self.sdl2_dynapi_combo.append('classic', 'Use "classic" SDL2')
         self.sdl2_dynapi_combo.set_active(0)
         self.grid.attach(self.sdl2_dynapi_combo, 1, row, 2, 1)
 

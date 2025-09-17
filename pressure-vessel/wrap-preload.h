@@ -30,12 +30,6 @@ typedef enum
   PV_APPEND_PRELOAD_FLAGS_NONE = 0
 } PvAppendPreloadFlags;
 
-void pv_wrap_append_preload (PvWrapContext *context,
-                             GPtrArray *argv,
-                             PvPreloadVariableIndex which,
-                             const char *preload,
-                             PvAppendPreloadFlags flags);
-
 void pv_wrap_append_preloads (PvWrapContext *context,
                               GPtrArray *argv,
                               WrapPreloadModule *inputs,

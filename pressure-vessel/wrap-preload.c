@@ -391,7 +391,7 @@ append_preload_basename (PvWrapContext *context,
  * Adjust @preload to be valid for the container and append it
  * to @argv.
  */
-void
+static void
 pv_wrap_append_preload (PvWrapContext *context,
                         GPtrArray *argv,
                         PvPreloadVariableIndex which,
@@ -402,8 +402,6 @@ pv_wrap_append_preload (PvWrapContext *context,
   SrtLoadableFlags loadable_flags;
   const char *variable;
 
-  g_return_if_fail (PV_IS_WRAP_CONTEXT (context));
-  g_return_if_fail (argv != NULL);
   g_return_if_fail (preload != NULL);
   g_return_if_fail (which >= 0);
   g_return_if_fail (which < G_N_ELEMENTS (pv_preload_variables));

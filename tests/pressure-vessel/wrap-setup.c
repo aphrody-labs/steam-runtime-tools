@@ -1933,6 +1933,11 @@ populate_ld_preload (Fixture *f,
     {
       const PreloadTest *test = &ld_preload_tests[i];
       GLogLevelFlags old_fatal_mask = G_LOG_FATAL_MASK;
+      WrapPreloadModule module =
+        {
+          .which = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
+          .preload = (char *) test->input,
+        };
 
       /* We expect a warning for libgtk3-nocsd.so.0, but the test framework
        * makes warnings and critical warnings fatal, in addition to the
@@ -1952,11 +1957,11 @@ populate_ld_preload (Fixture *f,
                                  test->warning);
         }
 
-      pv_wrap_append_preload (f->context,
-                              argv,
-                              PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
-                              test->input,
-                              flags | PV_APPEND_PRELOAD_FLAGS_IN_UNIT_TESTS);
+      pv_wrap_append_preloads (f->context,
+                               argv,
+                               &module,
+                               1,
+                               flags | PV_APPEND_PRELOAD_FLAGS_IN_UNIT_TESTS);
 
       /* If we modified the fatal mask, put back the old value. */
       if (test->warning != NULL)

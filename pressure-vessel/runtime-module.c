@@ -82,6 +82,7 @@ icd_details_free (IcdDetails *self)
   gsize i;
 
   g_object_unref (self->icd);
+  g_object_unref (self->provider);
 
   for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
     pv_module_per_arch_clear (&self->archs[i]);

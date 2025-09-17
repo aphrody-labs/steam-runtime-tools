@@ -405,7 +405,9 @@ pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
 
   if (g_hash_table_lookup_extended (self, original_json, NULL, &other_voidp))
     {
-      const char *other_path = other_voidp;
+      IcdDetails *other = other_voidp;
+      SrtBaseJsonGraphicsModule *other_module = other->icd;
+      const char *other_path = other_module->json_path;
 
       g_info ("Ignoring \"%s\" because it has the same content as \"%s\"",
               path_in_provider, other_path);
@@ -414,8 +416,8 @@ pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
 
   /* Remember it so we can ignore any subsequent duplicates.
    * Casts are required because GHashTable is not const-correct for
+   * The cast is required because GHashTable is not const-correct for
    * "borrowed" keys and values. */
-  g_hash_table_replace (self, (void *) original_json,
-                        (void *) path_in_provider);
+  g_hash_table_replace (self, (void *) original_json, details);
   return TRUE;
 }

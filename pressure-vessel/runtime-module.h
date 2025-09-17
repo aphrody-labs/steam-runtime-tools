@@ -239,8 +239,7 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdStack, icd_stack_free)
  * Keys are unowned strings with JSON manifest content, borrowed from the
  * #SrtBaseJsonGraphicsModule in the #IcdDetails.
  *
- * Values are unowned paths within the #PvGraphicsProvider sysroot,
- * borrowed from the #SrtBaseJsonGraphicsModule in the #IcdDetails.
+ * Values are the #IcdDetails itself.
  */
 typedef GHashTable PvManifestDeduplicator;
 

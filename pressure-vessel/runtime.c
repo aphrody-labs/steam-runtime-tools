@@ -47,6 +47,7 @@
 #include "flatpak-run-private.h"
 #include "mtree.h"
 #include "passwd.h"
+#include "runtime-module.h"
 #include "runtime-flags.h"
 #include "supported-architectures.h"
 #include "tree-copy.h"
@@ -2154,117 +2155,6 @@ collect_s2tc (PvRuntime *self,
   return TRUE;
 }
 
-typedef enum
-{
-  ICD_KIND_NONEXISTENT,
-  ICD_KIND_ABSOLUTE,
-  ICD_KIND_SONAME,
-  ICD_KIND_META_LAYER,
-} IcdKind;
-
-static const char *
-icd_kind_to_string (IcdKind kind)
-{
-  switch (kind)
-    {
-      case ICD_KIND_NONEXISTENT:
-        return "does not exist";
-
-      case ICD_KIND_ABSOLUTE:
-        return "absolute path";
-
-      case ICD_KIND_SONAME:
-        return "SONAME";
-
-      case ICD_KIND_META_LAYER:
-        return "Vulkan meta-layer";
-
-      default:
-        g_return_val_if_reached ("(internal error!)");
-    }
-}
-
-typedef struct
-{
-  /* (type SrtEglIcd) or (type SrtVulkanIcd) or (type SrtVdpauDriver)
-   * or (type SrtVaApiDriver) or (type SrtVulkanLayer) or
-   * (type SrtDriDriver) */
-  gpointer icd;
-  /* Some sort of name borrowed from icd */
-  const char *debug_name;
-  /* Either SONAME, or absolute path in the provider's namespace.
-   * Keyed by the index of a multiarch tuple in multiarch_tuples. */
-  gchar *resolved_libraries[PV_N_SUPPORTED_ARCHITECTURES];
-  /* Keyed by the index of a multiarch tuple in multiarch_tuples. */
-  IcdKind kinds[PV_N_SUPPORTED_ARCHITECTURES];
-  /* If the corresponding item in @kinds is ICD_KIND_ABSOLUTE,
-   * a path accessible in the container from which the library will
-   * be loadable: might look like either
-   * /run/host/usr/lib/.../libfoo.so or /overrides/lib/.../libfoo.so
-   * Otherwise %NULL. */
-  gchar *paths_in_container[PV_N_SUPPORTED_ARCHITECTURES];
-} IcdDetails;
-
-static IcdDetails *
-icd_details_new (gpointer icd)
-{
-  IcdDetails *self;
-  gsize i;
-  const char *name;
-
-  g_return_val_if_fail (G_IS_OBJECT (icd), NULL);
-
-  if (SRT_IS_DRI_DRIVER (icd))
-    name = srt_dri_driver_get_library_path (icd);
-  else if (SRT_IS_EGL_ICD (icd))
-    name = srt_egl_icd_get_json_path (icd);
-  else if (SRT_IS_EGL_EXTERNAL_PLATFORM (icd))
-    name = srt_egl_external_platform_get_json_path (icd);
-  else if (SRT_IS_VULKAN_ICD (icd))
-    name = srt_vulkan_icd_get_json_path (icd);
-  else if (SRT_IS_VULKAN_LAYER (icd))
-    name = srt_vulkan_layer_get_json_path (icd);
-  else if (SRT_IS_VDPAU_DRIVER (icd))
-    name = srt_vdpau_driver_get_library_path (icd);
-  else if (SRT_IS_VA_API_DRIVER (icd))
-    name = srt_va_api_driver_get_library_path (icd);
-  else if (SRT_IS_OPENXR_1_RUNTIME (icd))
-    name = srt_openxr_1_runtime_get_json_path (icd);
-  else
-    g_return_val_if_reached (NULL);
-
-  self = g_slice_new0 (IcdDetails);
-  self->icd = g_object_ref (icd);
-  self->debug_name = name;
-
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-    {
-      self->resolved_libraries[i] = NULL;
-      self->kinds[i] = ICD_KIND_NONEXISTENT;
-      self->paths_in_container[i] = NULL;
-    }
-
-  return self;
-}
-
-static void
-icd_details_free (IcdDetails *self)
-{
-  gsize i;
-
-  g_object_unref (self->icd);
-
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-    {
-      g_free (self->resolved_libraries[i]);
-      g_free (self->paths_in_container[i]);
-    }
-
-  g_slice_free (IcdDetails, self);
-}
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdDetails, icd_details_free)
-
 /*
  * pv_runtime_capture_libraries:
  * @self: (not nullable): The runtime
@@ -2365,7 +2255,7 @@ pv_runtime_capture_libraries (PvRuntime *self,
  * to @libdir_patterns that will capture the driver and its dependencies
  * into `${libdir}`.
  *
- * Change `details->kinds[multiarch_index]` from %ICD_KIND_NONEXISTENT
+ * Change `details->archs[multiarch_index].kind` from %ICD_KIND_NONEXISTENT
  * to %ICD_KIND_ABSOLUTE, %ICD_KIND_SONAME or %ICD_KIND_NONEXISTENT
  * as appropriate.
  */
@@ -2382,7 +2272,7 @@ bind_icds (PvRuntime *self,
 {
   static const char options[] = "if-exists:if-same-abi";
   g_autoptr(GHashTable) basename_set = NULL;
-  /* If details_arr[i]->kinds[multiarch_index] is ICD_KIND_ABSOLUTE,
+  /* If details_arr[i]->archs[multiarch_index].kind is ICD_KIND_ABSOLUTE,
    * then basenames[i] is the basename of the file; otherwise %NULL. */
   g_autofree const char **basenames = NULL;
   /* If details_arr[i] will not be passed to capsule-capture-libs because
@@ -2412,39 +2302,40 @@ bind_icds (PvRuntime *self,
   for (i = 0; i < n_details; i++)
     {
       IcdDetails *details = details_arr[i];
+      PvModulePerArch *details_arch = &details->archs[multiarch_index];
 
       g_return_val_if_fail (details != NULL, FALSE);
 
-      if (details->resolved_libraries[multiarch_index] == NULL)
+      if (details_arch->resolved_library == NULL)
         continue;
 
-      g_return_val_if_fail (details->kinds[multiarch_index] == ICD_KIND_NONEXISTENT,
+      g_return_val_if_fail (details_arch->kind == ICD_KIND_NONEXISTENT,
                             FALSE);
-      g_return_val_if_fail (details->paths_in_container[multiarch_index] == NULL,
+      g_return_val_if_fail (details_arch->path_in_container == NULL,
                             FALSE);
 
       g_info ("Capturing %s loadable module #%" G_GSIZE_FORMAT ": %s",
               subdir, i, details->debug_name);
       g_info ("Checking for implementation on %s: %s",
               arch->details->tuple,
-              details->resolved_libraries[multiarch_index]);
+              details_arch->resolved_library);
 
-      if (!g_path_is_absolute (details->resolved_libraries[multiarch_index]))
+      if (!g_path_is_absolute (details_arch->resolved_library))
         {
           g_autofree gchar *pattern = NULL;
 
           g_debug ("Classified as SONAME");
-          details->kinds[multiarch_index] = ICD_KIND_SONAME;
+          details_arch->kind = ICD_KIND_SONAME;
 
           pattern = g_strdup_printf ("even-if-older:%s:soname:%s",
                                      options,
-                                     details->resolved_libraries[multiarch_index]);
+                                     details_arch->resolved_library);
           g_ptr_array_add (libdir_patterns, g_steal_pointer (&pattern));
           continue;
         }
 
       g_debug ("Classified as path-based");
-      details->kinds[multiarch_index] = ICD_KIND_ABSOLUTE;
+      details_arch->kind = ICD_KIND_ABSOLUTE;
 
       /* We set subdir_relative_to_overrides non-NULL if and only if at least
        * one driver is ICD_KIND_ABSOLUTE */
@@ -2479,13 +2370,14 @@ bind_icds (PvRuntime *self,
 
   for (i = 0; i < n_details && !*use_numbered_subdirs; i++)
     {
-      IcdDetails *details = details_arr[i];
+      const IcdDetails *details = details_arr[i];
+      const PvModulePerArch *details_arch = &details->archs[multiarch_index];
       const char *base;
 
-      if (details->kinds[multiarch_index] != ICD_KIND_ABSOLUTE)
+      if (details_arch->kind != ICD_KIND_ABSOLUTE)
         continue;
 
-      base = glnx_basename (details->resolved_libraries[multiarch_index]);
+      base = glnx_basename (details_arch->resolved_library);
       basenames[i] = base;
 
       if (g_hash_table_contains (basename_set, base))
@@ -2532,16 +2424,17 @@ bind_icds (PvRuntime *self,
 
       for (i = 0; i < n_details; i++)
         {
-          IcdDetails *details = details_arr[i];
+          const IcdDetails *details = details_arr[i];
+          const PvModulePerArch *details_arch = &details->archs[multiarch_index];
           g_autofree gchar *pattern = NULL;
           struct stat stat_buf;
           glnx_autofd int fd = -1;
 
-          if (details->kinds[multiarch_index] != ICD_KIND_ABSOLUTE)
+          if (details_arch->kind != ICD_KIND_ABSOLUTE)
             continue;
 
           fd = _srt_sysroot_open (self->provider->in_current_ns,
-                                  details->resolved_libraries[multiarch_index],
+                                  details_arch->resolved_library,
                                   SRT_RESOLVE_FLAGS_NONE,
                                   NULL, NULL);
 
@@ -2571,12 +2464,12 @@ bind_icds (PvRuntime *self,
           else
             {
               g_warning ("Unable to look up resolved path \"%s\" in provider",
-                         details->resolved_libraries[multiarch_index]);
+                         details_arch->resolved_library);
             }
 
           pattern = g_strdup_printf ("no-dependencies:even-if-older:%s:path:%s",
                                      options,
-                                     details->resolved_libraries[multiarch_index]);
+                                     details_arch->resolved_library);
           g_ptr_array_add (patterns, g_steal_pointer (&pattern));
         }
 
@@ -2595,6 +2488,7 @@ bind_icds (PvRuntime *self,
   for (i = 0; i < n_details; i++)
     {
       IcdDetails *details = details_arr[i];
+      PvModulePerArch *details_arch = &details->archs[multiarch_index];
       g_autofree gchar *numbered_subdir = NULL;
       g_autofree gchar *dependency_pattern = NULL;
       g_autofree gchar *seq_str = NULL;
@@ -2605,14 +2499,14 @@ bind_icds (PvRuntime *self,
       int dest_fd;
       struct stat stat_buf;
 
-      if (details->kinds[multiarch_index] != ICD_KIND_ABSOLUTE)
+      if (details_arch->kind != ICD_KIND_ABSOLUTE)
         continue;
 
       base = basenames[i];
 
       if (base == NULL)
         {
-          base = glnx_basename (details->resolved_libraries[multiarch_index]);
+          base = glnx_basename (details_arch->resolved_library);
           basenames[i] = base;
         }
 
@@ -2643,7 +2537,7 @@ bind_icds (PvRuntime *self,
                 {
                   g_debug ("\"%s\" was not created: not creating \"%s\" either",
                            basenames[other], base);
-                  details->kinds[multiarch_index] = ICD_KIND_NONEXISTENT;
+                  details_arch->kind = ICD_KIND_NONEXISTENT;
                 }
               else
                 {
@@ -2686,7 +2580,7 @@ bind_icds (PvRuntime *self,
           dest_fd = numbered_subdir_fd;
           pattern = g_strdup_printf ("no-dependencies:even-if-older:%s:path:%s",
                                      options,
-                                     details->resolved_libraries[multiarch_index]);
+                                     details_arch->resolved_library);
 
           if (!pv_runtime_capture_libraries (self, arch,
                                              dest_relative_to_overrides,
@@ -2708,7 +2602,7 @@ bind_icds (PvRuntime *self,
           /* capsule-capture-libs didn't actually create the symlink,
            * which means the ICD is nonexistent or the wrong architecture.
            * We don't need to capture the dependencies in this case. */
-          details->kinds[multiarch_index] = ICD_KIND_NONEXISTENT;
+          details_arch->kind = ICD_KIND_NONEXISTENT;
           /* If the directory is empty we can also remove it.
            * This is opportunistic, so ignore ENOTEMPTY. */
           if (numbered_subdir != NULL)
@@ -2749,24 +2643,25 @@ bind_icds (PvRuntime *self,
 
       dependency_pattern = g_strdup_printf ("only-dependencies:%s:path:%s",
                                             options,
-                                            details->resolved_libraries[multiarch_index]);
+                                            details_arch->resolved_library);
       g_ptr_array_add (libdir_patterns, g_steal_pointer (&dependency_pattern));
 
       if (G_LIKELY (target != NULL && target[0] == '/'))
-        details->paths_in_container[multiarch_index] = g_steal_pointer (&target);
+        details_arch->path_in_container = g_steal_pointer (&target);
       else
-        details->paths_in_container[multiarch_index] = g_build_filename (arch->libdir_in_container,
-                                                                         subdir,
-                                                                         seq_str ? seq_str : "",
-                                                                         base,
+        details_arch->path_in_container = g_build_filename (arch->libdir_in_container,
+                                                            subdir,
+                                                            seq_str ? seq_str : "",
+                                                            base,
                                                                          NULL);
     }
 
 success:
   for (i = 0; i < n_details; i++)
     {
-      IcdDetails *details = details_arr[i];
-      const char *type_str = icd_kind_to_string (details->kinds[multiarch_index]);
+      const IcdDetails *details = details_arr[i];
+      const PvModulePerArch *details_arch = &details->archs[multiarch_index];
+      const char *type_str = icd_kind_to_string (details_arch->kind);
 
       g_info ("Captured %s loadable module #%" G_GSIZE_FORMAT ": %s",
               subdir, i, details->debug_name);
@@ -4762,12 +4657,13 @@ setup_json_manifest (PvRuntime *self,
 
   for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
     {
+      const PvModulePerArch *details_arch;
       const SrtKnownArchitecture *arch;
       const char *tuple;
       g_autofree gchar *arch_bits = NULL;
 
-      g_assert (i < G_N_ELEMENTS (details->kinds));
-      g_assert (i < G_N_ELEMENTS (details->paths_in_container));
+      g_assert (i < G_N_ELEMENTS (details->archs));
+      details_arch = &details->archs[i];
 
       tuple = pv_multiarch_tuples[i];
       arch = _srt_architecture_get_by_tuple (tuple);
@@ -4790,14 +4686,14 @@ setup_json_manifest (PvRuntime *self,
             }
         }
 
-      if (details->kinds[i] == ICD_KIND_ABSOLUTE)
+      if (details_arch->kind == ICD_KIND_ABSOLUTE)
         {
           g_autofree gchar *write_to_file = NULL;
           g_autofree gchar *write_to_dir = NULL;
           g_autofree gchar *json_in_container = NULL;
           g_autofree gchar *relative_to_overrides = NULL;
 
-          g_assert (details->paths_in_container[i] != NULL);
+          g_assert (details_arch->path_in_container != NULL);
 
           relative_to_overrides = get_manifest_relative_to_overrides (details->icd,
                                                                       sub_dir,
@@ -4820,13 +4716,13 @@ setup_json_manifest (PvRuntime *self,
             }
 
           g_debug ("Generating \"overrides/%s\" with path \"%s\"",
-                   relative_to_overrides, details->paths_in_container[i]);
+                   relative_to_overrides, details_arch->path_in_container);
 
           if (layer != NULL)
             {
               g_autoptr(SrtVulkanLayer) replacement = NULL;
               replacement = srt_vulkan_layer_new_replace_library_path (layer,
-                                                                       details->paths_in_container[i]);
+                                                                       details_arch->path_in_container);
 
               if (arch_bits != NULL && library_arch == NULL)
                 _srt_vulkan_layer_set_library_arch (replacement, arch_bits);
@@ -4839,7 +4735,7 @@ setup_json_manifest (PvRuntime *self,
               g_autoptr(SrtEglIcd) replacement = NULL;
 
               replacement = srt_egl_icd_new_replace_library_path (egl,
-                                                                  details->paths_in_container[i]);
+                                                                  details_arch->path_in_container);
 
               if (!srt_egl_icd_write_to_file (replacement, write_to_file,
                                               error))
@@ -4850,7 +4746,7 @@ setup_json_manifest (PvRuntime *self,
               g_autoptr(SrtEglExternalPlatform) replacement = NULL;
 
               replacement = srt_egl_external_platform_new_replace_library_path (ext_platform,
-                                                                                details->paths_in_container[i]);
+                                                                                details_arch->path_in_container);
 
               if (!srt_egl_external_platform_write_to_file (replacement, write_to_file, error))
                 return FALSE;
@@ -4859,7 +4755,7 @@ setup_json_manifest (PvRuntime *self,
             {
               g_autoptr(SrtVulkanIcd) replacement = NULL;
               replacement = srt_vulkan_icd_new_replace_library_path (icd,
-                                                                     details->paths_in_container[i]);
+                                                                     details_arch->path_in_container);
 
               if (arch_bits != NULL && library_arch == NULL)
                 _srt_vulkan_icd_set_library_arch (replacement, arch_bits);
@@ -4871,7 +4767,7 @@ setup_json_manifest (PvRuntime *self,
             {
               g_autoptr(SrtOpenXr1Runtime) replacement = NULL;
               replacement = srt_openxr_1_runtime_new_replace_library_path (xr_rt,
-                                                                           details->paths_in_container[i]);
+                                                                           details_arch->path_in_container);
 
               if (!srt_openxr_1_runtime_write_to_file (replacement, write_to_file, error))
                 return FALSE;
@@ -4883,8 +4779,8 @@ setup_json_manifest (PvRuntime *self,
 
           pv_search_path_append (search_path, json_in_container);
         }
-      else if (details->kinds[i] == ICD_KIND_SONAME
-               || details->kinds[i] == ICD_KIND_META_LAYER)
+      else if (details_arch->kind == ICD_KIND_SONAME
+               || details_arch->kind == ICD_KIND_META_LAYER)
         {
           g_debug ("Will use graphics stack provider JSON as-is for %s/%s",
                    sub_dir, json_basename);
@@ -4977,56 +4873,72 @@ setup_each_json_manifest (PvRuntime *self,
   return TRUE;
 }
 
+/*
+ * @details_arr: (element-type IcdDetails):
+ * @patterns: (element-type filename):
+ */
 static gboolean
-collect_vulkan_layers (PvRuntime *self,
-                       const GPtrArray *layer_details,
-                       GPtrArray *libdir_patterns,
-                       RuntimeArchitecture *arch,
-                       const gchar *dir_name,
-                       GError **error)
+collect_json_based_drivers (PvRuntime *self,
+                            RuntimeArchitecture *arch,
+                            const char *description,
+                            const GPtrArray *details_arr,
+                            const gchar *bind_icds_subdir,
+                            GPtrArray *libdir_patterns,
+                            GError **error)
 {
   /* We don't have to use multiple directories unless there are
    * filename collisions, because the order of the JSON manifests
-   * might matter, but the order of the actual libraries does not. */
+   * might matter, but the order of the actual libraries does not
+   * (this is true for all the JSON-based driver families we currently
+   * support). */
   gboolean use_numbered_subdirs = FALSE;
   gsize j;
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
-    _srt_profiling_start ("Collecting Vulkan %s layers", dir_name);
+    _srt_profiling_start ("Collecting %s", description);
+  const gsize multiarch_index = arch->multiarch_index;
 
   g_return_val_if_fail (self->provider != NULL, FALSE);
-  g_return_val_if_fail (layer_details != NULL, FALSE);
+  g_return_val_if_fail (details_arr != NULL, FALSE);
   g_return_val_if_fail (libdir_patterns != NULL, FALSE);
-  g_return_val_if_fail (dir_name != NULL, FALSE);
+  g_return_val_if_fail (bind_icds_subdir != NULL, FALSE);
 
-  for (j = 0; j < layer_details->len; j++)
+  g_debug ("Collecting %s %s from provider...",
+           arch->details->tuple, description);
+
+  for (j = 0; j < details_arr->len; j++)
     {
-      g_autoptr(SrtLibrary) library = NULL;
-      SrtLibraryIssues issues;
-      IcdDetails *details = g_ptr_array_index (layer_details, j);
-      SrtVulkanLayer *layer = SRT_VULKAN_LAYER (details->icd);
+      IcdDetails *details = g_ptr_array_index (details_arr, j);
+      PvModulePerArch *details_arch = &details->archs[multiarch_index];
+      SrtBaseGraphicsModule *base = SRT_BASE_GRAPHICS_MODULE (details->icd);
       const char *resolved_library;
-      const gsize multiarch_index = arch->multiarch_index;
 
-      g_assert (details->resolved_libraries[multiarch_index] == NULL);
+      g_assert (details_arch->resolved_library == NULL);
 
-      if (!srt_vulkan_layer_check_error (layer, NULL))
+      if (!_srt_base_graphics_module_check_error (base, NULL))
         continue;
 
       /* For meta-layers we don't have a library path */
-      if (srt_vulkan_layer_get_library_path(layer) == NULL)
+      if (SRT_IS_VULKAN_LAYER (base) && base->library_path == NULL)
         {
-          details->kinds[multiarch_index] = ICD_KIND_META_LAYER;
+          details_arch->kind = ICD_KIND_META_LAYER;
           continue;
+        }
+      else
+        {
+          g_assert (base->library_path != NULL);
         }
 
       /* If the library_path is relative to the JSON file, turn it into an
        * absolute path. If it's already absolute, or if it's a basename to be
        * looked up in the system library search path, use it as-is. */
-      details->resolved_libraries[multiarch_index] = srt_vulkan_layer_resolve_library_path (layer);
-      resolved_library = details->resolved_libraries[multiarch_index];
-      g_assert (details->resolved_libraries[multiarch_index] != NULL);
+      details_arch->resolved_library = _srt_base_graphics_module_resolve_library_path (base);
+      resolved_library = details_arch->resolved_library;
+      g_assert (details_arch->resolved_library != NULL);
 
-      if (strchr (resolved_library, '/') != NULL &&
+      /* TODO: Previously we only did this for Vulkan layers, but is it
+       * applicable to all file types? */
+      if (SRT_IS_VULKAN_LAYER (base) &&
+          strchr (resolved_library, '/') != NULL &&
           (strstr (resolved_library, "$ORIGIN/") != NULL ||
            strstr (resolved_library, "${ORIGIN}") != NULL ||
            strstr (resolved_library, "$LIB/") != NULL ||
@@ -5044,6 +4956,9 @@ collect_vulkan_layers (PvRuntime *self,
            * see what the resulting path is. */
           if (_srt_sysroot_is_direct (self->provider->in_current_ns))
             {
+              g_autoptr(SrtLibrary) library = NULL;
+              SrtLibraryIssues issues;
+
               /* It's in our current namespace, so we can dlopen it. */
               g_info ("Evaluating dynamic string tokens in \"%s\"", resolved_library);
               issues = srt_check_library_presence (resolved_library,
@@ -5056,7 +4971,7 @@ collect_vulkan_layers (PvRuntime *self,
                 {
                   g_info ("Unable to load library %s: %s", resolved_library,
                           srt_library_get_messages (library));
-                  g_clear_pointer (&details->resolved_libraries[multiarch_index], g_free);
+                  g_clear_pointer (&details_arch->resolved_library, g_free);
                   continue;
                 }
 
@@ -5066,8 +4981,8 @@ collect_vulkan_layers (PvRuntime *self,
               /* This is "borrowed" and we are about to invalidate it */
               resolved_library = NULL;
 
-              g_free (details->resolved_libraries[multiarch_index]);
-              details->resolved_libraries[multiarch_index] = g_strdup (srt_library_get_absolute_path (library));
+              g_free (details_arch->resolved_library);
+              details_arch->resolved_library = g_strdup (srt_library_get_absolute_path (library));
             }
           else
             {
@@ -5075,15 +4990,15 @@ collect_vulkan_layers (PvRuntime *self,
               g_info ("Cannot support ld.so special tokens, e.g. ${LIB}, when provider "
                       "is not the root filesystem: ignoring %s",
                       resolved_library);
-              g_clear_pointer (&details->resolved_libraries[multiarch_index], g_free);
+              g_clear_pointer (&details_arch->resolved_library, g_free);
               continue;
             }
         }
     }
 
-  if (!bind_icds (self, arch, dir_name,
-                  (IcdDetails **) layer_details->pdata,
-                  layer_details->len,
+  if (!bind_icds (self, arch, bind_icds_subdir,
+                  (IcdDetails **) details_arr->pdata,
+                  details_arr->len,
                   &use_numbered_subdirs, libdir_patterns, NULL, error))
     return FALSE;
 
@@ -5106,6 +5021,7 @@ collect_openxr_1_runtime (PvRuntime *self,
     _srt_profiling_start ("Collecting OpenXR 1 runtimes");
   SrtOpenXr1Runtime *rt;
   IcdDetails *details;
+  PvModulePerArch *details_arch;
   /* We don't have to use multiple directories because there is at most one
    * active runtime per architecture, so filenames cannot collide */
   gboolean use_numbered_subdirs = FALSE;
@@ -5122,9 +5038,10 @@ collect_openxr_1_runtime (PvRuntime *self,
 
   g_return_val_if_fail (srt_openxr_1_runtime_check_error (rt, NULL), TRUE);
 
-  details->resolved_libraries[multiarch_index] =
+  details_arch = &details->archs[multiarch_index];
+  details_arch->resolved_library =
     srt_openxr_1_runtime_resolve_library_path (rt);
-  g_assert (details->resolved_libraries[multiarch_index] != NULL);
+  g_assert (details_arch->resolved_library != NULL);
 
   if (!bind_icds (self, arch, "openxr/1", &details, 1, &use_numbered_subdirs,
                   patterns, NULL, error))
@@ -6018,12 +5935,13 @@ collect_one_mesa_drirc (PvRuntime *self,
 {
   g_autofree gchar *symlink = NULL;
   const gsize multiarch_index = arch->multiarch_index;
+  const PvModulePerArch *details_arch = &details->archs[multiarch_index];
   const char *resolved;
 
   /* This is assumed to be called after collecting ICDs */
-  resolved = details->resolved_libraries[multiarch_index];
+  resolved = details_arch->resolved_library;
 
-  switch (details->kinds[multiarch_index])
+  switch (details_arch->kind)
     {
       case ICD_KIND_ABSOLUTE:
         g_return_if_fail (resolved != NULL);
@@ -6076,11 +5994,12 @@ collect_mesa_drirc (PvRuntime *self,
     {
       IcdDetails *details = g_ptr_array_index (egl_icd_details, i);
       const gsize multiarch_index = arch->multiarch_index;
+      const PvModulePerArch *details_arch = &details->archs[multiarch_index];
       const char *resolved;
       const char *base;
 
       /* This is assumed to be called after collecting ICDs */
-      resolved = details->resolved_libraries[multiarch_index];
+      resolved = details_arch->resolved_library;
 
       if (resolved == NULL)
         continue;
@@ -6661,141 +6580,6 @@ pv_runtime_create_aliases (PvRuntime *self,
 }
 
 /*
- * @egl_icd_details: (element-type IcdDetails):
- * @patterns: (element-type filename):
- */
-static gboolean
-collect_egl_drivers (PvRuntime *self,
-                     RuntimeArchitecture *arch,
-                     GPtrArray *egl_icd_details,
-                     GPtrArray *patterns,
-                     GError **error)
-{
-  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
-    _srt_profiling_start ("Collecting EGL drivers");
-  gsize j;
-  /* As with Vulkan layers, the order of the manifests matters
-   * but the order of the actual libraries does not. */
-  gboolean use_numbered_subdirs = FALSE;
-  const gsize multiarch_index = arch->multiarch_index;
-
-  g_debug ("Collecting %s EGL drivers from provider...",
-           arch->details->tuple);
-
-  for (j = 0; j < egl_icd_details->len; j++)
-    {
-      IcdDetails *details = g_ptr_array_index (egl_icd_details, j);
-      SrtEglIcd *icd = SRT_EGL_ICD (details->icd);
-
-      g_assert (details->resolved_libraries[multiarch_index] == NULL);
-
-      if (!srt_egl_icd_check_error (icd, NULL))
-        continue;
-
-      details->resolved_libraries[multiarch_index] = srt_egl_icd_resolve_library_path (icd);
-      g_assert (details->resolved_libraries[multiarch_index] != NULL);
-    }
-
-  if (!bind_icds (self, arch, "glvnd",
-                  (IcdDetails **) egl_icd_details->pdata,
-                  egl_icd_details->len,
-                  &use_numbered_subdirs, patterns, NULL, error))
-    return FALSE;
-
-  return TRUE;
-}
-
-/*
- * @egl_ext_platform_details: (element-type IcdDetails):
- * @patterns: (element-type filename):
- */
-static gboolean
-collect_egl_ext_platforms (PvRuntime *self,
-                           RuntimeArchitecture *arch,
-                           GPtrArray *egl_ext_platform_details,
-                           GPtrArray *patterns,
-                           GError **error)
-{
-  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
-    _srt_profiling_start ("Collecting EGL external platforms");
-  gsize j;
-  /* As with Vulkan layers, the order of the manifests matters
-   * but the order of the actual libraries does not. */
-  gboolean use_numbered_subdirs = FALSE;
-  const gsize multiarch_index = arch->multiarch_index;
-
-  g_debug ("Collecting %s EGL external platforms from provider...",
-           arch->details->tuple);
-
-  for (j = 0; j < egl_ext_platform_details->len; j++)
-    {
-      IcdDetails *details = g_ptr_array_index (egl_ext_platform_details, j);
-      SrtEglExternalPlatform *ext = SRT_EGL_EXTERNAL_PLATFORM (details->icd);
-
-      g_assert (details->resolved_libraries[multiarch_index] == NULL);
-
-      if (!srt_egl_external_platform_check_error (ext, NULL))
-        continue;
-
-      details->resolved_libraries[multiarch_index] = srt_egl_external_platform_resolve_library_path (ext);
-      g_assert (details->resolved_libraries[multiarch_index] != NULL);
-    }
-
-  if (!bind_icds (self, arch, "egl_external_platform",
-                  (IcdDetails **) egl_ext_platform_details->pdata,
-                  egl_ext_platform_details->len,
-                  &use_numbered_subdirs, patterns, NULL, error))
-    return FALSE;
-
-  return TRUE;
-}
-
-/*
- * @vulkan_icd_details: (element-type IcdDetails):
- * @patterns: (element-type filename):
- */
-static gboolean
-collect_vulkan_icds (PvRuntime *self,
-                     RuntimeArchitecture *arch,
-                     GPtrArray *vulkan_icd_details,
-                     GPtrArray *patterns,
-                     GError **error)
-{
-  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
-    _srt_profiling_start ("Collecting Vulkan ICDs");
-  gsize j;
-  /* As with Vulkan layers, the order of the manifests matters
-   * but the order of the actual libraries does not. */
-  gboolean use_numbered_subdirs = FALSE;
-  const gsize multiarch_index = arch->multiarch_index;
-
-  g_debug ("Collecting %s Vulkan drivers from provider...",
-           arch->details->tuple);
-
-  for (j = 0; j < vulkan_icd_details->len; j++)
-    {
-      IcdDetails *details = g_ptr_array_index (vulkan_icd_details, j);
-      SrtVulkanIcd *icd = SRT_VULKAN_ICD (details->icd);
-
-      g_assert (details->resolved_libraries[multiarch_index] == NULL);
-
-      if (!srt_vulkan_icd_check_error (icd, NULL))
-        continue;
-
-      details->resolved_libraries[multiarch_index] = srt_vulkan_icd_resolve_library_path (icd);
-      g_assert (details->resolved_libraries[multiarch_index] != NULL);
-    }
-
-  if (!bind_icds (self, arch, "vulkan",
-                  (IcdDetails **) vulkan_icd_details->pdata,
-                  vulkan_icd_details->len,
-                  &use_numbered_subdirs, patterns, NULL, error))
-    return FALSE;
-
-  return TRUE;
-}
-
-/*
  * @patterns: (element-type filename):
  */
 static gboolean
@@ -6812,7 +6596,6 @@ collect_vdpau_drivers (PvRuntime *self,
   /* The VDPAU loader looks up drivers by name, not by readdir(),
    * so order doesn't matter unless there are name collisions. */
   gboolean use_numbered_subdirs = FALSE;
-  const GList *icd_iter;
   gsize j;
   const gsize multiarch_index = arch->multiarch_index;
 
@@ -6830,19 +6613,11 @@ collect_vdpau_drivers (PvRuntime *self,
     return TRUE;
 
   self->any_vdpau_drivers = TRUE;
-  details_arr = g_ptr_array_new_full (g_list_length (vdpau_drivers),
-                                      (GDestroyNotify) G_CALLBACK (icd_details_free));
-
-  for (icd_iter = vdpau_drivers, j = 0; icd_iter != NULL; icd_iter = icd_iter->next, j++)
-    {
-      g_autoptr(IcdDetails) details = icd_details_new (icd_iter->data);
-
-      g_assert (details->resolved_libraries[multiarch_index] == NULL);
-      details->resolved_libraries[multiarch_index] = srt_vdpau_driver_resolve_library_path (details->icd);
-      g_assert (details->resolved_libraries[multiarch_index] != NULL);
-      g_assert (g_path_is_absolute (details->resolved_libraries[multiarch_index]));
-      g_ptr_array_add (details_arr, g_steal_pointer (&details));
-    }
+  details_arr = icd_details_array_sized_new (g_list_length (vdpau_drivers));
+  icd_details_fill_array_single_arch (details_arr,
+                                      self->provider,
+                                      vdpau_drivers,
+                                      multiarch_index);
 
   /* In practice we won't actually use the sequence number for VDPAU
    * because they can only be located in a single directory,
@@ -6857,10 +6632,11 @@ collect_vdpau_drivers (PvRuntime *self,
   for (j = 0; j < details_arr->len; j++)
     {
       IcdDetails *details = g_ptr_array_index (details_arr, j);
+      const PvModulePerArch *details_arch = &details->archs[multiarch_index];
 
       /* Because the path is always absolute, ICD_KIND_SONAME makes
        * no sense */
-      g_assert (details->kinds[multiarch_index] != ICD_KIND_SONAME);
+      g_assert (details_arch->kind != ICD_KIND_SONAME);
     }
 
   return TRUE;
@@ -6885,7 +6661,6 @@ collect_dri_drivers (PvRuntime *self,
   /* The DRI loader looks up drivers by name, not by readdir(),
    * so order doesn't matter unless there are name collisions. */
   gboolean use_numbered_subdirs = FALSE;
-  const GList *icd_iter;
   gsize j;
   const gsize multiarch_index = arch->multiarch_index;
 
@@ -6911,43 +6686,38 @@ collect_dri_drivers (PvRuntime *self,
                                                             SRT_DRIVER_FLAGS_NONE);
     }
 
-  details_arr = g_ptr_array_new_full (g_list_length (dri_drivers) + g_list_length (va_api_drivers),
-                                      (GDestroyNotify) G_CALLBACK (icd_details_free));
+  details_arr = icd_details_array_sized_new (g_list_length (dri_drivers)
+                                             + g_list_length (va_api_drivers));
+  icd_details_fill_array_single_arch (details_arr,
+                                      self->provider,
+                                      dri_drivers,
+                                      multiarch_index);
+  icd_details_fill_array_single_arch (details_arr,
+                                      self->provider,
+                                      va_api_drivers,
+                                      multiarch_index);
+  j = 0;
 
-  for (icd_iter = dri_drivers, j = 0; icd_iter != NULL; icd_iter = icd_iter->next, j++)
+  while (j < details_arr->len)
     {
-      g_autoptr(IcdDetails) details = icd_details_new (icd_iter->data);
+      IcdDetails *details = g_ptr_array_index (details_arr, j);
+      const PvModulePerArch *details_arch = &details->archs[multiarch_index];
+      const char *resolved = details_arch->resolved_library;
 
-      g_assert (details->resolved_libraries[multiarch_index] == NULL);
-      details->resolved_libraries[multiarch_index] = srt_dri_driver_resolve_library_path (details->icd);
-      g_assert (details->resolved_libraries[multiarch_index] != NULL);
-      g_assert (g_path_is_absolute (details->resolved_libraries[multiarch_index]));
-      g_ptr_array_add (details_arr, g_steal_pointer (&details));
-    }
-
-  for (icd_iter = va_api_drivers, j = 0; icd_iter != NULL; icd_iter = icd_iter->next, j++)
-    {
-      g_autoptr(IcdDetails) details = NULL;
-      g_autofree gchar *resolved = NULL;
-
-      resolved = srt_va_api_driver_resolve_library_path (icd_iter->data);
-
-      if (g_str_has_suffix (resolved, "/nvidia_drv_video.so"))
+      if (SRT_IS_VA_API_DRIVER (details->icd)
+          && g_str_has_suffix (resolved, "/nvidia_drv_video.so"))
         {
           /* https://github.com/elFarto/nvidia-vaapi-driver depends on
            * GStreamer, which is rather more than our dependency-handling
            * mechanisms are really prepared to deal with. */
           g_info ("Avoiding use of \"%s\" because it has a lot of dependencies",
                   resolved);
-          continue;
+          g_ptr_array_remove_index (details_arr, j);
         }
-
-      details = icd_details_new (icd_iter->data);
-      g_assert (details->resolved_libraries[multiarch_index] == NULL);
-      details->resolved_libraries[multiarch_index] = g_steal_pointer (&resolved);
-      g_assert (details->resolved_libraries[multiarch_index] != NULL);
-      g_assert (g_path_is_absolute (details->resolved_libraries[multiarch_index]));
-      g_ptr_array_add (details_arr, g_steal_pointer (&details));
+      else
+        {
+          j++;
+        }
     }
 
   if (!bind_icds (self, arch, "dri",
@@ -6959,10 +6729,11 @@ collect_dri_drivers (PvRuntime *self,
   for (j = 0; j < details_arr->len; j++)
     {
       IcdDetails *details = g_ptr_array_index (details_arr, j);
+      const PvModulePerArch *details_arch = &details->archs[multiarch_index];
 
       /* Because the path is always absolute, ICD_KIND_SONAME makes
        * no sense */
-      g_assert (details->kinds[multiarch_index] != ICD_KIND_SONAME);
+      g_assert (details_arch->kind != ICD_KIND_SONAME);
     }
 
   return TRUE;
@@ -7042,288 +6813,6 @@ pv_append_host_dri_library_paths (PvRuntime *self,
     pv_search_path_append (search_path, drivers_path);
 }
 
-/*
- * Returns: (element-type IcdDetails):
- */
-static GPtrArray *
-pv_enumerate_egl_ext_platforms (SrtSystemInfo *system_info,
-                                const gchar *which_system)
-{
-  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
-  g_autoptr(SrtObjectList) egl_ext_platforms = NULL;
-  g_autoptr(GPtrArray) egl_ext_platform_details = NULL;
-  gsize i;
-  const GList *icd_iter;
-
-  timer = _srt_profiling_start ("Enumerating EGL external platforms on %s system",
-                                which_system);
-  g_debug ("Enumerating EGL external platforms on %s system...", which_system);
-  egl_ext_platforms = srt_system_info_list_egl_external_platforms (system_info, NULL);
-  egl_ext_platform_details = g_ptr_array_new_full (g_list_length (egl_ext_platforms),
-                                                   (GDestroyNotify) G_CALLBACK (icd_details_free));
-
-  for (icd_iter = egl_ext_platforms, i = 0;
-       icd_iter != NULL;
-       icd_iter = icd_iter->next, i++)
-    {
-      SrtEglExternalPlatform *ext = icd_iter->data;
-      const gchar *path = srt_egl_external_platform_get_json_path (ext);
-      GError *local_error = NULL;
-
-      if (!srt_egl_external_platform_check_error (ext, &local_error))
-        {
-          g_warning ("Failed to load EGL external platform #%" G_GSIZE_FORMAT  " from %s: %s",
-                     i, path, local_error->message);
-          g_clear_error (&local_error);
-          continue;
-        }
-
-      g_info ("EGL external platform #%" G_GSIZE_FORMAT " at %s: %s",
-              i, path, srt_egl_external_platform_get_library_path (ext));
-
-      g_ptr_array_add (egl_ext_platform_details, icd_details_new (ext));
-    }
-
-  return g_steal_pointer (&egl_ext_platform_details);
-}
-
-/*
- * Returns: (element-type IcdDetails):
- */
-static GPtrArray *
-pv_enumerate_egl_icds (SrtSystemInfo *system_info,
-                       const gchar *which_system)
-{
-  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
-  g_autoptr(SrtObjectList) egl_icds = NULL;
-  g_autoptr(GPtrArray) egl_icd_details = NULL;
-  gsize i;
-  const GList *icd_iter;
-
-  timer = _srt_profiling_start ("Enumerating EGL ICDs on %s system", which_system);
-  g_debug ("Enumerating EGL ICDs on %s system...", which_system);
-  egl_icds = srt_system_info_list_egl_icds (system_info, NULL);
-  egl_icd_details = g_ptr_array_new_full (g_list_length (egl_icds),
-                                          (GDestroyNotify) G_CALLBACK (icd_details_free));
-
-  for (icd_iter = egl_icds, i = 0;
-       icd_iter != NULL;
-       icd_iter = icd_iter->next, i++)
-    {
-      SrtEglIcd *icd = icd_iter->data;
-      const gchar *path = srt_egl_icd_get_json_path (icd);
-      GError *local_error = NULL;
-
-      if (!srt_egl_icd_check_error (icd, &local_error))
-        {
-          g_warning ("Failed to load EGL ICD #%" G_GSIZE_FORMAT  " from %s: %s",
-                     i, path, local_error->message);
-          g_clear_error (&local_error);
-          continue;
-        }
-
-      g_info ("EGL ICD #%" G_GSIZE_FORMAT " at %s: %s",
-              i, path, srt_egl_icd_get_library_path (icd));
-
-      g_ptr_array_add (egl_icd_details, icd_details_new (icd));
-    }
-
-  return g_steal_pointer (&egl_icd_details);
-}
-
-/*
- * Returns: (element-type IcdDetails):
- */
-static GPtrArray *
-pv_enumerate_vulkan_icds (SrtSystemInfo *system_info,
-                          const gchar *which_system)
-{
-  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
-  g_autoptr(SrtObjectList) vulkan_icds = NULL;
-  g_autoptr(GPtrArray) vulkan_icd_details = NULL;
-  gsize i;
-  const GList *icd_iter;
-
-  timer = _srt_profiling_start ("Enumerating Vulkan ICDs on %s system", which_system);
-  g_debug ("Enumerating Vulkan ICDs on %s system...", which_system);
-  vulkan_icds = srt_system_info_list_vulkan_icds (system_info, NULL);
-  vulkan_icd_details = g_ptr_array_new_full (g_list_length (vulkan_icds),
-                                             (GDestroyNotify) G_CALLBACK (icd_details_free));
-
-  for (icd_iter = vulkan_icds, i = 0;
-       icd_iter != NULL;
-       icd_iter = icd_iter->next, i++)
-    {
-      SrtVulkanIcd *icd = icd_iter->data;
-      const gchar *path = srt_vulkan_icd_get_json_path (icd);
-      GError *local_error = NULL;
-
-      if (!srt_vulkan_icd_check_error (icd, &local_error))
-        {
-          g_warning ("Failed to load Vulkan ICD #%" G_GSIZE_FORMAT " from %s: %s",
-                     i, path, local_error->message);
-          g_clear_error (&local_error);
-          continue;
-        }
-
-      g_info ("Vulkan ICD #%" G_GSIZE_FORMAT " at %s: %s",
-              i, path, srt_vulkan_icd_get_library_path (icd));
-
-      g_ptr_array_add (vulkan_icd_details, icd_details_new (icd));
-    }
-
-  return g_steal_pointer (&vulkan_icd_details);
-}
-
-static GHashTable *
-pv_enumerate_openxr_1_runtimes (SrtSystemInfo *system_info,
-                                const gchar *which_system)
-{
-  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
-  g_autoptr(GHashTable) runtimes = g_hash_table_new_full (g_str_hash,
-                                                          g_str_equal,
-                                                          g_free,
-                                                          (GDestroyNotify) icd_details_free);
-  gsize i;
-
-  timer = _srt_profiling_start ("Enumerating OpenXR 1 runtimes on %s system",
-                                which_system);
-  g_debug ("Enumerating OpenXR 1 runtimes on %s system...", which_system);
-
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-    {
-      g_autoptr(SrtOpenXr1Runtime) rt = NULL;
-      g_autoptr(GError) local_error = NULL;
-      const char *multiarch_tuple = pv_multiarch_tuples[i];
-      const char *path;
-
-      rt = srt_system_info_dup_openxr_1_runtime (system_info, multiarch_tuple);
-      if (rt == NULL)
-        continue;
-
-      path = srt_openxr_1_runtime_get_json_path (rt);
-
-      if (!srt_openxr_1_runtime_check_error (rt, &local_error))
-        {
-          g_warning ("Failed to load OpenXR 1 runtime for %s from %s: %s",
-                     multiarch_tuple, path, local_error->message);
-          g_clear_error (&local_error);
-          continue;
-        }
-
-      g_info ("OpenXR 1 runtime for %s at %s: %s",
-              multiarch_tuple, path,
-              srt_openxr_1_runtime_get_library_path (rt));
-
-      g_hash_table_insert (runtimes,
-                           g_strdup (multiarch_tuple),
-                           icd_details_new (rt));
-    }
-
-  return g_steal_pointer (&runtimes);
-}
-
-/*
- * @vulkan_layer_details: (inout) (element-type IcdDetails):
- */
-static void
-pv_append_vulkan_layers_details (GList *vulkan_layers,
-                                 const gchar *which,
-                                 GPtrArray *vulkan_layer_details)
-{
-  gsize i;
-  const GList *icd_i;
-
-  for (icd_i = vulkan_layers, i = 0; icd_i != NULL; icd_i = icd_i->next, i++)
-    {
-      SrtVulkanLayer *layer = icd_i->data;
-      const gchar *path = srt_vulkan_layer_get_json_path (layer);
-      GError *local_error = NULL;
-
-      if (!srt_vulkan_layer_check_error (layer, &local_error))
-        {
-          g_warning ("Failed to load Vulkan %s layer #%" G_GSIZE_FORMAT
-                     " from %s: %s", which, i, path, local_error->message);
-          g_clear_error (&local_error);
-          continue;
-        }
-
-      const gchar *description = srt_vulkan_layer_get_library_path (layer);
-
-      if (description == NULL)
-        description = "meta-layer";
-
-      g_info ("Vulkan %s layer #%" G_GSIZE_FORMAT " at %s: %s",
-              which, i, path, description);
-
-      g_ptr_array_add (vulkan_layer_details, icd_details_new (layer));
-    }
-}
-
-/*
- * @vulkan_exp_layer_details: (out) (element-type IcdDetails):
- * @vulkan_imp_layer_details: (out) (element-type IcdDetails):
- */
-static void
-pv_enumerate_vulkan_layer_details (SrtSystemInfo *system_info,
-                                   const gchar *which_system,
-                                   GPtrArray **vulkan_exp_layer_details,
-                                   GPtrArray **vulkan_imp_layer_details)
-{
-  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
-  g_autoptr(SrtObjectList) vulkan_exp_layers = NULL;
-  g_autoptr(SrtObjectList) vulkan_imp_layers = NULL;
-
-  g_return_if_fail (vulkan_exp_layer_details != NULL);
-  g_return_if_fail (*vulkan_exp_layer_details == NULL);
-  g_return_if_fail (vulkan_imp_layer_details != NULL);
-  g_return_if_fail (*vulkan_imp_layer_details == NULL);
-
-  timer = _srt_profiling_start ("Enumerating Vulkan layers on %s system", which_system);
-
-  g_debug ("Enumerating Vulkan explicit layers on %s system...", which_system);
-  vulkan_exp_layers = srt_system_info_list_explicit_vulkan_layers (system_info);
-  *vulkan_exp_layer_details = g_ptr_array_new_full (g_list_length (vulkan_exp_layers),
-                                                    (GDestroyNotify) G_CALLBACK (icd_details_free));
-  pv_append_vulkan_layers_details (vulkan_exp_layers, "explicit", *vulkan_exp_layer_details);
-
-  g_debug ("Enumerating Vulkan implicit layers on %s system...", which_system);
-  vulkan_imp_layers = srt_system_info_list_implicit_vulkan_layers (system_info);
-  *vulkan_imp_layer_details = g_ptr_array_new_full (g_list_length (vulkan_imp_layers),
-                                                    (GDestroyNotify) G_CALLBACK (icd_details_free));
-  pv_append_vulkan_layers_details (vulkan_imp_layers, "implicit", *vulkan_imp_layer_details);
-}
-
-typedef struct
-{
-  GPtrArray *egl_icd_details;   /* (element-type IcdDetails) */
-  GPtrArray *egl_ext_platform_details;   /* (element-type IcdDetails) */
-  GPtrArray *vulkan_icd_details;   /* (element-type IcdDetails) */
-  GPtrArray *vulkan_exp_layer_details;   /* (element-type IcdDetails) */
-  GPtrArray *vulkan_imp_layer_details;   /* (element-type IcdDetails) */
-  GHashTable *openxr_1_runtime_details;  /* (element-type utf8 IcdDetails) */
-} IcdStack;
-
-static IcdStack *
-icd_stack_new (void)
-{
-  return g_slice_new0 (IcdStack);
-}
-
-static void
-icd_stack_free (IcdStack *self)
-{
-  g_clear_pointer (&self->egl_icd_details, g_ptr_array_unref);
-  g_clear_pointer (&self->egl_ext_platform_details, g_ptr_array_unref);
-  g_clear_pointer (&self->vulkan_icd_details, g_ptr_array_unref);
-  g_clear_pointer (&self->vulkan_exp_layer_details, g_ptr_array_unref);
-  g_clear_pointer (&self->vulkan_imp_layer_details, g_ptr_array_unref);
-  g_clear_pointer (&self->openxr_1_runtime_details, g_hash_table_unref);
-  g_slice_free (IcdStack, self);
-}
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdStack, icd_stack_free)
-
 /* Prepend the given @new_entry to the colon-delimited directory list in the
  * original environment variable @var (in turn defaulting that to @default_)
  * if not given.
@@ -7395,10 +6884,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   g_autoptr(GString) openxr_1_runtime_path = g_string_new ("");
   g_autoptr(GString) va_api_path = g_string_new ("");
   gboolean any_architecture_works = FALSE;
-  SrtSystemInfo *system_info;
-  SrtSystemInfo *host_system_info = NULL;
-  g_autoptr(IcdStack) provider_stack = icd_stack_new ();
-  g_autoptr(IcdStack) host_stack = icd_stack_new ();
+  g_autoptr(IcdStack) provider_stack = NULL;
+  g_autoptr(IcdStack) host_stack = NULL;
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
   g_autoptr(SrtProfilingTimer) part_timer = NULL;
   gboolean all_libglx_from_provider = TRUE;
@@ -7429,43 +6916,25 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   if (!pv_runtime_provide_container_access (self, error))
     return FALSE;
 
-  system_info = pv_graphics_provider_get_system_info (self->provider, 0);
+  provider_stack = icd_stack_new ();
+  icd_stack_enumerate (provider_stack,
+                       self->flags,
+                       self->provider,
+                       provider_label);
 
   if (self->interpreter_host_provider != NULL)
-    host_system_info = pv_graphics_provider_get_system_info (self->interpreter_host_provider,
-                                                             0);
-
-  provider_stack->egl_icd_details = pv_enumerate_egl_icds (system_info, provider_label);
-  provider_stack->egl_ext_platform_details = pv_enumerate_egl_ext_platforms (system_info,
-                                                                             provider_label);
-  provider_stack->vulkan_icd_details = pv_enumerate_vulkan_icds (system_info,
-                                                                 provider_label);
-  if (self->flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
-    {
-      pv_enumerate_vulkan_layer_details (system_info,
-                                         provider_label,
-                                         &provider_stack->vulkan_exp_layer_details,
-                                         &provider_stack->vulkan_imp_layer_details);
-    }
-
-  if (self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
-    provider_stack->openxr_1_runtime_details = pv_enumerate_openxr_1_runtimes (system_info,
-                                                                               provider_label);
-
-  if (host_system_info != NULL)
     {
       const gchar *host_label = "host";
-      host_stack->egl_icd_details = pv_enumerate_egl_icds (host_system_info, host_label);
-      host_stack->egl_ext_platform_details = pv_enumerate_egl_ext_platforms (host_system_info,
-                                                                             host_label);
-      host_stack->vulkan_icd_details = pv_enumerate_vulkan_icds (host_system_info, host_label);
-      if (self->flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
-        {
-          pv_enumerate_vulkan_layer_details (host_system_info,
-                                             host_label,
-                                             &host_stack->vulkan_exp_layer_details,
-                                             &host_stack->vulkan_imp_layer_details);
-        }
+      PvRuntimeFlags host_flags = self->flags;
+
+      /* We currently assume there are no FEX thunks for OpenXR */
+      host_flags &= ~PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES;
+
+      host_stack = icd_stack_new ();
+      icd_stack_enumerate (host_stack,
+                           host_flags,
+                           self->interpreter_host_provider,
+                           host_label);
     }
 
   /* We set this FALSE later if we decide not to use the provider libc
@@ -7545,29 +7014,51 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           collect_core_libraries_patterns (patterns);
           collect_graphics_libraries_patterns (patterns);
 
-          if (!collect_egl_drivers (self, arch, provider_stack->egl_icd_details,
-                                    patterns, error))
+          if (!collect_json_based_drivers (self,
+                                           arch,
+                                           "EGL drivers",
+                                           provider_stack->egl_icd_details,
+                                           "glvnd",
+                                           patterns,
+                                           error))
             return FALSE;
 
-          if (!collect_egl_ext_platforms (self, arch,
-                                          provider_stack->egl_ext_platform_details,
-                                          patterns, error))
+          if (!collect_json_based_drivers (self,
+                                           arch,
+                                           "EGL external platforms",
+                                           provider_stack->egl_ext_platform_details,
+                                           "egl_external_platform",
+                                           patterns,
+                                           error))
             return FALSE;
 
-          if (!collect_vulkan_icds (self, arch, provider_stack->vulkan_icd_details,
-                                    patterns, error))
+          if (!collect_json_based_drivers (self,
+                                           arch,
+                                           "Vulkan drivers",
+                                           provider_stack->vulkan_icd_details,
+                                           "vulkan",
+                                           patterns,
+                                           error))
             return FALSE;
 
           if (self->flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
             {
-              g_debug ("Collecting Vulkan explicit layers from provider...");
-              if (!collect_vulkan_layers (self, provider_stack->vulkan_exp_layer_details,
-                                          patterns, arch, "vulkan_exp_layer", error))
+              if (!collect_json_based_drivers (self,
+                                               arch,
+                                               "Vulkan explicit layers",
+                                               provider_stack->vulkan_exp_layer_details,
+                                               "vulkan_exp_layer",
+                                               patterns,
+                                               error))
                 return FALSE;
 
-              g_debug ("Collecting Vulkan implicit layers from provider...");
-              if (!collect_vulkan_layers (self, provider_stack->vulkan_imp_layer_details,
-                                          patterns, arch, "vulkan_imp_layer", error))
+              if (!collect_json_based_drivers (self,
+                                               arch,
+                                               "Vulkan implicit layers",
+                                               provider_stack->vulkan_imp_layer_details,
+                                               "vulkan_imp_layer",
+                                               patterns,
+                                               error))
                 return FALSE;
             }
 
@@ -7786,7 +7277,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                  provider_stack->egl_icd_details, egl_path, error))
     return FALSE;
 
-  if (host_stack->egl_icd_details != NULL)
+  if (host_stack != NULL
+      && host_stack->egl_icd_details != NULL)
     {
       for (i = 0; i < host_stack->egl_icd_details->len; i++)
         {
@@ -7801,7 +7293,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                  egl_ext_platform_path, error))
     return FALSE;
 
-  if (host_stack->egl_ext_platform_details != NULL)
+  if (host_stack != NULL
+      && host_stack->egl_ext_platform_details != NULL)
     {
       for (i = 0; i < host_stack->egl_ext_platform_details->len; i++)
         {
@@ -7817,7 +7310,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                  provider_stack->vulkan_icd_details, vulkan_path, error))
     return FALSE;
 
-  if (host_stack->vulkan_icd_details != NULL)
+  if (host_stack != NULL
+      && host_stack->vulkan_icd_details != NULL)
     {
       for (i = 0; i < host_stack->vulkan_icd_details->len; i++)
         {
@@ -7835,7 +7329,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                      vulkan_exp_layer_path, error))
         return FALSE;
 
-      if (host_stack->vulkan_exp_layer_details != NULL)
+      if (host_stack != NULL
+          && host_stack->vulkan_exp_layer_details != NULL)
         {
           for (i = 0; i < host_stack->vulkan_exp_layer_details->len; i++)
             {
@@ -7851,7 +7346,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                      vulkan_imp_layer_path, error))
         return FALSE;
 
-      if (host_stack->vulkan_imp_layer_details != NULL)
+      if (host_stack != NULL
+          && host_stack->vulkan_imp_layer_details != NULL)
         {
           for (i = 0; i < host_stack->vulkan_imp_layer_details->len; i++)
             {

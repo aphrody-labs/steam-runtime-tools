@@ -35,19 +35,11 @@
  * (x86_64 on x86) */
 #define PV_PRIMARY_ARCHITECTURE 0
 
-#if defined(__i386__) || defined(__x86_64__)
-#define PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST 1 /* AArch64 */
-#else
-#define PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST 0
-#endif
-
 extern const char * const pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES + 1];
-extern const char * const pv_multiarch_as_emulator_tuples[PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST + 1];
 
 typedef struct
 {
   const char *tuple;
-  SrtMachineType machine_type;
 
   /* Directories other than /usr/lib that we must search for loadable
    * modules, least-ambiguous first, most-ambiguous last, not including
@@ -74,7 +66,6 @@ typedef struct
 } PvMultiarchDetails;
 
 extern const PvMultiarchDetails pv_multiarch_details[PV_N_SUPPORTED_ARCHITECTURES];
-extern const PvMultiarchDetails pv_multiarch_as_emulator_details[PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST];
 
 extern const char * const pv_other_ld_so_cache[];
 extern const char * const pv_other_ld_so_conf[];
@@ -93,5 +84,3 @@ typedef enum
 
 GPtrArray *pv_multiarch_details_get_libdirs (const PvMultiarchDetails *self,
                                              PvMultiarchLibdirsFlags flags);
-
-gboolean pv_supported_architectures_include_machine_type (SrtMachineType machine);

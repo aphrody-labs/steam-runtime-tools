@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2021 Collabora Ltd.
+ * Copyright © 2020-2025 Collabora Ltd.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -27,9 +27,11 @@
 
 #include <steam-runtime-tools/steam-runtime-tools.h>
 
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
 
 #include "runtime-flags.h"
+#include "supported-architectures.h"
 
 typedef struct _PvGraphicsProvider PvGraphicsProvider;
 typedef struct _PvGraphicsProviderClass PvGraphicsProviderClass;
@@ -38,8 +40,8 @@ struct _PvGraphicsProvider
 {
   GObject parent;
 
-  /* All members are read-only after initable_init(), which means it's
-   * OK to access this object from more than one thread. */
+  /* All public members are read-only after initable_init(), which means
+   * it's OK to access this object from more than one thread. */
   SrtSysroot *in_current_ns;
   gchar *path_in_container_ns;
   gchar *path_in_host_ns;
@@ -59,18 +61,23 @@ struct _PvGraphicsProviderClass
 #define PV_GRAPHICS_PROVIDER_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), PV_TYPE_GRAPHICS_PROVIDER, PvGraphicsProviderClass)
 GType pv_graphics_provider_get_type (void);
 
-PvGraphicsProvider *pv_graphics_provider_new (const char *path_in_current_ns,
-                                              const char *path_in_container_ns,
-                                              PvGraphicsProviderFlags flags,
-                                              GError **error);
+gboolean pv_graphics_provider_has_architecture (PvGraphicsProvider *self,
+                                                GQuark tuple);
+void pv_graphics_provider_add_architecture (PvGraphicsProvider *self,
+                                            GQuark tuple);
+const GQuark *pv_graphics_provider_get_architectures (PvGraphicsProvider *self,
+                                                      gsize *n);
 
 gchar *pv_graphics_provider_search_in_path_and_bin (PvGraphicsProvider *self,
                                                     const gchar *search_paths,
                                                     const gchar *program_name);
-SrtSystemInfo *pv_graphics_provider_create_system_info (PvGraphicsProvider *self);
+
+SrtSystemInfo *pv_graphics_provider_get_system_info (PvGraphicsProvider *self,
+                                                     GQuark arch_specific);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (PvGraphicsProvider, g_object_unref)
 
-gchar *pv_graphics_provider_choose_mount_point (const char *path_in_current_ns,
-                                                PvRuntimeFlags flags,
-                                                GError **error);
+GPtrArray *pv_graphics_provider_build_array (const char *provider_path,
+                                             const SrtKnownArchitecture *host_machine,
+                                             PvRuntimeFlags flags,
+                                             GError **error);

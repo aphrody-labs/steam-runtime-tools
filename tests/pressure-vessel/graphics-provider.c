@@ -177,18 +177,25 @@ static void
 test_graphics_provider_search (Fixture *f,
                                gconstpointer context)
 {
-  g_autoptr(PvGraphicsProvider) graphics_provider = NULL;
+  g_autoptr(GPtrArray) graphics_providers = NULL;
+  PvGraphicsProvider *graphics_provider = NULL;
   g_autoptr(GError) error = NULL;
   gsize i;
 
   /* Assume the provider path in current ns is the tmpdir. In this way we have
-   * a controlled environment that we can edit for our tests. */
-  graphics_provider = pv_graphics_provider_new (f->tmpdir,
-                                                "/run/host",
-                                                PV_GRAPHICS_PROVIDER_FLAGS_NONE,
-                                                &error);
+   * a controlled environment that we can edit for our tests.
+   * To keep things simple in this unit test, don't start multi-threaded
+   * graphics driver enumeration immediately. */
+  graphics_providers = pv_graphics_provider_build_array (f->tmpdir,
+                                                         NULL,
+                                                         PV_RUNTIME_FLAGS_SINGLE_THREAD,
+                                                         &error);
   g_assert_no_error (error);
-  g_assert_nonnull (graphics_provider);
+  g_assert_nonnull (graphics_providers);
+  g_assert_cmpuint (graphics_providers->len, ==, 1);
+  graphics_provider = g_ptr_array_index (graphics_providers, 0);
+  g_assert_cmpstr (graphics_provider->path_in_container_ns,
+                   ==, "/run/gfx/main");
 
   for (i = 0; i < G_N_ELEMENTS (graphics_provider_test); i++)
     {

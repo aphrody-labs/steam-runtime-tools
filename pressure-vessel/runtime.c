@@ -85,13 +85,6 @@
  */
 #define PV_ADVERB_WITHOUT_MUTABLE_SYSROOT PV_FROM_HOST_WITHOUT_MUTABLE_SYSROOT "/" PKGLIBEXECDIR "/pv-adverb"
 
-typedef struct
-{
-  GCancellable *cancellable;
-  GThread *thread;
-  SrtSystemInfo *system_info;
-} EnumerationThread;
-
 /*
  * PvRuntime:
  *
@@ -126,14 +119,9 @@ struct _PvRuntime
   gchar *runtime_app;           /* runtime_files + "/app" */
   gchar *runtime_files_on_host;
   const gchar *adverb_in_container;
+  GPtrArray *providers;
   PvGraphicsProvider *provider;
   PvGraphicsProvider *interpreter_host_provider;
-  EnumerationThread indep_thread;
-  EnumerationThread host_thread;
-#if PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST > 0
-  EnumerationThread *arch_host_threads;
-#endif
-  EnumerationThread *arch_threads;
   SrtDirentCompareFunc arbitrary_dirent_order;
   GCompareFunc arbitrary_str_order;
 
@@ -159,8 +147,7 @@ struct _PvRuntimeClass
 enum {
   PROP_0,
   PROP_BUBBLEWRAP,
-  PROP_GRAPHICS_PROVIDER,
-  PROP_INTERPRETER_HOST_PROVIDER,
+  PROP_GRAPHICS_PROVIDERS,
   PROP_SOURCE,
   PROP_ORIGINAL_ENVIRON,
   PROP_FLAGS,
@@ -183,6 +170,7 @@ static gboolean pv_runtime_symlinkat (const gchar *target,
                                       int destination_dirfd,
                                       const gchar *destination,
                                       GError **error);
+
 
 /*
  * Return whether @path is expected to be a mutable directory in
@@ -377,7 +365,7 @@ path_visible_in_provider_namespace (PvRuntimeFlags flags,
    * /run/parent/etc a symlink to /run/parent/usr/etc.
    *
    * Otherwise, bind_runtime_base() is responsible for mounting the provider's
-   * /etc on /var/pressure-vessel/gfx/etc or /run/gfx/etc. */
+   * /etc on /var/pressure-vessel/gfx/DIR/etc or /run/gfx/DIR/etc. */
   if (g_str_has_prefix (path, "etc")
       && (path[3] == '\0' || path[3] == '/'))
     return TRUE;
@@ -766,12 +754,8 @@ pv_runtime_get_property (GObject *object,
         g_value_set_string (value, self->bubblewrap);
         break;
 
-      case PROP_GRAPHICS_PROVIDER:
-        g_value_set_object (value, self->provider);
-        break;
-
-      case PROP_INTERPRETER_HOST_PROVIDER:
-        g_value_set_object (value, self->interpreter_host_provider);
+      case PROP_GRAPHICS_PROVIDERS:
+        g_value_set_boxed (value, self->providers);
         break;
 
       case PROP_ORIGINAL_ENVIRON:
@@ -816,16 +800,40 @@ pv_runtime_set_property (GObject *object,
         self->bubblewrap = g_value_dup_string (value);
         break;
 
-      case PROP_GRAPHICS_PROVIDER:
+      case PROP_GRAPHICS_PROVIDERS:
         /* Construct-only */
-        g_return_if_fail (self->provider == NULL);
-        self->provider = g_value_dup_object (value);
-        break;
+        g_return_if_fail (self->providers == NULL);
+        self->providers = g_value_dup_boxed (value);
 
-      case PROP_INTERPRETER_HOST_PROVIDER:
-        /* Construct-only */
-        g_return_if_fail (self->interpreter_host_provider == NULL);
-        self->interpreter_host_provider = g_value_dup_object (value);
+        if (self->providers != NULL)
+          {
+            gsize i;
+
+            for (i = 0; i < self->providers->len; i++)
+              {
+                PvGraphicsProvider *provider = g_ptr_array_index (self->providers, i);
+
+                /* For now, we only support having one graphics stack
+                 * provider for our own architectures (normally x86),
+                 * and one for the host of an interpreter like FEX
+                 * (normally aarch64). */
+                if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+                  {
+                    if (self->interpreter_host_provider == NULL)
+                      self->interpreter_host_provider = g_object_ref (provider);
+                    else
+                      g_warning ("Only one interpreter host provider can be used");
+                  }
+                else
+                  {
+                    if (self->provider == NULL)
+                      self->provider = g_object_ref (provider);
+                    else
+                      g_warning ("Only one graphics stack provider can be used");
+                  }
+              }
+          }
+
         break;
 
       case PROP_ORIGINAL_ENVIRON:
@@ -1251,272 +1259,6 @@ pv_runtime_create_copy (PvRuntime *self,
   return TRUE;
 }
 
-typedef struct
-{
-  const PvMultiarchDetails *details;
-  PvGraphicsProvider *provider;
-  GCancellable *cancellable;
-  PvRuntimeFlags runtime_flags;
-} EnumerationThreadInputs;
-
-/* Called in main thread */
-static EnumerationThreadInputs *
-enumeration_thread_inputs_new (const PvMultiarchDetails *details,
-                               PvRuntimeFlags runtime_flags,
-                               PvGraphicsProvider *provider,
-                               GCancellable *cancellable)
-{
-  EnumerationThreadInputs *self = g_new0 (EnumerationThreadInputs, 1);
-
-  self->details = details;
-  self->runtime_flags = runtime_flags;
-  self->provider = g_object_ref (provider);
-  self->cancellable = g_object_ref (cancellable);
-  return self;
-}
-
-/* Called in enumeration thread */
-static void
-enumeration_thread_inputs_free (EnumerationThreadInputs *self)
-{
-  g_object_unref (self->cancellable);
-  g_object_unref (self->provider);
-  g_free (self);
-}
-
-/* Called in enumeration thread */
-static gpointer
-enumerate_arch (gpointer data)
-{
-  EnumerationThreadInputs *inputs = data;
-  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
-    _srt_profiling_start ("Enumerating %s drivers in thread",
-                          inputs->details->tuple);
-  const char * const tuples[] = { inputs->details->tuple, NULL };
-  g_autoptr(SrtSystemInfo) system_info =
-    pv_graphics_provider_create_system_info (inputs->provider);
-
-  srt_system_info_set_multiarch_tuples (system_info, tuples);
-
-  if (g_cancellable_is_cancelled (inputs->cancellable))
-    goto out;
-
-  /* At the moment the real host is included only when FEX emulator is in use.
-   * Skipping VDPAU until there is a real use case for it, because
-   * it only supports one search path entry, which is problematic for us. */
-  if (!(inputs->provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST))
-    {
-      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating %s VDPAU drivers in thread",
-                              inputs->details->tuple);
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
-
-      /* We ignore the results. system_info will cache them for later
-       * calls, so when we're doing the actual work, redoing this call
-       * will just retrieve them */
-      drivers = srt_system_info_list_vdpau_drivers (system_info,
-                                                    inputs->details->tuple,
-                                                    SRT_DRIVER_FLAGS_NONE);
-    }
-
-  if (g_cancellable_is_cancelled (inputs->cancellable))
-    goto out;
-
-  if (TRUE)
-    {
-      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating %s DRI drivers in thread",
-                              inputs->details->tuple);
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
-
-      drivers = srt_system_info_list_dri_drivers (system_info,
-                                                  inputs->details->tuple,
-                                                  SRT_DRIVER_FLAGS_NONE);
-    }
-
-  if (g_cancellable_is_cancelled (inputs->cancellable))
-    goto out;
-
-  if (TRUE)
-    {
-      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating %s VA-API drivers in thread",
-                              inputs->details->tuple);
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
-
-      drivers = srt_system_info_list_va_api_drivers (system_info,
-                                                     inputs->details->tuple,
-                                                     SRT_DRIVER_FLAGS_NONE);
-    }
-
-  if (g_cancellable_is_cancelled (inputs->cancellable))
-    goto out;
-
-  g_free (srt_system_info_dup_libdl_platform (system_info,
-                                              inputs->details->tuple, NULL));
-
-out:
-  enumeration_thread_inputs_free (inputs);
-  return g_steal_pointer (&system_info);
-}
-
-static void
-cache_indep_graphics_stack (SrtSystemInfo *system_info,
-                            PvRuntimeFlags flags,
-                            GCancellable *cancellable)
-{
-  if (g_cancellable_is_cancelled (cancellable))
-    return;
-
-  if (TRUE)
-    {
-      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating EGL ICDs in thread");
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
-
-      drivers = srt_system_info_list_egl_icds (system_info, NULL);
-    }
-
-  if (g_cancellable_is_cancelled (cancellable))
-    return;
-
-  if (TRUE)
-    {
-      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating EGL external platforms in thread");
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
-
-      drivers = srt_system_info_list_egl_external_platforms (system_info, NULL);
-    }
-
-  if (g_cancellable_is_cancelled (cancellable))
-    return;
-
-  if (TRUE)
-    {
-      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating Vulkan ICDs in thread");
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
-
-      drivers = srt_system_info_list_vulkan_icds (system_info, NULL);
-    }
-
-  if (g_cancellable_is_cancelled (cancellable))
-    return;
-
-  if (flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
-    {
-      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating Vulkan layers in thread");
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) exp_layers = NULL;
-      G_GNUC_UNUSED g_autoptr(SrtObjectList) imp_layers = NULL;
-
-      exp_layers = srt_system_info_list_explicit_vulkan_layers (system_info);
-      imp_layers = srt_system_info_list_implicit_vulkan_layers (system_info);
-    }
-}
-
-/* Called in enumeration thread */
-static gpointer
-enumerate_indep (gpointer data)
-{
-  EnumerationThreadInputs *inputs = data;
-  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
-    _srt_profiling_start ("Enumerating cross-architecture ICDs in thread");
-  g_autoptr(SrtSystemInfo) system_info =
-    pv_graphics_provider_create_system_info (inputs->provider);
-
-  srt_system_info_set_multiarch_tuples (system_info, pv_multiarch_tuples);
-  cache_indep_graphics_stack (system_info,
-                              inputs->runtime_flags,
-                              inputs->cancellable);
-
-  enumeration_thread_inputs_free (inputs);
-  return g_steal_pointer (&system_info);
-}
-
-/*
- * Must be called from same thread as enumeration_thread_start_arch()
- * or enumeration_thread_start_indep().
- *
- * Returns: (transfer none):
- */
-static SrtSystemInfo *
-enumeration_thread_join (EnumerationThread *self)
-{
-  if (self->thread != NULL)
-    {
-      g_assert (self->system_info == NULL);
-      g_cancellable_cancel (self->cancellable);
-      self->system_info = g_thread_join (g_steal_pointer (&self->thread));
-    }
-
-  return self->system_info;
-}
-
-static void
-enumeration_thread_clear (EnumerationThread *self)
-{
-  enumeration_thread_join (self);
-  g_clear_object (&self->system_info);
-  g_clear_object (&self->cancellable);
-}
-
-static void
-enumeration_threads_clear (EnumerationThread **arr,
-                           gsize n)
-{
-  EnumerationThread *threads = *arr;
-  gsize i;
-
-  *arr = NULL;
-
-  if (threads == NULL)
-    return;
-
-  for (i = 0; i < n; i++)
-    enumeration_thread_clear (threads + i);
-
-  g_free (threads);
-}
-
-/* Must be called in main thread */
-static void
-enumeration_thread_start_arch (EnumerationThread *self,
-                               const PvMultiarchDetails *details,
-                               PvRuntimeFlags flags,
-                               PvGraphicsProvider *provider)
-{
-  g_return_if_fail (self->cancellable == NULL);
-  g_return_if_fail (self->system_info == NULL);
-  g_return_if_fail (self->thread == NULL);
-
-  self->cancellable = g_cancellable_new ();
-  self->thread = g_thread_new (details->tuple, enumerate_arch,
-                               enumeration_thread_inputs_new (details, flags,
-                                                              provider,
-                                                              self->cancellable));
-}
-
-/* Must be called in main thread */
-static void
-enumeration_thread_start_indep (EnumerationThread *self,
-                                PvRuntimeFlags flags,
-                                PvGraphicsProvider *provider,
-                                const gchar *thread_name)
-{
-  g_return_if_fail (self->cancellable == NULL);
-  g_return_if_fail (self->system_info == NULL);
-  g_return_if_fail (self->thread == NULL);
-
-  self->cancellable = g_cancellable_new ();
-  self->thread = g_thread_new (thread_name == NULL ? "cross-architecture" : thread_name,
-                               enumerate_indep,
-                               enumeration_thread_inputs_new (NULL, flags,
-                                                              provider,
-                                                              self->cancellable));
-}
-
 static gboolean
 pv_runtime_initable_init (GInitable *initable,
                           GCancellable *cancellable G_GNUC_UNUSED,
@@ -1538,48 +1280,6 @@ pv_runtime_initable_init (GInitable *initable,
 
   if (self->pv_prefix == NULL)
     return FALSE;
-
-  /* Enumerating the graphics provider's drivers only requires things
-   * we already know, so start this first, and let it run in parallel
-   * with other setup. The results go in the SrtSystemInfo's cache
-   * for future use. */
-  if (self->provider != NULL
-      && !(self->flags & PV_RUNTIME_FLAGS_SINGLE_THREAD))
-    {
-      gsize i;
-
-      enumeration_thread_start_indep (&self->indep_thread,
-                                      self->flags,
-                                      self->provider, NULL);
-
-      if (self->interpreter_host_provider != NULL)
-        {
-          enumeration_thread_start_indep (&self->host_thread,
-                                          self->flags,
-                                          self->interpreter_host_provider,
-                                          "real-host");
-
-#if PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST > 0
-          self->arch_host_threads = g_new0 (EnumerationThread,
-                                            PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST);
-
-          for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST; i++)
-            enumeration_thread_start_arch (&self->arch_host_threads[i],
-                                           &pv_multiarch_as_emulator_details[i],
-                                           self->flags,
-                                           self->interpreter_host_provider);
-#endif
-        }
-
-      self->arch_threads = g_new0 (EnumerationThread,
-                                   PV_N_SUPPORTED_ARCHITECTURES);
-
-      for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-        enumeration_thread_start_arch (&self->arch_threads[i],
-                                       &pv_multiarch_details[i],
-                                       self->flags,
-                                       self->provider);
-    }
 
   /* If we are in Flatpak container we don't expect to have a working bwrap */
   if (self->bubblewrap != NULL
@@ -1892,19 +1592,14 @@ pv_runtime_dispose (GObject *object)
   /* This is borrowed from mutable_sysroot, so must be cleared here */
   self->runtime_files = NULL;
 
+  if (self->providers != NULL)
+    g_ptr_array_set_size (self->providers, 0);
+
   g_clear_object (&self->provider);
   g_clear_object (&self->interpreter_host_provider);
   g_clear_object (&self->mutable_sysroot);
   g_clear_object (&self->real_root);
   g_clear_object (&self->host_root);
-  enumeration_thread_clear (&self->indep_thread);
-  enumeration_thread_clear (&self->host_thread);
-#if PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST > 0
-  enumeration_threads_clear (&self->arch_host_threads,
-                             PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST);
-#endif
-  enumeration_threads_clear (&self->arch_threads,
-                             PV_N_SUPPORTED_ARCHITECTURES);
 
   G_OBJECT_CLASS (pv_runtime_parent_class)->dispose (object);
 }
@@ -1919,6 +1614,7 @@ pv_runtime_finalize (GObject *object)
   g_free (self->libcapsule_knowledge);
   g_strfreev (self->original_environ);
   glnx_close_fd (&self->overrides_fd);
+  g_clear_pointer (&self->providers, g_ptr_array_unref);
   g_free (self->runtime_abi_json);
   g_free (self->runtime_app);
   glnx_close_fd (&self->runtime_files_fd);
@@ -1951,21 +1647,13 @@ pv_runtime_class_init (PvRuntimeClass *cls)
                          (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                           G_PARAM_STATIC_STRINGS));
 
-  properties[PROP_GRAPHICS_PROVIDER] =
-    g_param_spec_object ("graphics-provider",
-                         "Graphics provider",
-                         "Sysroot used for graphics stack, or NULL",
-                         PV_TYPE_GRAPHICS_PROVIDER,
-                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
-                          G_PARAM_STATIC_STRINGS));
-
-  properties[PROP_INTERPRETER_HOST_PROVIDER] =
-    g_param_spec_object ("interpreter-host-provider",
-                         "Interpreter host graphics provider",
-                         "Sysroot used for the interpreter host graphics stack, or NULL",
-                         PV_TYPE_GRAPHICS_PROVIDER,
-                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
-                          G_PARAM_STATIC_STRINGS));
+  properties[PROP_GRAPHICS_PROVIDERS] =
+    g_param_spec_boxed ("graphics-providers",
+                        "Graphics providers",
+                        "Sysroots used for graphics stack, or NULL",
+                        G_TYPE_PTR_ARRAY,
+                        (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS));
 
   properties[PROP_ORIGINAL_ENVIRON] =
     g_param_spec_boxed ("original-environ", "Original environ",
@@ -2010,8 +1698,7 @@ PvRuntime *
 pv_runtime_new (const char *source,
                 const char *variable_dir,
                 const char *bubblewrap,
-                PvGraphicsProvider *provider,
-                PvGraphicsProvider *interpreter_host_provider,
+                GPtrArray *providers,
                 const char * const *original_environ,
                 PvRuntimeFlags flags,
                 PvWorkaroundFlags workarounds,
@@ -2024,8 +1711,7 @@ pv_runtime_new (const char *source,
                          NULL,
                          error,
                          "bubblewrap", bubblewrap,
-                         "graphics-provider", provider,
-                         "interpreter-host-provider", interpreter_host_provider,
+                         "graphics-providers", providers,
                          "original-environ", original_environ,
                          "variable-dir", variable_dir,
                          "source", source,
@@ -6297,9 +5983,9 @@ pv_runtime_collect_lib_symlink_data (PvRuntime *self,
    * or /lib* (as configured by --remap-link-prefix in
    * pv_runtime_get_capsule_capture_libs()), then the symlink will
    * point to something like /run/host/lib/libfoo.so or
-   * /run/gfx/usr/lib64/libbar.so. To find the corresponding path
+   * /run/gfx/DIR/usr/lib64/libbar.so. To find the corresponding path
    * in the graphics stack provider, we can remove the /run/host,
-   * /run/gfx or /var/pressure-vessel/gfx prefix.
+   * /run/gfx/DIR or /var/pressure-vessel/gfx/DIR prefix.
    *
    * If capsule-capture-libs found a library elsewhere, for example
    * in $HOME or /opt, then we assume it will be visible at the same
@@ -6349,8 +6035,8 @@ collect_one_mesa_drirc (PvRuntime *self,
         /* We already created a symlink in /overrides pointing to the
          * path in the container namespace, which is the same as the
          * path in the provider namespace, but with an optional prefix
-         * that we already know how to remove (/run/host, /run/gfx or
-         * /var/pressure-vessel/gfx). */
+         * that we already know how to remove (/run/host, /run/gfx/DIR or
+         * /var/pressure-vessel/gfx/DIR). */
         g_return_if_fail (resolved != NULL);
         symlink = g_build_filename (arch->libdir_relative_to_overrides,
                                     glnx_basename (resolved), NULL);
@@ -7282,7 +6968,6 @@ collect_dri_drivers (PvRuntime *self,
   return TRUE;
 }
 
-#if PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST > 0
 /*
  * @search_path: (inout):
  */
@@ -7356,7 +7041,6 @@ pv_append_host_dri_library_paths (PvRuntime *self,
   while (_srt_hash_table_iter_next (&iter, &drivers_path, NULL))
     pv_search_path_append (search_path, drivers_path);
 }
-#endif
 
 /*
  * Returns: (element-type IcdDetails):
@@ -7711,8 +7395,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   g_autoptr(GString) openxr_1_runtime_path = g_string_new ("");
   g_autoptr(GString) va_api_path = g_string_new ("");
   gboolean any_architecture_works = FALSE;
-  g_autoptr(SrtSystemInfo) system_info = NULL;
-  g_autoptr(SrtSystemInfo) host_system_info = NULL;
+  SrtSystemInfo *system_info;
+  SrtSystemInfo *host_system_info = NULL;
   g_autoptr(IcdStack) provider_stack = icd_stack_new ();
   g_autoptr(IcdStack) host_stack = icd_stack_new ();
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
@@ -7745,21 +7429,11 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   if (!pv_runtime_provide_container_access (self, error))
     return FALSE;
 
-  if (self->flags & PV_RUNTIME_FLAGS_SINGLE_THREAD)
-    {
-      system_info = pv_graphics_provider_create_system_info (self->provider);
-      srt_system_info_set_multiarch_tuples (system_info, pv_multiarch_tuples);
+  system_info = pv_graphics_provider_get_system_info (self->provider, 0);
 
-      if (self->interpreter_host_provider != NULL)
-        host_system_info = pv_graphics_provider_create_system_info (self->interpreter_host_provider);
-    }
-  else
-    {
-      system_info = g_object_ref (enumeration_thread_join (&self->indep_thread));
-
-      if (self->interpreter_host_provider != NULL)
-        host_system_info = g_object_ref (enumeration_thread_join (&self->host_thread));
-    }
+  if (self->interpreter_host_provider != NULL)
+    host_system_info = pv_graphics_provider_get_system_info (self->interpreter_host_provider,
+                                                             0);
 
   provider_stack->egl_icd_details = pv_enumerate_egl_icds (system_info, provider_label);
   provider_stack->egl_ext_platform_details = pv_enumerate_egl_ext_platforms (system_info,
@@ -7811,6 +7485,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
       if (runtime_architecture_init (arch, self))
         {
+          GQuark arch_quark = g_quark_from_static_string (arch->details->tuple);
           g_autoptr(GPtrArray) dirs = NULL;
           g_autofree gchar *this_dri_path_in_container = g_build_filename (arch->libdir_in_container,
                                                                            "dri", NULL);
@@ -7896,10 +7571,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                 return FALSE;
             }
 
-          if (self->flags & PV_RUNTIME_FLAGS_SINGLE_THREAD)
-            arch_system_info = system_info;
-          else
-            arch_system_info = enumeration_thread_join (&self->arch_threads[i]);
+          arch_system_info = pv_graphics_provider_get_system_info (self->provider,
+                                                                   arch_quark);
 
           if ((self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
               && !collect_openxr_1_runtime (self, arch, provider_stack->openxr_1_runtime_details,
@@ -8042,24 +7715,25 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
   if (self->interpreter_host_provider != NULL)
     {
-      g_assert (pv_multiarch_as_emulator_tuples[PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST] == NULL);
+      gsize n;
+      const GQuark *host_tuples;
 
-#if PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST > 0
-      for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST; i++)
+      host_tuples = pv_graphics_provider_get_architectures (self->interpreter_host_provider, &n);
+
+      for (i = 0; i < n; i++)
         {
+          GQuark arch_quark = host_tuples[i];
           SrtSystemInfo *arch_system_info;
+          const char *tuple = g_quark_to_string (arch_quark);
 
-          if (self->flags & PV_RUNTIME_FLAGS_SINGLE_THREAD)
-            arch_system_info = host_system_info;
-          else
-            arch_system_info = enumeration_thread_join (&self->arch_host_threads[i]);
+          arch_system_info = pv_graphics_provider_get_system_info (self->interpreter_host_provider,
+                                                                   arch_quark);
 
           pv_append_host_dri_library_paths (self,
                                             arch_system_info,
-                                            pv_multiarch_as_emulator_tuples[i],
+                                            tuple,
                                             dri_path);
         }
-#endif
     }
 
   part_timer = _srt_profiling_start ("Finishing graphics stack capture");

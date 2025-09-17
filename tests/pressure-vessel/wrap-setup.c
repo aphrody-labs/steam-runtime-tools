@@ -195,32 +195,38 @@ fixture_create_runtime (Fixture *f,
                         PvRuntimeFlags flags)
 {
   g_autoptr(GError) local_error = NULL;
-  g_autoptr(PvGraphicsProvider) graphics_provider = NULL;
-  const char *gfx_in_container;
+  g_autoptr(GPtrArray) graphics_providers = NULL;
+  PvGraphicsProvider *graphics_provider;
+  const char *expected_gfx_in_container;
 
   g_assert_null (f->context->runtime);
 
-  if (flags & PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX)
-    gfx_in_container = "/run/parent";
-  else
-    gfx_in_container = "/run/host";
+  flags |= (PV_RUNTIME_FLAGS_VERBOSE | PV_RUNTIME_FLAGS_SINGLE_THREAD);
 
-  graphics_provider = pv_graphics_provider_new ("/",
-                                                gfx_in_container,
-                                                PV_GRAPHICS_PROVIDER_FLAGS_NONE,
-                                                &local_error);
+  if (flags & PV_RUNTIME_FLAGS_INTERPRETER_ROOT)
+    expected_gfx_in_container = "/var/pressure-vessel/gfx/main";
+  else if (flags & PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX)
+    expected_gfx_in_container = "/run/parent";
+  else
+    expected_gfx_in_container = "/run/host";
+
+  graphics_providers = pv_graphics_provider_build_array ("/",
+                                                         NULL,
+                                                         flags,
+                                                         &local_error);
   g_assert_no_error (local_error);
-  g_assert_nonnull (graphics_provider);
+  g_assert_nonnull (graphics_providers);
+  g_assert_cmpuint (graphics_providers->len, ==, 1);
+  graphics_provider = g_ptr_array_index (graphics_providers, 0);
+  g_assert_cmpstr (graphics_provider->path_in_container_ns,
+                   ==, expected_gfx_in_container);
 
   f->context->runtime = pv_runtime_new (f->mock_runtime,
                                         f->var,
                                         NULL,
-                                        graphics_provider,
-                                        NULL,
+                                        graphics_providers,
                                         _srt_peek_environ_nonnull (),
-                                        (flags
-                                         | PV_RUNTIME_FLAGS_VERBOSE
-                                         | PV_RUNTIME_FLAGS_SINGLE_THREAD),
+                                        flags,
                                         PV_WORKAROUND_FLAGS_NONE,
                                         &local_error);
   g_assert_no_error (local_error);
@@ -2177,10 +2183,6 @@ test_supported_archs (Fixture *f,
                    SRT_ABI_X86_64);
   g_assert_cmpstr (pv_multiarch_tuples[1], ==, SRT_ABI_I386);
 
-  /* We also support running x86 on an aarch64 emulator host */
-  g_assert_cmpint (PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST, ==, 1);
-  g_assert_cmpstr (pv_multiarch_as_emulator_tuples[0], ==, SRT_ABI_AARCH64);
-
 #else /* !x86 */
 
   /* The only supported architecture is the one we were compiled for */
@@ -2213,21 +2215,6 @@ test_supported_archs (Fixture *f,
 
   /* The array of tuples has one extra element, to make it a GStrv */
   g_assert_cmpstr (pv_multiarch_tuples[i], ==, NULL);
-
-#if PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST > 0
-  /* Emulator host details and tuples are also in the same order */
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES_AS_EMULATOR_HOST; i++)
-    {
-      const PvMultiarchDetails *details = &pv_multiarch_as_emulator_details[i];
-
-      g_assert_cmpstr (pv_multiarch_as_emulator_tuples[i], ==, details->tuple);
-    }
-#else
-  i = 0;
-#endif
-
-  /* Array of tuples has one extra element, again */
-  g_assert_cmpstr (pv_multiarch_as_emulator_tuples[i], ==, NULL);
 }
 
 /*

@@ -436,7 +436,8 @@ pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
   if (original_json == NULL)
     return TRUE;
 
-  if (g_hash_table_lookup_extended (self, original_json, NULL, &other_voidp))
+  if (g_hash_table_lookup_extended (self->content_to_details,
+                                    original_json, NULL, &other_voidp))
     {
       IcdDetails *other = other_voidp;
       SrtBaseJsonGraphicsModule *other_module = other->icd;
@@ -453,6 +454,7 @@ pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
    * Casts are required because GHashTable is not const-correct for
    * The cast is required because GHashTable is not const-correct for
    * "borrowed" keys and values. */
-  g_hash_table_replace (self, (void *) original_json, details);
+  g_hash_table_replace (self->content_to_details,
+                        (void *) original_json, details);
   return TRUE;
 }

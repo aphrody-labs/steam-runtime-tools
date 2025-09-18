@@ -242,24 +242,38 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdStack, icd_stack_free)
 
 /*
  * PvManifestDeduplicator:
+ * @content_to_details: (element-type utf8 IcdDetails): A map representing
+ *  JSON manifests with unique content, used to detect and suppress
+ *  exact duplicates.
+ *  Keys are unowned strings with JSON manifest content, borrowed from
+ *  the #SrtBaseJsonGraphicsModule in the #IcdDetails.
+ *  Values are the #IcdDetails itself.
  *
- * A map representing JSON manifests with unique content, used to detect
- * and suppress exact duplicates.
- *
- * Keys are unowned strings with JSON manifest content, borrowed from the
- * #SrtBaseJsonGraphicsModule in the #IcdDetails.
- *
- * Values are the #IcdDetails itself.
+ * Data structure used to eliminate duplicate JSON manifests for Vulkan
+ * drivers, EGL drivers and EGL external platforms.
  */
-typedef GHashTable PvManifestDeduplicator;
-
-static inline PvManifestDeduplicator *
-pv_manifest_deduplicator_new (void)
+typedef struct
 {
-  return g_hash_table_new_full (g_str_hash, g_str_equal, NULL, NULL);
+  GHashTable *content_to_details;
+} PvManifestDeduplicator;
+
+#define PV_MANIFEST_DEDUPLICATOR_INIT { NULL }
+
+static void
+pv_manifest_deduplicator_clear (PvManifestDeduplicator *self)
+{
+  g_clear_pointer (&self->content_to_details, g_hash_table_unref);
 }
 
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (PvManifestDeduplicator, g_hash_table_unref)
+G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (PvManifestDeduplicator,
+                                  pv_manifest_deduplicator_clear)
+
+static inline void
+pv_manifest_deduplicator_init (PvManifestDeduplicator *self)
+{
+  self->content_to_details = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                                    NULL, NULL);
+}
 
 gboolean pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
                                                  IcdDetails *details);

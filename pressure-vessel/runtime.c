@@ -4988,20 +4988,20 @@ setup_each_json_manifest (PvRuntime *self,
 {
   gsize j;
   g_autoptr(GHashTable) json_set = NULL;
-  g_autoptr(PvManifestDeduplicator) content_seen = NULL;
+  g_auto(PvManifestDeduplicator) deduplicator = PV_MANIFEST_DEDUPLICATOR_INIT;
   int digits = pv_count_decimal_digits (details->len);
 
   g_return_val_if_fail (self->providers != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
 
   json_set = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
-  content_seen = pv_manifest_deduplicator_new ();
+  pv_manifest_deduplicator_init (&deduplicator);
 
   for (j = 0; j < details->len; j++)
     {
       if (!setup_json_manifest (self, bwrap, sub_dir,
                                 g_ptr_array_index (details, j),
-                                digits, j, json_set, content_seen,
+                                digits, j, json_set, &deduplicator,
                                 search_path, error))
         return FALSE;
     }

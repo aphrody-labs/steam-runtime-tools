@@ -66,32 +66,6 @@ teardown (Fixture *f,
   tests_check_fd_leaks_leave (f->old_fds);
 }
 
-static void
-test_first_key (Fixture *f,
-                gconstpointer context)
-{
-  g_autoptr(GHashTable) table = g_hash_table_new (g_str_hash, g_str_equal);
-  gpointer k;
-
-  k = pv_hash_table_get_first_key (table, NULL);
-  g_assert_null (k);
-
-  g_hash_table_add (table, (char *) "hello");
-  k = pv_hash_table_get_first_key (table, NULL);
-  g_assert_cmpstr (k, ==, "hello");
-  k = pv_hash_table_get_first_key (table, _srt_generic_strcmp0);
-  g_assert_cmpstr (k, ==, "hello");
-
-  g_hash_table_add (table, (char *) "world");
-  k = pv_hash_table_get_first_key (table, NULL);
-
-  if (g_strcmp0 (k, "hello") != 0)
-    g_assert_cmpstr (k, ==, "world");
-
-  k = pv_hash_table_get_first_key (table, _srt_generic_strcmp0);
-  g_assert_cmpstr (k, ==, "hello");
-}
-
 typedef struct
 {
   gsize n;
@@ -743,8 +717,6 @@ main (int argc,
   _srt_tests_init (&argc, &argv, NULL);
   g_test_add ("/count-decimal-digits", Fixture, NULL,
               setup, test_count_decimal_digits, teardown);
-  g_test_add ("/first-key", Fixture, NULL,
-              setup, test_first_key, teardown);
   g_test_add ("/generate-unique-filepath", Fixture, NULL,
               setup, test_generate_unique_filepath, teardown);
   g_test_add ("/run-sync", Fixture, NULL,

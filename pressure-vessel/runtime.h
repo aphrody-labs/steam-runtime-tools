@@ -34,6 +34,7 @@
 #include "flatpak-utils-base-private.h"
 #include "graphics-provider.h"
 #include "runtime-flags.h"
+#include "runtime-library-data.h"
 #include "utils.h"
 
 /* If we're in an emulator like FEX-Emu, we need to use the host

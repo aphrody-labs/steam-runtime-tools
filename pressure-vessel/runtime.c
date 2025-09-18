@@ -49,6 +49,7 @@
 #include "passwd.h"
 #include "runtime-module.h"
 #include "runtime-flags.h"
+#include "runtime-library-data.h"
 #include "supported-architectures.h"
 #include "tree-copy.h"
 #include "utils.h"
@@ -121,8 +122,6 @@ struct _PvRuntime
   gchar *runtime_files_on_host;
   const gchar *adverb_in_container;
   GPtrArray *providers;
-  PvGraphicsProvider *provider;
-  PvGraphicsProvider *interpreter_host_provider;
   SrtDirentCompareFunc arbitrary_dirent_order;
   GCompareFunc arbitrary_str_order;
 
@@ -627,6 +626,8 @@ typedef struct
   gsize multiarch_index;
   /* Always &pv_multiarch_details[self->multiarch_index] */
   const PvMultiarchDetails *details;
+  /* Graphics stack provider to use */
+  PvGraphicsProvider *provider;
   /* "lib/TUPLE/aliases", so that for example
    * /overrides/${aliases_relative_to_overrides}/libbz2.so.1 might exist
    * inside the final container */
@@ -647,11 +648,36 @@ typedef struct
   gchar *ld_so;
 } RuntimeArchitecture;
 
+static PvGraphicsProvider *
+pv_runtime_get_graphics_provider (PvRuntime *self,
+                                  GQuark multiarch_tuple)
+{
+  gsize i;
+
+  if (self->providers == NULL)
+    return NULL;
+
+  if (multiarch_tuple == 0)
+    return NULL;
+
+  for (i = 0; i < self->providers->len; i++)
+    {
+      PvGraphicsProvider *provider = g_ptr_array_index (self->providers, i);
+
+      if (pv_graphics_provider_has_architecture (provider, multiarch_tuple))
+        return provider;
+    }
+
+  return NULL;
+}
+
 static gboolean
 runtime_architecture_init (RuntimeArchitecture *self,
                            PvRuntime *runtime)
 {
   const gchar *argv[] = { NULL, "--print-ld.so", NULL };
+  PvGraphicsProvider *provider;
+  GQuark tuple_quark;
 
   g_return_val_if_fail (self->multiarch_index < PV_N_SUPPORTED_ARCHITECTURES,
                         FALSE);
@@ -662,6 +688,12 @@ runtime_architecture_init (RuntimeArchitecture *self,
   g_return_val_if_fail (self->details->tuple != NULL, FALSE);
   g_return_val_if_fail (g_strcmp0 (pv_multiarch_tuples[self->multiarch_index],
                                    self->details->tuple) == 0, FALSE);
+
+  tuple_quark = g_quark_from_static_string (self->details->tuple);
+  g_return_val_if_fail (tuple_quark != 0, FALSE);
+  provider = pv_runtime_get_graphics_provider (runtime, tuple_quark);
+  g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (provider), FALSE);
+  self->provider = g_object_ref (provider);
 
   self->capsule_capture_libs_basename = g_strdup_printf ("%s-capsule-capture-libs",
                                                          self->details->tuple);
@@ -697,6 +729,7 @@ runtime_architecture_check_valid (RuntimeArchitecture *self)
 {
   g_return_val_if_fail (self->multiarch_index < PV_N_SUPPORTED_ARCHITECTURES, FALSE);
   g_return_val_if_fail (self->details == &pv_multiarch_details[self->multiarch_index], FALSE);
+  g_return_val_if_fail (self->provider != NULL, FALSE);
   g_return_val_if_fail (self->capsule_capture_libs_basename != NULL, FALSE);
   g_return_val_if_fail (self->capsule_capture_libs != NULL, FALSE);
   g_return_val_if_fail (self->libdir_relative_to_overrides != NULL, FALSE);
@@ -711,6 +744,7 @@ runtime_architecture_clear (RuntimeArchitecture *self)
 {
   self->multiarch_index = G_MAXSIZE;
   self->details = NULL;
+  g_clear_object (&self->provider);
   g_clear_pointer (&self->capsule_capture_libs_basename, g_free);
   g_clear_pointer (&self->capsule_capture_libs, g_free);
   g_clear_pointer (&self->libdir_relative_to_overrides, g_free);
@@ -805,36 +839,6 @@ pv_runtime_set_property (GObject *object,
         /* Construct-only */
         g_return_if_fail (self->providers == NULL);
         self->providers = g_value_dup_boxed (value);
-
-        if (self->providers != NULL)
-          {
-            gsize i;
-
-            for (i = 0; i < self->providers->len; i++)
-              {
-                PvGraphicsProvider *provider = g_ptr_array_index (self->providers, i);
-
-                /* For now, we only support having one graphics stack
-                 * provider for our own architectures (normally x86),
-                 * and one for the host of an interpreter like FEX
-                 * (normally aarch64). */
-                if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
-                  {
-                    if (self->interpreter_host_provider == NULL)
-                      self->interpreter_host_provider = g_object_ref (provider);
-                    else
-                      g_warning ("Only one interpreter host provider can be used");
-                  }
-                else
-                  {
-                    if (self->provider == NULL)
-                      self->provider = g_object_ref (provider);
-                    else
-                      g_warning ("Only one graphics stack provider can be used");
-                  }
-              }
-          }
-
         break;
 
       case PROP_ORIGINAL_ENVIRON:
@@ -1596,8 +1600,6 @@ pv_runtime_dispose (GObject *object)
   if (self->providers != NULL)
     g_ptr_array_set_size (self->providers, 0);
 
-  g_clear_object (&self->provider);
-  g_clear_object (&self->interpreter_host_provider);
   g_clear_object (&self->mutable_sysroot);
   g_clear_object (&self->real_root);
   g_clear_object (&self->host_root);
@@ -2049,7 +2051,7 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
   g_autoptr(FlatpakBwrap) ret = NULL;
   glnx_autofd int runtime_files_fd = -1;
 
-  g_return_val_if_fail (self->provider != NULL, NULL);
+  g_return_val_if_fail (arch->provider != NULL, NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
   ret = pv_bwrap_copy (self->container_access_adverb);
@@ -2062,17 +2064,17 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
 
   /* Every symlink that starts with exactly /app/ (for Flatpak) */
   remap_app = g_strjoin (NULL, "/app/", "=",
-                         self->provider->path_in_container_ns,
+                         arch->provider->path_in_container_ns,
                          "/app/", NULL);
 
   /* Every symlink that starts with exactly /usr/ */
   remap_usr = g_strjoin (NULL, "/usr/", "=",
-                         self->provider->path_in_container_ns,
+                         arch->provider->path_in_container_ns,
                          "/usr/", NULL);
 
   /* Every symlink that starts with /lib, e.g. /lib64 */
   remap_lib = g_strjoin (NULL, "/lib", "=",
-                         self->provider->path_in_container_ns,
+                         arch->provider->path_in_container_ns,
                          "/lib", NULL);
 
   runtime_files_fd = dup (self->runtime_files_fd);
@@ -2094,7 +2096,7 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
                           "--remap-link-prefix", remap_app,
                           "--remap-link-prefix", remap_usr,
                           "--remap-link-prefix", remap_lib,
-                          "--provider", self->provider->in_current_ns->path,
+                          "--provider", arch->provider->in_current_ns->path,
                           "--container",
                           NULL);
 
@@ -2133,9 +2135,9 @@ collect_s2tc (PvRuntime *self,
   g_autofree gchar *s2tc = g_build_filename (libdir, "libtxc_dxtn.so", NULL);
   g_autofree gchar *s2tc_in_current_namespace = NULL;
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (arch->provider != NULL, FALSE);
 
-  s2tc_in_current_namespace = g_build_filename (self->provider->in_current_ns->path,
+  s2tc_in_current_namespace = g_build_filename (arch->provider->in_current_ns->path,
                                                 s2tc, NULL);
 
   if (g_file_test (s2tc_in_current_namespace, G_FILE_TEST_EXISTS))
@@ -2185,7 +2187,6 @@ pv_runtime_capture_libraries (PvRuntime *self,
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
   gsize i;
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
   g_return_val_if_fail (runtime_architecture_check_valid (arch), FALSE);
   g_return_val_if_fail (destination != NULL, FALSE);
   g_return_val_if_fail (n_patterns > 0, FALSE);
@@ -2287,7 +2288,6 @@ bind_icds (PvRuntime *self,
   gsize i;
   int digits = pv_count_decimal_digits (n_details);
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
   g_return_val_if_fail (runtime_architecture_check_valid (arch), FALSE);
   g_return_val_if_fail (subdir != NULL, FALSE);
   g_return_val_if_fail (n_details == 0 || details_arr != NULL, FALSE);
@@ -2433,7 +2433,7 @@ bind_icds (PvRuntime *self,
           if (details_arch->kind != ICD_KIND_ABSOLUTE)
             continue;
 
-          fd = _srt_sysroot_open (self->provider->in_current_ns,
+          fd = _srt_sysroot_open (arch->provider->in_current_ns,
                                   details_arch->resolved_library,
                                   SRT_RESOLVE_FLAGS_NONE,
                                   NULL, NULL);
@@ -2673,7 +2673,7 @@ success:
 }
 
 static gboolean
-bind_gfx_provider (PvRuntime *self,
+bind_gfx_provider (PvGraphicsProvider *provider,
                    FlatpakBwrap *bwrap,
                    const char *prepend_path,
                    GError **error)
@@ -2682,17 +2682,17 @@ bind_gfx_provider (PvRuntime *self,
   g_autofree gchar *mount_point = NULL;
 
   mount_point = g_build_filename (prepend_path,
-                                  self->provider->path_in_container_ns,
+                                  provider->path_in_container_ns,
                                   NULL);
 
   if (!pv_bwrap_bind_usr (bwrap,
-                          self->provider->path_in_host_ns,
-                          self->provider->in_current_ns->fd,
+                          provider->path_in_host_ns,
+                          provider->in_current_ns->fd,
                           mount_point,
                           error))
     return FALSE;
 
-  provider_etc = g_build_filename (self->provider->in_current_ns->path,
+  provider_etc = g_build_filename (provider->in_current_ns->path,
                                    "etc", NULL);
 
   if (g_file_test (provider_etc, G_FILE_TEST_IS_DIR))
@@ -2700,7 +2700,7 @@ bind_gfx_provider (PvRuntime *self,
       g_autofree gchar *in_host = NULL;
       g_autofree gchar *in_container = NULL;
 
-      in_host = g_build_filename (self->provider->path_in_host_ns,
+      in_host = g_build_filename (provider->path_in_host_ns,
                                   "etc", NULL);
       in_container = g_build_filename (mount_point, "etc", NULL);
       /* The caller is expected to handle possible use of an interpreter root
@@ -2994,21 +2994,37 @@ bind_runtime_base (PvRuntime *self,
 
   _srt_env_overlay_set (container_env, "XDG_RUNTIME_DIR", xrd);
 
-  if (self->provider != NULL
-      && (g_strcmp0 (self->provider->path_in_host_ns, "/") != 0
-          || g_strcmp0 (self->provider->path_in_container_ns, "/run/host") != 0))
+  if (self->providers != NULL)
     {
-      if (!bind_gfx_provider (self, bwrap, "/", error))
-        return FALSE;
+      for (i = 0; i < self->providers->len; i++)
+        {
+          PvGraphicsProvider *provider = g_ptr_array_index (self->providers, i);
 
-      /* Symlinks in the FEX-Emu rootfs are resolved as if it was
-       * chrooted into that rootfs, so the graphics-stack provider needs
-       * to exist inside the rootfs too. */
-      if (self->flags & PV_RUNTIME_FLAGS_INTERPRETER_ROOT
-          && !bind_gfx_provider (self, bwrap,
-                                 PV_RUNTIME_PATH_INTERPRETER_ROOT,
-                                 error))
-        return FALSE;
+          /* The interpreter host graphics provider is mounted at the
+           * real root, so it doesn't need to be bind-mounted specifically */
+          if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+            continue;
+
+          /* We always mount / on /run/host (in main()) so we don't need
+           * to do it here */
+          if (g_strcmp0 (provider->path_in_host_ns, "/") == 0
+              && g_strcmp0 (provider->path_in_container_ns, "/run/host") == 0)
+            continue;
+
+          /* If a graphics provider is mounted at a different mount point
+           * such as /run/gfx, then we do need to mount it specifically */
+          if (!bind_gfx_provider (provider, bwrap, "/", error))
+            return FALSE;
+
+          /* Symlinks in the FEX-Emu rootfs are resolved as if it was
+           * chrooted into that rootfs, so the graphics-stack provider needs
+           * to exist inside the rootfs too. */
+          if (self->flags & PV_RUNTIME_FLAGS_INTERPRETER_ROOT
+              && !bind_gfx_provider (provider, bwrap,
+                                     PV_RUNTIME_PATH_INTERPRETER_ROOT,
+                                     error))
+            return FALSE;
+        }
     }
 
   for (i = 0; i < G_N_ELEMENTS (bind_mutable); i++)
@@ -3042,7 +3058,7 @@ bind_runtime_base (PvRuntime *self,
           if (g_strv_contains (from_host, dest))
             continue;
 
-          if (self->provider != NULL && g_strv_contains (from_provider, dest))
+          if (self->providers != NULL && g_strv_contains (from_provider, dest))
             continue;
 
           if ((self->flags & PV_RUNTIME_FLAGS_INTERPRETER_ROOT)
@@ -3164,14 +3180,12 @@ bind_runtime_base (PvRuntime *self,
         return FALSE;
     }
 
-  if (self->provider != NULL)
+  if (self->providers != NULL)
     {
       for (i = 0; from_provider[i] != NULL; i++)
         {
           const char *item = from_provider[i];
-          g_autoptr(GError) local_error = NULL;
-          g_autofree char *path_in_provider = NULL;
-          glnx_autofd int fd = -1;
+          gsize provider_index;
           PvRuntimeEmulationRoots roots;
 
           /* In FEX-Emu or similar, the graphics provider is only used for
@@ -3184,29 +3198,49 @@ bind_runtime_base (PvRuntime *self,
           else
             roots = PV_RUNTIME_EMULATION_ROOTS_REAL_ONLY;
 
-          fd = _srt_sysroot_open (self->provider->in_current_ns, item,
-                                  SRT_RESOLVE_FLAGS_NONE,
-                                  &path_in_provider, &local_error);
-
-          if (fd >= 0)
+          /* We look for /etc/drirc, etc. in each graphics stack provider
+           * in turn, in priority order, stopping if we find them. */
+          for (provider_index = 0;
+               provider_index < self->providers->len;
+               provider_index++)
             {
-              g_autofree char *host_path = NULL;
+              g_autoptr(GError) local_error = NULL;
+              g_autofree char *path_in_provider = NULL;
+              glnx_autofd int fd = -1;
+              PvGraphicsProvider *provider;
 
-              host_path = g_build_filename (self->provider->path_in_host_ns,
-                                            path_in_provider, NULL);
+              provider = g_ptr_array_index (self->providers, provider_index);
 
-              if (!pv_runtime_bind_into_container (self, bwrap,
-                                                   host_path, NULL, 0, item,
-                                                   roots, error))
-                g_return_val_if_reached (FALSE);
+              if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+                continue;
+
+              fd = _srt_sysroot_open (provider->in_current_ns, item,
+                                      SRT_RESOLVE_FLAGS_NONE,
+                                      &path_in_provider, &local_error);
+
+              if (fd >= 0)
+                {
+                  g_autofree char *host_path = NULL;
+
+                  host_path = g_build_filename (provider->path_in_host_ns,
+                                                path_in_provider, NULL);
+
+                  if (!pv_runtime_bind_into_container (self, bwrap,
+                                                       host_path, NULL, 0, item,
+                                                       roots, error))
+                    g_return_val_if_reached (FALSE);
+
+                  break;
+                }
+
+              if (!g_error_matches (local_error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND))
+                g_debug ("Cannot resolve \"%s\" in \"%s\": %s",
+                         item, provider->in_current_ns->path,
+                         local_error->message);
             }
-          else
-            {
-              g_debug ("Cannot resolve \"%s\" in \"%s\": %s",
-                       item, self->provider->in_current_ns->path,
-                       local_error->message);
-              g_clear_error (&local_error);
-            }
+
+          if (provider_index >= self->providers->len)
+            g_debug ("Cannot resolve \"%s\" in any graphics provider", item);
         }
     }
 
@@ -3660,8 +3694,9 @@ typedef enum
  */
 static gboolean
 pv_runtime_take_from_provider (PvRuntime *self,
-                               FlatpakBwrap *bwrap,
+                               PvGraphicsProvider *provider,
                                const char *source_in_provider,
+                               FlatpakBwrap *bwrap,
                                const char *dest_in_container,
                                TakeFromProviderFlags flags,
                                GError **error)
@@ -3672,7 +3707,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
   glnx_autofd int source_fd = -1;
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (provider != NULL, FALSE);
   g_return_val_if_fail (bwrap == NULL || !pv_bwrap_was_finished (bwrap), FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
@@ -3688,7 +3723,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
   if (flags & TAKE_FROM_PROVIDER_FLAGS_IF_REGULAR)
     resolve_flags |= SRT_RESOLVE_FLAGS_MUST_BE_REGULAR;
 
-  source_fd = _srt_sysroot_open (self->provider->in_current_ns,
+  source_fd = _srt_sysroot_open (provider->in_current_ns,
                                  source_in_provider, resolve_flags,
                                  &realpath_in_provider, &resolve_error);
 
@@ -3699,7 +3734,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
           g_debug ("Not replacing \"${container}/%s\" with \"%s/%s\": "
                    "source is not a directory: %s",
                    dest_in_container,
-                   self->provider->in_current_ns->path, source_in_provider,
+                   provider->in_current_ns->path, source_in_provider,
                    resolve_error->message);
           return TRUE;
         }
@@ -3712,7 +3747,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
           g_debug ("Not replacing \"${container}/%s\" with \"%s/%s\": "
                    "source is not a regular file: %s",
                    dest_in_container,
-                   self->provider->in_current_ns->path, source_in_provider,
+                   provider->in_current_ns->path, source_in_provider,
                    resolve_error->message);
           return TRUE;
         }
@@ -3725,7 +3760,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
           g_debug ("Not replacing \"${container}/%s\" with \"%s/%s\": "
                    "source does not exist: %s",
                    dest_in_container,
-                   self->provider->in_current_ns->path, source_in_provider,
+                   provider->in_current_ns->path, source_in_provider,
                    resolve_error->message);
           return TRUE;
         }
@@ -3764,7 +3799,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
        * dangling and this probably isn't going to work. */
       if (path_visible_in_provider_namespace (self->flags, source_in_provider))
         {
-          target = g_build_filename (self->provider->path_in_container_ns,
+          target = g_build_filename (provider->path_in_container_ns,
                                      source_in_provider, NULL);
         }
       /* A few paths are always available as-is in the container, such
@@ -3786,7 +3821,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
 
               g_debug ("Creating \"${container}/%s\" by copying \"%s/%s\"",
                        dest_in_container,
-                       self->provider->in_current_ns->path,
+                       provider->in_current_ns->path,
                        source_in_provider);
 
               if (source_fd < 0)
@@ -3822,7 +3857,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
               if (glnx_regfile_copy_bytes (file_fd, dest_fd, (off_t) -1) < 0)
                 return glnx_throw_errno_prefix (error,
                                                 "Unable to copy contents of \"%s/%s\" to \"%s\"",
-                                                self->provider->in_current_ns->path,
+                                                provider->in_current_ns->path,
                                                 source_in_provider,
                                                 dest_in_container);
 
@@ -3830,7 +3865,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
             }
 
           g_warning ("\"%s\" is unlikely to appear in \"%s\"",
-                     source_in_provider, self->provider->path_in_container_ns);
+                     source_in_provider, provider->path_in_container_ns);
           /* We might as well try *something*.
            * path_visible_in_provider_namespace() covers all the paths
            * that are going to appear in /run/host or similar, so try with
@@ -3872,7 +3907,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
 
       g_debug ("Trying to replace \"${container}/%s\" with \"%s/%s\" via "
                "bind mount",
-               dest_in_container, self->provider->in_current_ns->path,
+               dest_in_container, provider->in_current_ns->path,
                source_in_provider);
 
       if (source_fd < 0)
@@ -3903,7 +3938,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
           if (fstat (source_fd, &stat_buf) != 0)
             return glnx_throw_errno_prefix (error,
                                             "fstat \"%s/%s\"",
-                                            self->provider->in_current_ns->path,
+                                            provider->in_current_ns->path,
                                             realpath_in_provider);
 
           if (S_ISDIR (stat_buf.st_mode))
@@ -3912,7 +3947,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
                 {
                   g_warning ("Not mounting \"%s/%s\" over "
                              "non-directory file or nonexistent path \"%s\"",
-                             self->provider->in_current_ns->path,
+                             provider->in_current_ns->path,
                              source_in_provider, dest);
                   return TRUE;
                 }
@@ -3924,7 +3959,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
                 {
                   g_warning ("Not mounting \"%s/%s\" over directory or "
                              "nonexistent path \"%s\"",
-                             self->provider->in_current_ns->path,
+                             provider->in_current_ns->path,
                              source_in_provider, dest);
                   return TRUE;
                 }
@@ -3933,7 +3968,7 @@ pv_runtime_take_from_provider (PvRuntime *self,
 
       /* This is not 100% robust against the provider sysroot being
        * modified while we're looking at it, but it's the best we can do. */
-      source_in_current_ns = g_build_filename (self->provider->in_current_ns->path,
+      source_in_current_ns = g_build_filename (provider->in_current_ns->path,
                                                realpath_in_provider,
                                                NULL);
       abs_dest = g_build_filename ("/", dest_in_container, NULL);
@@ -3962,6 +3997,9 @@ pv_runtime_take_from_provider (PvRuntime *self,
  * Try to arrange for one of @sources_in_provider to be made available
  * at the path @dest_in_container in the container we are creating.
  *
+ * Unlike pv_runtime_take_from_provider(), all graphics stack providers
+ * are searched.
+ *
  * Note that neither @source_in_provider nor @dest_in_container is
  * guaranteed to be an absolute path.
  *
@@ -3976,10 +4014,10 @@ pv_runtime_take_any_from_provider (PvRuntime *self,
                                    GError **error)
 {
   SrtResolveFlags resolve_flags = SRT_RESOLVE_FLAGS_NONE;
-  gsize i;
+  gsize provider_index;
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (self->providers != NULL, FALSE);
   g_return_val_if_fail (bwrap == NULL || !pv_bwrap_was_finished (bwrap), FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
@@ -4001,35 +4039,52 @@ pv_runtime_take_any_from_provider (PvRuntime *self,
       flags &= ~TAKE_FROM_PROVIDER_FLAGS_IF_REGULAR;
     }
 
-  for (i = 0; sources_in_provider[i] != NULL; i++)
+  for (provider_index = 0;
+       provider_index < self->providers->len;
+       provider_index++)
     {
-      const char *source_in_provider = sources_in_provider[i];
-      glnx_autofd int fd = -1;
-      g_autoptr(GError) local_error = NULL;
+      PvGraphicsProvider *provider;
+      gsize source_index;
 
-      fd = _srt_sysroot_open (self->provider->in_current_ns,
-                              source_in_provider, resolve_flags,
-                              NULL, &local_error);
+      provider = g_ptr_array_index (self->providers, provider_index);
 
-      if (fd < 0)
+      if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+        continue;
+
+      for (source_index = 0;
+           sources_in_provider[source_index] != NULL;
+           source_index++)
         {
-          if (!g_error_matches (local_error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND))
-            g_debug ("\"%s/%s\": %s",
-                     self->provider->in_current_ns->path,
-                     source_in_provider, local_error->message);
+          const char *source_in_provider = sources_in_provider[source_index];
+          glnx_autofd int fd = -1;
+          g_autoptr(GError) local_error = NULL;
 
-          continue;
+          fd = _srt_sysroot_open (provider->in_current_ns,
+                                  source_in_provider, resolve_flags,
+                                  NULL, &local_error);
+
+          if (fd < 0)
+            {
+              if (!g_error_matches (local_error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND))
+                g_debug ("\"%s/%s\": %s",
+                         provider->in_current_ns->path,
+                         source_in_provider, local_error->message);
+
+              continue;
+            }
+
+          if (!pv_runtime_take_from_provider (self,
+                                              provider, source_in_provider,
+                                              bwrap, dest_in_container,
+                                              flags, error))
+            return FALSE;
+
+          return TRUE;
         }
-
-      if (!pv_runtime_take_from_provider (self, bwrap, source_in_provider,
-                                          dest_in_container, flags, error))
-        return FALSE;
-
-      return TRUE;
     }
 
   /* None of the possibilities matched */
-  g_debug ("Did not find a suitable \"%s\" in provider, ignoring",
+  g_debug ("Did not find a suitable \"%s\" in any provider, ignoring",
            dest_in_container);
   return TRUE;
 }
@@ -4415,12 +4470,12 @@ pv_runtime_take_ld_so_from_provider (PvRuntime *self,
   glnx_autofd int path_fd = -1;
   g_autofree gchar *ld_so_relative_to_provider = NULL;
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (arch->provider != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
 
   g_debug ("Making provider's ld.so visible in container");
 
-  path_fd = _srt_sysroot_open (self->provider->in_current_ns, arch->ld_so,
+  path_fd = _srt_sysroot_open (arch->provider->in_current_ns, arch->ld_so,
                                SRT_RESOLVE_FLAGS_READABLE,
                                &ld_so_relative_to_provider, error);
 
@@ -4442,8 +4497,9 @@ pv_runtime_take_ld_so_from_provider (PvRuntime *self,
    * having to dereference a long chain of symlinks every time we run
    * an executable. */
   if (self->mutable_sysroot != NULL &&
-      !pv_runtime_take_from_provider (self, bwrap, ld_so_relative_to_provider,
-                                      arch->ld_so,
+      !pv_runtime_take_from_provider (self,
+                                      arch->provider, ld_so_relative_to_provider,
+                                      bwrap, arch->ld_so,
                                       TAKE_FROM_PROVIDER_FLAGS_NONE, error))
     return FALSE;
 
@@ -4461,8 +4517,9 @@ pv_runtime_take_ld_so_from_provider (PvRuntime *self,
    * non-standard path), that's pretty much a disaster, because it will
    * just crash. However, all of those (chains of) non-standard symlinks
    * will end up pointing to ld_so_in_runtime. */
-  return pv_runtime_take_from_provider (self, bwrap, ld_so_relative_to_provider,
-                                        ld_so_in_runtime,
+  return pv_runtime_take_from_provider (self,
+                                        arch->provider, ld_so_relative_to_provider,
+                                        bwrap, ld_so_in_runtime,
                                         TAKE_FROM_PROVIDER_FLAGS_NONE, error);
 }
 
@@ -4573,7 +4630,7 @@ setup_json_manifest (PvRuntime *self,
   const char *library_arch = NULL;
   gsize i;
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (details->provider != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
   g_return_val_if_fail (sub_dir != NULL, FALSE);
 
@@ -4797,9 +4854,9 @@ setup_json_manifest (PvRuntime *self,
       g_debug ("Copying \"%s\" as-is to implement \"%s\" in container",
                json_in_provider, json_in_container);
 
-      if (!pv_runtime_take_from_provider (self, bwrap,
-                                          json_in_provider,
-                                          json_in_container,
+      if (!pv_runtime_take_from_provider (self,
+                                          details->provider, json_in_provider,
+                                          bwrap, json_in_container,
                                           (TAKE_FROM_PROVIDER_FLAGS_COPY_FALLBACK
                                            | TAKE_FROM_PROVIDER_FLAGS_REALPATH),
                                           error))
@@ -4838,7 +4895,7 @@ setup_each_json_manifest (PvRuntime *self,
   g_autoptr(PvManifestDeduplicator) content_seen = NULL;
   int digits = pv_count_decimal_digits (details->len);
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (self->providers != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
 
   json_set = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
@@ -4880,7 +4937,7 @@ collect_json_based_drivers (PvRuntime *self,
     _srt_profiling_start ("Collecting %s", description);
   const gsize multiarch_index = arch->multiarch_index;
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (arch->provider != NULL, FALSE);
   g_return_val_if_fail (details_arr != NULL, FALSE);
   g_return_val_if_fail (libdir_patterns != NULL, FALSE);
   g_return_val_if_fail (bind_icds_subdir != NULL, FALSE);
@@ -4937,7 +4994,7 @@ collect_json_based_drivers (PvRuntime *self,
            * no API to tell us. The only way we can find out the library's
            * real location is to tell libdl to load (dlopen) the library, and
            * see what the resulting path is. */
-          if (_srt_sysroot_is_direct (self->provider->in_current_ns))
+          if (_srt_sysroot_is_direct (arch->provider->in_current_ns))
             {
               g_autoptr(SrtLibrary) library = NULL;
               SrtLibraryIssues issues;
@@ -5103,21 +5160,21 @@ pv_runtime_get_ld_so (PvRuntime *self,
                               "/etc",
                               NULL);
 
-      if (self->provider != NULL)
+      if (arch->provider != NULL)
         {
           g_autofree gchar *provider_etc = NULL;
           g_autofree gchar *provider_etc_dest = NULL;
 
           if (!pv_bwrap_bind_usr (temp_bwrap,
-                                  self->provider->path_in_host_ns,
-                                  self->provider->in_current_ns->fd,
-                                  self->provider->path_in_container_ns,
+                                  arch->provider->path_in_host_ns,
+                                  arch->provider->in_current_ns->fd,
+                                  arch->provider->path_in_container_ns,
                                   error))
             return FALSE;
 
-          provider_etc = g_build_filename (self->provider->path_in_host_ns,
+          provider_etc = g_build_filename (arch->provider->path_in_host_ns,
                                            "etc", NULL);
-          provider_etc_dest = g_build_filename (self->provider->path_in_container_ns,
+          provider_etc_dest = g_build_filename (arch->provider->path_in_container_ns,
                                                 "etc", NULL);
           /* Using --ro-bind directly, as above */
           flatpak_bwrap_add_args (temp_bwrap,
@@ -5365,41 +5422,6 @@ collect_core_libraries_patterns (GPtrArray *patterns)
                                       exact_sonames[i]));
 }
 
-/*
- * @self: The runtime
- * @pathp: (inout): A candidate path for /usr/lib/gconv
- *  or similar in the graphics stack provider, which may be "stolen"
- *  on success
- * @gconv_in_provider: Map { owned string => itself } representing a set
- *  of paths to /usr/lib/gconv or equivalent in the graphics stack provider
- *
- * Returns: %TRUE if the path `*pathp` was suitable
- */
-static gboolean
-pv_runtime_try_gconv_dir (PvRuntime *self,
-                          gchar **pathp,
-                          GHashTable *gconv_in_provider)
-{
-  /* Quietly short-circuit if already added, for example in the common case
-   * where the path we derived from the realpath() of libc.so.6 matches
-   * /usr/${LIB}/gconv */
-  if (g_hash_table_contains (gconv_in_provider, *pathp))
-    return TRUE;
-
-  g_debug ("Checking for gconv in %s", *pathp);
-
-  if (_srt_sysroot_test (self->provider->in_current_ns, *pathp,
-                         SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY, NULL))
-    {
-      g_debug ("... yes");
-      g_hash_table_add (gconv_in_provider, g_steal_pointer (pathp));
-      return TRUE;
-    }
-
-  g_debug ("... no");
-  return FALSE;
-}
-
 typedef struct
 {
   /* SONAME of "main" library.
@@ -5492,12 +5514,11 @@ out:
  * @bwrap:
  * @libc_symlink: The symlink created by capsule-capture-libs,
  *  relative to /overrides.
- *  Its target is either `self->provider->path_in_container_ns`
+ *  Its target is either `arch->provider->path_in_container_ns`
  *  followed by the path to glibc in the graphics stack provider
  *  namespace, or the path to glibc in a non-standard directory such
  *  as /opt with no special prefix.
- * @gconv_in_provider: Map { owned string => itself } representing a set
- *  of paths to /usr/lib/gconv or equivalent in the graphics stack provider
+ * @gconv_in_provider: Collection of directories like usr/lib/gconv
  * @error: Used to raise an error on failure
  */
 static gboolean
@@ -5507,7 +5528,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
                                 FlatpakBwrap *bwrap,
                                 const char *libc_symlink,
                                 const char *ld_so_in_runtime,
-                                GHashTable *gconv_in_provider,
+                                PvRuntimeLibraryData *gconv_in_provider,
                                 GError **error)
 {
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) libc_timer =
@@ -5516,7 +5537,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
   g_autofree char *libc_target = NULL;
   g_autofree char *libdl_lib = NULL;
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (arch->provider != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
 
   if (!pv_runtime_take_ld_so_from_provider (self, arch,
@@ -5535,7 +5556,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
     }
   else
     {
-      g_autofree gchar *dir = g_build_filename ("/usr", libdl_lib, "gconv", NULL);
+      g_autofree gchar *dir = g_build_filename ("usr", libdl_lib, "gconv", NULL);
 
       /* On some host OSs, the hard-coded path used to dlopen gconv modules
        * does not actually match the realpath() of the directory containing
@@ -5546,7 +5567,8 @@ pv_runtime_collect_libc_family (PvRuntime *self,
        * Void Linux, which would mean we mount both /usr/lib64/gconv (here)
        * and /usr/lib/gconv (below), ensuring that whichever one glibc
        * actually wants to load, it'll work. */
-      pv_runtime_try_gconv_dir (self, &dir, gconv_in_provider);
+      pv_runtime_library_data_try (gconv_in_provider, dir, arch->provider,
+                                   "libdl ${LIB}", libdl_lib, NULL);
     }
 
   libc_target = glnx_readlinkat_malloc (self->overrides_fd, libc_symlink,
@@ -5564,7 +5586,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
        * provider prefix if present. Note that after this, target_in_provider
        * can either be absolute, or relative to the root of the provider. */
       target_in_provider = _srt_get_path_after (libc_target,
-                                                self->provider->path_in_container_ns);
+                                                arch->provider->path_in_container_ns);
 
       if (target_in_provider == NULL)
         target_in_provider = libc_target;
@@ -5597,10 +5619,14 @@ pv_runtime_collect_libc_family (PvRuntime *self,
       else
         gconv_prefix = "/";
 
+      /* This always starts with a slash, but pv_runtime_library_data_try()
+       * wants paths with no slash, hence the +1 below. */
       gconv_dir_in_provider = g_build_filename (gconv_prefix, dir, "gconv", NULL);
 
-      if (pv_runtime_try_gconv_dir (self, &gconv_dir_in_provider,
-                                    gconv_in_provider))
+      if (pv_runtime_library_data_try (gconv_in_provider,
+                                       gconv_dir_in_provider + 1,
+                                       arch->provider,
+                                       "glibc directory", dir, NULL))
         found = TRUE;
 
       if (!found)
@@ -5625,8 +5651,12 @@ pv_runtime_collect_libc_family (PvRuntime *self,
 
           g_clear_pointer (&gconv_dir_in_provider, g_free);
           gconv_dir_in_provider = g_build_filename (gconv_prefix, dir, "gconv", NULL);
-          if (pv_runtime_try_gconv_dir (self, &gconv_dir_in_provider,
-                                        gconv_in_provider))
+
+          if (pv_runtime_library_data_try (gconv_in_provider,
+                                           gconv_dir_in_provider + 1,
+                                           arch->provider,
+                                           "glibc directory without hwcaps",
+                                           dir, NULL))
             found = TRUE;
         }
 
@@ -5671,10 +5701,7 @@ typedef enum
  * @extra_suffix: (nullable): Subdirectory of ${libdir} where we expect
  *  the library to be located, e.g. `/dri`, or %NULL if none
  * @flags: Flags
- * @data_in_provider: (element-type filename ignored): A map
- *  `{ owned string => itself }` representing the set
- *  of data directories discovered. Each directory is represented
- *  as relative to the root of the provider, e.g. `usr/share/drirc.d`.
+ * @data_in_provider: Collection of data directories to update
  */
 static void
 pv_runtime_collect_lib_data (PvRuntime *self,
@@ -5683,7 +5710,7 @@ pv_runtime_collect_lib_data (PvRuntime *self,
                              const char *lib_in_provider,
                              const char *extra_suffix,
                              PvRuntimeDataFlags flags,
-                             GHashTable *data_in_provider)
+                             PvRuntimeLibraryData *data_in_provider)
 {
   const char *libdir_suffixes[] =
   {
@@ -5698,7 +5725,7 @@ pv_runtime_collect_lib_data (PvRuntime *self,
   g_autofree gchar *dir_in_provider_usr_share = NULL;
 
   g_return_if_fail (PV_IS_RUNTIME (self));
-  g_return_if_fail (self->provider != NULL);
+  g_return_if_fail (arch->provider != NULL);
   g_return_if_fail (runtime_architecture_check_valid (arch));
   g_return_if_fail (dir_basename != NULL);
   g_return_if_fail (lib_in_provider != NULL);
@@ -5716,16 +5743,11 @@ pv_runtime_collect_lib_data (PvRuntime *self,
   dir_in_provider_usr_share = g_build_filename ("usr", "share", dir_basename, NULL);
 
   if ((flags & PV_RUNTIME_DATA_FLAGS_USR_SHARE_FIRST)
-      && _srt_sysroot_test (self->provider->in_current_ns,
-                            dir_in_provider_usr_share,
-                            SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY, NULL))
-    {
-      g_debug ("Using \"/%s\" based on hard-coded /usr/share",
-               dir_in_provider_usr_share);
-      g_hash_table_add (data_in_provider,
-                        g_steal_pointer (&dir_in_provider_usr_share));
-      return;
-    }
+      && pv_runtime_library_data_try (data_in_provider,
+                                      dir_in_provider_usr_share,
+                                      arch->provider,
+                                      "hard-coded", "/usr/share", NULL))
+    return;
 
   /* lib_in_provider can either be absolute, or relative to the root of
    * the provider: normalize it to relative so we only have to deal with
@@ -5792,29 +5814,25 @@ pv_runtime_collect_lib_data (PvRuntime *self,
 
   g_return_if_fail (dir_in_provider[0] != '/');
 
-  if (_srt_sysroot_test (self->provider->in_current_ns,
-                         dir_in_provider,
-                         SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY, NULL))
-    {
-      g_debug ("Using \"/%s\" based on library path \"/%s\"",
-               dir_in_provider, lib_in_provider);
-      g_hash_table_add (data_in_provider,
-                        g_steal_pointer (&dir_in_provider));
-      return;
-    }
+  if (pv_runtime_library_data_try (data_in_provider, dir_in_provider,
+                                   arch->provider,
+                                   "library path", lib_in_provider, NULL))
+    return;
 
   if (!(flags & PV_RUNTIME_DATA_FLAGS_USR_SHARE_FIRST)
-      && strcmp (dir_in_provider, dir_in_provider_usr_share) != 0
-      && _srt_sysroot_test (self->provider->in_current_ns,
-                            dir_in_provider_usr_share,
-                            SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY, NULL))
+      && strcmp (dir_in_provider, dir_in_provider_usr_share) != 0)
     {
-      g_debug ("Using \"/%s\" based on fallback to /usr/share, because "
-               "\"/%s\" based on \"/%s\" is not a directory",
-               dir_in_provider_usr_share, dir_in_provider, lib_in_provider);
-      g_hash_table_add (data_in_provider,
-                        g_steal_pointer (&dir_in_provider_usr_share));
-      return;
+      g_autofree gchar *because = NULL;
+
+      because = g_strdup_printf (", because \"/%s\" based on \"/%s\" is not a directory",
+                                 dir_in_provider,
+                                 lib_in_provider);
+
+      if (pv_runtime_library_data_try (data_in_provider,
+                                       dir_in_provider_usr_share,
+                                       arch->provider,
+                                       "fallback to", "usr/share", because))
+        return;
     }
 
   if (flags & PV_RUNTIME_DATA_FLAGS_IGNORE_MISSING)
@@ -5843,13 +5861,12 @@ pv_runtime_collect_lib_data (PvRuntime *self,
  * @dir_basename: Directory in ${datadir}, e.g. `drirc.d`
  * @lib_symlink: The symlink created by capsule-capture-libs,
  *  relative to /overrides.
- *  Its target is either `self->provider->path_in_container_ns`
+ *  Its target is either `arch->provider->path_in_container_ns`
  *  followed by the path to a library in the graphics stack provider
  *  namespace, or the path to a library in a non-standard directory such
  *  as /opt with no special prefix.
  * @flags: Flags
- * @data_in_provider: Map { owned string => itself } representing the set
- *  of data directories discovered
+ * @data_in_provider: Collection of data directories to update
  *
  * Returns: %TRUE if @lib_symlink exists and is a symlink
  */
@@ -5859,13 +5876,12 @@ pv_runtime_collect_lib_symlink_data (PvRuntime *self,
                                      const char *dir_basename,
                                      const char *lib_symlink,
                                      PvRuntimeDataFlags flags,
-                                     GHashTable *data_in_provider)
+                                     PvRuntimeLibraryData *data_in_provider)
 {
   g_autofree char *target = NULL;
   const char *target_in_provider;
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
-  g_return_val_if_fail (self->provider != NULL, FALSE);
   g_return_val_if_fail (runtime_architecture_check_valid (arch), FALSE);
   g_return_val_if_fail (dir_basename != NULL, FALSE);
   g_return_val_if_fail (lib_symlink != NULL, FALSE);
@@ -5898,7 +5914,7 @@ pv_runtime_collect_lib_symlink_data (PvRuntime *self,
    * or relative to the root of the provider. */
 
   target_in_provider = _srt_get_path_after (target,
-                                            self->provider->path_in_container_ns);
+                                            arch->provider->path_in_container_ns);
 
   if (target_in_provider == NULL)
     target_in_provider = target;
@@ -5914,7 +5930,7 @@ collect_one_mesa_drirc (PvRuntime *self,
                         RuntimeArchitecture *arch,
                         const IcdDetails *details,
                         PvRuntimeDataFlags flags,
-                        GHashTable *drirc_data_in_provider)
+                        PvRuntimeLibraryData *drirc_data_in_provider)
 {
   g_autofree gchar *symlink = NULL;
   const gsize multiarch_index = arch->multiarch_index;
@@ -5969,7 +5985,7 @@ collect_mesa_drirc (PvRuntime *self,
                     GPtrArray *egl_icd_details,
                     GPtrArray *vulkan_icd_details,
                     SrtSystemInfo *arch_system_info,
-                    GHashTable *drirc_data_in_provider)
+                    PvRuntimeLibraryData *drirc_data_in_provider)
 {
   g_autoptr(SrtObjectList) dri_drivers = NULL;
 
@@ -6041,15 +6057,14 @@ collect_mesa_drirc (PvRuntime *self,
  *  in diagnostic messages
  * @all_from_provider: %TRUE if the instances of @lib_name for all
  *  architectures came from the graphics stack provider
- * @data_in_provider: (element-type filename ignored): A set of
- *  filenames for @dir_basename relative to the root of the graphics
- *  stack provider, for example `{ "usr/share/drirc.d", "app/share/drirc.d" }`
+ * @data_in_provider: Data directories we previously collected
  * @error: Used to raise an error on failure
  *
  * Make each path in @data_in_provider available in the final container
  * at the same path.
  *
- * Additionally, make one of them available at `usr/share/` + @dir_basename.
+ * Additionally, make the highest-precedence of them available at
+ * `usr/share/` + @dir_basename.
  *
  * Returns: %TRUE on success
  */
@@ -6059,20 +6074,21 @@ pv_runtime_finish_lib_data (PvRuntime *self,
                             const gchar *dir_basename,
                             const gchar *lib_name,
                             gboolean all_from_provider,
-                            GHashTable *data_in_provider,
+                            PvRuntimeLibraryData *data_in_provider,
                             GError **error)
 {
   g_autofree gchar *canonical_path = NULL;
-  g_auto(SrtHashTableIter) iter = SRT_HASH_TABLE_ITER_CLEARED;
   const gchar *data_path = NULL;
+  PvGraphicsProvider *provider = NULL;
+  gsize iter;
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (self->providers != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
   g_return_val_if_fail (dir_basename != NULL, FALSE);
 
   canonical_path = g_build_filename ("usr", "share", dir_basename, NULL);
 
-  if (g_hash_table_size (data_in_provider) > 0 && !all_from_provider)
+  if (data_in_provider->paths->len > 0 && !all_from_provider)
     {
       /* See the explanation in the similar
        * "any_libc_from_provider && !all_libc_from_provider" case, above */
@@ -6082,20 +6098,23 @@ pv_runtime_finish_lib_data (PvRuntime *self,
     }
 
   /* We might have more than one data directory in the provider,
-   * e.g. one for each supported multiarch tuple */
+   * e.g. one for each supported multiarch tuple - and in more complex
+   * scenarios, each one might come from a different graphics stack
+   * provider. We prefer the one that was found first, which will have
+   * come from the highest-precedence architecture. */
+  pv_runtime_library_data_iter_init (data_in_provider, &iter);
 
-  _srt_hash_table_iter_init_sorted (&iter, data_in_provider,
-                                    self->arbitrary_str_order);
-
-  while (_srt_hash_table_iter_next (&iter, &data_path, NULL))
+  while (pv_runtime_library_data_iter_next (data_in_provider, &iter,
+                                            &data_path, &provider))
     {
       g_warn_if_fail (data_path != NULL && data_path[0] != '/');
 
       /* If we found a library at foo/lib/libbar.so.0 and then found its
        * data in foo/share/bar, it's reasonable to expect that libbar
        * will still be looking for foo/share/bar in the container. */
-      if (!pv_runtime_take_from_provider (self, bwrap,
-                                          data_path, data_path,
+      if (!pv_runtime_take_from_provider (self,
+                                          provider, data_path,
+                                          bwrap, data_path,
                                           (TAKE_FROM_PROVIDER_FLAGS_IF_DIR
                                            | TAKE_FROM_PROVIDER_FLAGS_IF_CONTAINER_COMPATIBLE),
                                           error))
@@ -6115,8 +6134,9 @@ pv_runtime_finish_lib_data (PvRuntime *self,
                                           NULL);
           if (_srt_fstatat_is_same_file (-1, data_path, -1, path_in_usr))
             {
-              if (!pv_runtime_take_from_provider (self, bwrap,
-                                                  data_path, path_in_usr,
+              if (!pv_runtime_take_from_provider (self,
+                                                  provider, data_path,
+                                                  bwrap, path_in_usr,
                                                   TAKE_FROM_PROVIDER_FLAGS_IF_DIR,
                                                   error))
                 return FALSE;
@@ -6127,7 +6147,7 @@ pv_runtime_finish_lib_data (PvRuntime *self,
   /* In the common case where data_in_provider contains canonical_path,
    * we have already made it available at canonical_path in the container.
    * Nothing more to do here. */
-  if (g_hash_table_contains (data_in_provider, canonical_path))
+  if (pv_runtime_library_data_contains (data_in_provider, canonical_path))
     return TRUE;
 
   /* In the uncommon case where data_in_provider *does not* contain
@@ -6140,25 +6160,16 @@ pv_runtime_finish_lib_data (PvRuntime *self,
    * found the x86_64 library in usr/lib/x86_64-linux-gnu but the
    * i386 library in app/lib/i386-linux-gnu, as we do in Flatpak -
    * then we don't have a great way to choose between them, so just
-   * pick one and hope for the best. In Flatpak, it is normal for
-   * this to happen because of the way multiarch has been implemented,
-   * but we know that both are very likely to be up-to-date, so we
-   * can pick either one and be happy. Otherwise, we'll warn in this
-   * case. */
-  if (!self->is_flatpak_env
-      && g_hash_table_size (data_in_provider) > 1)
-    {
-      g_warning ("Found more than one possible %s data directory from provider",
-                 dir_basename);
-    }
+   * pick the one associated with the highest-priority architecture
+   * and hope for the best. */
 
-  data_path = pv_hash_table_get_first_key (data_in_provider,
-                                           self->arbitrary_str_order);
+  pv_runtime_library_data_iter_init (data_in_provider, &iter);
 
-  if (data_path != NULL)
-    return pv_runtime_take_from_provider (self, bwrap,
-                                          data_path,
-                                          canonical_path,
+  if (pv_runtime_library_data_iter_next (data_in_provider, &iter,
+                                         &data_path, &provider))
+    return pv_runtime_take_from_provider (self,
+                                          provider, data_path,
+                                          bwrap, canonical_path,
                                           TAKE_FROM_PROVIDER_FLAGS_IF_CONTAINER_COMPATIBLE,
                                           error);
   else
@@ -6190,10 +6201,10 @@ pv_runtime_take_misc_data_from_provider (PvRuntime *self,
 static gboolean
 pv_runtime_finish_libc_family (PvRuntime *self,
                                FlatpakBwrap *bwrap,
-                               GHashTable *gconv_in_provider,
+                               PvRuntimeLibraryData *gconv_in_provider,
                                GError **error)
 {
-  g_auto(SrtHashTableIter) iter = SRT_HASH_TABLE_ITER_CLEARED;
+  PvGraphicsProvider *gconv_provider;
   const gchar *gconv_path;
   gsize i;
   /* List of paths where we expect to find "locale", sorted by the most
@@ -6210,6 +6221,10 @@ pv_runtime_finish_libc_family (PvRuntime *self,
 #elif defined(__aarch64__)
     "/usr/aarch64-unknown-linux-gnueabi/lib/locale",
 #endif
+    NULL
+  };
+  static const gchar * const share_i18n_path[] = {
+    "/usr/share/i18n",
     NULL
   };
   static const struct
@@ -6244,7 +6259,7 @@ pv_runtime_finish_libc_family (PvRuntime *self,
      * /usr/sbin/zic from libc-bin. */
   };
 
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (self->providers != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
 
   if (self->any_libc_from_provider && !self->all_libc_from_provider)
@@ -6275,11 +6290,10 @@ pv_runtime_finish_libc_family (PvRuntime *self,
                                               error))
         return FALSE;
 
-      if (!pv_runtime_take_from_provider (self, bwrap,
-                                          "/usr/share/i18n",
-                                          "/usr/share/i18n",
-                                          TAKE_FROM_PROVIDER_FLAGS_IF_EXISTS,
-                                          error))
+      if (!pv_runtime_take_any_from_provider (self, bwrap, share_i18n_path,
+                                              "/usr/share/i18n",
+                                              TAKE_FROM_PROVIDER_FLAGS_IF_EXISTS,
+                                              error))
         return FALSE;
 
       for (i = 0; i < G_N_ELEMENTS (glibc_executables); i++)
@@ -6289,15 +6303,32 @@ pv_runtime_finish_libc_family (PvRuntime *self,
           g_autofree char *provider_impl = NULL;
           g_autofree char *target_path_alloc = NULL;
           const char *target_path = glibc_executables[i].target_path;
+          PvGraphicsProvider *provider = NULL;
           TakeFromProviderFlags flags;
-          const gchar *search_paths = NULL;
+          gsize provider_index;
 
-          if (_srt_sysroot_is_direct (self->provider->in_current_ns))
-            search_paths = g_environ_getenv (self->original_environ, "PATH");
+          for (provider_index = 0;
+               provider_index < self->providers->len;
+               provider_index++)
+            {
+              const gchar *search_paths = NULL;
 
-          provider_impl = pv_graphics_provider_search_in_path_and_bin (self->provider,
-                                                                       search_paths,
-                                                                       executable);
+              provider = g_ptr_array_index (self->providers, provider_index);
+
+              if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+                continue;
+
+              if (_srt_sysroot_is_direct (provider->in_current_ns))
+                search_paths = g_environ_getenv (self->original_environ, "PATH");
+
+              provider_impl = pv_graphics_provider_search_in_path_and_bin (provider,
+                                                                           search_paths,
+                                                                           executable);
+
+              /* Leaves provider set to this one */
+              if (provider_impl != NULL)
+                break;
+            }
 
           if (target_path == NULL)
             {
@@ -6317,8 +6348,9 @@ pv_runtime_finish_libc_family (PvRuntime *self,
               else
                 g_debug ("Cannot find %s", executable);
             }
-          else if (!pv_runtime_take_from_provider (self, bwrap, provider_impl,
-                                                   target_path,
+          else if (!pv_runtime_take_from_provider (self,
+                                                   provider, provider_impl,
+                                                   bwrap, target_path,
                                                    flags,
                                                    &local_error))
             {
@@ -6338,14 +6370,14 @@ pv_runtime_finish_libc_family (PvRuntime *self,
 
       g_debug ("Making provider gconv modules visible in container");
 
-      _srt_hash_table_iter_init_sorted (&iter, gconv_in_provider,
-                                        self->arbitrary_str_order);
+      pv_runtime_library_data_iter_init (gconv_in_provider, &i);
 
-      while (_srt_hash_table_iter_next (&iter, &gconv_path, NULL))
+      while (pv_runtime_library_data_iter_next (gconv_in_provider, &i,
+                                                &gconv_path, &gconv_provider))
         {
-          if (!pv_runtime_take_from_provider (self, bwrap,
-                                              gconv_path,
-                                              gconv_path,
+          if (!pv_runtime_take_from_provider (self,
+                                              gconv_provider, gconv_path,
+                                              bwrap, gconv_path,
                                               TAKE_FROM_PROVIDER_FLAGS_IF_DIR,
                                               error))
             return FALSE;
@@ -6598,7 +6630,7 @@ collect_vdpau_drivers (PvRuntime *self,
   self->any_vdpau_drivers = TRUE;
   details_arr = icd_details_array_sized_new (g_list_length (vdpau_drivers));
   icd_details_fill_array_single_arch (details_arr,
-                                      self->provider,
+                                      arch->provider,
                                       vdpau_drivers,
                                       multiarch_index);
 
@@ -6672,11 +6704,11 @@ collect_dri_drivers (PvRuntime *self,
   details_arr = icd_details_array_sized_new (g_list_length (dri_drivers)
                                              + g_list_length (va_api_drivers));
   icd_details_fill_array_single_arch (details_arr,
-                                      self->provider,
+                                      arch->provider,
                                       dri_drivers,
                                       multiarch_index);
   icd_details_fill_array_single_arch (details_arr,
-                                      self->provider,
+                                      arch->provider,
                                       va_api_drivers,
                                       multiarch_index);
   j = 0;
@@ -6873,56 +6905,61 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   g_autoptr(SrtProfilingTimer) part_timer = NULL;
   gboolean all_libglx_from_provider = TRUE;
   gboolean all_libdrm_from_provider = TRUE;
-  g_autoptr(GHashTable) drirc_data_in_provider = g_hash_table_new_full (g_str_hash,
-                                                                        g_str_equal,
-                                                                        g_free, NULL);
-  g_autoptr(GHashTable) libdrm_data_in_provider = g_hash_table_new_full (g_str_hash,
-                                                                         g_str_equal,
-                                                                         g_free, NULL);
-  g_autoptr(GHashTable) nvidia_data_in_provider = g_hash_table_new_full (g_str_hash,
-                                                                         g_str_equal,
-                                                                         g_free, NULL);
-  g_autoptr(GHashTable) gconv_in_provider = g_hash_table_new_full (g_str_hash, g_str_equal,
-                                                                   g_free, NULL);
-  const gchar *provider_label = "provider";
+  g_auto(PvRuntimeLibraryData) drirc_data_in_provider = {};
+  g_auto(PvRuntimeLibraryData) libdrm_data_in_provider = {};
+  g_auto(PvRuntimeLibraryData) nvidia_data_in_provider = {};
+  g_auto(PvRuntimeLibraryData) gconv_in_provider = {};
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
-  g_return_val_if_fail (self->provider != NULL, FALSE);
+  g_return_val_if_fail (self->providers != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
   g_return_val_if_fail (bwrap == NULL || !pv_bwrap_was_finished (bwrap), FALSE);
   g_return_val_if_fail (container_env != NULL, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
-  timer = _srt_profiling_start ("Using graphics stack from %s",
-                                self->provider->in_current_ns->path);
+  timer = _srt_profiling_start ("Using graphics stack from provider(s)");
 
   if (!pv_runtime_provide_container_access (self, error))
     return FALSE;
 
   provider_stack = icd_stack_new ();
-  icd_stack_enumerate (provider_stack,
-                       self->flags,
-                       self->provider,
-                       provider_label);
 
-  if (self->interpreter_host_provider != NULL)
+  for (i = 0; i < self->providers->len; i++)
     {
-      const gchar *host_label = "host";
-      PvRuntimeFlags host_flags = self->flags;
+      PvGraphicsProvider *provider = g_ptr_array_index (self->providers, i);
 
-      /* We currently assume there are no FEX thunks for OpenXR */
-      host_flags &= ~PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES;
+      if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+        {
+          PvRuntimeFlags host_flags = self->flags;
 
-      host_stack = icd_stack_new ();
-      icd_stack_enumerate (host_stack,
-                           host_flags,
-                           self->interpreter_host_provider,
-                           host_label);
+          /* We currently assume there are no FEX thunks for OpenXR */
+          host_flags &= ~PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES;
+
+          if (host_stack == NULL)
+            host_stack = icd_stack_new ();
+
+          icd_stack_enumerate (host_stack,
+                               host_flags,
+                               provider,
+                               "host");
+        }
+      else
+        {
+          icd_stack_enumerate (provider_stack,
+                               self->flags,
+                               provider,
+                               "provider");
+        }
     }
 
   /* We set this FALSE later if we decide not to use the provider libc
    * for some architecture. */
   self->all_libc_from_provider = TRUE;
+
+  pv_runtime_library_data_init (&drirc_data_in_provider);
+  pv_runtime_library_data_init (&libdrm_data_in_provider);
+  pv_runtime_library_data_init (&nvidia_data_in_provider);
+  pv_runtime_library_data_init (&gconv_in_provider);
 
   g_assert (pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES] == NULL);
 
@@ -7045,7 +7082,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                 return FALSE;
             }
 
-          arch_system_info = pv_graphics_provider_get_system_info (self->provider,
+          arch_system_info = pv_graphics_provider_get_system_info (arch->provider,
                                                                    arch_quark);
 
           if ((self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
@@ -7098,7 +7135,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                                           bwrap,
                                                           soname_symlink,
                                                           ld_so_in_runtime,
-                                                          gconv_in_provider,
+                                                          &gconv_in_provider,
                                                           error))
                     return FALSE;
                 }
@@ -7115,11 +7152,11 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           if (!pv_runtime_collect_lib_symlink_data (self, arch, "libdrm",
                                                     libdrm_amdgpu,
                                                     PV_RUNTIME_DATA_FLAGS_NONE,
-                                                    libdrm_data_in_provider)
+                                                    &libdrm_data_in_provider)
               && !pv_runtime_collect_lib_symlink_data (self, arch, "libdrm",
                                                        libdrm,
                                                        PV_RUNTIME_DATA_FLAGS_NONE,
-                                                       libdrm_data_in_provider))
+                                                       &libdrm_data_in_provider))
             {
               /* For at least a single architecture, libdrm is newer in the container */
               all_libdrm_from_provider = FALSE;
@@ -7134,7 +7171,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           if (!pv_runtime_collect_lib_symlink_data (self, arch, "drirc.d",
                                                     libglx_mesa,
                                                     PV_RUNTIME_DATA_FLAGS_NONE,
-                                                    drirc_data_in_provider))
+                                                    &drirc_data_in_provider))
             {
               /* For at least a single architecture, libGLX_mesa is newer in the container */
               all_libglx_from_provider = FALSE;
@@ -7143,7 +7180,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           collect_mesa_drirc (self, arch, provider_stack->egl_icd_details,
                               provider_stack->vulkan_icd_details,
                               arch_system_info,
-                              drirc_data_in_provider);
+                              &drirc_data_in_provider);
 
           libglx_nvidia = g_build_filename (arch->libdir_relative_to_overrides,
                                             "libGLX_nvidia.so.0", NULL);
@@ -7155,7 +7192,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           pv_runtime_collect_lib_symlink_data (self, arch, "nvidia",
                                                libglx_nvidia,
                                                PV_RUNTIME_DATA_FLAGS_USR_SHARE_FIRST,
-                                               nvidia_data_in_provider);
+                                               &nvidia_data_in_provider);
 
           dirs = pv_multiarch_details_get_libdirs (arch->details,
                                                    PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
@@ -7187,12 +7224,18 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
       g_clear_pointer (&part_timer, _srt_profiling_end);
     }
 
-  if (self->interpreter_host_provider != NULL)
+  /* In practice we will only have one graphics stack provider for the
+   * interpreter host, but for completeness, iterate through 0 or more */
+  for (j = 0; j < self->providers->len; j++)
     {
+      PvGraphicsProvider *provider = g_ptr_array_index (self->providers, j);
       gsize n;
       const GQuark *host_tuples;
 
-      host_tuples = pv_graphics_provider_get_architectures (self->interpreter_host_provider, &n);
+      if (!(provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST))
+        continue;
+
+      host_tuples = pv_graphics_provider_get_architectures (provider, &n);
 
       for (i = 0; i < n; i++)
         {
@@ -7200,9 +7243,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           SrtSystemInfo *arch_system_info;
           const char *tuple = g_quark_to_string (arch_quark);
 
-          arch_system_info = pv_graphics_provider_get_system_info (self->interpreter_host_provider,
+          arch_system_info = pv_graphics_provider_get_system_info (provider,
                                                                    arch_quark);
-
           pv_append_host_dri_library_paths (self,
                                             arch_system_info,
                                             tuple,
@@ -7234,21 +7276,21 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
       return FALSE;
     }
 
-  if (!pv_runtime_finish_libc_family (self, bwrap, gconv_in_provider, error))
+  if (!pv_runtime_finish_libc_family (self, bwrap, &gconv_in_provider, error))
     return FALSE;
 
   if (!pv_runtime_finish_lib_data (self, bwrap, "libdrm", "libdrm",
                                    all_libdrm_from_provider,
-                                   libdrm_data_in_provider, error))
+                                   &libdrm_data_in_provider, error))
     return FALSE;
 
   if (!pv_runtime_finish_lib_data (self, bwrap, "drirc.d", "libGLX_mesa.so.0",
                                    all_libglx_from_provider,
-                                   drirc_data_in_provider, error))
+                                   &drirc_data_in_provider, error))
     return FALSE;
 
   if (!pv_runtime_finish_lib_data (self, bwrap, "nvidia", "libGLX_nvidia.so.0",
-                                   TRUE, nvidia_data_in_provider, error))
+                                   TRUE, &nvidia_data_in_provider, error))
     return FALSE;
 
   if (!pv_runtime_take_misc_data_from_provider (self, bwrap, error))
@@ -7518,7 +7560,7 @@ pv_runtime_bind (PvRuntime *self,
         return FALSE;
     }
 
-  if (self->provider != NULL)
+  if (self->providers != NULL)
     {
       if (!pv_runtime_use_provider_graphics_stack (self, bwrap,
                                                    container_env,
@@ -7871,6 +7913,7 @@ pv_runtime_has_library (PvRuntime *self,
   for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
     {
       const PvMultiarchDetails *details = &pv_multiarch_details[i];
+      GQuark arch_quark = g_quark_from_static_string (details->tuple);
       g_autoptr(GPtrArray) dirs = NULL;
       gsize j;
 
@@ -7881,6 +7924,7 @@ pv_runtime_has_library (PvRuntime *self,
         {
           const char *libdir = g_ptr_array_index (dirs, j);
           g_autofree gchar *path = g_build_filename (libdir, library, NULL);
+          PvGraphicsProvider *provider;
 
           if (self->mutable_sysroot != NULL)
             {
@@ -7916,6 +7960,8 @@ pv_runtime_has_library (PvRuntime *self,
                 }
             }
 
+          provider = pv_runtime_get_graphics_provider (self, arch_quark);
+
           /* If the graphics stack provider is not the same as the current
            * namespace (in practice this rarely/never happens), we also
            * want to steer clear of libraries that only exist in the
@@ -7925,10 +7971,11 @@ pv_runtime_has_library (PvRuntime *self,
            * and the library doesn't exist in the container runtime, then
            * it's OK to use libraries from it in LD_PRELOAD, because there
            * is no other version that might have been meant. */
-          if (self->provider != NULL
-              && !_srt_sysroot_is_direct (self->provider->in_current_ns))
+          if (provider != NULL
+              && !(provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+              && !_srt_sysroot_is_direct (provider->in_current_ns))
             {
-              if (_srt_sysroot_test (self->provider->in_current_ns, path,
+              if (_srt_sysroot_test (provider->in_current_ns, path,
                                      SRT_RESOLVE_FLAGS_NONE, NULL))
                 {
                   g_debug ("-> yes, ${provider}/%s", path);

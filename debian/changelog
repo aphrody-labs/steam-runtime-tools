@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20250910.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20250918.0) UNRELEASED; urgency=medium
 
   [ Simon McVittie ]
   * pressure-vessel:
@@ -14,9 +14,12 @@ steam-runtime-tools (0.20250910.0) UNRELEASED; urgency=medium
       (steamrt/tasks#774)
     - Make better use of cached information about drivers
       (steam-runtime-tools!831, steam-runtime-tools!832)
-    - Refactoring to make architecture support more flexible
-      (steam-runtime-tools!840, steam-runtime-tools!833,
-      steam-runtime-tools!834)
+    - Add experimental options to select separate graphics stack providers
+      on a per-architecture basis. For best results they should all be at
+      the same version of key components such as glibc and Mesa: for example,
+      x86_64 Debian 13 and i386 Debian 13 works well, but
+      x86_64 Debian 13 and i386 Debian 12 or vice versa should not be
+      expected to be reliable. (steamrt/tasks#785)
   * Diagnostic tools:
     - x86_64 is now sorted before i386 in steam-runtime-system-info output
     - steam-runtime-launch-options now offers 'Use "classic" SDL2'
@@ -40,7 +43,7 @@ steam-runtime-tools (0.20250910.0) UNRELEASED; urgency=medium
   [ Timo Witte ]
   * Fix a typo (ValveSoftware/steam-runtime#775)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 17 Sep 2025 15:37:25 +0100
+ -- Simon McVittie <smcv@collabora.com>  Thu, 18 Sep 2025 11:55:29 +0100
 
 steam-runtime-tools (0.20250820.0) steamrt; urgency=medium
 

@@ -48,7 +48,8 @@ const char *icd_kind_to_string (IcdKind kind);
  *  for %ICD_KIND_ABSOLUTE it is the absolute path in the provider's
  *  namespace (but possibly contains libdl dynamic string tokens),
  *  and for other kinds it is %NULL.
- * @path_in_container: If the @kind is %ICD_KIND_ABSOLUTE, then this is
+ * @path_in_container: If the @kind is %ICD_KIND_ABSOLUTE or %ICD_KIND_SONAME,
+ *  then this is
  *  a concrete, absolute path accessible in the container from which the
  *  library will be loadable, with no libdl dynamic string tokens,
  *  for example "/run/host/usr/lib/.../libfoo.so" or

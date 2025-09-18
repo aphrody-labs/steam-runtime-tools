@@ -2335,6 +2335,13 @@ bind_icds (PvRuntime *self,
                                      options,
                                      details_arch->resolved_library);
           g_ptr_array_add (libdir_patterns, g_steal_pointer (&pattern));
+
+          /* Even though we have not actually run capsule-capture-libs yet,
+           * we can predict where it's going to end up:
+           * it will be ${overrides}/lib/${arch}/${SONAME}. */
+          details_arch->path_in_container = g_build_filename (arch->libdir_in_container,
+                                                              details_arch->resolved_library,
+                                                              NULL);
           continue;
         }
 
@@ -2679,12 +2686,12 @@ success:
             /* No point in outputting this for SONAME since it will
              * just be the basename of the library, again */
             g_info ("Path in provider: %s", details_arch->resolved_library);
-            g_info ("Path in container: %s", details_arch->path_in_container);
-            g_warn_if_fail (details_arch->path_in_container != NULL);
             /* Fall through */
 
           case ICD_KIND_SONAME:
             g_warn_if_fail (details_arch->resolved_library != NULL);
+            g_info ("Path in container: %s", details_arch->path_in_container);
+            g_warn_if_fail (details_arch->path_in_container != NULL);
             break;
 
           case ICD_KIND_META_LAYER:

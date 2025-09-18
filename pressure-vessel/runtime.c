@@ -4539,9 +4539,8 @@ get_manifest_relative_to_overrides (gpointer icd,
  *  of JSON manifests already created. Used internally to notice when
  *  to use unique sub directories to avoid naming conflicts. Ignored and may be
  *  %NULL for OpenXR runtimes and Vulkan layers. Required for other file types.
- * @content_seen: (nullable): A map `{ unowned string => unowned path }`
- *  representing JSON manifests with unique content, used to detect and suppress
- *  exact duplicates. If %NULL, duplicates are not suppressed.
+ * @deduplicator: (nullable): A #PvManifestDeduplicator or %NULL.
+ *  If %NULL, duplicates are not suppressed.
  * @search_path: Used to build `$VK_DRIVER_FILES` or a similar search path
  * @error: Used to raise an error on failure
  *
@@ -4555,7 +4554,7 @@ setup_json_manifest (PvRuntime *self,
                      int digits,
                      gsize seq,
                      GHashTable *json_set,
-                     GHashTable *content_seen,
+                     PvManifestDeduplicator *deduplicator,
                      GString *search_path,
                      GError **error)
 {
@@ -4572,9 +4571,7 @@ setup_json_manifest (PvRuntime *self,
   g_autofree gchar *json_basename = NULL;
   const char *json_in_provider = NULL;
   const char *library_arch = NULL;
-  const char *original_json = NULL;
   gsize i;
-  void *other_voidp;
 
   g_return_val_if_fail (self->provider != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
@@ -4585,7 +4582,6 @@ setup_json_manifest (PvRuntime *self,
   loaded = _srt_base_graphics_module_check_error (base, NULL);
   json_in_provider = module->json_path;
   library_arch = module->library_arch;
-  original_json = module->original_json;
 
   if (SRT_IS_VULKAN_LAYER (details->icd))
     {
@@ -4624,7 +4620,8 @@ setup_json_manifest (PvRuntime *self,
       return TRUE;
     }
 
-  if (original_json != NULL && content_seen != NULL)
+  if (deduplicator != NULL
+      && !pv_manifest_deduplicator_add_if_unique (deduplicator, details))
     {
       /* In a Flatpak environment with i386 multiarch compatibility,
        * we can see two identical copies of files like nvidia_icd.json,
@@ -4638,21 +4635,7 @@ setup_json_manifest (PvRuntime *self,
        * per-architecture filenames like radeon_icd.x86_64.json, which
        * contain absolute paths that will only work for the appropriate
        * architecture. */
-      if (g_hash_table_lookup_extended (content_seen, original_json, NULL,
-                                        &other_voidp))
-        {
-          const char *other = other_voidp;
-
-          g_info ("Ignoring \"%s\" because it has the same content as \"%s\"",
-                  json_in_provider, other);
-          return TRUE;
-        }
-
-      /* Remember it so we can ignore any subsequent duplicates.
-       * Casts are required because GHashTable is not const-correct for
-       * "borrowed" keys and values. */
-      g_hash_table_replace (content_seen, (void *) original_json,
-                            (void *) json_in_provider);
+      return TRUE;
     }
 
   for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
@@ -4852,14 +4835,14 @@ setup_each_json_manifest (PvRuntime *self,
 {
   gsize j;
   g_autoptr(GHashTable) json_set = NULL;
-  g_autoptr(GHashTable) content_seen = NULL;
+  g_autoptr(PvManifestDeduplicator) content_seen = NULL;
   int digits = pv_count_decimal_digits (details->len);
 
   g_return_val_if_fail (self->provider != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
 
   json_set = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
-  content_seen = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, NULL);
+  content_seen = pv_manifest_deduplicator_new ();
 
   for (j = 0; j < details->len; j++)
     {

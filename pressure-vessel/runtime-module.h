@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <stdbool.h>
+
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "libglnx.h"
 
@@ -104,6 +106,8 @@ G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (PvModulePerArch, pv_module_per_arch_clear)
  * @provider: The graphics stack provider where we found this driver
  * @archs: A per-architecture array of details keyed by the index of
  *  a multiarch tuple in @pv_multiarch_tuples
+ * @duplicate: If true, this driver's JSON manifest is a duplicate of a
+ *  previously discovered JSON manifest of the same type.
  *
  * Details of a driver, Vulkan layer or similar thing discovered in a
  * graphics provider.
@@ -173,6 +177,7 @@ typedef struct
   const char *debug_name;
   PvGraphicsProvider *provider;
   PvModulePerArch archs[PV_N_SUPPORTED_ARCHITECTURES];
+  bool is_duplicate : 1;
 } IcdDetails;
 
 void icd_details_free (IcdDetails *self);
@@ -275,5 +280,6 @@ pv_manifest_deduplicator_init (PvManifestDeduplicator *self)
                                                     NULL, NULL);
 }
 
-gboolean pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
-                                                 IcdDetails *details);
+void pv_manifest_deduplicator_populate (PvManifestDeduplicator *self,
+                                        IcdDetails * const *details_arr,
+                                        gsize n);

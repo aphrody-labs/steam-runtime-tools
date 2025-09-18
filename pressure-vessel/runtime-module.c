@@ -408,15 +408,7 @@ icd_stack_free (IcdStack *self)
   g_slice_free (IcdStack, self);
 }
 
-/*
- * pv_manifest_deduplicator_add_if_unique:
- * @self: The deduplicator
- * @details: An #IcdDetails based on a #SrtBaseJsonGraphicsModule
- *
- * Returns: %TRUE if the JSON manifest appears to be unique, or %FALSE
- *  if it was a duplicate of one that we already saw.
- */
-gboolean
+static void
 pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
                                         IcdDetails *details)
 {
@@ -425,8 +417,6 @@ pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
   const char *original_json;
   void *other_voidp;
 
-  g_return_val_if_fail (SRT_IS_BASE_JSON_GRAPHICS_MODULE (details->icd), FALSE);
-
   module = details->icd;
   path_in_provider = module->json_path;
   original_json = module->original_json;
@@ -434,7 +424,7 @@ pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
   /* We don't track the original content of layer manifests to save some
    * memory, because Vulkan-Loader will deduplicate them anyway */
   if (original_json == NULL)
-    return TRUE;
+    return;
 
   if (g_hash_table_lookup_extended (self->content_to_details,
                                     original_json, NULL, &other_voidp))
@@ -447,7 +437,8 @@ pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
               "because it has the same content as \"%s\" in \"%s\"",
               path_in_provider, details->provider->in_current_ns->path,
               other_path, other->provider->in_current_ns->path);
-      return FALSE;
+      details->is_duplicate = true;
+      return;
     }
 
   /* Remember it so we can ignore any subsequent duplicates.
@@ -456,5 +447,20 @@ pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
    * "borrowed" keys and values. */
   g_hash_table_replace (self->content_to_details,
                         (void *) original_json, details);
-  return TRUE;
+}
+
+void
+pv_manifest_deduplicator_populate (PvManifestDeduplicator *self,
+                                   IcdDetails * const *details,
+                                   gsize n)
+{
+  gsize i;
+
+  g_return_if_fail (g_hash_table_size (self->content_to_details) == 0);
+
+  for (i = 0; i < n; i++)
+    {
+      g_return_if_fail (SRT_IS_BASE_JSON_GRAPHICS_MODULE (details[i]->icd));
+      pv_manifest_deduplicator_add_if_unique (self, details[i]);
+    }
 }

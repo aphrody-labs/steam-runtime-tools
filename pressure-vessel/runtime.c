@@ -4661,8 +4661,6 @@ get_manifest_relative_to_overrides (gpointer icd,
  *  of JSON manifests already created. Used internally to notice when
  *  to use unique sub directories to avoid naming conflicts. Ignored and may be
  *  %NULL for OpenXR runtimes and Vulkan layers. Required for other file types.
- * @deduplicator: (nullable): A #PvManifestDeduplicator or %NULL.
- *  If %NULL, duplicates are not suppressed.
  * @search_path: Used to build `$VK_DRIVER_FILES` or a similar search path
  * @error: Used to raise an error on failure
  *
@@ -4676,7 +4674,6 @@ setup_json_manifest (PvRuntime *self,
                      int digits,
                      gsize seq,
                      GHashTable *json_set,
-                     PvManifestDeduplicator *deduplicator,
                      GString *search_path,
                      GError **error)
 {
@@ -4739,24 +4736,6 @@ setup_json_manifest (PvRuntime *self,
   if (!loaded)
     {
       g_debug ("Original JSON manifest failed to load, nothing to do");
-      return TRUE;
-    }
-
-  if (deduplicator != NULL
-      && !pv_manifest_deduplicator_add_if_unique (deduplicator, details))
-    {
-      /* In a Flatpak environment with i386 multiarch compatibility,
-       * we can see two identical copies of files like nvidia_icd.json,
-       * each listing a SONAME which can be loaded equally well by both
-       * word sizes. Deduplicate them by their content.
-       *
-       * Layers don't need this treatment, because Vulkan-Loader will
-       * deduplicate those by their names anyway.
-       *
-       * Mesa also doesn't need (or get) this treatment, because it installs
-       * per-architecture filenames like radeon_icd.x86_64.json, which
-       * contain absolute paths that will only work for the appropriate
-       * architecture. */
       return TRUE;
     }
 
@@ -4997,12 +4976,35 @@ setup_each_json_manifest (PvRuntime *self,
   json_set = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
   pv_manifest_deduplicator_init (&deduplicator);
 
+  /* If we are using more than one graphics stack provider, we could see
+   * more than one identical copy of files like nvidia_icd.json, each
+   * listing a SONAME which can be loaded equally well by more than one
+   * architecture. Deduplicate them by their content.
+   *
+   * Similarly, in a Flatpak environment with i386 multiarch compatibility,
+   * we can see two identical copies of files like nvidia_icd.json,
+   * each listing a SONAME which can be loaded equally well by both
+   * word sizes.
+   *
+   * Layers don't need this treatment, because Vulkan-Loader will
+   * deduplicate those by their names anyway.
+   *
+   * Mesa also doesn't need (or get) this treatment, because it installs
+   * per-architecture filenames like radeon_icd.x86_64.json, which
+   * contain absolute paths that will only work for the appropriate
+   * architecture. */
+  pv_manifest_deduplicator_populate (&deduplicator,
+                                     (IcdDetails **) details->pdata,
+                                     details->len);
+
   for (j = 0; j < details->len; j++)
     {
-      if (!setup_json_manifest (self, bwrap, sub_dir,
-                                g_ptr_array_index (details, j),
-                                digits, j, json_set, &deduplicator,
-                                search_path, error))
+      IcdDetails *d = g_ptr_array_index (details, j);
+
+      if (!d->is_duplicate
+          && !setup_json_manifest (self, bwrap, sub_dir, d,
+                                   digits, j, json_set,
+                                   search_path, error))
         return FALSE;
     }
 
@@ -7499,7 +7501,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                       "/" _SRT_GRAPHICS_OPENXR_1_RUNTIME_SUFFIX,
                                     details,
                                     0, 0,        /* no sequence number used */
-                                    NULL, NULL,  /* no deduplication required */
+                                    NULL,        /* no deduplication required */
                                     openxr_1_runtime_path, error))
             return FALSE;
         }

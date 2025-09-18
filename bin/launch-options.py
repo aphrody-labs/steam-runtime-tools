@@ -38,10 +38,12 @@ except ImportError:
     pass
 
 import gi
+gi.require_version('Gdk', '3.0')
 gi.require_version('Gtk', '3.0')
 
 # Ignore E402: import not at top of file. gi.require_version() must come first
 from gi.repository import GLib      # noqa: E402
+from gi.repository import Gdk       # noqa: E402
 from gi.repository import Gtk       # noqa: E402
 
 logger = logging.getLogger('steam-runtime-launch-options')
@@ -63,6 +65,14 @@ RUNTIMES = [
 # and native Linux (whatever the host system happens to be running, e.g.
 # SteamOS, Debian, Arch, Fedora).
 COMPAT_TARGETS = RUNTIMES + ['windows', 'host']
+
+# Keys treated as "Enter" by GTK
+ENTER_KEYS = [
+    # Main keyboard Enter key, below Backspace
+    Gdk.KEY_Return,
+    # Numeric keypad Enter key
+    Gdk.KEY_KP_Enter,
+]
 
 
 def tristate_environment(name):
@@ -525,14 +535,26 @@ class Gui:
         self._pressure_vessel_changed_id = 0
         self._ldlp_runtime_changed_id = 0
         self._proton_changed_id = 0
+        self._response_id = 0
+        self._key_release_event_id = 0
 
-        self.window = Gtk.Window()
+        self.window = Gtk.Dialog()
         self.window.set_default_size(720, 480)
         self.window.connect('delete-event', Gtk.main_quit)
         self.window.set_title('Launch options')
 
-        self.vbox = Gtk.Box.new(Gtk.Orientation.VERTICAL, 6)
-        self.window.add(self.vbox)
+        self.window.add_button("_Cancel", Gtk.ResponseType.CANCEL)
+        ok_button = self.window.add_button("_Run", Gtk.ResponseType.OK)
+        # Note that grab_default() is not enough here: if the focus is on
+        # a combo box, Enter will go to the combo box, not the default button.
+        ok_button.grab_focus()
+
+        if hasattr(Gtk, 'STYLE_CLASS_SUGGESTED_ACTION'):
+            ok_button.get_style_context().add_class(
+                Gtk.STYLE_CLASS_SUGGESTED_ACTION,
+            )
+
+        self.vbox = self.window.get_content_area()
 
         row = 0
 
@@ -870,24 +892,6 @@ class Gui:
             scrolled_window.props.height_request = 120
         self.grid.attach(scrolled_window, 1, row, 2, 1)
 
-        row += 1
-
-        buttons_grid = Gtk.Grid(
-            column_spacing=6,
-            column_homogeneous=True,
-            halign=Gtk.Align.END,
-        )
-
-        cancel_button = Gtk.Button.new_with_label('Cancel')
-        cancel_button.connect('clicked', Gtk.main_quit)
-        buttons_grid.attach(cancel_button, 0, 0, 1, 1)
-
-        run_button = Gtk.Button.new_with_label('Run')
-        run_button.connect('clicked', self.run_cb)
-        buttons_grid.attach(run_button, 1, 0, 1, 1)
-
-        self.vbox.pack_end(buttons_grid, False, False, 0)
-
         self._container_runtime_changed_id = (
             self.container_runtime_combo.connect(
                 'changed',
@@ -921,6 +925,16 @@ class Gui:
                 'changed',
                 self._proton_changed,
             )
+        )
+
+        self._response_id = self.window.connect(
+            'response',
+            self._dialog_response_cb,
+        )
+
+        self._key_release_event_id = self.window.connect(
+            'key-release-event',
+            self._key_release_event_cb,
         )
 
     def parse_args(
@@ -1682,8 +1696,15 @@ class Gui:
             logger.debug('Command parsed to %r', argv)
             self.app.argv = argv
 
-    def run_cb(self, _ignored=None):
-        # type: (typing.Any) -> None
+    def _dialog_response_cb(
+        self,
+        dialog,     # type: typing.Any
+        response,   # type: int
+    ):
+        # type: (...) -> None
+        if response != Gtk.ResponseType.OK:
+            Gtk.main_quit()
+            return
 
         shell, argv, environ = self.build_argv()
 
@@ -1950,6 +1971,18 @@ class Gui:
 
         if self.failed:
             sys.exit(126)
+
+    def _key_release_event_cb(
+        self,
+        window,     # type: typing.Any
+        event,      # type: typing.Any
+    ):
+        # type: (...) -> None
+        if (
+            event.state & Gdk.ModifierType.CONTROL_MASK
+            and event.keyval in ENTER_KEYS
+        ):
+            self.window.response(Gtk.ResponseType.OK)
 
 
 if __name__ == '__main__':

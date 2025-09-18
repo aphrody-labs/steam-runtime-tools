@@ -2259,6 +2259,10 @@ pv_runtime_capture_libraries (PvRuntime *self,
  * Change `details->archs[multiarch_index].kind` from %ICD_KIND_NONEXISTENT
  * to %ICD_KIND_ABSOLUTE, %ICD_KIND_SONAME or %ICD_KIND_NONEXISTENT
  * as appropriate.
+ *
+ * If the driver is an absolute path, change its
+ * `details->archs[multiarch_index].path_in_container`
+ * from %NULL to a non-%NULL path. Otherwise leave it %NULL.
  */
 static gboolean
 bind_icds (PvRuntime *self,
@@ -2668,6 +2672,29 @@ success:
               subdir, i, details->debug_name);
       g_info ("Implementation on %s: %s",
               arch->details->tuple, type_str);
+
+      switch (details_arch->kind)
+        {
+          case ICD_KIND_ABSOLUTE:
+            /* No point in outputting this for SONAME since it will
+             * just be the basename of the library, again */
+            g_info ("Path in provider: %s", details_arch->resolved_library);
+            g_info ("Path in container: %s", details_arch->path_in_container);
+            g_warn_if_fail (details_arch->path_in_container != NULL);
+            /* Fall through */
+
+          case ICD_KIND_SONAME:
+            g_warn_if_fail (details_arch->resolved_library != NULL);
+            break;
+
+          case ICD_KIND_META_LAYER:
+          case ICD_KIND_NONEXISTENT:
+            g_warn_if_fail (details_arch->path_in_container == NULL);
+            break;
+
+          default:
+            g_warn_if_reached ();
+        }
     }
 
   return TRUE;

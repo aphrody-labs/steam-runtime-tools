@@ -212,6 +212,7 @@ fixture_create_runtime (Fixture *f,
 
   graphics_providers = pv_graphics_provider_build_array ("/",
                                                          NULL,
+                                                         NULL,
                                                          flags,
                                                          &local_error);
   g_assert_no_error (local_error);

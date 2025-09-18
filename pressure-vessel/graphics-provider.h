@@ -78,6 +78,7 @@ SrtSystemInfo *pv_graphics_provider_get_system_info (PvGraphicsProvider *self,
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (PvGraphicsProvider, g_object_unref)
 
 GPtrArray *pv_graphics_provider_build_array (const char *provider_path,
+                                             GHashTable *quark_to_provider,
                                              const SrtKnownArchitecture *host_machine,
                                              PvRuntimeFlags flags,
                                              GError **error);

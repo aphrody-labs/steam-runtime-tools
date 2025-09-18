@@ -150,13 +150,15 @@ cache_indep_graphics_stack (SrtSystemInfo *system_info,
                             PvRuntimeFlags flags,
                             GCancellable *cancellable)
 {
+  const char *label = _srt_system_info_get_sysroot_path (system_info);
+
   if (g_cancellable_is_cancelled (cancellable))
     return;
 
   if (TRUE)
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating EGL ICDs in thread");
+        _srt_profiling_start ("Enumerating %s EGL ICDs in thread", label);
       G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
 
       drivers = srt_system_info_list_egl_icds (system_info, NULL);
@@ -168,7 +170,8 @@ cache_indep_graphics_stack (SrtSystemInfo *system_info,
   if (TRUE)
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating EGL external platforms in thread");
+        _srt_profiling_start ("Enumerating %s EGL external platforms in thread",
+                              label);
       G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
 
       drivers = srt_system_info_list_egl_external_platforms (system_info, NULL);
@@ -180,7 +183,7 @@ cache_indep_graphics_stack (SrtSystemInfo *system_info,
   if (TRUE)
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating Vulkan ICDs in thread");
+        _srt_profiling_start ("Enumerating %s Vulkan ICDs in thread", label);
       G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
 
       drivers = srt_system_info_list_vulkan_icds (system_info, NULL);
@@ -192,7 +195,7 @@ cache_indep_graphics_stack (SrtSystemInfo *system_info,
   if (flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
-        _srt_profiling_start ("Enumerating Vulkan layers in thread");
+        _srt_profiling_start ("Enumerating %s Vulkan layers in thread", label);
       G_GNUC_UNUSED g_autoptr(SrtObjectList) exp_layers = NULL;
       G_GNUC_UNUSED g_autoptr(SrtObjectList) imp_layers = NULL;
 
@@ -856,6 +859,7 @@ pv_graphics_provider_choose_mount_point (const char *path_in_current_ns,
 
 GPtrArray *
 pv_graphics_provider_build_array (const char *provider_path,
+                                  GHashTable *quark_to_provider,
                                   const SrtKnownArchitecture *host_machine,
                                   PvRuntimeFlags flags,
                                   GError **error)
@@ -883,13 +887,48 @@ pv_graphics_provider_build_array (const char *provider_path,
 
   for (i = 0; i < G_N_ELEMENTS (pv_multiarch_details); i++)
     {
+      g_autoptr(PvGraphicsProvider) arch_provider = NULL;
       const char *tuple = pv_multiarch_details[i].tuple;
       GQuark q = g_quark_from_static_string (tuple);
+      const char *arch_path = NULL;
 
-      g_debug ("Architecture %s graphics stack provided by %s",
-               tuple, provider_path);
+      if (quark_to_provider != NULL)
+        arch_path = g_hash_table_lookup (quark_to_provider,
+                                         GUINT_TO_POINTER (q));
 
-      pv_graphics_provider_add_architecture (graphics_provider, q);
+      if (arch_path == NULL || g_str_equal (arch_path, provider_path))
+        {
+          arch_path = provider_path;
+          arch_provider = g_object_ref (graphics_provider);
+        }
+      else
+        {
+          g_autofree gchar *arch_mount = NULL;
+
+          arch_mount = pv_graphics_provider_choose_mount_point (arch_path,
+                                                                tuple,
+                                                                flags,
+                                                                error);
+
+          if (arch_mount == NULL)
+            return NULL;
+
+          arch_provider = pv_graphics_provider_new (arch_path,
+                                                    arch_mount,
+                                                    PV_GRAPHICS_PROVIDER_FLAGS_NONE,
+                                                    error);
+
+          if (arch_provider == NULL)
+            return NULL;
+        }
+
+      g_debug ("Architecture %s graphics stack provided by %s -> %s",
+               tuple, arch_path, arch_provider->path_in_container_ns);
+
+      pv_graphics_provider_add_architecture (arch_provider, q);
+
+      if (!g_ptr_array_find (ret, arch_provider, NULL))
+        g_ptr_array_add (ret, g_object_ref (arch_provider));
 
       if (host_machine != NULL
           && g_str_equal (tuple, host_machine->multiarch_tuple))
@@ -901,12 +940,16 @@ pv_graphics_provider_build_array (const char *provider_path,
         }
     }
 
-  /* Enumerating the graphics provider's drivers only requires things
-   * we already know, so start this first, and let it run in parallel
+  /* Enumerating the graphics providers' drivers only requires things
+   * we already know, so start these first, and let them run in parallel
    * with other setup. The results go in the SrtSystemInfo's cache
    * for future use. */
-  pv_graphics_provider_start_enumeration (graphics_provider, flags, NULL);
-  g_ptr_array_add (ret, g_steal_pointer (&graphics_provider));
+  for (i = 0; i < ret->len; i++)
+    {
+      PvGraphicsProvider *provider = g_ptr_array_index (ret, i);
+
+      pv_graphics_provider_start_enumeration (provider, flags, NULL);
+    }
 
   if (flags & PV_RUNTIME_FLAGS_INTERPRETER_ROOT)
     {

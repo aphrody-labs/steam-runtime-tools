@@ -593,6 +593,7 @@ main (int argc,
           && self->options.graphics_provider[0] != '\0')
         {
           graphics_providers = pv_graphics_provider_build_array (self->options.graphics_provider,
+                                                                 self->options.arch_graphics_providers,
                                                                  host_machine,
                                                                  flags,
                                                                  error);

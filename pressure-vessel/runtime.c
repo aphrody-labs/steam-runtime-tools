@@ -4766,14 +4766,46 @@ setup_json_manifest (PvRuntime *self,
       const SrtKnownArchitecture *arch;
       const char *tuple;
       g_autofree gchar *arch_bits = NULL;
+      gboolean write_per_architecture;
 
       g_assert (i < G_N_ELEMENTS (details->archs));
       details_arch = &details->archs[i];
-      /* By the time we get here, bind_icds() should have figured out
-       * which kind each architecture's instantiation of the library is. */
-      g_warn_if_fail (details_arch->kind != ICD_KIND_UNDECIDED);
-
       tuple = pv_multiarch_tuples[i];
+
+      switch (details_arch->kind)
+        {
+          case ICD_KIND_ABSOLUTE:
+            /* We need to generate a new JSON manifest with the
+             * library_path updated to its in-container value */
+            g_debug ("%s[%s]: absolute path, will generate new manifest",
+                     details->debug_name, tuple);
+            write_per_architecture = TRUE;
+            break;
+
+          case ICD_KIND_SONAME:
+          case ICD_KIND_META_LAYER:
+            /* Can use provider's JSON file as-is */
+            g_debug ("%s[%s]: SONAME or meta-layer, can use manifest as-is",
+                     details->debug_name, tuple);
+            write_per_architecture = FALSE;
+            break;
+
+          case ICD_KIND_NONEXISTENT:
+          case ICD_KIND_IGNORED:
+            g_debug ("%s[%s]: not applicable", details->debug_name, tuple);
+            /* Nothing to do in these cases */
+            continue;
+
+          /* By the time we get here, bind_icds() should have figured out
+           * which kind each architecture's instantiation of the library is. */
+          case ICD_KIND_UNDECIDED:
+          default:
+            g_critical ("%s[%s]: should not reach here for %s",
+                        details->debug_name, tuple,
+                        icd_kind_to_string (details_arch->kind));
+            continue;
+        }
+
       arch = _srt_architecture_get_by_tuple (tuple);
 
       /* The architectures supported by pressure-vessel are always a
@@ -4791,7 +4823,7 @@ setup_json_manifest (PvRuntime *self,
           continue;
         }
 
-      if (details_arch->kind == ICD_KIND_ABSOLUTE)
+      if (write_per_architecture)
         {
           g_autofree gchar *write_to_file = NULL;
           g_autofree gchar *write_to_dir = NULL;
@@ -4884,8 +4916,7 @@ setup_json_manifest (PvRuntime *self,
 
           pv_search_path_append (search_path, json_in_container);
         }
-      else if (details_arch->kind == ICD_KIND_SONAME
-               || details_arch->kind == ICD_KIND_META_LAYER)
+      else
         {
           g_debug ("Will use graphics stack provider JSON as-is for %s/%s",
                    sub_dir, json_basename);

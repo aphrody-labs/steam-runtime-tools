@@ -4762,9 +4762,26 @@ setup_json_manifest (PvRuntime *self,
             break;
 
           case ICD_KIND_SONAME:
+            if (details->in_n_providers == self->providers->len)
+              {
+                g_debug ("%s[%s]: exists in every provider with same content, "
+                         "can use first provider's manifest as-is",
+                         details->debug_name, tuple);
+                write_per_architecture = FALSE;
+              }
+            else
+              {
+                g_debug ("%s[%s]: not the same in all providers, "
+                         "will generate new manifest",
+                         details->debug_name, tuple);
+                write_per_architecture = TRUE;
+              }
+            break;
+
           case ICD_KIND_META_LAYER:
-            /* Can use provider's JSON file as-is */
-            g_debug ("%s[%s]: SONAME or meta-layer, can use manifest as-is",
+            /* There is no library_path that we can rewrite,
+             * and no other way to make it architecture-specific */
+            g_debug ("%s[%s]: meta-layer, must use manifest as-is",
                      details->debug_name, tuple);
             write_per_architecture = FALSE;
             break;

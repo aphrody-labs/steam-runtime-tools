@@ -19,6 +19,9 @@
  * IcdKind:
  * @ICD_KIND_UNDECIDED: We have not yet checked whether the module exists.
  * @ICD_KIND_NONEXISTENT: The module doesn't exist on this architecture.
+ * @ICD_KIND_IGNORED: We ignored the module on this architecture,
+ *  for example because the JSON manifest was for a different graphics
+ *  provider.
  * @ICD_KIND_ABSOLUTE: The module is an absolute path (possibly containing
  *  libdl dynamic string tokens such as `${LIB}`) which can be resolved
  *  to a library suitable for this architecture.
@@ -35,6 +38,7 @@ typedef enum
 {
   ICD_KIND_UNDECIDED = 0,
   ICD_KIND_NONEXISTENT,
+  ICD_KIND_IGNORED,
   ICD_KIND_ABSOLUTE,
   ICD_KIND_SONAME,
   ICD_KIND_META_LAYER,

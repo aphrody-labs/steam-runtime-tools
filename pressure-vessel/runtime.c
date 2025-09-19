@@ -2257,8 +2257,8 @@ pv_runtime_capture_libraries (PvRuntime *self,
  * into `${libdir}`.
  *
  * Change `details->archs[multiarch_index].kind` from %ICD_KIND_UNDECIDED
- * to %ICD_KIND_ABSOLUTE, %ICD_KIND_SONAME or %ICD_KIND_NONEXISTENT
- * as appropriate.
+ * to %ICD_KIND_ABSOLUTE, %ICD_KIND_SONAME, %ICD_KIND_IGNORED
+ * or %ICD_KIND_NONEXISTENT as appropriate.
  *
  * If the driver is an absolute path, change its
  * `details->archs[multiarch_index].path_in_container`
@@ -2700,6 +2700,7 @@ success:
 
           case ICD_KIND_META_LAYER:
           case ICD_KIND_NONEXISTENT:
+          case ICD_KIND_IGNORED:
             g_warn_if_fail (details_arch->path_in_container == NULL);
             break;
 
@@ -6005,6 +6006,7 @@ collect_one_mesa_drirc (PvRuntime *self,
         break;
 
       case ICD_KIND_NONEXISTENT:
+      case ICD_KIND_IGNORED:
       case ICD_KIND_META_LAYER:
         /* Nothing to do - we can't know the path because there is none */
         break;

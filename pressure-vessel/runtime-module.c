@@ -23,6 +23,9 @@ icd_kind_to_string (IcdKind kind)
       case ICD_KIND_NONEXISTENT:
         return "does not exist";
 
+      case ICD_KIND_IGNORED:
+        return "ignored/not applicable";
+
       case ICD_KIND_ABSOLUTE:
         return "absolute path";
 

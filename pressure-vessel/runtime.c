@@ -2256,7 +2256,7 @@ pv_runtime_capture_libraries (PvRuntime *self,
  * to @libdir_patterns that will capture the driver and its dependencies
  * into `${libdir}`.
  *
- * Change `details->archs[multiarch_index].kind` from %ICD_KIND_NONEXISTENT
+ * Change `details->archs[multiarch_index].kind` from %ICD_KIND_UNDECIDED
  * to %ICD_KIND_ABSOLUTE, %ICD_KIND_SONAME or %ICD_KIND_NONEXISTENT
  * as appropriate.
  *
@@ -2310,13 +2310,17 @@ bind_icds (PvRuntime *self,
 
       g_return_val_if_fail (details != NULL, FALSE);
       details_arch = &details->archs[multiarch_index];
-      g_return_val_if_fail (details_arch->kind == ICD_KIND_NONEXISTENT
+      g_return_val_if_fail (details_arch->kind == ICD_KIND_UNDECIDED
                             || details_arch->kind == ICD_KIND_META_LAYER,
                             FALSE);
       g_return_val_if_fail (details_arch->path_in_container == NULL, FALSE);
 
+      /* If the JSON manifest failed to load, we count that as NONEXISTENT. */
       if (details_arch->resolved_library == NULL)
-        continue;
+        {
+          details_arch->kind = ICD_KIND_NONEXISTENT;
+          continue;
+        }
 
       g_info ("Capturing %s loadable module #%" G_GSIZE_FORMAT ": %s",
               subdir, i, details->debug_name);
@@ -2699,6 +2703,7 @@ success:
             g_warn_if_fail (details_arch->path_in_container == NULL);
             break;
 
+          case ICD_KIND_UNDECIDED:
           default:
             g_warn_if_reached ();
         }
@@ -4739,6 +4744,9 @@ setup_json_manifest (PvRuntime *self,
 
       g_assert (i < G_N_ELEMENTS (details->archs));
       details_arch = &details->archs[i];
+      /* By the time we get here, bind_icds() should have figured out
+       * which kind each architecture's instantiation of the library is. */
+      g_warn_if_fail (details_arch->kind != ICD_KIND_UNDECIDED);
 
       tuple = pv_multiarch_tuples[i];
       arch = _srt_architecture_get_by_tuple (tuple);
@@ -5998,9 +6006,12 @@ collect_one_mesa_drirc (PvRuntime *self,
 
       case ICD_KIND_NONEXISTENT:
       case ICD_KIND_META_LAYER:
-      default:
         /* Nothing to do - we can't know the path because there is none */
         break;
+
+      case ICD_KIND_UNDECIDED:
+      default:
+        g_warn_if_reached ();
     }
 }
 

@@ -17,6 +17,9 @@ icd_kind_to_string (IcdKind kind)
 {
   switch (kind)
     {
+      case ICD_KIND_UNDECIDED:
+        return "unknown";
+
       case ICD_KIND_NONEXISTENT:
         return "does not exist";
 

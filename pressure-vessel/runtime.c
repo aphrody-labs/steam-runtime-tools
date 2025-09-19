@@ -2329,6 +2329,15 @@ bind_icds (PvRuntime *self,
 
       g_info ("Capturing %s loadable module #%" G_GSIZE_FORMAT ": %s",
               subdir, i, details->debug_name);
+
+      if (arch->known_arch != NULL
+          && !icd_details_arch_is_applicable (details, arch->known_arch))
+        {
+          g_debug ("Ignoring due to architecture restriction");
+          details_arch->kind = ICD_KIND_IGNORED;
+          continue;
+        }
+
       g_info ("Checking for implementation on %s: %s",
               arch->details->tuple,
               details_arch->resolved_library);

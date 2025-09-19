@@ -96,6 +96,32 @@ icd_details_free (IcdDetails *self)
   g_slice_free (IcdDetails, self);
 }
 
+gboolean
+icd_details_arch_is_applicable (const IcdDetails *self,
+                                const SrtKnownArchitecture *known_arch)
+{
+  g_return_val_if_fail (SRT_IS_BASE_GRAPHICS_MODULE (self->icd), FALSE);
+  g_return_val_if_fail (known_arch != NULL, TRUE);
+
+  if (SRT_IS_BASE_JSON_GRAPHICS_MODULE (self->icd))
+    {
+      SrtBaseJsonGraphicsModule *module = self->icd;
+
+      if (module->library_arch != NULL
+          && known_arch->sizeof_pointer > 0)
+        {
+          g_autofree gchar *arch_bits = NULL;
+
+          arch_bits = g_strdup_printf ("%u", known_arch->sizeof_pointer * 8);
+
+          if (!g_str_equal (module->library_arch, arch_bits))
+            return FALSE;
+        }
+    }
+
+  return TRUE;
+}
+
 /*
  * icd_details_fill_array_single_arch:
  * @details_arr: (element-type IcdDetails): The array to populate,

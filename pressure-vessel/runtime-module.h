@@ -179,6 +179,9 @@ void icd_details_free (IcdDetails *self);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdDetails, icd_details_free)
 
+gboolean icd_details_arch_is_applicable (const IcdDetails *self,
+                                         const SrtKnownArchitecture *known_arch);
+
 /*
  * icd_details_array_sized_new:
  * @n: Number of entries to allocate space for. This is only an

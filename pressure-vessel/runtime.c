@@ -2306,9 +2306,10 @@ bind_icds (PvRuntime *self,
   for (i = 0; i < n_details; i++)
     {
       IcdDetails *details = details_arr[i];
-      PvModulePerArch *details_arch = &details->archs[multiarch_index];
+      PvModulePerArch *details_arch;
 
       g_return_val_if_fail (details != NULL, FALSE);
+      details_arch = &details->archs[multiarch_index];
 
       if (details_arch->resolved_library == NULL)
         continue;

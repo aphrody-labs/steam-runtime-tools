@@ -2310,14 +2310,13 @@ bind_icds (PvRuntime *self,
 
       g_return_val_if_fail (details != NULL, FALSE);
       details_arch = &details->archs[multiarch_index];
+      g_return_val_if_fail (details_arch->kind == ICD_KIND_NONEXISTENT
+                            || details_arch->kind == ICD_KIND_META_LAYER,
+                            FALSE);
+      g_return_val_if_fail (details_arch->path_in_container == NULL, FALSE);
 
       if (details_arch->resolved_library == NULL)
         continue;
-
-      g_return_val_if_fail (details_arch->kind == ICD_KIND_NONEXISTENT,
-                            FALSE);
-      g_return_val_if_fail (details_arch->path_in_container == NULL,
-                            FALSE);
 
       g_info ("Capturing %s loadable module #%" G_GSIZE_FORMAT ": %s",
               subdir, i, details->debug_name);

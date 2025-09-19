@@ -2338,6 +2338,16 @@ bind_icds (PvRuntime *self,
           continue;
         }
 
+      if (details->provider != arch->provider)
+        {
+          g_debug ("Module found in \"%s\" but %s provider is \"%s\", ignoring",
+                   details->provider->in_current_ns->path,
+                   arch->details->tuple,
+                   arch->provider->in_current_ns->path);
+          details_arch->kind = ICD_KIND_IGNORED;
+          continue;
+        }
+
       g_info ("Checking for implementation on %s: %s",
               arch->details->tuple,
               details_arch->resolved_library);

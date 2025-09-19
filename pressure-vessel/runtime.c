@@ -626,6 +626,8 @@ typedef struct
   gsize multiarch_index;
   /* Always &pv_multiarch_details[self->multiarch_index] */
   const PvMultiarchDetails *details;
+  /* Architecture knowledge from libsteam-runtime-tools, if any */
+  const SrtKnownArchitecture *known_arch;
   /* Graphics stack provider to use */
   PvGraphicsProvider *provider;
   /* "lib/TUPLE/aliases", so that for example
@@ -694,6 +696,9 @@ runtime_architecture_init (RuntimeArchitecture *self,
   provider = pv_runtime_get_graphics_provider (runtime, tuple_quark);
   g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (provider), FALSE);
   self->provider = g_object_ref (provider);
+
+  /* Could in theory be %NULL, so be careful when dereferencing */
+  self->known_arch = _srt_architecture_get_by_tuple (self->details->tuple);
 
   self->capsule_capture_libs_basename = g_strdup_printf ("%s-capsule-capture-libs",
                                                          self->details->tuple);

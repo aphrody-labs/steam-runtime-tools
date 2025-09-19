@@ -4784,14 +4784,11 @@ setup_json_manifest (PvRuntime *self,
 
       arch_bits = g_strdup_printf ("%u", arch->sizeof_pointer * 8);
 
-      if (library_arch != NULL)
+      if (library_arch != NULL && !g_str_equal (library_arch, arch_bits))
         {
-          if (!g_str_equal (library_arch, arch_bits))
-            {
-              g_debug ("Skipping %s because library_arch from manifest is %s != %s",
-                       tuple, library_arch, arch_bits);
-              continue;
-            }
+          /* We should have figured this out already */
+          g_warn_if_fail (details_arch->kind == ICD_KIND_IGNORED);
+          continue;
         }
 
       if (details_arch->kind == ICD_KIND_ABSOLUTE)

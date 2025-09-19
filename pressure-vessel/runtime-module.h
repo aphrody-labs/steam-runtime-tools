@@ -106,6 +106,9 @@ G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (PvModulePerArch, pv_module_per_arch_clear)
  * @provider: The graphics stack provider where we found this driver
  * @archs: A per-architecture array of details keyed by the index of
  *  a multiarch tuple in @pv_multiarch_tuples
+ * @in_n_providers: Number of graphics stack providers with an identical
+ *  JSON manifest, or 1 if this module is not JSON-based or if no
+ *  deduplication was performed.
  * @duplicate: If true, this driver's JSON manifest is a duplicate of a
  *  previously discovered JSON manifest of the same type.
  *
@@ -177,6 +180,7 @@ typedef struct
   const char *debug_name;
   PvGraphicsProvider *provider;
   PvModulePerArch archs[PV_N_SUPPORTED_ARCHITECTURES];
+  gsize in_n_providers;
   bool is_duplicate : 1;
 } IcdDetails;
 

@@ -73,6 +73,7 @@ icd_details_new (PvGraphicsProvider *provider,
 
   self = g_slice_new0 (IcdDetails);
   self->provider = g_object_ref (provider);
+  self->in_n_providers = 1;
   self->icd = g_object_ref (icd);
   self->debug_name = name;
 
@@ -438,6 +439,7 @@ pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
               path_in_provider, details->provider->in_current_ns->path,
               other_path, other->provider->in_current_ns->path);
       details->is_duplicate = true;
+      other->in_n_providers += 1;
       return;
     }
 

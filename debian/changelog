@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20250918.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20250922.0) UNRELEASED; urgency=medium
 
   [ Simon McVittie ]
   * pressure-vessel:
@@ -39,6 +39,7 @@ steam-runtime-tools (0.20250918.0) UNRELEASED; urgency=medium
   * Tests:
     - Fix unit test regression on Debian 14 prereleases
       (steamrt/tasks#796)
+    - CI updates
 
   [ Tony Wasserka, Simon McVittie ]
   * Diagnostic tools:
@@ -48,7 +49,7 @@ steam-runtime-tools (0.20250918.0) UNRELEASED; urgency=medium
   [ Timo Witte ]
   * Fix a typo (ValveSoftware/steam-runtime#775)
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 18 Sep 2025 12:21:12 +0100
+ -- Simon McVittie <smcv@collabora.com>  Mon, 22 Sep 2025 18:05:25 +0100
 
 steam-runtime-tools (0.20250820.0) steamrt; urgency=medium
 

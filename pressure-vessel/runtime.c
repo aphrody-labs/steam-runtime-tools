@@ -624,6 +624,8 @@ typedef struct
 {
   /* Index into pv_multiarch_details, 0 <= x < PV_N_SUPPORTED_ARCHITECTURES */
   gsize multiarch_index;
+  /* The relevant multiarch tuple */
+  const char *tuple;
   /* Always &pv_multiarch_details[self->multiarch_index] */
   const PvMultiarchDetails *details;
   /* Architecture knowledge from libsteam-runtime-tools, if any */
@@ -687,31 +689,32 @@ runtime_architecture_init (RuntimeArchitecture *self,
 
   self->details = &pv_multiarch_details[self->multiarch_index];
   g_return_val_if_fail (self->details != NULL, FALSE);
-  g_return_val_if_fail (self->details->tuple != NULL, FALSE);
+  self->tuple = self->details->tuple;
+  g_return_val_if_fail (self->tuple != NULL, FALSE);
   g_return_val_if_fail (g_strcmp0 (pv_multiarch_tuples[self->multiarch_index],
-                                   self->details->tuple) == 0, FALSE);
+                                   self->tuple) == 0, FALSE);
 
-  tuple_quark = g_quark_from_static_string (self->details->tuple);
+  tuple_quark = g_quark_from_static_string (self->tuple);
   g_return_val_if_fail (tuple_quark != 0, FALSE);
   provider = pv_runtime_get_graphics_provider (runtime, tuple_quark);
   g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (provider), FALSE);
   self->provider = g_object_ref (provider);
 
   /* Could in theory be %NULL, so be careful when dereferencing */
-  self->known_arch = _srt_architecture_get_by_tuple (self->details->tuple);
+  self->known_arch = _srt_architecture_get_by_tuple (self->tuple);
 
   self->capsule_capture_libs_basename = g_strdup_printf ("%s-capsule-capture-libs",
-                                                         self->details->tuple);
+                                                         self->tuple);
   self->capsule_capture_libs = g_build_filename (runtime->helpers_path,
                                                  self->capsule_capture_libs_basename,
                                                  NULL);
   self->libdir_relative_to_overrides = g_strdup_printf ("lib/%s",
-                                                        self->details->tuple);
+                                                        self->tuple);
   self->libdir_in_container = g_build_filename (runtime->overrides_in_container,
                                                 self->libdir_relative_to_overrides, NULL);
 
   self->aliases_relative_to_overrides = g_strdup_printf ("lib/%s/aliases",
-                                                         self->details->tuple);
+                                                         self->tuple);
 
   /* This has the side-effect of testing whether we can run binaries
    * for this architecture on the current environment. We
@@ -722,7 +725,7 @@ runtime_architecture_init (RuntimeArchitecture *self,
 
   if (self->ld_so == NULL)
     {
-      g_info ("Cannot determine ld.so for %s", self->details->tuple);
+      g_info ("Cannot determine ld.so for %s", self->tuple);
       return FALSE;
     }
 

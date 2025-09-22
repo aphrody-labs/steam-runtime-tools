@@ -35,6 +35,7 @@
 #include "steam-runtime-tools/file-lock-internal.h"
 #include "steam-runtime-tools/graphics-internal.h"
 #include "steam-runtime-tools/graphics-drivers-json-based-internal.h"
+#include "steam-runtime-tools/libdl-internal.h"
 #include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/profiling-internal.h"
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
@@ -3469,6 +3470,7 @@ bind_runtime_ld_so (PvRuntime *self,
        * bwrap in /oldroot */
       g_autofree gchar *ld_so_cache_on_host = NULL;
       g_autofree gchar *ld_so_conf_on_host = NULL;
+      const char * const *extra_filenames;
 
       if (self->workarounds & PV_WORKAROUND_FLAGS_STEAMSNAP_356)
         mutable_ldso_dir = MUTABLE_LDSO_DIR_SNAP;
@@ -3576,10 +3578,12 @@ bind_runtime_ld_so (PvRuntime *self,
        * a distribution-specific path, e.g. Clear Linux uses
        * /var/cache/ldconfig/ld.so.cache. For simplicity, we make all these paths
        * symlinks, so that we only have to populate the cache in one place. */
-      for (i = 0; pv_other_ld_so_cache[i] != NULL; i++)
+      extra_filenames = _srt_get_extra_ld_so_cache_filenames ();
+
+      for (i = 0; extra_filenames[i] != NULL; i++)
         {
           g_autoptr(GError) local_error = NULL;
-          const char *path = pv_other_ld_so_cache[i];
+          const char *path = extra_filenames[i];
 
           if (!pv_runtime_make_symlink_in_container (self,
                                                      bwrap,
@@ -3591,10 +3595,12 @@ bind_runtime_ld_so (PvRuntime *self,
         }
 
       /* Similar, but for ld.so.conf, for example on Solus. */
-      for (i = 0; pv_other_ld_so_conf[i] != NULL; i++)
+      extra_filenames = _srt_get_extra_ld_so_conf_filenames ();
+
+      for (i = 0; extra_filenames[i] != NULL; i++)
         {
           g_autoptr(GError) local_error = NULL;
-          const char *path = pv_other_ld_so_conf[i];
+          const char *path = extra_filenames[i];
 
           if (!pv_runtime_make_symlink_in_container (self,
                                                      bwrap,

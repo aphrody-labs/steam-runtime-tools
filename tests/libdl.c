@@ -118,6 +118,36 @@ test_libdl_classify (Fixture *f,
     }
 }
 
+static void
+test_libdl_filenames (Fixture *f,
+                      gconstpointer context)
+{
+  const char * const *filenames;
+  gsize i;
+
+  filenames = _srt_get_extra_ld_so_cache_filenames ();
+  g_assert_nonnull (filenames);
+
+  for (i = 0; filenames[i] != NULL; i++)
+    g_assert_true (g_path_is_absolute (filenames[i]));
+
+  /* Clear Linux */
+  g_assert_true (g_strv_contains (filenames, "/var/cache/ldconfig/ld.so.cache"));
+  /* Interoperable path is not included */
+  g_assert_false (g_strv_contains (filenames, "/etc/ld.so.cache"));
+
+  filenames = _srt_get_extra_ld_so_conf_filenames ();
+  g_assert_nonnull (filenames);
+
+  for (i = 0; filenames[i] != NULL; i++)
+    g_assert_true (g_path_is_absolute (filenames[i]));
+
+  /* Solus */
+  g_assert_true (g_strv_contains (filenames, "/usr/share/defaults/etc/ld.so.conf"));
+  /* Interoperable path is not included */
+  g_assert_false (g_strv_contains (filenames, "/etc/ld.so.conf"));
+}
+
 int
 main (int argc,
       char **argv)
@@ -126,6 +156,8 @@ main (int argc,
 
   g_test_add ("/libdl/classify", Fixture, NULL, setup,
               test_libdl_classify, teardown);
+  g_test_add ("/libdl/filenames", Fixture, NULL, setup,
+              test_libdl_filenames, teardown);
 
   return g_test_run ();
 }

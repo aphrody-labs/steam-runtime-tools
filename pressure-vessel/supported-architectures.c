@@ -78,26 +78,6 @@ const PvMultiarchDetails pv_multiarch_details[PV_N_SUPPORTED_ARCHITECTURES] =
 #endif
 };
 
-/* Architecture-independent ld.so.cache filenames, other than the
- * conventional filename /etc/ld.so.cache used upstream and in Debian
- * (we assume this is also what's used in our runtimes). */
-const char * const pv_other_ld_so_cache[] =
-{
-  /* Clear Linux */
-  "/var/cache/ldconfig/ld.so.cache",
-  NULL
-};
-
-/* Architecture-independent ld.so.conf filenames, other than the
- * conventional filename /etc/ld.so.conf used upstream and in Debian
- * (we assume this is also what's used in our runtimes). */
-const char * const pv_other_ld_so_conf[] =
-{
-  /* Solus */
-  "/usr/share/defaults/etc/ld.so.conf",
-  NULL
-};
-
 /*
  * pv_known_architecture_get_libdirs:
  * @tuple: (nullable): A multiarch tuple, or %NULL

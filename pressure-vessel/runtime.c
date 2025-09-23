@@ -626,6 +626,8 @@ typedef struct
   gsize multiarch_index;
   /* Always &pv_multiarch_details[self->multiarch_index] */
   const PvMultiarchDetails *details;
+  /* Architecture knowledge from libsteam-runtime-tools, if any */
+  const SrtKnownArchitecture *known_arch;
   /* Graphics stack provider to use */
   PvGraphicsProvider *provider;
   /* "lib/TUPLE/aliases", so that for example
@@ -694,6 +696,9 @@ runtime_architecture_init (RuntimeArchitecture *self,
   provider = pv_runtime_get_graphics_provider (runtime, tuple_quark);
   g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (provider), FALSE);
   self->provider = g_object_ref (provider);
+
+  /* Could in theory be %NULL, so be careful when dereferencing */
+  self->known_arch = _srt_architecture_get_by_tuple (self->details->tuple);
 
   self->capsule_capture_libs_basename = g_strdup_printf ("%s-capsule-capture-libs",
                                                          self->details->tuple);
@@ -2257,8 +2262,8 @@ pv_runtime_capture_libraries (PvRuntime *self,
  * into `${libdir}`.
  *
  * Change `details->archs[multiarch_index].kind` from %ICD_KIND_UNDECIDED
- * to %ICD_KIND_ABSOLUTE, %ICD_KIND_SONAME or %ICD_KIND_NONEXISTENT
- * as appropriate.
+ * to %ICD_KIND_ABSOLUTE, %ICD_KIND_SONAME, %ICD_KIND_IGNORED
+ * or %ICD_KIND_NONEXISTENT as appropriate.
  *
  * If the driver is an absolute path, change its
  * `details->archs[multiarch_index].path_in_container`
@@ -2324,6 +2329,25 @@ bind_icds (PvRuntime *self,
 
       g_info ("Capturing %s loadable module #%" G_GSIZE_FORMAT ": %s",
               subdir, i, details->debug_name);
+
+      if (arch->known_arch != NULL
+          && !icd_details_arch_is_applicable (details, arch->known_arch))
+        {
+          g_debug ("Ignoring due to architecture restriction");
+          details_arch->kind = ICD_KIND_IGNORED;
+          continue;
+        }
+
+      if (details->provider != arch->provider)
+        {
+          g_debug ("Module found in \"%s\" but %s provider is \"%s\", ignoring",
+                   details->provider->in_current_ns->path,
+                   arch->details->tuple,
+                   arch->provider->in_current_ns->path);
+          details_arch->kind = ICD_KIND_IGNORED;
+          continue;
+        }
+
       g_info ("Checking for implementation on %s: %s",
               arch->details->tuple,
               details_arch->resolved_library);
@@ -2700,6 +2724,7 @@ success:
 
           case ICD_KIND_META_LAYER:
           case ICD_KIND_NONEXISTENT:
+          case ICD_KIND_IGNORED:
             g_warn_if_fail (details_arch->path_in_container == NULL);
             break;
 
@@ -4636,8 +4661,6 @@ get_manifest_relative_to_overrides (gpointer icd,
  *  of JSON manifests already created. Used internally to notice when
  *  to use unique sub directories to avoid naming conflicts. Ignored and may be
  *  %NULL for OpenXR runtimes and Vulkan layers. Required for other file types.
- * @deduplicator: (nullable): A #PvManifestDeduplicator or %NULL.
- *  If %NULL, duplicates are not suppressed.
  * @search_path: Used to build `$VK_DRIVER_FILES` or a similar search path
  * @error: Used to raise an error on failure
  *
@@ -4651,7 +4674,6 @@ setup_json_manifest (PvRuntime *self,
                      int digits,
                      gsize seq,
                      GHashTable *json_set,
-                     PvManifestDeduplicator *deduplicator,
                      GString *search_path,
                      GError **error)
 {
@@ -4717,38 +4739,69 @@ setup_json_manifest (PvRuntime *self,
       return TRUE;
     }
 
-  if (deduplicator != NULL
-      && !pv_manifest_deduplicator_add_if_unique (deduplicator, details))
-    {
-      /* In a Flatpak environment with i386 multiarch compatibility,
-       * we can see two identical copies of files like nvidia_icd.json,
-       * each listing a SONAME which can be loaded equally well by both
-       * word sizes. Deduplicate them by their content.
-       *
-       * Layers don't need this treatment, because Vulkan-Loader will
-       * deduplicate those by their names anyway.
-       *
-       * Mesa also doesn't need (or get) this treatment, because it installs
-       * per-architecture filenames like radeon_icd.x86_64.json, which
-       * contain absolute paths that will only work for the appropriate
-       * architecture. */
-      return TRUE;
-    }
-
   for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
     {
       const PvModulePerArch *details_arch;
       const SrtKnownArchitecture *arch;
       const char *tuple;
       g_autofree gchar *arch_bits = NULL;
+      gboolean write_per_architecture;
 
       g_assert (i < G_N_ELEMENTS (details->archs));
       details_arch = &details->archs[i];
-      /* By the time we get here, bind_icds() should have figured out
-       * which kind each architecture's instantiation of the library is. */
-      g_warn_if_fail (details_arch->kind != ICD_KIND_UNDECIDED);
-
       tuple = pv_multiarch_tuples[i];
+
+      switch (details_arch->kind)
+        {
+          case ICD_KIND_ABSOLUTE:
+            /* We need to generate a new JSON manifest with the
+             * library_path updated to its in-container value */
+            g_debug ("%s[%s]: absolute path, will generate new manifest",
+                     details->debug_name, tuple);
+            write_per_architecture = TRUE;
+            break;
+
+          case ICD_KIND_SONAME:
+            if (details->in_n_providers == self->providers->len)
+              {
+                g_debug ("%s[%s]: exists in every provider with same content, "
+                         "can use first provider's manifest as-is",
+                         details->debug_name, tuple);
+                write_per_architecture = FALSE;
+              }
+            else
+              {
+                g_debug ("%s[%s]: not the same in all providers, "
+                         "will generate new manifest",
+                         details->debug_name, tuple);
+                write_per_architecture = TRUE;
+              }
+            break;
+
+          case ICD_KIND_META_LAYER:
+            /* There is no library_path that we can rewrite,
+             * and no other way to make it architecture-specific */
+            g_debug ("%s[%s]: meta-layer, must use manifest as-is",
+                     details->debug_name, tuple);
+            write_per_architecture = FALSE;
+            break;
+
+          case ICD_KIND_NONEXISTENT:
+          case ICD_KIND_IGNORED:
+            g_debug ("%s[%s]: not applicable", details->debug_name, tuple);
+            /* Nothing to do in these cases */
+            continue;
+
+          /* By the time we get here, bind_icds() should have figured out
+           * which kind each architecture's instantiation of the library is. */
+          case ICD_KIND_UNDECIDED:
+          default:
+            g_critical ("%s[%s]: should not reach here for %s",
+                        details->debug_name, tuple,
+                        icd_kind_to_string (details_arch->kind));
+            continue;
+        }
+
       arch = _srt_architecture_get_by_tuple (tuple);
 
       /* The architectures supported by pressure-vessel are always a
@@ -4759,17 +4812,14 @@ setup_json_manifest (PvRuntime *self,
 
       arch_bits = g_strdup_printf ("%u", arch->sizeof_pointer * 8);
 
-      if (library_arch != NULL)
+      if (library_arch != NULL && !g_str_equal (library_arch, arch_bits))
         {
-          if (!g_str_equal (library_arch, arch_bits))
-            {
-              g_debug ("Skipping %s because library_arch from manifest is %s != %s",
-                       tuple, library_arch, arch_bits);
-              continue;
-            }
+          /* We should have figured this out already */
+          g_warn_if_fail (details_arch->kind == ICD_KIND_IGNORED);
+          continue;
         }
 
-      if (details_arch->kind == ICD_KIND_ABSOLUTE)
+      if (write_per_architecture)
         {
           g_autofree gchar *write_to_file = NULL;
           g_autofree gchar *write_to_dir = NULL;
@@ -4862,8 +4912,7 @@ setup_json_manifest (PvRuntime *self,
 
           pv_search_path_append (search_path, json_in_container);
         }
-      else if (details_arch->kind == ICD_KIND_SONAME
-               || details_arch->kind == ICD_KIND_META_LAYER)
+      else
         {
           g_debug ("Will use graphics stack provider JSON as-is for %s/%s",
                    sub_dir, json_basename);
@@ -4935,21 +4984,44 @@ setup_each_json_manifest (PvRuntime *self,
 {
   gsize j;
   g_autoptr(GHashTable) json_set = NULL;
-  g_autoptr(PvManifestDeduplicator) content_seen = NULL;
+  g_auto(PvManifestDeduplicator) deduplicator = PV_MANIFEST_DEDUPLICATOR_INIT;
   int digits = pv_count_decimal_digits (details->len);
 
   g_return_val_if_fail (self->providers != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
 
   json_set = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
-  content_seen = pv_manifest_deduplicator_new ();
+  pv_manifest_deduplicator_init (&deduplicator);
+
+  /* If we are using more than one graphics stack provider, we could see
+   * more than one identical copy of files like nvidia_icd.json, each
+   * listing a SONAME which can be loaded equally well by more than one
+   * architecture. Deduplicate them by their content.
+   *
+   * Similarly, in a Flatpak environment with i386 multiarch compatibility,
+   * we can see two identical copies of files like nvidia_icd.json,
+   * each listing a SONAME which can be loaded equally well by both
+   * word sizes.
+   *
+   * Layers don't need this treatment, because Vulkan-Loader will
+   * deduplicate those by their names anyway.
+   *
+   * Mesa also doesn't need (or get) this treatment, because it installs
+   * per-architecture filenames like radeon_icd.x86_64.json, which
+   * contain absolute paths that will only work for the appropriate
+   * architecture. */
+  pv_manifest_deduplicator_populate (&deduplicator,
+                                     (IcdDetails **) details->pdata,
+                                     details->len);
 
   for (j = 0; j < details->len; j++)
     {
-      if (!setup_json_manifest (self, bwrap, sub_dir,
-                                g_ptr_array_index (details, j),
-                                digits, j, json_set, content_seen,
-                                search_path, error))
+      IcdDetails *d = g_ptr_array_index (details, j);
+
+      if (!d->is_duplicate
+          && !setup_json_manifest (self, bwrap, sub_dir, d,
+                                   digits, j, json_set,
+                                   search_path, error))
         return FALSE;
     }
 
@@ -6005,6 +6077,7 @@ collect_one_mesa_drirc (PvRuntime *self,
         break;
 
       case ICD_KIND_NONEXISTENT:
+      case ICD_KIND_IGNORED:
       case ICD_KIND_META_LAYER:
         /* Nothing to do - we can't know the path because there is none */
         break;
@@ -7445,7 +7518,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                       "/" _SRT_GRAPHICS_OPENXR_1_RUNTIME_SUFFIX,
                                     details,
                                     0, 0,        /* no sequence number used */
-                                    NULL, NULL,  /* no deduplication required */
+                                    NULL,        /* no deduplication required */
                                     openxr_1_runtime_path, error))
             return FALSE;
         }

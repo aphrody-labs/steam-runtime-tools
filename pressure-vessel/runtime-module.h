@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <stdbool.h>
+
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "libglnx.h"
 
@@ -19,6 +21,9 @@
  * IcdKind:
  * @ICD_KIND_UNDECIDED: We have not yet checked whether the module exists.
  * @ICD_KIND_NONEXISTENT: The module doesn't exist on this architecture.
+ * @ICD_KIND_IGNORED: We ignored the module on this architecture,
+ *  for example because the JSON manifest was for a different graphics
+ *  provider.
  * @ICD_KIND_ABSOLUTE: The module is an absolute path (possibly containing
  *  libdl dynamic string tokens such as `${LIB}`) which can be resolved
  *  to a library suitable for this architecture.
@@ -35,6 +40,7 @@ typedef enum
 {
   ICD_KIND_UNDECIDED = 0,
   ICD_KIND_NONEXISTENT,
+  ICD_KIND_IGNORED,
   ICD_KIND_ABSOLUTE,
   ICD_KIND_SONAME,
   ICD_KIND_META_LAYER,
@@ -100,6 +106,11 @@ G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (PvModulePerArch, pv_module_per_arch_clear)
  * @provider: The graphics stack provider where we found this driver
  * @archs: A per-architecture array of details keyed by the index of
  *  a multiarch tuple in @pv_multiarch_tuples
+ * @in_n_providers: Number of graphics stack providers with an identical
+ *  JSON manifest, or 1 if this module is not JSON-based or if no
+ *  deduplication was performed.
+ * @duplicate: If true, this driver's JSON manifest is a duplicate of a
+ *  previously discovered JSON manifest of the same type.
  *
  * Details of a driver, Vulkan layer or similar thing discovered in a
  * graphics provider.
@@ -169,11 +180,16 @@ typedef struct
   const char *debug_name;
   PvGraphicsProvider *provider;
   PvModulePerArch archs[PV_N_SUPPORTED_ARCHITECTURES];
+  gsize in_n_providers;
+  bool is_duplicate : 1;
 } IcdDetails;
 
 void icd_details_free (IcdDetails *self);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdDetails, icd_details_free)
+
+gboolean icd_details_arch_is_applicable (const IcdDetails *self,
+                                         const SrtKnownArchitecture *known_arch);
 
 /*
  * icd_details_array_sized_new:
@@ -235,24 +251,39 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdStack, icd_stack_free)
 
 /*
  * PvManifestDeduplicator:
+ * @content_to_details: (element-type utf8 IcdDetails): A map representing
+ *  JSON manifests with unique content, used to detect and suppress
+ *  exact duplicates.
+ *  Keys are unowned strings with JSON manifest content, borrowed from
+ *  the #SrtBaseJsonGraphicsModule in the #IcdDetails.
+ *  Values are the #IcdDetails itself.
  *
- * A map representing JSON manifests with unique content, used to detect
- * and suppress exact duplicates.
- *
- * Keys are unowned strings with JSON manifest content, borrowed from the
- * #SrtBaseJsonGraphicsModule in the #IcdDetails.
- *
- * Values are the #IcdDetails itself.
+ * Data structure used to eliminate duplicate JSON manifests for Vulkan
+ * drivers, EGL drivers and EGL external platforms.
  */
-typedef GHashTable PvManifestDeduplicator;
-
-static inline PvManifestDeduplicator *
-pv_manifest_deduplicator_new (void)
+typedef struct
 {
-  return g_hash_table_new_full (g_str_hash, g_str_equal, NULL, NULL);
+  GHashTable *content_to_details;
+} PvManifestDeduplicator;
+
+#define PV_MANIFEST_DEDUPLICATOR_INIT { NULL }
+
+static void
+pv_manifest_deduplicator_clear (PvManifestDeduplicator *self)
+{
+  g_clear_pointer (&self->content_to_details, g_hash_table_unref);
 }
 
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (PvManifestDeduplicator, g_hash_table_unref)
+G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (PvManifestDeduplicator,
+                                  pv_manifest_deduplicator_clear)
 
-gboolean pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
-                                                 IcdDetails *details);
+static inline void
+pv_manifest_deduplicator_init (PvManifestDeduplicator *self)
+{
+  self->content_to_details = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                                    NULL, NULL);
+}
+
+void pv_manifest_deduplicator_populate (PvManifestDeduplicator *self,
+                                        IcdDetails * const *details_arr,
+                                        gsize n);

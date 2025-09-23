@@ -23,6 +23,9 @@ icd_kind_to_string (IcdKind kind)
       case ICD_KIND_NONEXISTENT:
         return "does not exist";
 
+      case ICD_KIND_IGNORED:
+        return "ignored/not applicable";
+
       case ICD_KIND_ABSOLUTE:
         return "absolute path";
 
@@ -70,6 +73,7 @@ icd_details_new (PvGraphicsProvider *provider,
 
   self = g_slice_new0 (IcdDetails);
   self->provider = g_object_ref (provider);
+  self->in_n_providers = 1;
   self->icd = g_object_ref (icd);
   self->debug_name = name;
 
@@ -91,6 +95,32 @@ icd_details_free (IcdDetails *self)
     pv_module_per_arch_clear (&self->archs[i]);
 
   g_slice_free (IcdDetails, self);
+}
+
+gboolean
+icd_details_arch_is_applicable (const IcdDetails *self,
+                                const SrtKnownArchitecture *known_arch)
+{
+  g_return_val_if_fail (SRT_IS_BASE_GRAPHICS_MODULE (self->icd), FALSE);
+  g_return_val_if_fail (known_arch != NULL, TRUE);
+
+  if (SRT_IS_BASE_JSON_GRAPHICS_MODULE (self->icd))
+    {
+      SrtBaseJsonGraphicsModule *module = self->icd;
+
+      if (module->library_arch != NULL
+          && known_arch->sizeof_pointer > 0)
+        {
+          g_autofree gchar *arch_bits = NULL;
+
+          arch_bits = g_strdup_printf ("%u", known_arch->sizeof_pointer * 8);
+
+          if (!g_str_equal (module->library_arch, arch_bits))
+            return FALSE;
+        }
+    }
+
+  return TRUE;
 }
 
 /*
@@ -379,15 +409,7 @@ icd_stack_free (IcdStack *self)
   g_slice_free (IcdStack, self);
 }
 
-/*
- * pv_manifest_deduplicator_add_if_unique:
- * @self: The deduplicator
- * @details: An #IcdDetails based on a #SrtBaseJsonGraphicsModule
- *
- * Returns: %TRUE if the JSON manifest appears to be unique, or %FALSE
- *  if it was a duplicate of one that we already saw.
- */
-gboolean
+static void
 pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
                                         IcdDetails *details)
 {
@@ -396,8 +418,6 @@ pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
   const char *original_json;
   void *other_voidp;
 
-  g_return_val_if_fail (SRT_IS_BASE_JSON_GRAPHICS_MODULE (details->icd), FALSE);
-
   module = details->icd;
   path_in_provider = module->json_path;
   original_json = module->original_json;
@@ -405,9 +425,10 @@ pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
   /* We don't track the original content of layer manifests to save some
    * memory, because Vulkan-Loader will deduplicate them anyway */
   if (original_json == NULL)
-    return TRUE;
+    return;
 
-  if (g_hash_table_lookup_extended (self, original_json, NULL, &other_voidp))
+  if (g_hash_table_lookup_extended (self->content_to_details,
+                                    original_json, NULL, &other_voidp))
     {
       IcdDetails *other = other_voidp;
       SrtBaseJsonGraphicsModule *other_module = other->icd;
@@ -417,13 +438,31 @@ pv_manifest_deduplicator_add_if_unique (PvManifestDeduplicator *self,
               "because it has the same content as \"%s\" in \"%s\"",
               path_in_provider, details->provider->in_current_ns->path,
               other_path, other->provider->in_current_ns->path);
-      return FALSE;
+      details->is_duplicate = true;
+      other->in_n_providers += 1;
+      return;
     }
 
   /* Remember it so we can ignore any subsequent duplicates.
    * Casts are required because GHashTable is not const-correct for
    * The cast is required because GHashTable is not const-correct for
    * "borrowed" keys and values. */
-  g_hash_table_replace (self, (void *) original_json, details);
-  return TRUE;
+  g_hash_table_replace (self->content_to_details,
+                        (void *) original_json, details);
+}
+
+void
+pv_manifest_deduplicator_populate (PvManifestDeduplicator *self,
+                                   IcdDetails * const *details,
+                                   gsize n)
+{
+  gsize i;
+
+  g_return_if_fail (g_hash_table_size (self->content_to_details) == 0);
+
+  for (i = 0; i < n; i++)
+    {
+      g_return_if_fail (SRT_IS_BASE_JSON_GRAPHICS_MODULE (details[i]->icd));
+      pv_manifest_deduplicator_add_if_unique (self, details[i]);
+    }
 }

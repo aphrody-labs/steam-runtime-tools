@@ -1,7 +1,11 @@
-steam-runtime-tools (0.20250922.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20250923.0) UNRELEASED; urgency=medium
 
   [ Simon McVittie ]
   * pressure-vessel:
+    - Fix a crash in the rare scenario that two different Vulkan/EGL
+      drivers, layers, etc. of the same type are implemented by hard links
+      or symbolic links to the same library
+      (steam-runtime-tools!849)
     - Fix sense of check for root as graphics stack provider when deciding
       how to handle LD_PRELOAD=libfoo.so.0
       (steam-runtime-tools!830)
@@ -20,6 +24,11 @@ steam-runtime-tools (0.20250922.0) UNRELEASED; urgency=medium
       x86_64 Debian 13 and i386 Debian 13 works well, but
       x86_64 Debian 13 and i386 Debian 12 or vice versa should not be
       expected to be reliable. (steamrt/tasks#785)
+    - Improve correctness of how we handle different JSON manifests
+      referring to the same Vulkan/EGL driver, layer, etc. on different
+      architectures
+      (steamrt/tasks#805)
+    - Refactoring (steamrt/tasks#785, steamrt/tasks#786, steamrt/tasks#805)
   * Diagnostic tools:
     - x86_64 is now sorted before i386 in steam-runtime-system-info output
     - steam-runtime-launch-options now offers 'Use "classic" SDL2'
@@ -32,11 +41,12 @@ steam-runtime-tools (0.20250922.0) UNRELEASED; urgency=medium
     - More internal utility functions
       (steam-runtime-tools!839)
     - Refactoring in architecture handling
-      (steam-runtime-tools!837, steam-runtime-tools!838)
+      (steamrt/tasks#785, steamrt/tasks#786, steamrt/tasks#805)
   * Packaging:
     - d/libsteam-runtime-tools-0-0.symbols:
       Belatedly update for 0.20250820.0
   * Tests:
+    - Improve test coverage (steam-runtime-tools!847)
     - Fix unit test regression on Debian 14 prereleases
       (steamrt/tasks#796)
     - CI updates
@@ -49,7 +59,7 @@ steam-runtime-tools (0.20250922.0) UNRELEASED; urgency=medium
   [ Timo Witte ]
   * Fix a typo (ValveSoftware/steam-runtime#775)
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 22 Sep 2025 18:05:25 +0100
+ -- Simon McVittie <smcv@collabora.com>  Tue, 23 Sep 2025 12:08:19 +0100
 
 steam-runtime-tools (0.20250820.0) steamrt; urgency=medium
 

@@ -2316,14 +2316,13 @@ bind_icds (PvRuntime *self,
       g_return_val_if_fail (details != NULL, FALSE);
       details_arch = &details->archs[multiarch_index];
       g_return_val_if_fail (details_arch->kind == ICD_KIND_UNDECIDED
+                            || details_arch->kind == ICD_KIND_NONEXISTENT
                             || details_arch->kind == ICD_KIND_META_LAYER,
                             FALSE);
       g_return_val_if_fail (details_arch->path_in_container == NULL, FALSE);
 
-      /* If the JSON manifest failed to load, we count that as NONEXISTENT. */
       if (details_arch->resolved_library == NULL)
         {
-          details_arch->kind = ICD_KIND_NONEXISTENT;
           continue;
         }
 
@@ -5069,8 +5068,13 @@ collect_json_based_drivers (PvRuntime *self,
 
       g_assert (details_arch->resolved_library == NULL);
 
+      /* If the JSON manifest failed to load, we count that as NONEXISTENT
+       * on all architectures. */
       if (!_srt_base_graphics_module_check_error (base, NULL))
-        continue;
+        {
+          details_arch->kind = ICD_KIND_NONEXISTENT;
+          continue;
+        }
 
       /* For meta-layers we don't have a library path */
       if (SRT_IS_VULKAN_LAYER (base) && base->library_path == NULL)

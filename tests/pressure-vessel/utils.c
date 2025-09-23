@@ -473,7 +473,6 @@ test_known_arch_libdirs (Fixture *f,
     const char * const expected[10];
   } tests[] =
   {
-#if defined(__i386__) || defined(__x86_64__)
     {
       SRT_ABI_I386,
       {
@@ -504,7 +503,6 @@ test_known_arch_libdirs (Fixture *f,
         NULL
       },
     },
-#elif defined(__aarch64__)
     {
       SRT_ABI_AARCH64,
       {
@@ -518,19 +516,26 @@ test_known_arch_libdirs (Fixture *f,
         NULL
       },
     },
-#else
     {
-      _SRT_MULTIARCH,
+      /* An architecture for which we have no hard-coded knowledge */
+      "potato-glados-eabi",
       {
-        "/lib/" _SRT_MULTIARCH,
-        "/usr/lib/" _SRT_MULTIARCH,
-        "IF_REMOVE_OVERRIDDEN:/usr/lib/" _SRT_MULTIARCH "/mesa",
+        "/lib/potato-glados-eabi",
+        "/usr/lib/potato-glados-eabi",
+        "IF_REMOVE_OVERRIDDEN:/usr/lib/potato-glados-eabi/mesa",
         "/lib",
         "/usr/lib",
         NULL
       },
     },
-#endif
+    {
+      NULL,
+      {
+        "/lib",
+        "/usr/lib",
+        NULL
+      },
+    },
   };
   gsize i;
   gsize remove_overridden;
@@ -544,9 +549,9 @@ test_known_arch_libdirs (Fixture *f,
 
       for (i = 0; i < G_N_ELEMENTS (tests); i++)
         {
-          const PvMultiarchDetails *details;
           g_autoptr(GPtrArray) expected = g_ptr_array_new ();
           g_autoptr(GPtrArray) actual = NULL;
+          const SrtKnownArchitecture *known = NULL;
           const char *tuple = tests[i].tuple;
           gsize j;
 
@@ -570,10 +575,10 @@ test_known_arch_libdirs (Fixture *f,
               g_ptr_array_add (expected, (gchar *) item);
             }
 
-          details = pv_multiarch_details_get_by_tuple (tuple);
-          g_assert_nonnull (details);
+          if (tuple != NULL)
+            known = _srt_architecture_get_by_tuple (tuple);
 
-          actual = pv_multiarch_details_get_libdirs (details, flags);
+          actual = pv_known_architecture_get_libdirs (tuple, known, flags);
 
           for (j = 0; j < expected->len; j++)
             g_test_message ("expected[%zu]: %s",

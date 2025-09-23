@@ -22,6 +22,7 @@
 #include <glib.h>
 
 #include "steam-runtime-tools/architecture.h"
+#include "steam-runtime-tools/architecture-internal.h"
 
 #if defined(__i386__) || defined(__x86_64__)
 #define PV_N_SUPPORTED_ARCHITECTURES 2
@@ -40,16 +41,6 @@ extern const char * const pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES + 1];
 typedef struct
 {
   const char *tuple;
-
-  /* Directories other than /usr/lib that we must search for loadable
-   * modules, least-ambiguous first, most-ambiguous last, not including
-   * Debian-style multiarch directories which are automatically derived
-   * from @tuple.
-   * - Exherbo <GNU-tuple>/lib
-   * - Red-Hat- or Arch-style lib<QUAL>
-   * - etc.
-   * Size is completely arbitrary, expand as needed */
-  const char *multilib[3];
 
   /* Alternative paths for ld.so.cache, other than ld.so.cache itself.
    * Size is completely arbitrary, expand as needed */
@@ -82,8 +73,9 @@ typedef enum
   PV_MULTIARCH_LIBDIRS_FLAGS_NONE = 0
 } PvMultiarchLibdirsFlags;
 
-GPtrArray *pv_multiarch_details_get_libdirs (const PvMultiarchDetails *self,
-                                             PvMultiarchLibdirsFlags flags);
+GPtrArray *pv_known_architecture_get_libdirs (const char *tuple,
+                                              const SrtKnownArchitecture *known,
+                                              PvMultiarchLibdirsFlags flags);
 
 static inline const PvMultiarchDetails *
 pv_multiarch_details_get_by_tuple (const char *tuple)

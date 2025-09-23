@@ -4181,8 +4181,9 @@ pv_runtime_remove_overridden_libraries (PvRuntime *self,
 
   timer = _srt_profiling_start ("Removing overridden %s libraries", arch->tuple);
 
-  dirs = pv_multiarch_details_get_libdirs (arch->details,
-                                           PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN);
+  dirs = pv_known_architecture_get_libdirs (arch->tuple,
+                                            arch->known_arch,
+                                            PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN);
   delete = g_new0 (GHashTable *, dirs->len);
   iters = g_new0 (SrtDirIter, dirs->len);
 
@@ -7310,8 +7311,9 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                                PV_RUNTIME_DATA_FLAGS_USR_SHARE_FIRST,
                                                &nvidia_data_in_provider);
 
-          dirs = pv_multiarch_details_get_libdirs (arch->details,
-                                                   PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
+          dirs = pv_known_architecture_get_libdirs (arch->tuple,
+                                                    arch->known_arch,
+                                                    PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
 
           for (j = 0; j < dirs->len; j++)
             {
@@ -8031,10 +8033,13 @@ pv_runtime_has_library (PvRuntime *self,
       const PvMultiarchDetails *details = &pv_multiarch_details[i];
       GQuark arch_quark = g_quark_from_static_string (details->tuple);
       g_autoptr(GPtrArray) dirs = NULL;
+      const SrtKnownArchitecture *known;
       gsize j;
 
-      dirs = pv_multiarch_details_get_libdirs (details,
-                                               PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
+      known = _srt_architecture_get_by_tuple (details->tuple);
+      dirs = pv_known_architecture_get_libdirs (details->tuple,
+                                                known,
+                                                PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
 
       for (j = 0; j < dirs->len; j++)
         {

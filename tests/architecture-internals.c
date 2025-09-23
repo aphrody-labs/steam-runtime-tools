@@ -43,6 +43,7 @@ test_architecture_get_by_tuple (Fixture *f,
 {
   const SrtKnownArchitecture *x86_64_arch;
   const SrtKnownArchitecture *i386_arch;
+  const SrtKnownArchitecture *aarch64_arch;
   const SrtKnownArchitecture *arch;
 
   x86_64_arch = _srt_architecture_get_by_tuple (SRT_ABI_X86_64);
@@ -67,7 +68,7 @@ test_architecture_get_by_tuple (Fixture *f,
   g_assert_cmpint (i386_arch->elf_encoding, ==, ELFDATA2LSB);
   g_assert_cmpint (i386_arch->sizeof_pointer, ==, 4);
 
-  arch = _srt_architecture_get_by_tuple (SRT_ABI_AARCH64);
+  arch = aarch64_arch = _srt_architecture_get_by_tuple (SRT_ABI_AARCH64);
   g_assert_nonnull (arch);
   g_assert_cmpstr (arch->multiarch_tuple, ==, SRT_ABI_AARCH64);
   g_assert_cmpstr (arch->interoperable_runtime_linker, ==,
@@ -94,6 +95,8 @@ test_architecture_get_by_tuple (Fixture *f,
   g_assert_true (arch == x86_64_arch);
 #elif defined(__i386__)
   g_assert_true (arch == i386_arch);
+#elif defined(__aarch64__)
+  g_assert_true (arch == aarch64_arch);
 #endif
   g_assert_cmpstr (arch->multiarch_tuple, ==, _SRT_MULTIARCH);
   g_assert_cmpint (arch->sizeof_pointer, ==, sizeof (void *));

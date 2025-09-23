@@ -2256,9 +2256,13 @@ pv_runtime_capture_libraries (PvRuntime *self,
  * to @libdir_patterns that will capture the driver and its dependencies
  * into `${libdir}`.
  *
- * Change `details->archs[multiarch_index].kind` from %ICD_KIND_NONEXISTENT
+ * Change `details->archs[multiarch_index].kind` from %ICD_KIND_UNDECIDED
  * to %ICD_KIND_ABSOLUTE, %ICD_KIND_SONAME or %ICD_KIND_NONEXISTENT
  * as appropriate.
+ *
+ * If the driver is an absolute path, change its
+ * `details->archs[multiarch_index].path_in_container`
+ * from %NULL to a non-%NULL path. Otherwise leave it %NULL.
  */
 static gboolean
 bind_icds (PvRuntime *self,
@@ -2302,17 +2306,21 @@ bind_icds (PvRuntime *self,
   for (i = 0; i < n_details; i++)
     {
       IcdDetails *details = details_arr[i];
-      PvModulePerArch *details_arch = &details->archs[multiarch_index];
+      PvModulePerArch *details_arch;
 
       g_return_val_if_fail (details != NULL, FALSE);
+      details_arch = &details->archs[multiarch_index];
+      g_return_val_if_fail (details_arch->kind == ICD_KIND_UNDECIDED
+                            || details_arch->kind == ICD_KIND_META_LAYER,
+                            FALSE);
+      g_return_val_if_fail (details_arch->path_in_container == NULL, FALSE);
 
+      /* If the JSON manifest failed to load, we count that as NONEXISTENT. */
       if (details_arch->resolved_library == NULL)
-        continue;
-
-      g_return_val_if_fail (details_arch->kind == ICD_KIND_NONEXISTENT,
-                            FALSE);
-      g_return_val_if_fail (details_arch->path_in_container == NULL,
-                            FALSE);
+        {
+          details_arch->kind = ICD_KIND_NONEXISTENT;
+          continue;
+        }
 
       g_info ("Capturing %s loadable module #%" G_GSIZE_FORMAT ": %s",
               subdir, i, details->debug_name);
@@ -2331,6 +2339,13 @@ bind_icds (PvRuntime *self,
                                      options,
                                      details_arch->resolved_library);
           g_ptr_array_add (libdir_patterns, g_steal_pointer (&pattern));
+
+          /* Even though we have not actually run capsule-capture-libs yet,
+           * we can predict where it's going to end up:
+           * it will be ${overrides}/lib/${arch}/${SONAME}. */
+          details_arch->path_in_container = g_build_filename (arch->libdir_in_container,
+                                                              details_arch->resolved_library,
+                                                              NULL);
           continue;
         }
 
@@ -2668,6 +2683,30 @@ success:
               subdir, i, details->debug_name);
       g_info ("Implementation on %s: %s",
               arch->details->tuple, type_str);
+
+      switch (details_arch->kind)
+        {
+          case ICD_KIND_ABSOLUTE:
+            /* No point in outputting this for SONAME since it will
+             * just be the basename of the library, again */
+            g_info ("Path in provider: %s", details_arch->resolved_library);
+            /* Fall through */
+
+          case ICD_KIND_SONAME:
+            g_warn_if_fail (details_arch->resolved_library != NULL);
+            g_info ("Path in container: %s", details_arch->path_in_container);
+            g_warn_if_fail (details_arch->path_in_container != NULL);
+            break;
+
+          case ICD_KIND_META_LAYER:
+          case ICD_KIND_NONEXISTENT:
+            g_warn_if_fail (details_arch->path_in_container == NULL);
+            break;
+
+          case ICD_KIND_UNDECIDED:
+          default:
+            g_warn_if_reached ();
+        }
     }
 
   return TRUE;
@@ -4705,6 +4744,9 @@ setup_json_manifest (PvRuntime *self,
 
       g_assert (i < G_N_ELEMENTS (details->archs));
       details_arch = &details->archs[i];
+      /* By the time we get here, bind_icds() should have figured out
+       * which kind each architecture's instantiation of the library is. */
+      g_warn_if_fail (details_arch->kind != ICD_KIND_UNDECIDED);
 
       tuple = pv_multiarch_tuples[i];
       arch = _srt_architecture_get_by_tuple (tuple);
@@ -5964,9 +6006,12 @@ collect_one_mesa_drirc (PvRuntime *self,
 
       case ICD_KIND_NONEXISTENT:
       case ICD_KIND_META_LAYER:
-      default:
         /* Nothing to do - we can't know the path because there is none */
         break;
+
+      case ICD_KIND_UNDECIDED:
+      default:
+        g_warn_if_reached ();
     }
 }
 

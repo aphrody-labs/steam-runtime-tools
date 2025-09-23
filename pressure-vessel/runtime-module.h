@@ -17,6 +17,7 @@
 
 /*
  * IcdKind:
+ * @ICD_KIND_UNDECIDED: We have not yet checked whether the module exists.
  * @ICD_KIND_NONEXISTENT: The module doesn't exist on this architecture.
  * @ICD_KIND_ABSOLUTE: The module is an absolute path (possibly containing
  *  libdl dynamic string tokens such as `${LIB}`) which can be resolved
@@ -32,6 +33,7 @@
  */
 typedef enum
 {
+  ICD_KIND_UNDECIDED = 0,
   ICD_KIND_NONEXISTENT,
   ICD_KIND_ABSOLUTE,
   ICD_KIND_SONAME,
@@ -48,7 +50,8 @@ const char *icd_kind_to_string (IcdKind kind);
  *  for %ICD_KIND_ABSOLUTE it is the absolute path in the provider's
  *  namespace (but possibly contains libdl dynamic string tokens),
  *  and for other kinds it is %NULL.
- * @path_in_container: If the @kind is %ICD_KIND_ABSOLUTE, then this is
+ * @path_in_container: If the @kind is %ICD_KIND_ABSOLUTE or %ICD_KIND_SONAME,
+ *  then this is
  *  a concrete, absolute path accessible in the container from which the
  *  library will be loadable, with no libdl dynamic string tokens,
  *  for example "/run/host/usr/lib/.../libfoo.so" or
@@ -71,7 +74,7 @@ pv_module_per_arch_init (PvModulePerArch *self)
 {
   self->resolved_library = NULL;
   self->path_in_container = NULL;
-  self->kind = ICD_KIND_NONEXISTENT;
+  self->kind = ICD_KIND_UNDECIDED;
 }
 
 static inline void
@@ -79,7 +82,7 @@ pv_module_per_arch_clear (PvModulePerArch *self)
 {
   g_clear_pointer (&self->resolved_library, g_free);
   g_clear_pointer (&self->path_in_container, g_free);
-  self->kind = ICD_KIND_NONEXISTENT;
+  self->kind = ICD_KIND_UNDECIDED;
 }
 
 G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (PvModulePerArch, pv_module_per_arch_clear)

@@ -2551,6 +2551,7 @@ bind_icds (PvRuntime *self,
               /* We don't need to capture the dependencies of icd_details[i],
                * because we are already going to capture the dependencies of
                * icd_details[other], and they are the same file */
+              details_arch->path_in_container = g_steal_pointer (&target);
               continue;
             }
         }

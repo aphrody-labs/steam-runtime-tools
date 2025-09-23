@@ -85,16 +85,22 @@ typedef enum
 GPtrArray *pv_multiarch_details_get_libdirs (const PvMultiarchDetails *self,
                                              PvMultiarchLibdirsFlags flags);
 
-static inline gboolean
-pv_supported_architectures_include_tuple (const char *tuple)
+static inline const PvMultiarchDetails *
+pv_multiarch_details_get_by_tuple (const char *tuple)
 {
   gsize i;
 
   for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
     {
       if (g_str_equal (tuple, pv_multiarch_tuples[i]))
-        return TRUE;
+        return &pv_multiarch_details[i];
     }
 
-  return FALSE;
+  return NULL;
+}
+
+static inline gboolean
+pv_supported_architectures_include_tuple (const char *tuple)
+{
+  return (pv_multiarch_details_get_by_tuple (tuple) != NULL);
 }

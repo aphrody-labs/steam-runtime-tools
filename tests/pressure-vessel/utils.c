@@ -36,6 +36,7 @@
 #include "tests/test-utils.h"
 #include "flatpak-utils-private.h"
 #include "mtree.h"
+#include "supported-architectures.h"
 #include "utils.h"
 
 typedef struct
@@ -462,6 +463,134 @@ test_envp_cmp (Fixture *f,
 }
 
 static void
+test_known_arch_libdirs (Fixture *f,
+                         gconstpointer context)
+{
+  static const struct
+  {
+    const char *tuple;
+    /* Length is arbitrary, extend as needed */
+    const char * const expected[10];
+  } tests[] =
+  {
+#if defined(__i386__) || defined(__x86_64__)
+    {
+      SRT_ABI_I386,
+      {
+        "/lib/" SRT_ABI_I386,
+        "/usr/lib/" SRT_ABI_I386,
+        "IF_REMOVE_OVERRIDDEN:/usr/lib/" SRT_ABI_I386 "/mesa",
+        "/i686-pc-linux-gnu/lib",
+        "/usr/i686-pc-linux-gnu/lib",
+        "/lib32",
+        "/usr/lib32",
+        "/lib",
+        "/usr/lib",
+        NULL
+      },
+    },
+    {
+      SRT_ABI_X86_64,
+      {
+        "/lib/" SRT_ABI_X86_64,
+        "/usr/lib/" SRT_ABI_X86_64,
+        "IF_REMOVE_OVERRIDDEN:/usr/lib/" SRT_ABI_X86_64 "/mesa",
+        "/x86_64-pc-linux-gnu/lib",
+        "/usr/x86_64-pc-linux-gnu/lib",
+        "/lib64",
+        "/usr/lib64",
+        "/lib",
+        "/usr/lib",
+        NULL
+      },
+    },
+#elif defined(__aarch64__)
+    {
+      SRT_ABI_AARCH64,
+      {
+        "/lib/" SRT_ABI_AARCH64,
+        "/usr/lib/" SRT_ABI_AARCH64,
+        "IF_REMOVE_OVERRIDDEN:/usr/lib/" SRT_ABI_AARCH64 "/mesa",
+        "/aarch64-unknown-linux-gnueabi/lib",
+        "/usr/aarch64-unknown-linux-gnueabi/lib",
+        "/lib",
+        "/usr/lib",
+        NULL
+      },
+    },
+#else
+    {
+      _SRT_MULTIARCH,
+      {
+        "/lib/" _SRT_MULTIARCH,
+        "/usr/lib/" _SRT_MULTIARCH,
+        "IF_REMOVE_OVERRIDDEN:/usr/lib/" _SRT_MULTIARCH "/mesa",
+        "/lib",
+        "/usr/lib",
+        NULL
+      },
+    },
+#endif
+  };
+  gsize i;
+  gsize remove_overridden;
+
+  for (remove_overridden = 0; remove_overridden < 2; remove_overridden++)
+    {
+      PvMultiarchLibdirsFlags flags = PV_MULTIARCH_LIBDIRS_FLAGS_NONE;
+
+      if (remove_overridden)
+        flags |= PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN;
+
+      for (i = 0; i < G_N_ELEMENTS (tests); i++)
+        {
+          const PvMultiarchDetails *details;
+          g_autoptr(GPtrArray) expected = g_ptr_array_new ();
+          g_autoptr(GPtrArray) actual = NULL;
+          const char *tuple = tests[i].tuple;
+          gsize j;
+
+          g_test_message ("test: %s, flags: 0x%x", tuple ?: "(null)", flags);
+
+          for (j = 0; j < G_N_ELEMENTS (tests[i].expected); j++)
+            {
+              const char *item = tests[i].expected[j];
+
+              if (item == NULL)
+                break;
+
+              if (g_str_has_prefix (item, "IF_REMOVE_OVERRIDDEN:"))
+                {
+                  if (flags & PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN)
+                    item = item + strlen ("IF_REMOVE_OVERRIDDEN:");
+                  else
+                    continue;
+                }
+
+              g_ptr_array_add (expected, (gchar *) item);
+            }
+
+          details = pv_multiarch_details_get_by_tuple (tuple);
+          g_assert_nonnull (details);
+
+          actual = pv_multiarch_details_get_libdirs (details, flags);
+
+          for (j = 0; j < expected->len; j++)
+            g_test_message ("expected[%zu]: %s",
+                            j, (const char *) g_ptr_array_index (expected, j));
+
+          for (j = 0; j < actual->len; j++)
+            g_test_message ("actual[%zu]: %s",
+                            j, (const char *) g_ptr_array_index (actual, j));
+
+          g_ptr_array_add (expected, NULL);
+          g_ptr_array_add (actual, NULL);
+          g_assert_cmpstrv ((GStrv) actual->pdata, (GStrv) expected->pdata);
+        }
+    }
+}
+
+static void
 test_mtree_entry_parse (Fixture *f,
                         gconstpointer context)
 {
@@ -724,6 +853,8 @@ main (int argc,
   g_test_add ("/delete-dangling-symlink", Fixture, NULL,
               setup, test_delete_dangling_symlink, teardown);
   g_test_add ("/envp-cmp", Fixture, NULL, setup, test_envp_cmp, teardown);
+  g_test_add ("/known-arch-libdirs", Fixture, NULL,
+              setup, test_known_arch_libdirs, teardown);
   g_test_add ("/mtree-entry-parse", Fixture, NULL,
               setup, test_mtree_entry_parse, teardown);
   g_test_add ("/search-path-append", Fixture, NULL,

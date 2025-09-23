@@ -38,6 +38,66 @@ teardown (Fixture *f,
 }
 
 static void
+dump_architecture (const SrtKnownArchitecture *arch)
+{
+  const char *description;
+
+  g_test_message ("Known architecture: %s", arch->multiarch_tuple);
+  g_test_message ("\tld.so(8): %s",
+                  arch->interoperable_runtime_linker ?: "(unknown)");
+  g_test_message ("\tIn OpenXR vocabulary: %s",
+                  arch->openxr_1_architecture ?: "(none)");
+
+  switch (arch->machine_type)
+    {
+      case SRT_MACHINE_TYPE_386:
+        description = "386";
+        break;
+      case SRT_MACHINE_TYPE_X86_64:
+        description = "X86_64";
+        break;
+      case SRT_MACHINE_TYPE_AARCH64:
+        description = "AARCH64";
+        break;
+      default:
+        description = "(unknown)";
+    }
+
+  g_test_message ("\tELF machine type: 0x%x: %s",
+                  arch->machine_type, description);
+
+  switch (arch->elf_class)
+    {
+      case ELFCLASS64:
+        description = "64-bit";
+        break;
+      case ELFCLASS32:
+        description = "32-bit";
+        break;
+      default:
+        description = "(unknown)";
+    }
+
+  g_test_message ("\tELF class: 0x%x: %s", arch->elf_class, description);
+
+  switch (arch->elf_encoding)
+    {
+      case ELFDATA2LSB:
+        description = "little-endian two's complement";
+        break;
+      case ELFDATA2MSB:
+        description = "big-endian two's complement";
+        break;
+      default:
+        description = "(unknown)";
+    }
+
+  g_test_message ("\tELF encoding: 0x%x: %s", arch->elf_encoding, description);
+
+  g_test_message ("\tsizeof(void *): %u bytes", arch->sizeof_pointer);
+}
+
+static void
 test_architecture_get_by_tuple (Fixture *f,
                                 gconstpointer context)
 {
@@ -46,8 +106,9 @@ test_architecture_get_by_tuple (Fixture *f,
   const SrtKnownArchitecture *aarch64_arch;
   const SrtKnownArchitecture *arch;
 
-  x86_64_arch = _srt_architecture_get_by_tuple (SRT_ABI_X86_64);
+  arch = x86_64_arch = _srt_architecture_get_by_tuple (SRT_ABI_X86_64);
   g_assert_nonnull (x86_64_arch);
+  dump_architecture (arch);
   g_assert_cmpstr (x86_64_arch->multiarch_tuple, ==, SRT_ABI_X86_64);
   g_assert_cmpstr (x86_64_arch->interoperable_runtime_linker, ==,
                    "/lib64/ld-linux-x86-64.so.2");
@@ -57,8 +118,9 @@ test_architecture_get_by_tuple (Fixture *f,
   g_assert_cmpint (x86_64_arch->elf_encoding, ==, ELFDATA2LSB);
   g_assert_cmpint (x86_64_arch->sizeof_pointer, ==, 8);
 
-  i386_arch = _srt_architecture_get_by_tuple (SRT_ABI_I386);
+  arch = i386_arch = _srt_architecture_get_by_tuple (SRT_ABI_I386);
   g_assert_nonnull (i386_arch);
+  dump_architecture (arch);
   g_assert_cmpstr (i386_arch->multiarch_tuple, ==, SRT_ABI_I386);
   g_assert_cmpstr (i386_arch->interoperable_runtime_linker, ==,
                    "/lib/ld-linux.so.2");
@@ -70,6 +132,7 @@ test_architecture_get_by_tuple (Fixture *f,
 
   arch = aarch64_arch = _srt_architecture_get_by_tuple (SRT_ABI_AARCH64);
   g_assert_nonnull (arch);
+  dump_architecture (arch);
   g_assert_cmpstr (arch->multiarch_tuple, ==, SRT_ABI_AARCH64);
   g_assert_cmpstr (arch->interoperable_runtime_linker, ==,
                    "/lib/ld-linux-aarch64.so.1");
@@ -82,6 +145,7 @@ test_architecture_get_by_tuple (Fixture *f,
   /* Used in unit tests */
   arch = _srt_architecture_get_by_tuple ("x86_64-mock-abi");
   g_assert_nonnull (arch);
+  dump_architecture (arch);
   g_assert_cmpstr (arch->multiarch_tuple, ==, "x86_64-mock-abi");
   g_assert_cmpstr (arch->interoperable_runtime_linker, ==, NULL);
   g_assert_cmpstr (arch->openxr_1_architecture, ==, NULL);

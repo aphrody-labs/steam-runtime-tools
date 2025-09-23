@@ -102,6 +102,10 @@ test_architecture_get_by_tuple (Fixture *f,
   g_assert_cmpstr (arch->multiarch_tuple, ==, _SRT_MULTIARCH);
   g_assert_cmpint (arch->sizeof_pointer, ==, sizeof (void *));
 #endif
+
+  /* An architecture we have no knowledge of isn't found */
+  arch = _srt_architecture_get_by_tuple ("potato-glados-eabi");
+  g_assert_null (arch);
 }
 
 int

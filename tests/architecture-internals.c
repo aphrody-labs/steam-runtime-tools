@@ -84,6 +84,7 @@ test_architecture_get_by_tuple (Fixture *f,
   g_assert_nonnull (arch);
   g_assert_cmpstr (arch->multiarch_tuple, ==, "x86_64-mock-abi");
   g_assert_cmpstr (arch->interoperable_runtime_linker, ==, NULL);
+  g_assert_cmpstr (arch->openxr_1_architecture, ==, NULL);
   g_assert_cmpint (arch->machine_type, ==, SRT_MACHINE_TYPE_UNKNOWN);
   g_assert_cmpint (arch->elf_class, ==, ELFCLASSNONE);
   g_assert_cmpint (arch->sizeof_pointer, ==, 8);

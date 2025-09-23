@@ -202,6 +202,8 @@ pressure_vessel_wrap_lib = static_library(
     'wrap-openxr.h',
     'wrap-pipewire.c',
     'wrap-pipewire.h',
+    'wrap-preload.c',
+    'wrap-preload.h',
     'wrap-setup.c',
     'wrap-setup.h',
   ],

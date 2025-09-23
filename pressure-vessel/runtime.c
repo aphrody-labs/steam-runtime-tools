@@ -2315,15 +2315,33 @@ bind_icds (PvRuntime *self,
 
       g_return_val_if_fail (details != NULL, FALSE);
       details_arch = &details->archs[multiarch_index];
-      g_return_val_if_fail (details_arch->kind == ICD_KIND_UNDECIDED
-                            || details_arch->kind == ICD_KIND_NONEXISTENT
-                            || details_arch->kind == ICD_KIND_META_LAYER,
-                            FALSE);
       g_return_val_if_fail (details_arch->path_in_container == NULL, FALSE);
 
-      if (details_arch->resolved_library == NULL)
+      switch (details_arch->kind)
         {
-          continue;
+          /* Usually by the time we get here, we have not yet decided
+           * whether the module exists or not. In this case, we do know
+           * what path it would have, if it did indeed exist. */
+          case ICD_KIND_UNDECIDED:
+            g_warn_if_fail (details_arch->resolved_library != NULL);
+            break;
+
+          /* We might already have decided that the module does not exist
+           * (JSON manifest failed to load), or that it is of a type that
+           * is not backed by a loadable module. */
+          case ICD_KIND_META_LAYER:
+          case ICD_KIND_NONEXISTENT:
+            g_warn_if_fail (details_arch->resolved_library == NULL);
+            continue;
+
+          /* We shouldn't have these types yet: it's this function that
+           * is responsible for setting them. */
+          case ICD_KIND_ABSOLUTE:
+          case ICD_KIND_SONAME:
+          case ICD_KIND_IGNORED:
+          default:
+            g_warn_if_reached ();
+            continue;
         }
 
       g_info ("Capturing %s loadable module #%" G_GSIZE_FORMAT ": %s",

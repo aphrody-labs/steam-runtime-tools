@@ -50,6 +50,16 @@ icd_details_check (const IcdDetails *self)
   base = SRT_BASE_GRAPHICS_MODULE (self->icd);
   g_return_val_if_fail (base->error == NULL, FALSE);
 
+  if (self->has_library)
+    {
+      g_return_val_if_fail (base->library_path != NULL, FALSE);
+    }
+  else
+    {
+      g_return_val_if_fail (base->library_path == NULL, FALSE);
+      g_return_val_if_fail (SRT_IS_VULKAN_LAYER (self->icd), FALSE);
+    }
+
   return TRUE;
 }
 
@@ -72,6 +82,16 @@ icd_details_new (PvGraphicsProvider *provider,
 
       g_return_val_if_fail (j->json_path != NULL, NULL);
       name = j->json_path;
+
+      /* If it's a Vulkan layer, then either it has a library_path
+       * or it is a meta-layer (has component layers).
+       * Otherwise it must have a library path. */
+      if (SRT_IS_VULKAN_LAYER (icd))
+        g_return_val_if_fail (j->component_layers != NULL
+                              || base->library_path != NULL,
+                              NULL);
+      else
+        g_return_val_if_fail (base->library_path != NULL, NULL);
     }
   else if (SRT_IS_DRI_DRIVER (icd)
            || SRT_IS_VA_API_DRIVER (icd)
@@ -90,6 +110,7 @@ icd_details_new (PvGraphicsProvider *provider,
   self->in_n_providers = 1;
   self->icd = g_object_ref (icd);
   self->debug_name = name;
+  self->has_library = (base->library_path != NULL);
 
   for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
     pv_module_per_arch_init (&self->archs[i]);

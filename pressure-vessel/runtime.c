@@ -5093,7 +5093,7 @@ collect_json_based_drivers (PvRuntime *self,
       g_assert (details_arch->resolved_library == NULL);
 
       /* For meta-layers we don't have a library path */
-      if (SRT_IS_VULKAN_LAYER (base) && base->library_path == NULL)
+      if (!details->has_library)
         {
           details_arch->kind = ICD_KIND_META_LAYER;
           continue;

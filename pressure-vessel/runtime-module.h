@@ -187,6 +187,7 @@ typedef struct
   PvGraphicsProvider *provider;
   PvModulePerArch archs[PV_N_SUPPORTED_ARCHITECTURES];
   gsize in_n_providers;
+  bool has_library : 1;
   bool is_duplicate : 1;
 } IcdDetails;
 

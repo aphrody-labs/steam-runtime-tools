@@ -2269,7 +2269,7 @@ pv_runtime_capture_libraries (PvRuntime *self,
  * to %ICD_KIND_ABSOLUTE, %ICD_KIND_SONAME, %ICD_KIND_IGNORED
  * or %ICD_KIND_NONEXISTENT as appropriate.
  *
- * If the driver is an absolute path, change its
+ * If the module is %ICD_KIND_ABSOLUTE or %ICD_KIND_SONAME, change its
  * `details->archs[multiarch_index].path_in_container`
  * from %NULL to a non-%NULL path. Otherwise leave it %NULL.
  */

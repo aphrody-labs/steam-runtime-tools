@@ -3609,7 +3609,7 @@ bind_runtime_ld_so (PvRuntime *self,
                                                      path,
                                                      PV_RUNTIME_EMULATION_ROOTS_INTERPRETER_ONLY,
                                                      &local_error))
-            g_warning ("%s", local_error->message);
+            _srt_log_warning ("%s", local_error->message);
         }
 
       /* Similar, but for ld.so.conf, for example on Solus. */
@@ -3626,7 +3626,7 @@ bind_runtime_ld_so (PvRuntime *self,
                                                      path,
                                                      PV_RUNTIME_EMULATION_ROOTS_INTERPRETER_ONLY,
                                                      &local_error))
-            g_warning ("%s", local_error->message);
+            _srt_log_warning ("%s", local_error->message);
         }
 
       /* glibc from some distributions will want to load the ld.so cache from
@@ -3660,7 +3660,7 @@ bind_runtime_ld_so (PvRuntime *self,
                                                          path,
                                                          PV_RUNTIME_EMULATION_ROOTS_INTERPRETER_ONLY,
                                                          &local_error))
-                g_warning ("%s", local_error->message);
+                _srt_log_warning ("%s", local_error->message);
             }
         }
     }

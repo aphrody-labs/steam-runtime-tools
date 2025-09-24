@@ -602,6 +602,12 @@ class TestContainers(BaseTest):
         if 'G_DEBUG' not in env:
             env['G_DEBUG'] = 'fatal-criticals'
 
+        data_dirs = env.get('XDG_DATA_DIRS', '/usr/local/share:/usr/share')
+        env['XDG_DATA_DIRS'] = ':'.join([
+            os.path.join(self.G_TEST_SRCDIR, 'mock-drivers', 'share'),
+            data_dirs,
+        ])
+
         argv = [
             self.pv_wrap,
             '--verbose',

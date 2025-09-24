@@ -4801,17 +4801,16 @@ setup_json_manifest (PvRuntime *self,
 
           case ICD_KIND_NONEXISTENT:
           case ICD_KIND_IGNORED:
+          case ICD_KIND_UNDECIDED:
             g_debug ("%s[%s]: not applicable", details->debug_name, tuple);
-            /* Nothing to do in these cases */
+            /* Nothing to do in these cases.
+             * Note that we can get here with details_arch->kind still set
+             * to UNDECIDED if initial setup for the architecture as a whole
+             * was not successful. */
             continue;
 
-          /* By the time we get here, bind_icds() should have figured out
-           * which kind each architecture's instantiation of the library is. */
-          case ICD_KIND_UNDECIDED:
           default:
-            g_critical ("%s[%s]: should not reach here for %s",
-                        details->debug_name, tuple,
-                        icd_kind_to_string (details_arch->kind));
+            g_warn_if_reached ();
             continue;
         }
 

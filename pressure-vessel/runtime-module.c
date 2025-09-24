@@ -164,11 +164,7 @@ icd_details_arch_is_applicable (const IcdDetails *self,
  * @self: The module
  * @multiarch_index: An index into @pv_multiarch_tuples
  *
- * Fill in @resolved_library in `archs[multiarch_index]`.
- *
- * If the module is a Vulkan meta-layer with no associated library,
- * also set the @kind to %ICD_KIND_META_LAYER.
- * Otherwise leave the @kind set to %ICD_KIND_UNDECIDED.
+ * Fill in @kind and @resolved_library in `archs[multiarch_index]`.
  */
 void
 icd_details_populate_architecture_by_index (IcdDetails *self,
@@ -184,7 +180,6 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
            self->provider->in_current_ns->path, self->debug_name, tuple);
   arch = &self->archs[multiarch_index];
   /* Precondition: We didn't already populate arch-specific info */
-  g_return_if_fail (!arch->populated);
   g_return_if_fail (arch->resolved_library == NULL);
   g_return_if_fail (arch->kind == ICD_KIND_UNDECIDED);
   g_return_if_fail (arch->path_in_container == NULL);
@@ -206,14 +201,42 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
       if (SRT_IS_BASE_JSON_GRAPHICS_MODULE (module))
         {
           /* arch->resolved_library could be either absolute or a basename */
+          if (g_path_is_absolute (arch->resolved_library))
+            arch->kind = ICD_KIND_ABSOLUTE;
+          else
+            arch->kind = ICD_KIND_SONAME;
         }
       else
         {
           g_return_if_fail (g_path_is_absolute (arch->resolved_library));
+          arch->kind = ICD_KIND_ABSOLUTE;
         }
     }
 
-  arch->populated = true;
+  g_info ("%s[%s]: %s",
+          self->debug_name, tuple, icd_kind_to_string (arch->kind));
+
+  /* Postconditions */
+  switch (arch->kind)
+    {
+      case ICD_KIND_ABSOLUTE:
+      case ICD_KIND_SONAME:
+        g_return_if_fail (arch->resolved_library != NULL);
+        break;
+
+      case ICD_KIND_META_LAYER:
+        g_return_if_fail (arch->resolved_library == NULL);
+        break;
+
+      /* This function can't currently have these results */
+      case ICD_KIND_IGNORED:
+      case ICD_KIND_NONEXISTENT:
+      /* The purpose of this function is to set the @kind to
+       * something other than %ICD_KIND_UNDECIDED */
+      case ICD_KIND_UNDECIDED:
+      default:
+        g_return_if_reached ();
+    }
 }
 
 /*

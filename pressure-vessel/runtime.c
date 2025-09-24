@@ -2265,10 +2265,6 @@ pv_runtime_capture_libraries (PvRuntime *self,
  * to @libdir_patterns that will capture the driver and its dependencies
  * into `${libdir}`.
  *
- * Change `details->archs[multiarch_index].kind` from %ICD_KIND_UNDECIDED
- * to %ICD_KIND_ABSOLUTE, %ICD_KIND_SONAME, %ICD_KIND_IGNORED
- * or %ICD_KIND_NONEXISTENT as appropriate.
- *
  * If the module is %ICD_KIND_ABSOLUTE or %ICD_KIND_SONAME, change its
  * `details->archs[multiarch_index].path_in_container`
  * from %NULL to a non-%NULL path. Otherwise leave it %NULL.
@@ -2310,8 +2306,7 @@ bind_icds (PvRuntime *self,
 
   multiarch_index = arch->multiarch_index;
 
-  /* Iterate through the drivers to classify them into ABSOLUTE, SONAME
-   * or missing. Add the SONAMEs to @patterns. */
+  /* Iterate through the drivers adding the SONAMEs to @patterns. */
   for (i = 0; i < n_details; i++)
     {
       IcdDetails *details = details_arr[i];
@@ -2319,32 +2314,22 @@ bind_icds (PvRuntime *self,
 
       g_return_val_if_fail (details != NULL, FALSE);
       details_arch = &details->archs[multiarch_index];
-      g_return_val_if_fail (details_arch->populated, FALSE);
       g_return_val_if_fail (details_arch->path_in_container == NULL, FALSE);
 
+      /* Architecture-specific information should have been populated
+       * before we get here */
       switch (details_arch->kind)
         {
-          /* Usually by the time we get here, we have not yet decided
-           * whether the module exists or not. In this case, we do know
-           * what path it would have, if it did indeed exist. */
-          case ICD_KIND_UNDECIDED:
-            g_warn_if_fail (details_arch->resolved_library != NULL);
-            break;
-
-          /* We might already have decided that the module does not exist
-           * (for example if dynamic string tokens could
-           * not be resolved to a concrete path), or that it is of a type
-           * that is not backed by a loadable module. */
-          case ICD_KIND_META_LAYER:
-          case ICD_KIND_NONEXISTENT:
-            g_warn_if_fail (details_arch->resolved_library == NULL);
-            continue;
-
-          /* We shouldn't have these types yet: it's this function that
-           * is responsible for setting them. */
           case ICD_KIND_ABSOLUTE:
           case ICD_KIND_SONAME:
+            break;
+
+          case ICD_KIND_META_LAYER:
           case ICD_KIND_IGNORED:
+          case ICD_KIND_NONEXISTENT:
+            continue;
+
+          case ICD_KIND_UNDECIDED:
           default:
             g_warn_if_reached ();
             continue;
@@ -2375,13 +2360,11 @@ bind_icds (PvRuntime *self,
               arch->tuple,
               details_arch->resolved_library);
 
-      if (!g_path_is_absolute (details_arch->resolved_library))
+      if (details_arch->kind == ICD_KIND_SONAME)
         {
           g_autofree gchar *pattern = NULL;
 
           g_debug ("Classified as SONAME");
-          details_arch->kind = ICD_KIND_SONAME;
-
           pattern = g_strdup_printf ("even-if-older:%s:soname:%s",
                                      options,
                                      details_arch->resolved_library);
@@ -2397,7 +2380,7 @@ bind_icds (PvRuntime *self,
         }
 
       g_debug ("Classified as path-based");
-      details_arch->kind = ICD_KIND_ABSOLUTE;
+      g_assert (details_arch->kind == ICD_KIND_ABSOLUTE);
 
       /* We set subdir_relative_to_overrides non-NULL if and only if at least
        * one driver is ICD_KIND_ABSOLUTE */
@@ -2724,11 +2707,9 @@ success:
     {
       const IcdDetails *details = details_arr[i];
       const PvModulePerArch *details_arch = &details->archs[multiarch_index];
-      const char *type_str = icd_kind_to_string (details_arch->kind);
 
       g_info ("Captured %s loadable module #%" G_GSIZE_FORMAT ": %s",
               subdir, i, details->debug_name);
-      g_info ("Implementation on %s: %s", arch->tuple, type_str);
 
       switch (details_arch->kind)
         {

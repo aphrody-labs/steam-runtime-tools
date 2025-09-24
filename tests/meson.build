@@ -123,7 +123,6 @@ foreach sub : [
   'expectations',
   'expectations_libtheora0',
   'expectations_with_missings',
-  'fake-icds',
   'input-monitor-outputs',
   'json-report',
   'mock-bwrap',

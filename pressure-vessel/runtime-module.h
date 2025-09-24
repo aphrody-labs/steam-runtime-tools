@@ -66,7 +66,13 @@ const char *icd_kind_to_string (IcdKind kind);
  *
  * Details of a driver, Vulkan layer or similar thing discovered in a
  * graphics provider, for one specific architecture.
- * ```
+ *
+ * Note that the reason why @resolved_library appears here, and not in
+ * #IcdDetails, is that its value can be architecture-specific:
+ * for some module types, we expand dynamic string tokens like ${LIB}.
+ * The module might also be relevant to some architectures
+ * but %ICD_KIND_IGNORED on others, for example because they are using
+ * a different graphics stack provider.
  */
 typedef struct
 {

@@ -212,6 +212,7 @@ icd_details_fill_array_single_arch (GPtrArray *details_arr,
  *  discovered by #SrtSystemInfo, which must be based on a JSON manifest
  *
  * Build an array of those @drivers that are not in an error state.
+ * No architecture-specific details are populated at this stage.
  *
  * Returns: (transfer container) (element-type IcdDetails): An array of
  *  representations of the drivers
@@ -424,6 +425,21 @@ icd_stack_enumerate_openxr_1_runtimes (IcdStack *self,
     }
 }
 
+/*
+ * icd_stack_enumerate:
+ * @self: The stack
+ * @runtime_flags: Flags determining which types of driver we are
+ *  interested in
+ * @provider: A graphics stack provider
+ * @which_system: A string such as `"host"` or `"provider"` for
+ *  use in diagnostic messages
+ *
+ * Find all the JSON-manifest-based drivers provided by @provider.
+ * No architecture-specific details are populated at this stage.
+ *
+ * Returns: (transfer container) (element-type IcdDetails): An array of
+ *  representations of the drivers
+ */
 void
 icd_stack_enumerate (IcdStack *self,
                      PvRuntimeFlags runtime_flags,

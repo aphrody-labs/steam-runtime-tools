@@ -196,10 +196,8 @@ void icd_details_free (IcdDetails *self);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdDetails, icd_details_free)
 
 void icd_details_populate_architecture_by_index (IcdDetails *self,
-                                                 gsize multiarch_index);
-
-gboolean icd_details_arch_is_applicable (const IcdDetails *self,
-                                         const SrtKnownArchitecture *known_arch);
+                                                 gsize multiarch_index,
+                                                 const SrtKnownArchitecture *known);
 
 /*
  * icd_details_array_sized_new:
@@ -218,7 +216,8 @@ icd_details_array_sized_new (gsize n)
 void icd_details_fill_array_single_arch (GPtrArray *details_arr,
                                          PvGraphicsProvider *provider,
                                          const GList *drivers,
-                                         gsize multiarch_index);
+                                         gsize multiarch_index,
+                                         const SrtKnownArchitecture *known);
 
 /*
  * IcdStack:

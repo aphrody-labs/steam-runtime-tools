@@ -2338,14 +2338,6 @@ bind_icds (PvRuntime *self,
       g_info ("Capturing %s loadable module #%" G_GSIZE_FORMAT ": %s",
               subdir, i, details->debug_name);
 
-      if (arch->known_arch != NULL
-          && !icd_details_arch_is_applicable (details, arch->known_arch))
-        {
-          g_debug ("Ignoring due to architecture restriction");
-          details_arch->kind = ICD_KIND_IGNORED;
-          continue;
-        }
-
       if (details->provider != arch->provider)
         {
           g_debug ("Module found in \"%s\" but %s provider is \"%s\", ignoring",
@@ -2714,11 +2706,6 @@ success:
       switch (details_arch->kind)
         {
           case ICD_KIND_ABSOLUTE:
-            /* No point in outputting this for SONAME since it will
-             * just be the basename of the library, again */
-            g_info ("Path in provider: %s", details_arch->resolved_library);
-            /* Fall through */
-
           case ICD_KIND_SONAME:
             g_warn_if_fail (details_arch->resolved_library != NULL);
             g_info ("Path in container: %s", details_arch->path_in_container);
@@ -4817,13 +4804,6 @@ setup_json_manifest (PvRuntime *self,
 
       arch_bits = g_strdup_printf ("%u", arch->sizeof_pointer * 8);
 
-      if (library_arch != NULL && !g_str_equal (library_arch, arch_bits))
-        {
-          /* We should have figured this out already */
-          g_warn_if_fail (details_arch->kind == ICD_KIND_IGNORED);
-          continue;
-        }
-
       if (write_per_architecture)
         {
           g_autofree gchar *write_to_file = NULL;
@@ -5074,11 +5054,26 @@ collect_json_based_drivers (PvRuntime *self,
       g_assert (base->error == NULL);
       g_assert (details_arch->resolved_library == NULL);
 
-      icd_details_populate_architecture_by_index (details, multiarch_index);
+      icd_details_populate_architecture_by_index (details,
+                                                  multiarch_index,
+                                                  arch->known_arch);
 
-      /* For meta-layers we don't have a library path */
-      if (!details->has_library)
-        continue;
+      switch (details_arch->kind)
+        {
+          case ICD_KIND_ABSOLUTE:
+          case ICD_KIND_SONAME:
+            break;
+
+          case ICD_KIND_IGNORED:
+          case ICD_KIND_META_LAYER:
+          case ICD_KIND_NONEXISTENT:
+            continue;
+
+          case ICD_KIND_UNDECIDED:
+          default:
+            g_warn_if_reached ();
+            continue;
+        }
 
       resolved_library = details_arch->resolved_library;
       g_assert (resolved_library != NULL);
@@ -5186,7 +5181,9 @@ collect_openxr_1_runtime (PvRuntime *self,
 
   g_return_val_if_fail (srt_openxr_1_runtime_check_error (rt, NULL), TRUE);
 
-  icd_details_populate_architecture_by_index (details, multiarch_index);
+  icd_details_populate_architecture_by_index (details,
+                                              multiarch_index,
+                                              arch->known_arch);
 
   if (!bind_icds (self, arch, "openxr/1", &details, 1, &use_numbered_subdirs,
                   patterns, NULL, error))
@@ -6741,7 +6738,8 @@ collect_vdpau_drivers (PvRuntime *self,
   icd_details_fill_array_single_arch (details_arr,
                                       arch->provider,
                                       vdpau_drivers,
-                                      multiarch_index);
+                                      multiarch_index,
+                                      arch->known_arch);
 
   /* In practice we won't actually use the sequence number for VDPAU
    * because they can only be located in a single directory,
@@ -6813,11 +6811,13 @@ collect_dri_drivers (PvRuntime *self,
   icd_details_fill_array_single_arch (details_arr,
                                       arch->provider,
                                       dri_drivers,
-                                      multiarch_index);
+                                      multiarch_index,
+                                      arch->known_arch);
   icd_details_fill_array_single_arch (details_arr,
                                       arch->provider,
                                       va_api_drivers,
-                                      multiarch_index);
+                                      multiarch_index,
+                                      arch->known_arch);
   j = 0;
 
   while (j < details_arr->len)

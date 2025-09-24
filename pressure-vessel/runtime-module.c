@@ -133,13 +133,10 @@ icd_details_free (IcdDetails *self)
   g_slice_free (IcdDetails, self);
 }
 
-gboolean
+static gboolean
 icd_details_arch_is_applicable (const IcdDetails *self,
                                 const SrtKnownArchitecture *known_arch)
 {
-  g_return_val_if_fail (icd_details_check (self), FALSE);
-  g_return_val_if_fail (known_arch != NULL, TRUE);
-
   if (SRT_IS_BASE_JSON_GRAPHICS_MODULE (self->icd))
     {
       SrtBaseJsonGraphicsModule *module = self->icd;
@@ -163,12 +160,14 @@ icd_details_arch_is_applicable (const IcdDetails *self,
  * icd_details_populate_architecture_by_index:
  * @self: The module
  * @multiarch_index: An index into @pv_multiarch_tuples
+ * @known: (nullable): Information about the architecture
  *
  * Fill in @kind and @resolved_library in `archs[multiarch_index]`.
  */
 void
 icd_details_populate_architecture_by_index (IcdDetails *self,
-                                            gsize multiarch_index)
+                                            gsize multiarch_index,
+                                            const SrtKnownArchitecture *known)
 {
   SrtBaseGraphicsModule *module = self->icd;
   PvModulePerArch *arch;
@@ -184,10 +183,15 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
   g_return_if_fail (arch->kind == ICD_KIND_UNDECIDED);
   g_return_if_fail (arch->path_in_container == NULL);
 
-  /* If this is a Vulkan meta-layer with no associated library,
-   * there's nothing to do */
-  if (!self->has_library)
+  if (known != NULL && !icd_details_arch_is_applicable (self, known))
     {
+      g_debug ("-> ignored due to architecture restriction");
+      arch->kind = ICD_KIND_IGNORED;
+    }
+  else if (!self->has_library)
+    {
+      /* If this is a Vulkan meta-layer with no associated library,
+       * there's nothing to do */
       g_return_if_fail (SRT_IS_VULKAN_LAYER (module));
       arch->kind = ICD_KIND_META_LAYER;
     }
@@ -222,14 +226,15 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
       case ICD_KIND_ABSOLUTE:
       case ICD_KIND_SONAME:
         g_return_if_fail (arch->resolved_library != NULL);
+        g_info ("-> path in provider: %s", arch->resolved_library);
         break;
 
+      case ICD_KIND_IGNORED:
       case ICD_KIND_META_LAYER:
         g_return_if_fail (arch->resolved_library == NULL);
         break;
 
       /* This function can't currently have these results */
-      case ICD_KIND_IGNORED:
       case ICD_KIND_NONEXISTENT:
       /* The purpose of this function is to set the @kind to
        * something other than %ICD_KIND_UNDECIDED */
@@ -246,6 +251,7 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
  * @drivers: (element-type SrtBaseGraphicsModule): The drivers as discovered
  *  by #SrtSystemInfo, which must be DRI, VA-API or VDPAU
  * @multiarch_index: An index into @pv_multiarch_tuples
+ * @known: (nullable): Information about the architecture
  *
  * Build an array of #IcdDetails, and populate the architecture-specific
  * details of architecture @multiarch_index only.
@@ -257,7 +263,8 @@ void
 icd_details_fill_array_single_arch (GPtrArray *details_arr,
                                     PvGraphicsProvider *provider,
                                     const GList *drivers,
-                                    gsize multiarch_index)
+                                    gsize multiarch_index,
+                                    const SrtKnownArchitecture *known)
 {
   const GList *icd_iter;
   gsize j;
@@ -272,7 +279,9 @@ icd_details_fill_array_single_arch (GPtrArray *details_arr,
                 || SRT_IS_VDPAU_DRIVER (module));
       g_assert (!SRT_IS_BASE_JSON_GRAPHICS_MODULE (module));
 
-      icd_details_populate_architecture_by_index (details, multiarch_index);
+      icd_details_populate_architecture_by_index (details,
+                                                  multiarch_index,
+                                                  known);
       g_return_if_fail (icd_details_check (details));
       g_ptr_array_add (details_arr, g_steal_pointer (&details));
     }

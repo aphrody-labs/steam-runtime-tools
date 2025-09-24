@@ -10,6 +10,7 @@
 
 #include "steam-runtime-tools/graphics-drivers-internal.h"
 #include "steam-runtime-tools/graphics-drivers-json-based-internal.h"
+#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/profiling-internal.h"
 
 const char *
@@ -200,8 +201,8 @@ icd_details_fill_array_json_based (GPtrArray *details_arr,
 
       if (!_srt_base_graphics_module_check_error (base, &local_error))
         {
-          g_warning ("Failed to load %s #%" G_GSIZE_FORMAT " from %s: %s",
-                     which, i, path, local_error->message);
+          _srt_log_warning ("Failed to load %s #%" G_GSIZE_FORMAT " from %s: %s",
+                            which, i, path, local_error->message);
           g_clear_error (&local_error);
           continue;
         }
@@ -361,8 +362,8 @@ icd_stack_enumerate_openxr_1_runtimes (IcdStack *self,
 
       if (!srt_openxr_1_runtime_check_error (rt, &local_error))
         {
-          g_warning ("Failed to load OpenXR 1 runtime for %s from %s: %s",
-                     multiarch_tuple, path, local_error->message);
+          _srt_log_warning ("Failed to load OpenXR 1 runtime for %s from %s: %s",
+                            multiarch_tuple, path, local_error->message);
           g_clear_error (&local_error);
           continue;
         }

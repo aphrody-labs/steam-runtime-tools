@@ -2319,6 +2319,7 @@ bind_icds (PvRuntime *self,
 
       g_return_val_if_fail (details != NULL, FALSE);
       details_arch = &details->archs[multiarch_index];
+      g_return_val_if_fail (details_arch->populated, FALSE);
       g_return_val_if_fail (details_arch->path_in_container == NULL, FALSE);
 
       switch (details_arch->kind)
@@ -5092,23 +5093,14 @@ collect_json_based_drivers (PvRuntime *self,
       g_assert (base->error == NULL);
       g_assert (details_arch->resolved_library == NULL);
 
+      icd_details_populate_architecture_by_index (details, multiarch_index);
+
       /* For meta-layers we don't have a library path */
       if (!details->has_library)
-        {
-          details_arch->kind = ICD_KIND_META_LAYER;
-          continue;
-        }
-      else
-        {
-          g_assert (base->library_path != NULL);
-        }
+        continue;
 
-      /* If the library_path is relative to the JSON file, turn it into an
-       * absolute path. If it's already absolute, or if it's a basename to be
-       * looked up in the system library search path, use it as-is. */
-      details_arch->resolved_library = _srt_base_graphics_module_resolve_library_path (base);
       resolved_library = details_arch->resolved_library;
-      g_assert (details_arch->resolved_library != NULL);
+      g_assert (resolved_library != NULL);
 
       /* TODO: Previously we only did this for Vulkan layers, but is it
        * applicable to all file types? */
@@ -5198,7 +5190,6 @@ collect_openxr_1_runtime (PvRuntime *self,
     _srt_profiling_start ("Collecting OpenXR 1 runtimes");
   SrtOpenXr1Runtime *rt;
   IcdDetails *details;
-  PvModulePerArch *details_arch;
   /* We don't have to use multiple directories because there is at most one
    * active runtime per architecture, so filenames cannot collide */
   gboolean use_numbered_subdirs = FALSE;
@@ -5214,10 +5205,7 @@ collect_openxr_1_runtime (PvRuntime *self,
 
   g_return_val_if_fail (srt_openxr_1_runtime_check_error (rt, NULL), TRUE);
 
-  details_arch = &details->archs[multiarch_index];
-  details_arch->resolved_library =
-    srt_openxr_1_runtime_resolve_library_path (rt);
-  g_assert (details_arch->resolved_library != NULL);
+  icd_details_populate_architecture_by_index (details, multiarch_index);
 
   if (!bind_icds (self, arch, "openxr/1", &details, 1, &use_numbered_subdirs,
                   patterns, NULL, error))

@@ -160,6 +160,63 @@ icd_details_arch_is_applicable (const IcdDetails *self,
 }
 
 /*
+ * icd_details_populate_architecture_by_index:
+ * @self: The module
+ * @multiarch_index: An index into @pv_multiarch_tuples
+ *
+ * Fill in @resolved_library in `archs[multiarch_index]`.
+ *
+ * If the module is a Vulkan meta-layer with no associated library,
+ * also set the @kind to %ICD_KIND_META_LAYER.
+ * Otherwise leave the @kind set to %ICD_KIND_UNDECIDED.
+ */
+void
+icd_details_populate_architecture_by_index (IcdDetails *self,
+                                            gsize multiarch_index)
+{
+  SrtBaseGraphicsModule *module = self->icd;
+  PvModulePerArch *arch;
+  g_autofree gchar *resolved_library = NULL;
+  const char *tuple = pv_multiarch_tuples[multiarch_index];
+
+  g_return_if_fail (icd_details_check (self));
+  g_debug ("%s:%s: checking architecture %s",
+           self->provider->in_current_ns->path, self->debug_name, tuple);
+  arch = &self->archs[multiarch_index];
+  /* Precondition: We didn't already populate arch-specific info */
+  g_return_if_fail (!arch->populated);
+  g_return_if_fail (arch->resolved_library == NULL);
+  g_return_if_fail (arch->kind == ICD_KIND_UNDECIDED);
+  g_return_if_fail (arch->path_in_container == NULL);
+
+  /* If this is a Vulkan meta-layer with no associated library,
+   * there's nothing to do */
+  if (!self->has_library)
+    {
+      g_return_if_fail (SRT_IS_VULKAN_LAYER (module));
+      arch->kind = ICD_KIND_META_LAYER;
+    }
+  else
+    {
+      resolved_library = _srt_base_graphics_module_resolve_library_path (module);
+      g_return_if_fail (resolved_library != NULL);
+
+      arch->resolved_library = g_steal_pointer (&resolved_library);
+
+      if (SRT_IS_BASE_JSON_GRAPHICS_MODULE (module))
+        {
+          /* arch->resolved_library could be either absolute or a basename */
+        }
+      else
+        {
+          g_return_if_fail (g_path_is_absolute (arch->resolved_library));
+        }
+    }
+
+  arch->populated = true;
+}
+
+/*
  * icd_details_fill_array_single_arch:
  * @details_arr: (element-type IcdDetails): The array to populate,
  *  as returned by icd_details_array_sized_new()
@@ -167,8 +224,8 @@ icd_details_arch_is_applicable (const IcdDetails *self,
  *  by #SrtSystemInfo, which must be DRI, VA-API or VDPAU
  * @multiarch_index: An index into @pv_multiarch_tuples
  *
- * Build an array of #IcdDetails, and fill in the @resolved_library
- * for architecture @multiarch_index only.
+ * Build an array of #IcdDetails, and populate the architecture-specific
+ * details of architecture @multiarch_index only.
  *
  * Returns: (transfer container) (element-type IcdDetails): An array of
  *  representations of the drivers
@@ -186,18 +243,13 @@ icd_details_fill_array_single_arch (GPtrArray *details_arr,
     {
       SrtBaseGraphicsModule *module = icd_iter->data;
       g_autoptr(IcdDetails) details = icd_details_new (provider, module);
-      PvModulePerArch *arch = &details->archs[multiarch_index];
 
       g_assert (SRT_IS_DRI_DRIVER (module)
                 || SRT_IS_VA_API_DRIVER (module)
                 || SRT_IS_VDPAU_DRIVER (module));
       g_assert (!SRT_IS_BASE_JSON_GRAPHICS_MODULE (module));
 
-      g_assert (arch->resolved_library == NULL);
-      arch->resolved_library = _srt_base_graphics_module_resolve_library_path (module);
-      g_assert (arch->resolved_library != NULL);
-      g_assert (g_path_is_absolute (arch->resolved_library));
-
+      icd_details_populate_architecture_by_index (details, multiarch_index);
       g_return_if_fail (icd_details_check (details));
       g_ptr_array_add (details_arr, g_steal_pointer (&details));
     }

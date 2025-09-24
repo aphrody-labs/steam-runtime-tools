@@ -79,6 +79,7 @@ typedef struct
   gchar *resolved_library;
   gchar *path_in_container;
   IcdKind kind;
+  bool populated : 1;
 } PvModulePerArch;
 
 static inline void
@@ -87,6 +88,7 @@ pv_module_per_arch_init (PvModulePerArch *self)
   self->resolved_library = NULL;
   self->path_in_container = NULL;
   self->kind = ICD_KIND_UNDECIDED;
+  self->populated = false;
 }
 
 static inline void
@@ -95,6 +97,7 @@ pv_module_per_arch_clear (PvModulePerArch *self)
   g_clear_pointer (&self->resolved_library, g_free);
   g_clear_pointer (&self->path_in_container, g_free);
   self->kind = ICD_KIND_UNDECIDED;
+  self->populated = false;
 }
 
 G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (PvModulePerArch, pv_module_per_arch_clear)
@@ -194,6 +197,9 @@ typedef struct
 void icd_details_free (IcdDetails *self);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdDetails, icd_details_free)
+
+void icd_details_populate_architecture_by_index (IcdDetails *self,
+                                                 gsize multiarch_index);
 
 gboolean icd_details_arch_is_applicable (const IcdDetails *self,
                                          const SrtKnownArchitecture *known_arch);

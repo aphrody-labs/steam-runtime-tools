@@ -46,6 +46,7 @@ icd_details_check (const IcdDetails *self)
 {
   SrtBaseGraphicsModule *base;
 
+  g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (self->provider), FALSE);
   g_return_val_if_fail (SRT_IS_BASE_GRAPHICS_MODULE (self->icd), FALSE);
   base = SRT_BASE_GRAPHICS_MODULE (self->icd);
   g_return_val_if_fail (base->error == NULL, FALSE);

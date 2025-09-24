@@ -597,6 +597,11 @@ class TestContainers(BaseTest):
 
         final_argv_temp = tempfile.NamedTemporaryFile()
 
+        env = os.environ.copy()
+
+        if 'G_DEBUG' not in env:
+            env['G_DEBUG'] = 'fatal-criticals'
+
         argv = [
             self.pv_wrap,
             '--verbose',
@@ -696,6 +701,7 @@ class TestContainers(BaseTest):
                     completed = self.run_subprocess(
                         argv,
                         cwd=self.artifacts,
+                        env=env,
                         stdout=tee.stdin,
                         stderr=tee.stdin,
                         universal_newlines=True,

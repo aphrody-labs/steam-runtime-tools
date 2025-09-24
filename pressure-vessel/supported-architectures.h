@@ -22,6 +22,7 @@
 #include <glib.h>
 
 #include "steam-runtime-tools/architecture.h"
+#include "steam-runtime-tools/architecture-internal.h"
 
 #if defined(__i386__) || defined(__x86_64__)
 #define PV_N_SUPPORTED_ARCHITECTURES 2
@@ -40,20 +41,6 @@ extern const char * const pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES + 1];
 typedef struct
 {
   const char *tuple;
-
-  /* Directories other than /usr/lib that we must search for loadable
-   * modules, least-ambiguous first, most-ambiguous last, not including
-   * Debian-style multiarch directories which are automatically derived
-   * from @tuple.
-   * - Exherbo <GNU-tuple>/lib
-   * - Red-Hat- or Arch-style lib<QUAL>
-   * - etc.
-   * Size is completely arbitrary, expand as needed */
-  const char *multilib[3];
-
-  /* Alternative paths for ld.so.cache, other than ld.so.cache itself.
-   * Size is completely arbitrary, expand as needed */
-  const char *other_ld_so_cache[2];
 
   /* Known values that ${PLATFORM} can expand to.
    * Refer to sysdeps/x86/cpu-features.c and sysdeps/x86/dl-procinfo.c
@@ -82,19 +69,26 @@ typedef enum
   PV_MULTIARCH_LIBDIRS_FLAGS_NONE = 0
 } PvMultiarchLibdirsFlags;
 
-GPtrArray *pv_multiarch_details_get_libdirs (const PvMultiarchDetails *self,
-                                             PvMultiarchLibdirsFlags flags);
+GPtrArray *pv_known_architecture_get_libdirs (const char *tuple,
+                                              const SrtKnownArchitecture *known,
+                                              PvMultiarchLibdirsFlags flags);
 
-static inline gboolean
-pv_supported_architectures_include_tuple (const char *tuple)
+static inline const PvMultiarchDetails *
+pv_multiarch_details_get_by_tuple (const char *tuple)
 {
   gsize i;
 
   for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
     {
       if (g_str_equal (tuple, pv_multiarch_tuples[i]))
-        return TRUE;
+        return &pv_multiarch_details[i];
     }
 
-  return FALSE;
+  return NULL;
+}
+
+static inline gboolean
+pv_supported_architectures_include_tuple (const char *tuple)
+{
+  return (pv_multiarch_details_get_by_tuple (tuple) != NULL);
 }

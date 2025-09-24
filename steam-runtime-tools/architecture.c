@@ -66,6 +66,24 @@ static const SrtKnownArchitecture known_architectures[] =
       .multiarch_tuple = SRT_ABI_X86_64,
       .interoperable_runtime_linker = "/lib64/ld-linux-x86-64.so.2",
       .openxr_1_architecture = "x86_64",
+      .multilib_suffixes = ((const char * const[]){
+          "x86_64-pc-linux-gnu/lib",
+          "lib64",
+          NULL
+      }),
+      .extra_ld_so_caches = ((const char * const[]){
+          "ld-x86_64-pc-linux-gnu.cache",
+          NULL
+      }),
+      .libdl_platform_expansions = ((const char * const[]){
+          /* Reference: sysdeps/x86/cpu-features.c and
+           * sysdeps/x86/dl-procinfo.c in glibc */
+          "xeon_phi",
+          "haswell",
+          "x86_64",
+          NULL
+      }),
+      .steam_gameoverlayrenderer_dir = "ubuntu12_64",
       .machine_type = EM_X86_64,
       .elf_class = ELFCLASS64,
       .elf_encoding = ELFDATA2LSB,
@@ -76,6 +94,25 @@ static const SrtKnownArchitecture known_architectures[] =
       .multiarch_tuple = SRT_ABI_I386,
       .interoperable_runtime_linker = "/lib/ld-linux.so.2",
       .openxr_1_architecture = "i686",
+      .multilib_suffixes = ((const char * const[]){
+          "i686-pc-linux-gnu/lib",
+          "lib32",
+          NULL
+      }),
+      .extra_ld_so_caches = ((const char * const[]){
+          "ld-i686-pc-linux-gnu.cache",
+          NULL
+      }),
+      .libdl_platform_expansions = ((const char * const[]){
+          /* Reference: sysdeps/x86/cpu-features.c and
+           * sysdeps/x86/dl-procinfo.c in glibc */
+          "i686",
+          "i586",
+          "i486",
+          "i386",
+          NULL
+      }),
+      .steam_gameoverlayrenderer_dir = "ubuntu12_32",
       .machine_type = EM_386,
       .elf_class = ELFCLASS32,
       .elf_encoding = ELFDATA2LSB,
@@ -86,6 +123,11 @@ static const SrtKnownArchitecture known_architectures[] =
       .multiarch_tuple = "x86_64-linux-gnux32",
       .interoperable_runtime_linker = "/libx32/ld-linux-x32.so.2",
       .openxr_1_architecture = "x32",
+      .multilib_suffixes = ((const char * const[]){ "libx32", NULL }),
+      .extra_ld_so_caches = ((const char * const[]){
+          "ld-i686-pc-linux-gnu.cache",
+          NULL
+      }),
       .machine_type = EM_X86_64,
       .elf_class = ELFCLASS32,
       .elf_encoding = ELFDATA2LSB,
@@ -96,6 +138,15 @@ static const SrtKnownArchitecture known_architectures[] =
       .multiarch_tuple = SRT_ABI_AARCH64,
       .interoperable_runtime_linker = "/lib/ld-linux-aarch64.so.1",
       .openxr_1_architecture = "aarch64",
+      .multilib_suffixes = ((const char * const[]){
+          "aarch64-unknown-linux-gnueabi/lib",
+          NULL
+      }),
+      .extra_ld_so_caches = ((const char * const[]){
+          "ld-aarch64-unknown-linux-gnueabi.cache",
+          NULL
+      }),
+      .libdl_platform_expansions = ((const char * const[]){ "aarch64", NULL }),
       .machine_type = EM_AARCH64,
       .elf_class = ELFCLASS64,
       .elf_encoding = ELFDATA2LSB,

@@ -56,3 +56,6 @@ typedef enum
 G_GNUC_INTERNAL
 SrtLoadableKind _srt_loadable_classify (const char *loadable,
                                         SrtLoadableFlags *flags_out);
+
+const char * const *_srt_get_extra_ld_so_cache_filenames (void);
+const char * const *_srt_get_extra_ld_so_conf_filenames (void);

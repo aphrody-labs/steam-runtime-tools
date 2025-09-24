@@ -202,3 +202,57 @@ out:
 
   return kind;
 }
+
+/*
+ * _srt_get_extra_ld_so_cache_filenames:
+ *
+ * Return an array of non-standard, architecture-independent filenames
+ * for ld.so.cache.
+ *
+ * The result does not include the standard `/etc/ld.so.cache`,
+ * as used upstream, in Debian and in the Steam Runtime.
+ *
+ * The result does not include any architecture-specific filenames.
+ * For those, see #SrtKnownArchitecture.extra_ld_so_caches.
+ *
+ * Returns: (array zero-terminated=1) (element-type filename): The filenames
+ */
+const char * const *
+_srt_get_extra_ld_so_cache_filenames (void)
+{
+  static const char * const filenames[] =
+  {
+    /* Clear Linux */
+    "/var/cache/ldconfig/ld.so.cache",
+    NULL
+  };
+
+  return filenames;
+}
+
+/*
+ * _srt_get_extra_ld_so_conf_filenames:
+ *
+ * Return an array of non-standard, architecture-independent filenames
+ * for ld.so.conf.
+ *
+ * The result does not include the standard `/etc/ld.so.conf`,
+ * as used upstream, in Debian and in the Steam Runtime.
+ *
+ * The result does not include any architecture-specific filenames.
+ * If we supported any, they would be part of #SrtKnownArchitecture.
+ *
+ * Returns: (array zero-terminated=1) (element-type filename): The filenames
+ */
+const char * const *
+_srt_get_extra_ld_so_conf_filenames (void)
+{
+  static const char * const filenames[] =
+  {
+    /* Solus */
+    "/usr/share/defaults/etc/ld.so.conf",
+    NULL
+  };
+
+  return filenames;
+}

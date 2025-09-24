@@ -35,6 +35,7 @@
 #include "steam-runtime-tools/file-lock-internal.h"
 #include "steam-runtime-tools/graphics-internal.h"
 #include "steam-runtime-tools/graphics-drivers-json-based-internal.h"
+#include "steam-runtime-tools/libdl-internal.h"
 #include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/profiling-internal.h"
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
@@ -624,6 +625,8 @@ typedef struct
 {
   /* Index into pv_multiarch_details, 0 <= x < PV_N_SUPPORTED_ARCHITECTURES */
   gsize multiarch_index;
+  /* The relevant multiarch tuple */
+  const char *tuple;
   /* Always &pv_multiarch_details[self->multiarch_index] */
   const PvMultiarchDetails *details;
   /* Architecture knowledge from libsteam-runtime-tools, if any */
@@ -687,31 +690,32 @@ runtime_architecture_init (RuntimeArchitecture *self,
 
   self->details = &pv_multiarch_details[self->multiarch_index];
   g_return_val_if_fail (self->details != NULL, FALSE);
-  g_return_val_if_fail (self->details->tuple != NULL, FALSE);
+  self->tuple = self->details->tuple;
+  g_return_val_if_fail (self->tuple != NULL, FALSE);
   g_return_val_if_fail (g_strcmp0 (pv_multiarch_tuples[self->multiarch_index],
-                                   self->details->tuple) == 0, FALSE);
+                                   self->tuple) == 0, FALSE);
 
-  tuple_quark = g_quark_from_static_string (self->details->tuple);
+  tuple_quark = g_quark_from_static_string (self->tuple);
   g_return_val_if_fail (tuple_quark != 0, FALSE);
   provider = pv_runtime_get_graphics_provider (runtime, tuple_quark);
   g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (provider), FALSE);
   self->provider = g_object_ref (provider);
 
   /* Could in theory be %NULL, so be careful when dereferencing */
-  self->known_arch = _srt_architecture_get_by_tuple (self->details->tuple);
+  self->known_arch = _srt_architecture_get_by_tuple (self->tuple);
 
   self->capsule_capture_libs_basename = g_strdup_printf ("%s-capsule-capture-libs",
-                                                         self->details->tuple);
+                                                         self->tuple);
   self->capsule_capture_libs = g_build_filename (runtime->helpers_path,
                                                  self->capsule_capture_libs_basename,
                                                  NULL);
   self->libdir_relative_to_overrides = g_strdup_printf ("lib/%s",
-                                                        self->details->tuple);
+                                                        self->tuple);
   self->libdir_in_container = g_build_filename (runtime->overrides_in_container,
                                                 self->libdir_relative_to_overrides, NULL);
 
   self->aliases_relative_to_overrides = g_strdup_printf ("lib/%s/aliases",
-                                                         self->details->tuple);
+                                                         self->tuple);
 
   /* This has the side-effect of testing whether we can run binaries
    * for this architecture on the current environment. We
@@ -722,7 +726,7 @@ runtime_architecture_init (RuntimeArchitecture *self,
 
   if (self->ld_so == NULL)
     {
-      g_info ("Cannot determine ld.so for %s", self->details->tuple);
+      g_info ("Cannot determine ld.so for %s", self->tuple);
       return FALSE;
     }
 
@@ -2342,14 +2346,14 @@ bind_icds (PvRuntime *self,
         {
           g_debug ("Module found in \"%s\" but %s provider is \"%s\", ignoring",
                    details->provider->in_current_ns->path,
-                   arch->details->tuple,
+                   arch->tuple,
                    arch->provider->in_current_ns->path);
           details_arch->kind = ICD_KIND_IGNORED;
           continue;
         }
 
       g_info ("Checking for implementation on %s: %s",
-              arch->details->tuple,
+              arch->tuple,
               details_arch->resolved_library);
 
       if (!g_path_is_absolute (details_arch->resolved_library))
@@ -2705,8 +2709,7 @@ success:
 
       g_info ("Captured %s loadable module #%" G_GSIZE_FORMAT ": %s",
               subdir, i, details->debug_name);
-      g_info ("Implementation on %s: %s",
-              arch->details->tuple, type_str);
+      g_info ("Implementation on %s: %s", arch->tuple, type_str);
 
       switch (details_arch->kind)
         {
@@ -3467,6 +3470,7 @@ bind_runtime_ld_so (PvRuntime *self,
        * bwrap in /oldroot */
       g_autofree gchar *ld_so_cache_on_host = NULL;
       g_autofree gchar *ld_so_conf_on_host = NULL;
+      const char * const *extra_filenames;
 
       if (self->workarounds & PV_WORKAROUND_FLAGS_STEAMSNAP_356)
         mutable_ldso_dir = MUTABLE_LDSO_DIR_SNAP;
@@ -3574,10 +3578,12 @@ bind_runtime_ld_so (PvRuntime *self,
        * a distribution-specific path, e.g. Clear Linux uses
        * /var/cache/ldconfig/ld.so.cache. For simplicity, we make all these paths
        * symlinks, so that we only have to populate the cache in one place. */
-      for (i = 0; pv_other_ld_so_cache[i] != NULL; i++)
+      extra_filenames = _srt_get_extra_ld_so_cache_filenames ();
+
+      for (i = 0; extra_filenames[i] != NULL; i++)
         {
           g_autoptr(GError) local_error = NULL;
-          const char *path = pv_other_ld_so_cache[i];
+          const char *path = extra_filenames[i];
 
           if (!pv_runtime_make_symlink_in_container (self,
                                                      bwrap,
@@ -3589,10 +3595,12 @@ bind_runtime_ld_so (PvRuntime *self,
         }
 
       /* Similar, but for ld.so.conf, for example on Solus. */
-      for (i = 0; pv_other_ld_so_conf[i] != NULL; i++)
+      extra_filenames = _srt_get_extra_ld_so_conf_filenames ();
+
+      for (i = 0; extra_filenames[i] != NULL; i++)
         {
           g_autoptr(GError) local_error = NULL;
-          const char *path = pv_other_ld_so_conf[i];
+          const char *path = extra_filenames[i];
 
           if (!pv_runtime_make_symlink_in_container (self,
                                                      bwrap,
@@ -3610,11 +3618,16 @@ bind_runtime_ld_so (PvRuntime *self,
        * as done in upstream glibc (and Debian, Arch, etc.). */
       for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
         {
-          const PvMultiarchDetails *details = &pv_multiarch_details[i];
+          const SrtKnownArchitecture *known;
 
-          for (j = 0; j < G_N_ELEMENTS (details->other_ld_so_cache); j++)
+          known = _srt_architecture_get_by_tuple (pv_multiarch_tuples[i]);
+
+          if (known == NULL || known->extra_ld_so_caches == NULL)
+            continue;
+
+          for (j = 0; known->extra_ld_so_caches[j] != NULL; j++)
             {
-              const char *base = details->other_ld_so_cache[j];
+              const char *base = known->extra_ld_so_caches[j];
               g_autoptr(GError) local_error = NULL;
               g_autofree gchar *path = NULL;
 
@@ -4177,11 +4190,11 @@ pv_runtime_remove_overridden_libraries (PvRuntime *self,
   /* Not applicable/possible if we don't have a mutable sysroot */
   g_return_val_if_fail (self->mutable_sysroot != NULL, FALSE);
 
-  timer = _srt_profiling_start ("Removing overridden %s libraries",
-                                arch->details->tuple);
+  timer = _srt_profiling_start ("Removing overridden %s libraries", arch->tuple);
 
-  dirs = pv_multiarch_details_get_libdirs (arch->details,
-                                           PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN);
+  dirs = pv_known_architecture_get_libdirs (arch->tuple,
+                                            arch->known_arch,
+                                            PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN);
   delete = g_new0 (GHashTable *, dirs->len);
   iters = g_new0 (SrtDirIter, dirs->len);
 
@@ -4236,7 +4249,7 @@ pv_runtime_remove_overridden_libraries (PvRuntime *self,
         }
 
       g_debug ("Removing overridden %s libraries from \"%s\" in mutable sysroot...",
-               arch->details->tuple, libdir);
+               arch->tuple, libdir);
 
       if (!_srt_dir_iter_init_take_fd (&iters[i], &libdir_fd,
                                        SRT_DIR_ITER_FLAGS_ENSURE_DTYPE,
@@ -5057,8 +5070,7 @@ collect_json_based_drivers (PvRuntime *self,
   g_return_val_if_fail (libdir_patterns != NULL, FALSE);
   g_return_val_if_fail (bind_icds_subdir != NULL, FALSE);
 
-  g_debug ("Collecting %s %s from provider...",
-           arch->details->tuple, description);
+  g_debug ("Collecting %s %s from provider...", arch->tuple, description);
 
   for (j = 0; j < details_arr->len; j++)
     {
@@ -5117,7 +5129,7 @@ collect_json_based_drivers (PvRuntime *self,
               /* It's in our current namespace, so we can dlopen it. */
               g_info ("Evaluating dynamic string tokens in \"%s\"", resolved_library);
               issues = srt_check_library_presence (resolved_library,
-                                                   arch->details->tuple, NULL,
+                                                   arch->tuple, NULL,
                                                    SRT_LIBRARY_SYMBOLS_FORMAT_PLAIN,
                                                    &library);
               if (issues & (SRT_LIBRARY_ISSUES_CANNOT_LOAD |
@@ -5182,10 +5194,9 @@ collect_openxr_1_runtime (PvRuntime *self,
   gboolean use_numbered_subdirs = FALSE;
   const gsize multiarch_index = arch->multiarch_index;
 
-  g_debug ("Collecting %s OpenXR 1 runtime from provider...",
-           arch->details->tuple);
+  g_debug ("Collecting %s OpenXR 1 runtime from provider...", arch->tuple);
 
-  details = g_hash_table_lookup (openxr_1_runtime_details, arch->details->tuple);
+  details = g_hash_table_lookup (openxr_1_runtime_details, arch->tuple);
   if (details == NULL)
     return TRUE;
 
@@ -5661,7 +5672,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
     return FALSE;
 
   libdl_lib = srt_system_info_dup_libdl_lib (system_info,
-                                             arch->details->tuple,
+                                             arch->tuple,
                                              &local_error);
 
   if (libdl_lib == NULL)
@@ -5892,7 +5903,7 @@ pv_runtime_collect_lib_data (PvRuntime *self,
    * leave dir empty, but that's OK: dir_in_provider will become
    * something like "share/drirc.d" which will be looked up in the
    * provider namespace. */
-  lib_multiarch = g_build_filename ("/lib", arch->details->tuple, NULL);
+  lib_multiarch = g_build_filename ("/lib", arch->tuple, NULL);
   libdir_suffixes[0] = lib_multiarch;
 
   for (gsize i = 0; i < G_N_ELEMENTS (libdir_suffixes); i++)
@@ -6149,7 +6160,7 @@ collect_mesa_drirc (PvRuntime *self,
    * so its time cost will be trivial and therefore there's no need to
    * do additional profiling */
   dri_drivers = srt_system_info_list_dri_drivers (arch_system_info,
-                                                  arch->details->tuple,
+                                                  arch->tuple,
                                                   SRT_DRIVER_FLAGS_NONE);
 
   for (const GList *icd_iter = dri_drivers;
@@ -6528,11 +6539,11 @@ pv_runtime_handle_alias (PvRuntime *self,
   soname_in_overrides = g_build_filename (arch->libdir_relative_to_overrides,
                                           soname, NULL);
   soname_in_runtime_usr = g_build_filename (self->runtime_usr, "lib",
-                                            arch->details->tuple, soname, NULL);
+                                            arch->tuple, soname, NULL);
   /* We are not always in a merged-/usr runtime, e.g. if we are using a
    * "sysroot" runtime. */
   soname_in_runtime = g_build_filename (self->runtime_files, "lib",
-                                        arch->details->tuple, soname, NULL);
+                                        arch->tuple, soname, NULL);
 
   if (fstatat (self->overrides_fd, soname_in_overrides, &stat_buf, AT_SYMLINK_NOFOLLOW) == 0
       && (S_ISLNK (stat_buf.st_mode) || S_ISREG (stat_buf.st_mode)))
@@ -6573,13 +6584,13 @@ pv_runtime_handle_alias (PvRuntime *self,
   else if (g_file_test (soname_in_runtime_usr,
                         (G_FILE_TEST_IS_REGULAR | G_FILE_TEST_IS_SYMLINK)))
     {
-      target = g_build_filename ("/usr/lib", arch->details->tuple, soname, NULL);
+      target = g_build_filename ("/usr/lib", arch->tuple, soname, NULL);
       g_info ("Found %s in runtime's /usr/lib: %s", soname, target);
     }
   else if (g_file_test (soname_in_runtime,
                         (G_FILE_TEST_IS_REGULAR | G_FILE_TEST_IS_SYMLINK)))
     {
-      target = g_build_filename ("/lib", arch->details->tuple, soname, NULL);
+      target = g_build_filename ("/lib", arch->tuple, soname, NULL);
       g_info ("Found %s in runtime's /lib: %s", soname, target);
     }
   else if (arch->multiarch_index == PV_PRIMARY_ARCHITECTURE)
@@ -6594,7 +6605,7 @@ pv_runtime_handle_alias (PvRuntime *self,
        * architectures (in practice i386), it's OK that e.g. libbz2.so.1.0
        * only exists for the primary architecture */
       g_debug ("%s not supported on secondary architecture %s by this runtime",
-               soname, arch->details->tuple);
+               soname, arch->tuple);
       return TRUE;
     }
 
@@ -6733,13 +6744,13 @@ collect_vdpau_drivers (PvRuntime *self,
   gsize j;
   const gsize multiarch_index = arch->multiarch_index;
 
-  g_debug ("Enumerating %s VDPAU ICDs on provider...", arch->details->tuple);
+  g_debug ("Enumerating %s VDPAU ICDs on provider...", arch->tuple);
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) enum_timer =
         _srt_profiling_start ("Enumerating VDPAU drivers");
 
       vdpau_drivers = srt_system_info_list_vdpau_drivers (system_info,
-                                                          arch->details->tuple,
+                                                          arch->tuple,
                                                           SRT_DRIVER_FLAGS_NONE);
     }
 
@@ -6798,25 +6809,23 @@ collect_dri_drivers (PvRuntime *self,
   gsize j;
   const gsize multiarch_index = arch->multiarch_index;
 
-  g_debug ("Enumerating %s DRI drivers on provider...",
-           arch->details->tuple);
+  g_debug ("Enumerating %s DRI drivers on provider...", arch->tuple);
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) enum_timer =
         _srt_profiling_start ("Enumerating DRI drivers");
 
       dri_drivers = srt_system_info_list_dri_drivers (system_info,
-                                                      arch->details->tuple,
+                                                      arch->tuple,
                                                       SRT_DRIVER_FLAGS_NONE);
     }
 
-  g_debug ("Enumerating %s VA-API drivers on provider...",
-           arch->details->tuple);
+  g_debug ("Enumerating %s VA-API drivers on provider...", arch->tuple);
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) enum_timer =
         _srt_profiling_start ("Enumerating VA-API drivers");
 
       va_api_drivers = srt_system_info_list_va_api_drivers (system_info,
-                                                            arch->details->tuple,
+                                                            arch->tuple,
                                                             SRT_DRIVER_FLAGS_NONE);
     }
 
@@ -7093,7 +7102,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
       if (runtime_architecture_init (arch, self))
         {
-          GQuark arch_quark = g_quark_from_static_string (arch->details->tuple);
+          GQuark arch_quark = g_quark_from_static_string (arch->tuple);
           g_autoptr(GPtrArray) dirs = NULL;
           g_autofree gchar *this_dri_path_in_container = g_build_filename (arch->libdir_in_container,
                                                                            "dri", NULL);
@@ -7113,7 +7122,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
             {
               g_info ("Container does not have %s so it cannot run "
                       "%s binaries",
-                      arch->ld_so, arch->details->tuple);
+                      arch->ld_so, arch->tuple);
               continue;
             }
 
@@ -7313,8 +7322,9 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                                PV_RUNTIME_DATA_FLAGS_USR_SHARE_FIRST,
                                                &nvidia_data_in_provider);
 
-          dirs = pv_multiarch_details_get_libdirs (arch->details,
-                                                   PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
+          dirs = pv_known_architecture_get_libdirs (arch->tuple,
+                                                    arch->known_arch,
+                                                    PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
 
           for (j = 0; j < dirs->len; j++)
             {
@@ -8034,10 +8044,13 @@ pv_runtime_has_library (PvRuntime *self,
       const PvMultiarchDetails *details = &pv_multiarch_details[i];
       GQuark arch_quark = g_quark_from_static_string (details->tuple);
       g_autoptr(GPtrArray) dirs = NULL;
+      const SrtKnownArchitecture *known;
       gsize j;
 
-      dirs = pv_multiarch_details_get_libdirs (details,
-                                               PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
+      known = _srt_architecture_get_by_tuple (details->tuple);
+      dirs = pv_known_architecture_get_libdirs (details->tuple,
+                                                known,
+                                                PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
 
       for (j = 0; j < dirs->len; j++)
         {

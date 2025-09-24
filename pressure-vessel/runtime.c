@@ -2331,7 +2331,7 @@ bind_icds (PvRuntime *self,
             break;
 
           /* We might already have decided that the module does not exist
-           * (JSON manifest failed to load or dynamic string tokens could
+           * (for example if dynamic string tokens could
            * not be resolved to a concrete path), or that it is of a type
            * that is not backed by a loadable module. */
           case ICD_KIND_META_LAYER:
@@ -4715,7 +4715,6 @@ setup_json_manifest (PvRuntime *self,
   SrtEglIcd *egl = NULL;
   SrtEglExternalPlatform *ext_platform = NULL;
   SrtOpenXr1Runtime *xr_rt = NULL;
-  gboolean loaded = FALSE;
   gboolean need_provider_json = FALSE;
   const SrtKnownArchitecture *provider_json_arch = NULL;
   g_autofree gchar *json_basename = NULL;
@@ -4729,7 +4728,8 @@ setup_json_manifest (PvRuntime *self,
 
   module = SRT_BASE_JSON_GRAPHICS_MODULE (details->icd);
   base = &module->parent;
-  loaded = _srt_base_graphics_module_check_error (base, NULL);
+  g_return_val_if_fail (base->error == NULL, FALSE);
+
   json_in_provider = module->json_path;
   library_arch = module->library_arch;
 
@@ -4762,13 +4762,6 @@ setup_json_manifest (PvRuntime *self,
 
   g_debug ("Setting up JSON manifest for \"%s\" loadable module \"%s\": \"%s\"",
            sub_dir, json_basename, details->debug_name);
-
-  /* If the layer failed to load, there's nothing to make available */
-  if (!loaded)
-    {
-      g_debug ("Original JSON manifest failed to load, nothing to do");
-      return TRUE;
-    }
 
   for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
     {
@@ -5096,15 +5089,8 @@ collect_json_based_drivers (PvRuntime *self,
       SrtBaseGraphicsModule *base = SRT_BASE_GRAPHICS_MODULE (details->icd);
       const char *resolved_library;
 
+      g_assert (base->error == NULL);
       g_assert (details_arch->resolved_library == NULL);
-
-      /* If the JSON manifest failed to load, we count that as NONEXISTENT
-       * on all architectures. */
-      if (!_srt_base_graphics_module_check_error (base, NULL))
-        {
-          details_arch->kind = ICD_KIND_NONEXISTENT;
-          continue;
-        }
 
       /* For meta-layers we don't have a library path */
       if (SRT_IS_VULKAN_LAYER (base) && base->library_path == NULL)

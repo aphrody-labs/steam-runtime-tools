@@ -41,15 +41,30 @@ icd_kind_to_string (IcdKind kind)
     }
 }
 
+static gboolean
+icd_details_check (const IcdDetails *self)
+{
+  SrtBaseGraphicsModule *base;
+
+  g_return_val_if_fail (SRT_IS_BASE_GRAPHICS_MODULE (self->icd), FALSE);
+  base = SRT_BASE_GRAPHICS_MODULE (self->icd);
+  g_return_val_if_fail (base->error == NULL, FALSE);
+
+  return TRUE;
+}
+
 static IcdDetails *
 icd_details_new (PvGraphicsProvider *provider,
                  gpointer icd)
 {
+  SrtBaseGraphicsModule *base;
   IcdDetails *self;
   gsize i;
   const char *name;
 
   g_return_val_if_fail (SRT_IS_BASE_GRAPHICS_MODULE (icd), NULL);
+  base = SRT_BASE_GRAPHICS_MODULE (icd);
+  g_return_val_if_fail (base->error == NULL, NULL);
 
   if (SRT_IS_BASE_JSON_GRAPHICS_MODULE (icd))
     {
@@ -62,8 +77,6 @@ icd_details_new (PvGraphicsProvider *provider,
            || SRT_IS_VA_API_DRIVER (icd)
            || SRT_IS_VDPAU_DRIVER (icd))
     {
-      SrtBaseGraphicsModule *base = SRT_BASE_GRAPHICS_MODULE (icd);
-
       g_return_val_if_fail (base->library_path != NULL, NULL);
       name = base->library_path;
     }
@@ -102,7 +115,7 @@ gboolean
 icd_details_arch_is_applicable (const IcdDetails *self,
                                 const SrtKnownArchitecture *known_arch)
 {
-  g_return_val_if_fail (SRT_IS_BASE_GRAPHICS_MODULE (self->icd), FALSE);
+  g_return_val_if_fail (icd_details_check (self), FALSE);
   g_return_val_if_fail (known_arch != NULL, TRUE);
 
   if (SRT_IS_BASE_JSON_GRAPHICS_MODULE (self->icd))
@@ -162,6 +175,8 @@ icd_details_fill_array_single_arch (GPtrArray *details_arr,
       arch->resolved_library = _srt_base_graphics_module_resolve_library_path (module);
       g_assert (arch->resolved_library != NULL);
       g_assert (g_path_is_absolute (arch->resolved_library));
+
+      g_return_if_fail (icd_details_check (details));
       g_ptr_array_add (details_arr, g_steal_pointer (&details));
     }
 }
@@ -191,6 +206,7 @@ icd_details_fill_array_json_based (GPtrArray *details_arr,
 
   for (icd_i = drivers, i = 0; icd_i != NULL; icd_i = icd_i->next, i++)
     {
+      g_autoptr(IcdDetails) details = NULL;
       SrtBaseJsonGraphicsModule *module = icd_i->data;
       SrtBaseGraphicsModule *base = &module->parent;
       const gchar *path;
@@ -215,7 +231,9 @@ icd_details_fill_array_json_based (GPtrArray *details_arr,
       g_info ("%s #%" G_GSIZE_FORMAT " at %s: %s",
               which, i, path, description);
 
-      g_ptr_array_add (details_arr, icd_details_new (provider, module));
+      details = icd_details_new (provider, module);
+      g_return_if_fail (icd_details_check (details));
+      g_ptr_array_add (details_arr, g_steal_pointer (&details));
     }
 }
 
@@ -355,6 +373,7 @@ icd_stack_enumerate_openxr_1_runtimes (IcdStack *self,
     {
       g_autoptr(SrtOpenXr1Runtime) rt = NULL;
       g_autoptr(GError) local_error = NULL;
+      g_autoptr(IcdDetails) details = NULL;
       const char *multiarch_tuple = g_quark_to_string (tuples[i]);
       const char *path;
 
@@ -376,9 +395,11 @@ icd_stack_enumerate_openxr_1_runtimes (IcdStack *self,
               multiarch_tuple, path,
               srt_openxr_1_runtime_get_library_path (rt));
 
+      details = icd_details_new (provider, rt);
+      g_return_if_fail (icd_details_check (details));
       g_hash_table_insert (self->openxr_1_runtime_details,
                            g_strdup (multiarch_tuple),
-                           icd_details_new (provider, rt));
+                           g_steal_pointer (&details));
     }
 }
 

@@ -186,6 +186,9 @@ for abi in supported_abis:
         debian10/usr/lib/{0}/vdpau/libvdpau_radeonsi.so.1.0.0
         ''').format(abi)
 
+# To avoid being dependent on readdir() order, don't include more
+# than one *.json file in any directory that we are going to scan for
+# Vulkan *.json files. (The order of EGL *.json files is well-defined.)
 files = files + '''
 debian10/usr/lib/i386-linux-gnu/dri/r300_dri.so
 debian10/usr/lib/i386-linux-gnu/dri/radeonsi_dri.so

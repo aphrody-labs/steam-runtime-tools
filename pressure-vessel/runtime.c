@@ -2331,8 +2331,9 @@ bind_icds (PvRuntime *self,
             break;
 
           /* We might already have decided that the module does not exist
-           * (JSON manifest failed to load), or that it is of a type that
-           * is not backed by a loadable module. */
+           * (JSON manifest failed to load or dynamic string tokens could
+           * not be resolved to a concrete path), or that it is of a type
+           * that is not backed by a loadable module. */
           case ICD_KIND_META_LAYER:
           case ICD_KIND_NONEXISTENT:
             g_warn_if_fail (details_arch->resolved_library == NULL);
@@ -3608,7 +3609,7 @@ bind_runtime_ld_so (PvRuntime *self,
                                                      path,
                                                      PV_RUNTIME_EMULATION_ROOTS_INTERPRETER_ONLY,
                                                      &local_error))
-            g_warning ("%s", local_error->message);
+            _srt_log_warning ("%s", local_error->message);
         }
 
       /* Similar, but for ld.so.conf, for example on Solus. */
@@ -3625,7 +3626,7 @@ bind_runtime_ld_so (PvRuntime *self,
                                                      path,
                                                      PV_RUNTIME_EMULATION_ROOTS_INTERPRETER_ONLY,
                                                      &local_error))
-            g_warning ("%s", local_error->message);
+            _srt_log_warning ("%s", local_error->message);
         }
 
       /* glibc from some distributions will want to load the ld.so cache from
@@ -3659,7 +3660,7 @@ bind_runtime_ld_so (PvRuntime *self,
                                                          path,
                                                          PV_RUNTIME_EMULATION_ROOTS_INTERPRETER_ONLY,
                                                          &local_error))
-                g_warning ("%s", local_error->message);
+                _srt_log_warning ("%s", local_error->message);
             }
         }
     }
@@ -5160,6 +5161,7 @@ collect_json_based_drivers (PvRuntime *self,
                   g_info ("Unable to load library %s: %s", resolved_library,
                           srt_library_get_messages (library));
                   g_clear_pointer (&details_arch->resolved_library, g_free);
+                  details_arch->kind = ICD_KIND_NONEXISTENT;
                   continue;
                 }
 
@@ -5179,6 +5181,7 @@ collect_json_based_drivers (PvRuntime *self,
                       "is not the root filesystem: ignoring %s",
                       resolved_library);
               g_clear_pointer (&details_arch->resolved_library, g_free);
+              details_arch->kind = ICD_KIND_NONEXISTENT;
               continue;
             }
         }

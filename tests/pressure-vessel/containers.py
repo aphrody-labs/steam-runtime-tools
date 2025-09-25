@@ -597,6 +597,17 @@ class TestContainers(BaseTest):
 
         final_argv_temp = tempfile.NamedTemporaryFile()
 
+        env = os.environ.copy()
+
+        if 'G_DEBUG' not in env:
+            env['G_DEBUG'] = 'fatal-criticals'
+
+        data_dirs = env.get('XDG_DATA_DIRS', '/usr/local/share:/usr/share')
+        env['XDG_DATA_DIRS'] = ':'.join([
+            os.path.join(self.G_TEST_SRCDIR, 'mock-drivers', 'share'),
+            data_dirs,
+        ])
+
         argv = [
             self.pv_wrap,
             '--verbose',
@@ -696,6 +707,7 @@ class TestContainers(BaseTest):
                     completed = self.run_subprocess(
                         argv,
                         cwd=self.artifacts,
+                        env=env,
                         stdout=tee.stdin,
                         stderr=tee.stdin,
                         universal_newlines=True,

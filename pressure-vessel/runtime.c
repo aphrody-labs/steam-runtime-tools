@@ -121,6 +121,7 @@ struct _PvRuntime
   gchar *runtime_usr;           /* either runtime_files or that + "/usr" */
   gchar *runtime_app;           /* runtime_files + "/app" */
   gchar *runtime_files_on_host;
+  GArray *tuples;
   const gchar *adverb_in_container;
   GPtrArray *providers;
   SrtDirentCompareFunc arbitrary_dirent_order;
@@ -783,6 +784,10 @@ pv_runtime_init (PvRuntime *self)
   self->variable_dir_fd = -1;
   self->is_flatpak_env = g_file_test ("/.flatpak-info",
                                       G_FILE_TEST_IS_REGULAR);
+
+  self->tuples = g_array_new (TRUE,    /* allocate extra zeroed entry */
+                              TRUE,    /* zero-fill newly added entries */
+                              sizeof (GQuark));
 }
 
 static void
@@ -913,11 +918,22 @@ static void
 pv_runtime_constructed (GObject *object)
 {
   PvRuntime *self = PV_RUNTIME (object);
+  gsize i;
 
   G_OBJECT_CLASS (pv_runtime_parent_class)->constructed (object);
 
   g_return_if_fail (self->original_environ != NULL);
   g_return_if_fail (self->source != NULL);
+
+  /* For the moment, they're still hard-coded
+   * (TODO: they should be a construct-time property). */
+  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+    {
+      GQuark arch_quark = g_quark_from_static_string (pv_multiarch_tuples[i]);
+
+      g_debug ("Supported architecture: %s", g_quark_to_string (arch_quark));
+      g_array_append_val (self->tuples, arch_quark);
+    }
 }
 
 static void
@@ -1636,6 +1652,7 @@ pv_runtime_finalize (GObject *object)
   g_clear_pointer (&self->runtime_lock, srt_file_lock_free);
   g_free (self->source);
   g_free (self->source_files);
+  g_clear_pointer (&self->tuples, g_array_unref);
   g_free (self->variable_dir);
   glnx_close_fd (&self->variable_dir_fd);
 
@@ -7654,11 +7671,7 @@ pv_runtime_bind (PvRuntime *self,
           _SRT_GRAPHICS_EXPLICIT_VULKAN_LAYER_SUFFIX,
           _SRT_GRAPHICS_IMPLICIT_VULKAN_LAYER_SUFFIX,
         };
-      GQuark arch_quarks[G_N_ELEMENTS (pv_multiarch_details)];
       gsize i;
-
-      for (i = 0; i < G_N_ELEMENTS (pv_multiarch_details); i++)
-        arch_quarks[i] = g_quark_from_static_string (pv_multiarch_details[i].tuple);
 
       for (i = 0; i < G_N_ELEMENTS (layer_suffixes); i++)
         {
@@ -7668,8 +7681,8 @@ pv_runtime_bind (PvRuntime *self,
 
           search_path = _srt_graphics_get_vulkan_search_paths (self->real_root,
                                                                _srt_const_strv (self->original_environ),
-                                                               arch_quarks,
-                                                               G_N_ELEMENTS (arch_quarks),
+                                                               (const GQuark *) self->tuples->data,
+                                                               self->tuples->len,
                                                                suffix);
 
           for (j = 0; search_path != NULL && search_path[j] != NULL; j++)

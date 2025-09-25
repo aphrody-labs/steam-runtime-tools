@@ -624,9 +624,7 @@ error:
 
 typedef struct
 {
-  /* Index into pv_multiarch_tuples, 0 <= x < PV_N_SUPPORTED_ARCHITECTURES */
-  gsize multiarch_index;
-  /* The relevant multiarch tuple */
+  /* g_quark_to_string (tuple_quark) */
   const char *tuple;
   /* Architecture knowledge from libsteam-runtime-tools, if any */
   const SrtKnownArchitecture *known_arch;
@@ -679,20 +677,19 @@ pv_runtime_get_graphics_provider (PvRuntime *self,
 
 static gboolean
 runtime_architecture_init (RuntimeArchitecture *self,
-                           PvRuntime *runtime)
+                           PvRuntime *runtime,
+                           GQuark tuple)
 {
   const gchar *argv[] = { NULL, "--print-ld.so", NULL };
   PvGraphicsProvider *provider;
 
-  g_return_val_if_fail (self->multiarch_index < PV_N_SUPPORTED_ARCHITECTURES,
-                        FALSE);
+  g_return_val_if_fail (tuple != 0, FALSE);
   g_return_val_if_fail (self->tuple == NULL, FALSE);
 
-  self->tuple = pv_multiarch_tuples[self->multiarch_index];
+  self->tuple_quark = tuple;
+  self->tuple = g_quark_to_string (tuple);
   g_return_val_if_fail (self->tuple != NULL, FALSE);
 
-  self->tuple_quark = g_quark_from_static_string (self->tuple);
-  g_return_val_if_fail (self->tuple_quark != 0, FALSE);
   provider = pv_runtime_get_graphics_provider (runtime, self->tuple_quark);
   g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (provider), FALSE);
   self->provider = g_object_ref (provider);
@@ -732,8 +729,8 @@ runtime_architecture_init (RuntimeArchitecture *self,
 static gboolean
 runtime_architecture_check_valid (RuntimeArchitecture *self)
 {
-  g_return_val_if_fail (self->multiarch_index < PV_N_SUPPORTED_ARCHITECTURES, FALSE);
-  g_return_val_if_fail (self->tuple == pv_multiarch_tuples[self->multiarch_index], FALSE);
+  g_return_val_if_fail (self->tuple != NULL, FALSE);
+  g_return_val_if_fail (self->tuple_quark != 0, FALSE);
   g_return_val_if_fail (self->provider != NULL, FALSE);
   g_return_val_if_fail (self->capsule_capture_libs_basename != NULL, FALSE);
   g_return_val_if_fail (self->capsule_capture_libs != NULL, FALSE);
@@ -747,8 +744,8 @@ runtime_architecture_check_valid (RuntimeArchitecture *self)
 static void
 runtime_architecture_clear (RuntimeArchitecture *self)
 {
-  self->multiarch_index = G_MAXSIZE;
   self->tuple = NULL;
+  self->tuple_quark = 0;
   g_clear_object (&self->provider);
   g_clear_pointer (&self->capsule_capture_libs_basename, g_free);
   g_clear_pointer (&self->capsule_capture_libs, g_free);
@@ -6985,18 +6982,18 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   pv_runtime_library_data_init (&nvidia_data_in_provider);
   pv_runtime_library_data_init (&gconv_in_provider);
 
-  g_assert (pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES] == NULL);
-
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  for (i = 0; i < self->tuples->len; i++)
     {
+      GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
+      const char *tuple = g_quark_to_string (tuple_quark);
       g_autoptr(GError) local_error = NULL;
-      g_auto (RuntimeArchitecture) arch_on_stack = { i };
+      g_auto (RuntimeArchitecture) arch_on_stack = { NULL };
       RuntimeArchitecture *arch = &arch_on_stack;
 
-      part_timer = _srt_profiling_start ("%s libraries", pv_multiarch_tuples[i]);
-      g_debug ("Checking for %s libraries...", pv_multiarch_tuples[i]);
+      part_timer = _srt_profiling_start ("%s libraries", tuple);
+      g_debug ("Checking for %s libraries...", tuple);
 
-      if (runtime_architecture_init (arch, self))
+      if (runtime_architecture_init (arch, self, tuple_quark))
         {
           g_autoptr(GPtrArray) dirs = NULL;
           g_autofree gchar *this_dri_path_in_container = g_build_filename (arch->libdir_in_container,
@@ -7282,14 +7279,14 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
     {
       GString *archs = g_string_new ("");
 
-      g_assert (pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES] == NULL);
-
-      for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+      for (i = 0; i < self->tuples->len; i++)
         {
+          GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
+
           if (archs->len > 0)
             g_string_append (archs, ", ");
 
-          g_string_append (archs, pv_multiarch_tuples[i]);
+          g_string_append (archs, g_quark_to_string (tuple_quark));
         }
 
       g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,

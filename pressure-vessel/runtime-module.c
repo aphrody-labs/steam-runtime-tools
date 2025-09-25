@@ -292,6 +292,12 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
 
   is_json_based = SRT_IS_BASE_JSON_GRAPHICS_MODULE (module);
 
+  if (!pv_graphics_provider_has_architecture (self->provider, quark))
+    {
+      g_debug ("-> provider not relevant for %s, ignoring", tuple);
+      return;
+    }
+
   if (known != NULL && !icd_details_arch_is_applicable (self, known))
     {
       g_debug ("-> ignored due to architecture restriction");

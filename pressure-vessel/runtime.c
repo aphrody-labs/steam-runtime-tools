@@ -2326,16 +2326,6 @@ bind_icds (PvRuntime *self,
       g_info ("Capturing %s loadable module #%" G_GSIZE_FORMAT ": %s",
               subdir, i, details->debug_name);
 
-      if (details->provider != arch->provider)
-        {
-          g_debug ("Module found in \"%s\" but %s provider is \"%s\", ignoring",
-                   details->provider->in_current_ns->path,
-                   arch->tuple,
-                   arch->provider->in_current_ns->path);
-          details_arch->kind = ICD_KIND_IGNORED;
-          continue;
-        }
-
       g_info ("Checking for implementation on %s: %s",
               arch->tuple,
               details_arch->resolved_library);

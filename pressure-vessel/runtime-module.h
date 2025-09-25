@@ -15,7 +15,6 @@
 
 #include "graphics-provider.h"
 #include "runtime-flags.h"
-#include "supported-architectures.h"
 
 /*
  * IcdKind:

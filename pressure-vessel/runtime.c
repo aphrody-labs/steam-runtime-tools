@@ -4591,7 +4591,8 @@ pv_runtime_take_ld_so_from_provider (PvRuntime *self,
  *  Required for other file types.
  */
 static char *
-get_manifest_relative_to_overrides (gpointer icd,
+get_manifest_relative_to_overrides (PvRuntime *self,
+                                    gpointer icd,
                                     const char *sub_dir,
                                     const SrtKnownArchitecture *arch,
                                     int digits,
@@ -4618,17 +4619,19 @@ get_manifest_relative_to_overrides (gpointer icd,
     }
   /* OpenXR 1 runtimes need to be in a fixed location, but each architecture has
    * at most one active runtime, so they can't collide with each other. */
-  else if (SRT_IS_OPENXR_1_RUNTIME (icd))
+  else if (SRT_IS_OPENXR_1_RUNTIME (icd)
+           && arch != NULL
+           && arch->openxr_1_architecture != NULL)
     {
-      g_assert (arch != NULL);
-      /* Assume that every architecture supported by PV also appears in OpenXR's
-       * table of architecture names. */
-      g_assert (arch->openxr_1_architecture != NULL);
+      GQuark primary_arch;
+
+      g_assert (self->tuples->len > 0);
+      primary_arch = g_array_index (self->tuples, GQuark, 0);
 
       /* Older versions of the OpenXR loader don't support architecture-specific
        * filenames, so name the primary architecture as the default instead,
        * that way at least it can be loaded as expected. */
-      if (g_str_equal (arch->multiarch_tuple, pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE]))
+      if (g_str_equal (arch->multiarch_tuple, g_quark_to_string (primary_arch)))
         return g_strdup_printf ("%s/active_runtime.json", sub_dir);
       else
         return g_strdup_printf ("%s/active_runtime.%s.json",
@@ -4813,7 +4816,8 @@ setup_json_manifest (PvRuntime *self,
 
           g_assert (details_arch->path_in_container != NULL);
 
-          relative_to_overrides = get_manifest_relative_to_overrides (details->icd,
+          relative_to_overrides = get_manifest_relative_to_overrides (self,
+                                                                      details->icd,
                                                                       sub_dir,
                                                                       arch,
                                                                       digits,
@@ -4918,7 +4922,8 @@ setup_json_manifest (PvRuntime *self,
       g_autofree gchar *relative_to_overrides = NULL;
       g_autofree gchar *json_in_container = NULL;
 
-      relative_to_overrides = get_manifest_relative_to_overrides (details->icd,
+      relative_to_overrides = get_manifest_relative_to_overrides (self,
+                                                                  details->icd,
                                                                   sub_dir,
                                                                   provider_json_arch,
                                                                   digits,
@@ -6437,6 +6442,10 @@ pv_runtime_handle_alias (PvRuntime *self,
   g_autofree gchar *target = NULL;
   struct stat stat_buf;
   const char *target_base;
+  GQuark primary_arch;
+
+  g_assert (self->tuples->len > 0);
+  primary_arch = g_array_index (self->tuples, GQuark, 0);
 
   soname_in_overrides = g_build_filename (arch->libdir_relative_to_overrides,
                                           soname, NULL);
@@ -6495,7 +6504,7 @@ pv_runtime_handle_alias (PvRuntime *self,
       target = g_build_filename ("/lib", arch->tuple, soname, NULL);
       g_info ("Found %s in runtime's /lib: %s", soname, target);
     }
-  else if (arch->multiarch_index == PV_PRIMARY_ARCHITECTURE)
+  else if (arch->tuple_quark == primary_arch)
     {
       return glnx_throw (error, "The expected library %s is missing from both the runtime "
                          "and the \"overrides\" directory", soname);

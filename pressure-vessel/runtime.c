@@ -624,12 +624,10 @@ error:
 
 typedef struct
 {
-  /* Index into pv_multiarch_details, 0 <= x < PV_N_SUPPORTED_ARCHITECTURES */
+  /* Index into pv_multiarch_tuples, 0 <= x < PV_N_SUPPORTED_ARCHITECTURES */
   gsize multiarch_index;
   /* The relevant multiarch tuple */
   const char *tuple;
-  /* Always &pv_multiarch_details[self->multiarch_index] */
-  const PvMultiarchDetails *details;
   /* Architecture knowledge from libsteam-runtime-tools, if any */
   const SrtKnownArchitecture *known_arch;
   /* Graphics stack provider to use */
@@ -688,14 +686,10 @@ runtime_architecture_init (RuntimeArchitecture *self,
 
   g_return_val_if_fail (self->multiarch_index < PV_N_SUPPORTED_ARCHITECTURES,
                         FALSE);
-  g_return_val_if_fail (self->details == NULL, FALSE);
+  g_return_val_if_fail (self->tuple == NULL, FALSE);
 
-  self->details = &pv_multiarch_details[self->multiarch_index];
-  g_return_val_if_fail (self->details != NULL, FALSE);
-  self->tuple = self->details->tuple;
+  self->tuple = pv_multiarch_tuples[self->multiarch_index];
   g_return_val_if_fail (self->tuple != NULL, FALSE);
-  g_return_val_if_fail (g_strcmp0 (pv_multiarch_tuples[self->multiarch_index],
-                                   self->tuple) == 0, FALSE);
 
   self->tuple_quark = g_quark_from_static_string (self->tuple);
   g_return_val_if_fail (self->tuple_quark != 0, FALSE);
@@ -739,7 +733,7 @@ static gboolean
 runtime_architecture_check_valid (RuntimeArchitecture *self)
 {
   g_return_val_if_fail (self->multiarch_index < PV_N_SUPPORTED_ARCHITECTURES, FALSE);
-  g_return_val_if_fail (self->details == &pv_multiarch_details[self->multiarch_index], FALSE);
+  g_return_val_if_fail (self->tuple == pv_multiarch_tuples[self->multiarch_index], FALSE);
   g_return_val_if_fail (self->provider != NULL, FALSE);
   g_return_val_if_fail (self->capsule_capture_libs_basename != NULL, FALSE);
   g_return_val_if_fail (self->capsule_capture_libs != NULL, FALSE);
@@ -754,7 +748,7 @@ static void
 runtime_architecture_clear (RuntimeArchitecture *self)
 {
   self->multiarch_index = G_MAXSIZE;
-  self->details = NULL;
+  self->tuple = NULL;
   g_clear_object (&self->provider);
   g_clear_pointer (&self->capsule_capture_libs_basename, g_free);
   g_clear_pointer (&self->capsule_capture_libs, g_free);

@@ -422,9 +422,9 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
 }
 
 /*
- * icd_details_get_architecture_by_index:
+ * icd_details_get_architecture:
  * @self: A module
- * @multiarch_index: An index into @pv_multiarch_tuples
+ * @quark: Interned string representing a multiarch tuple
  *
  * Return architecture-specific information with @kind set to
  * %ICD_KIND_ABSOLUTE, %ICD_KIND_SONAME or %ICD_KIND_META_LAYER,
@@ -433,17 +433,14 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
  * Returns: (nullable): Architecture-specific information
  */
 PvModulePerArch *
-icd_details_get_architecture_by_index (IcdDetails *self,
-                                       gsize multiarch_index)
+icd_details_get_architecture (IcdDetails *self,
+                              GQuark quark)
 {
   PvModulePerArch *arch;
-  GQuark quark;
 
   g_return_val_if_fail (icd_details_check (self), NULL);
-  g_return_val_if_fail (multiarch_index < G_N_ELEMENTS (pv_multiarch_tuples) - 1,
-                        NULL);
+  g_return_val_if_fail (quark != 0, NULL);
 
-  quark = g_quark_from_static_string (pv_multiarch_tuples[multiarch_index]);
   arch = icd_details_lookup_architecture (self, quark);
 
   if (arch == NULL)

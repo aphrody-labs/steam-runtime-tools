@@ -196,8 +196,8 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdDetails, icd_details_free)
 void icd_details_populate_architecture_by_index (IcdDetails *self,
                                                  gsize multiarch_index,
                                                  const SrtKnownArchitecture *known);
-PvModulePerArch *icd_details_get_architecture_by_index (IcdDetails *self,
-                                                        gsize multiarch_index);
+PvModulePerArch *icd_details_get_architecture (IcdDetails *self,
+                                               GQuark quark);
 
 /*
  * icd_details_array_sized_new:

@@ -4733,17 +4733,15 @@ setup_json_manifest (PvRuntime *self,
   g_debug ("Setting up JSON manifest for \"%s\" loadable module \"%s\": \"%s\"",
            sub_dir, json_basename, details->debug_name);
 
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  for (i = 0; i < self->tuples->len; i++)
     {
+      GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
+      const char *tuple = g_quark_to_string (tuple_quark);
       const PvModulePerArch *details_arch;
       const SrtKnownArchitecture *arch;
-      const char *tuple;
-      GQuark tuple_quark;
       g_autofree gchar *arch_bits = NULL;
       gboolean write_per_architecture;
 
-      tuple = pv_multiarch_tuples[i];
-      tuple_quark = g_quark_from_static_string (tuple);
       details_arch = icd_details_get_architecture (details, tuple_quark);
 
       if (details_arch == NULL)

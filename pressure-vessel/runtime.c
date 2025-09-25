@@ -651,6 +651,8 @@ typedef struct
   gchar *libdir_in_container;
   /* ABI's interoperable ld.so path, for example /lib64/ld-linux-x86-64.so.2 */
   gchar *ld_so;
+  /* Architecture tuple as a quark */
+  GQuark tuple_quark;
 } RuntimeArchitecture;
 
 static PvGraphicsProvider *
@@ -682,7 +684,6 @@ runtime_architecture_init (RuntimeArchitecture *self,
 {
   const gchar *argv[] = { NULL, "--print-ld.so", NULL };
   PvGraphicsProvider *provider;
-  GQuark tuple_quark;
 
   g_return_val_if_fail (self->multiarch_index < PV_N_SUPPORTED_ARCHITECTURES,
                         FALSE);
@@ -695,9 +696,9 @@ runtime_architecture_init (RuntimeArchitecture *self,
   g_return_val_if_fail (g_strcmp0 (pv_multiarch_tuples[self->multiarch_index],
                                    self->tuple) == 0, FALSE);
 
-  tuple_quark = g_quark_from_static_string (self->tuple);
-  g_return_val_if_fail (tuple_quark != 0, FALSE);
-  provider = pv_runtime_get_graphics_provider (runtime, tuple_quark);
+  self->tuple_quark = g_quark_from_static_string (self->tuple);
+  g_return_val_if_fail (self->tuple_quark != 0, FALSE);
+  provider = pv_runtime_get_graphics_provider (runtime, self->tuple_quark);
   g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (provider), FALSE);
   self->provider = g_object_ref (provider);
 
@@ -6994,7 +6995,6 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
       if (runtime_architecture_init (arch, self))
         {
-          GQuark arch_quark = g_quark_from_static_string (arch->tuple);
           g_autoptr(GPtrArray) dirs = NULL;
           g_autofree gchar *this_dri_path_in_container = g_build_filename (arch->libdir_in_container,
                                                                            "dri", NULL);
@@ -7103,7 +7103,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
             }
 
           arch_system_info = pv_graphics_provider_get_system_info (arch->provider,
-                                                                   arch_quark);
+                                                                   arch->tuple_quark);
 
           if ((self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
               && !collect_openxr_1_runtime (self, arch, provider_stack->openxr_1_runtime_details,

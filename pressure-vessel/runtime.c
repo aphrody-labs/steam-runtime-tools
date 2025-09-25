@@ -3599,11 +3599,13 @@ bind_runtime_ld_so (PvRuntime *self,
        * does this. Again, for simplicity we direct all these to the same path:
        * it's OK to mix multiple architectures' libraries into one cache,
        * as done in upstream glibc (and Debian, Arch, etc.). */
-      for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+      for (i = 0; i < self->tuples->len; i++)
         {
+          GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
+          const char *tuple = g_quark_to_string (tuple_quark);
           const SrtKnownArchitecture *known;
 
-          known = _srt_architecture_get_by_tuple (pv_multiarch_tuples[i]);
+          known = _srt_architecture_get_by_tuple (tuple);
 
           if (known == NULL || known->extra_ld_so_caches == NULL)
             continue;

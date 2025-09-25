@@ -6653,7 +6653,6 @@ collect_vdpau_drivers (PvRuntime *self,
   /* The VDPAU loader looks up drivers by name, not by readdir(),
    * so order doesn't matter unless there are name collisions. */
   gboolean use_numbered_subdirs = FALSE;
-  gsize j;
   const gsize multiarch_index = arch->multiarch_index;
 
   g_debug ("Enumerating %s VDPAU ICDs on provider...", arch->tuple);
@@ -6686,16 +6685,6 @@ collect_vdpau_drivers (PvRuntime *self,
                   details_arr->len,
                   &use_numbered_subdirs, patterns, NULL, error))
     return FALSE;
-
-  for (j = 0; j < details_arr->len; j++)
-    {
-      IcdDetails *details = g_ptr_array_index (details_arr, j);
-      const PvModulePerArch *details_arch = &details->archs[multiarch_index];
-
-      /* Because the path is always absolute, ICD_KIND_SONAME makes
-       * no sense */
-      g_assert (details_arch->kind != ICD_KIND_SONAME);
-    }
 
   return TRUE;
 }
@@ -6791,16 +6780,6 @@ collect_dri_drivers (PvRuntime *self,
                   details_arr->len,
                   &use_numbered_subdirs, patterns, dri_path, error))
     return FALSE;
-
-  for (j = 0; j < details_arr->len; j++)
-    {
-      IcdDetails *details = g_ptr_array_index (details_arr, j);
-      const PvModulePerArch *details_arch = &details->archs[multiarch_index];
-
-      /* Because the path is always absolute, ICD_KIND_SONAME makes
-       * no sense */
-      g_assert (details_arch->kind != ICD_KIND_SONAME);
-    }
 
   return TRUE;
 }

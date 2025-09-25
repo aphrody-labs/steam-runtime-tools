@@ -264,24 +264,23 @@ icd_details_arch_is_applicable (const IcdDetails *self,
 }
 
 /*
- * icd_details_populate_architecture_by_index:
+ * icd_details_populate_architecture:
  * @self: The module
- * @multiarch_index: An index into @pv_multiarch_tuples
+ * @quark: Interned string representing a multiarch tuple
  * @known: (nullable): Information about the architecture
  *
  * Add a new architecture to @archs (it must not already exist)
- * with details of this module on `pv_multiarch_tuples[multiarch_index]`.
+ * with details of this module on the architecture given by @quark.
  */
 void
-icd_details_populate_architecture_by_index (IcdDetails *self,
-                                            gsize multiarch_index,
-                                            const SrtKnownArchitecture *known)
+icd_details_populate_architecture (IcdDetails *self,
+                                   GQuark quark,
+                                   const SrtKnownArchitecture *known)
 {
   g_auto(PvModulePerArch) arch = PV_MODULE_PER_ARCH_INIT;
   SrtBaseGraphicsModule *module = self->icd;
   g_autofree gchar *resolved_library = NULL;
-  const char *tuple = pv_multiarch_tuples[multiarch_index];
-  GQuark quark = g_quark_from_static_string (tuple);
+  const char *tuple = g_quark_to_string (quark);
   gboolean is_json_based;
 
   g_return_if_fail (icd_details_check (self));
@@ -467,26 +466,28 @@ icd_details_get_architecture (IcdDetails *self,
  * icd_details_fill_array_single_arch:
  * @details_arr: (element-type IcdDetails): The array to populate,
  *  as returned by icd_details_array_sized_new()
+ * @tuple: Interned string representing a multiarch tuple
  * @drivers: (element-type SrtBaseGraphicsModule): The drivers as discovered
  *  by #SrtSystemInfo, which must be DRI, VA-API or VDPAU
- * @multiarch_index: An index into @pv_multiarch_tuples
  * @known: (nullable): Information about the architecture
  *
  * Build an array of #IcdDetails, and populate the architecture-specific
- * details of architecture @multiarch_index only.
+ * details of architecture @tuple only.
  *
  * Returns: (transfer container) (element-type IcdDetails): An array of
  *  representations of the drivers
  */
 void
 icd_details_fill_array_single_arch (GPtrArray *details_arr,
+                                    GQuark tuple,
                                     PvGraphicsProvider *provider,
                                     const GList *drivers,
-                                    gsize multiarch_index,
                                     const SrtKnownArchitecture *known)
 {
   const GList *icd_iter;
   gsize j;
+
+  g_return_if_fail (tuple != 0);
 
   for (icd_iter = drivers, j = 0; icd_iter != NULL; icd_iter = icd_iter->next, j++)
     {
@@ -498,9 +499,7 @@ icd_details_fill_array_single_arch (GPtrArray *details_arr,
                 || SRT_IS_VDPAU_DRIVER (module));
       g_assert (!SRT_IS_BASE_JSON_GRAPHICS_MODULE (module));
 
-      icd_details_populate_architecture_by_index (details,
-                                                  multiarch_index,
-                                                  known);
+      icd_details_populate_architecture (details, tuple, known);
       g_return_if_fail (icd_details_check (details));
       g_ptr_array_add (details_arr, g_steal_pointer (&details));
     }

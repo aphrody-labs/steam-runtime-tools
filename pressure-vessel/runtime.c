@@ -5026,7 +5026,6 @@ collect_json_based_drivers (PvRuntime *self,
   gsize j;
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
     _srt_profiling_start ("Collecting %s", description);
-  const gsize multiarch_index = arch->multiarch_index;
 
   g_return_val_if_fail (arch->provider != NULL, FALSE);
   g_return_val_if_fail (details_arr != NULL, FALSE);
@@ -5039,9 +5038,9 @@ collect_json_based_drivers (PvRuntime *self,
     {
       IcdDetails *details = g_ptr_array_index (details_arr, j);
 
-      icd_details_populate_architecture_by_index (details,
-                                                  multiarch_index,
-                                                  arch->known_arch);
+      icd_details_populate_architecture (details,
+                                         arch->tuple_quark,
+                                         arch->known_arch);
     }
 
   if (!bind_icds (self, arch, bind_icds_subdir,
@@ -5072,7 +5071,6 @@ collect_openxr_1_runtime (PvRuntime *self,
   /* We don't have to use multiple directories because there is at most one
    * active runtime per architecture, so filenames cannot collide */
   gboolean use_numbered_subdirs = FALSE;
-  const gsize multiarch_index = arch->multiarch_index;
 
   g_debug ("Collecting %s OpenXR 1 runtime from provider...", arch->tuple);
 
@@ -5084,9 +5082,9 @@ collect_openxr_1_runtime (PvRuntime *self,
 
   g_return_val_if_fail (srt_openxr_1_runtime_check_error (rt, NULL), TRUE);
 
-  icd_details_populate_architecture_by_index (details,
-                                              multiarch_index,
-                                              arch->known_arch);
+  icd_details_populate_architecture (details,
+                                     arch->tuple_quark,
+                                     arch->known_arch);
 
   if (!bind_icds (self, arch, "openxr/1", &details, 1, &use_numbered_subdirs,
                   patterns, NULL, error))
@@ -6636,7 +6634,6 @@ collect_vdpau_drivers (PvRuntime *self,
   /* The VDPAU loader looks up drivers by name, not by readdir(),
    * so order doesn't matter unless there are name collisions. */
   gboolean use_numbered_subdirs = FALSE;
-  const gsize multiarch_index = arch->multiarch_index;
 
   g_debug ("Enumerating %s VDPAU ICDs on provider...", arch->tuple);
     {
@@ -6654,9 +6651,9 @@ collect_vdpau_drivers (PvRuntime *self,
   self->any_vdpau_drivers = TRUE;
   details_arr = icd_details_array_sized_new (g_list_length (vdpau_drivers));
   icd_details_fill_array_single_arch (details_arr,
+                                      arch->tuple_quark,
                                       arch->provider,
                                       vdpau_drivers,
-                                      multiarch_index,
                                       arch->known_arch);
 
   /* In practice we won't actually use the sequence number for VDPAU
@@ -6692,7 +6689,6 @@ collect_dri_drivers (PvRuntime *self,
    * so order doesn't matter unless there are name collisions. */
   gboolean use_numbered_subdirs = FALSE;
   gsize j;
-  const gsize multiarch_index = arch->multiarch_index;
 
   g_debug ("Enumerating %s DRI drivers on provider...", arch->tuple);
     {
@@ -6717,14 +6713,14 @@ collect_dri_drivers (PvRuntime *self,
   details_arr = icd_details_array_sized_new (g_list_length (dri_drivers)
                                              + g_list_length (va_api_drivers));
   icd_details_fill_array_single_arch (details_arr,
+                                      arch->tuple_quark,
                                       arch->provider,
                                       dri_drivers,
-                                      multiarch_index,
                                       arch->known_arch);
   icd_details_fill_array_single_arch (details_arr,
+                                      arch->tuple_quark,
                                       arch->provider,
                                       va_api_drivers,
-                                      multiarch_index,
                                       arch->known_arch);
   j = 0;
 

@@ -193,9 +193,9 @@ void icd_details_free (IcdDetails *self);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdDetails, icd_details_free)
 
-void icd_details_populate_architecture_by_index (IcdDetails *self,
-                                                 gsize multiarch_index,
-                                                 const SrtKnownArchitecture *known);
+void icd_details_populate_architecture (IcdDetails *self,
+                                        GQuark quark,
+                                        const SrtKnownArchitecture *known);
 PvModulePerArch *icd_details_get_architecture (IcdDetails *self,
                                                GQuark quark);
 
@@ -214,9 +214,9 @@ icd_details_array_sized_new (gsize n)
 }
 
 void icd_details_fill_array_single_arch (GPtrArray *details_arr,
+                                         GQuark tuple,
                                          PvGraphicsProvider *provider,
                                          const GList *drivers,
-                                         gsize multiarch_index,
                                          const SrtKnownArchitecture *known);
 
 /*

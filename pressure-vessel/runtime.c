@@ -1801,16 +1801,18 @@ pv_runtime_adverb_regenerate_ld_so_cache (PvRuntime *self,
    * pv_runtime_set_search_paths(), except that here, we split them up:
    * the directories containing SONAMEs go in ld.so.conf, and only the
    * directories containing aliases go in LD_LIBRARY_PATH. */
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  for (i = 0; i < self->tuples->len; i++)
     {
+      GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
+      const char *tuple = g_quark_to_string (tuple_quark);
       g_autofree gchar *ld_path = NULL;
       g_autofree gchar *aliases = NULL;
 
       ld_path = g_build_filename (self->overrides_in_container, "lib",
-                                  pv_multiarch_tuples[i], NULL);
+                                  tuple, NULL);
 
       aliases = g_build_filename (self->overrides_in_container, "lib",
-                                  pv_multiarch_tuples[i], "aliases", NULL);
+                                  tuple, "aliases", NULL);
 
       flatpak_bwrap_add_args (adverb_argv,
                               "--add-ld.so-path", ld_path,

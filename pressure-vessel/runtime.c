@@ -7925,16 +7925,16 @@ pv_runtime_has_library (PvRuntime *self,
 
   g_debug ("Checking whether runtime has library: %s", library);
 
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  for (i = 0; i < self->tuples->len; i++)
     {
-      const PvMultiarchDetails *details = &pv_multiarch_details[i];
-      GQuark arch_quark = g_quark_from_static_string (details->tuple);
+      GQuark arch_quark = g_array_index (self->tuples, GQuark, i);
+      const char *tuple = g_quark_to_string (arch_quark);
       g_autoptr(GPtrArray) dirs = NULL;
       const SrtKnownArchitecture *known;
       gsize j;
 
-      known = _srt_architecture_get_by_tuple (details->tuple);
-      dirs = pv_known_architecture_get_libdirs (details->tuple,
+      known = _srt_architecture_get_by_tuple (tuple);
+      dirs = pv_known_architecture_get_libdirs (tuple,
                                                 known,
                                                 PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
 

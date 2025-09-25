@@ -383,6 +383,45 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
 }
 
 /*
+ * icd_details_get_architecture_by_index:
+ * @self: A module
+ * @multiarch_index: An index into @pv_multiarch_tuples
+ *
+ * Return architecture-specific information with @kind set to
+ * %ICD_KIND_ABSOLUTE, %ICD_KIND_SONAME or %ICD_KIND_META_LAYER,
+ * or %NULL if the architecture is ignored or nonexistent.
+ *
+ * Returns: (nullable): Architecture-specific information
+ */
+PvModulePerArch *
+icd_details_get_architecture_by_index (IcdDetails *self,
+                                       gsize multiarch_index)
+{
+  PvModulePerArch *arch;
+
+  g_return_val_if_fail (icd_details_check (self), NULL);
+  g_return_val_if_fail (multiarch_index < G_N_ELEMENTS (self->archs), NULL);
+
+  arch = &self->archs[multiarch_index];
+
+  switch (arch->kind)
+    {
+      case ICD_KIND_ABSOLUTE:
+      case ICD_KIND_SONAME:
+      case ICD_KIND_META_LAYER:
+        return arch;
+
+      case ICD_KIND_IGNORED:
+      case ICD_KIND_NONEXISTENT:
+      case ICD_KIND_UNDECIDED:
+        return NULL;
+
+      default:
+        g_return_val_if_reached (NULL);
+    }
+}
+
+/*
  * icd_details_fill_array_single_arch:
  * @details_arr: (element-type IcdDetails): The array to populate,
  *  as returned by icd_details_array_sized_new()

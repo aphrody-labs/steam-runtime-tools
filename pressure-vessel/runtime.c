@@ -2312,28 +2312,16 @@ bind_icds (PvRuntime *self,
       IcdDetails *details = details_arr[i];
       PvModulePerArch *details_arch;
 
-      g_return_val_if_fail (details != NULL, FALSE);
-      details_arch = &details->archs[multiarch_index];
+      if (!details->has_library)
+        continue;
+
+      details_arch = icd_details_get_architecture_by_index (details,
+                                                            multiarch_index);
+
+      if (details_arch == NULL)
+        continue;
+
       g_return_val_if_fail (details_arch->path_in_container == NULL, FALSE);
-
-      /* Architecture-specific information should have been populated
-       * before we get here */
-      switch (details_arch->kind)
-        {
-          case ICD_KIND_ABSOLUTE:
-          case ICD_KIND_SONAME:
-            break;
-
-          case ICD_KIND_META_LAYER:
-          case ICD_KIND_IGNORED:
-          case ICD_KIND_NONEXISTENT:
-            continue;
-
-          case ICD_KIND_UNDECIDED:
-          default:
-            g_warn_if_reached ();
-            continue;
-        }
 
       g_info ("Capturing %s loadable module #%" G_GSIZE_FORMAT ": %s",
               subdir, i, details->debug_name);
@@ -2407,11 +2395,15 @@ bind_icds (PvRuntime *self,
 
   for (i = 0; i < n_details && !*use_numbered_subdirs; i++)
     {
-      const IcdDetails *details = details_arr[i];
-      const PvModulePerArch *details_arch = &details->archs[multiarch_index];
+      IcdDetails *details = details_arr[i];
+      const PvModulePerArch *details_arch;
       const char *base;
 
-      if (details_arch->kind != ICD_KIND_ABSOLUTE)
+      details_arch = icd_details_get_architecture_by_index (details,
+                                                            multiarch_index);
+
+      if (details_arch == NULL
+          || details_arch->kind != ICD_KIND_ABSOLUTE)
         continue;
 
       base = glnx_basename (details_arch->resolved_library);
@@ -2461,13 +2453,17 @@ bind_icds (PvRuntime *self,
 
       for (i = 0; i < n_details; i++)
         {
-          const IcdDetails *details = details_arr[i];
-          const PvModulePerArch *details_arch = &details->archs[multiarch_index];
+          IcdDetails *details = details_arr[i];
+          const PvModulePerArch *details_arch;
           g_autofree gchar *pattern = NULL;
           struct stat stat_buf;
           glnx_autofd int fd = -1;
 
-          if (details_arch->kind != ICD_KIND_ABSOLUTE)
+          details_arch = icd_details_get_architecture_by_index (details,
+                                                                multiarch_index);
+
+          if (details_arch == NULL
+              || details_arch->kind != ICD_KIND_ABSOLUTE)
             continue;
 
           fd = _srt_sysroot_open (arch->provider->in_current_ns,
@@ -2525,7 +2521,7 @@ bind_icds (PvRuntime *self,
   for (i = 0; i < n_details; i++)
     {
       IcdDetails *details = details_arr[i];
-      PvModulePerArch *details_arch = &details->archs[multiarch_index];
+      PvModulePerArch *details_arch;
       g_autofree gchar *numbered_subdir = NULL;
       g_autofree gchar *dependency_pattern = NULL;
       g_autofree gchar *seq_str = NULL;
@@ -2536,7 +2532,11 @@ bind_icds (PvRuntime *self,
       int dest_fd;
       struct stat stat_buf;
 
-      if (details_arch->kind != ICD_KIND_ABSOLUTE)
+      details_arch = icd_details_get_architecture_by_index (details,
+                                                            multiarch_index);
+
+      if (details_arch == NULL
+          || details_arch->kind != ICD_KIND_ABSOLUTE)
         continue;
 
       base = basenames[i];
@@ -2697,8 +2697,14 @@ bind_icds (PvRuntime *self,
 success:
   for (i = 0; i < n_details; i++)
     {
-      const IcdDetails *details = details_arr[i];
-      const PvModulePerArch *details_arch = &details->archs[multiarch_index];
+      IcdDetails *details = details_arr[i];
+      const PvModulePerArch *details_arch;
+
+      details_arch = icd_details_get_architecture_by_index (details,
+                                                            multiarch_index);
+
+      if (details_arch == NULL)
+        continue;
 
       g_info ("Captured %s loadable module #%" G_GSIZE_FORMAT ": %s",
               subdir, i, details->debug_name);
@@ -2713,11 +2719,11 @@ success:
             break;
 
           case ICD_KIND_META_LAYER:
-          case ICD_KIND_NONEXISTENT:
-          case ICD_KIND_IGNORED:
             g_warn_if_fail (details_arch->path_in_container == NULL);
             break;
 
+          case ICD_KIND_NONEXISTENT:
+          case ICD_KIND_IGNORED:
           case ICD_KIND_UNDECIDED:
           default:
             g_warn_if_reached ();
@@ -4740,9 +4746,14 @@ setup_json_manifest (PvRuntime *self,
       g_autofree gchar *arch_bits = NULL;
       gboolean write_per_architecture;
 
-      g_assert (i < G_N_ELEMENTS (details->archs));
-      details_arch = &details->archs[i];
       tuple = pv_multiarch_tuples[i];
+      details_arch = icd_details_get_architecture_by_index (details, i);
+
+      if (details_arch == NULL)
+        {
+          g_debug ("%s[%s]: not applicable", details->debug_name, tuple);
+          continue;
+        }
 
       switch (details_arch->kind)
         {
@@ -4782,14 +4793,9 @@ setup_json_manifest (PvRuntime *self,
           case ICD_KIND_NONEXISTENT:
           case ICD_KIND_IGNORED:
           case ICD_KIND_UNDECIDED:
-            g_debug ("%s[%s]: not applicable", details->debug_name, tuple);
-            /* Nothing to do in these cases.
-             * Note that we can get here with details_arch->kind still set
-             * to UNDECIDED if initial setup for the architecture as a whole
-             * was not successful. */
-            continue;
-
           default:
+            /* icd_details_get_architecture_by_index() should not
+             * return these types */
             g_warn_if_reached ();
             continue;
         }
@@ -5941,17 +5947,22 @@ pv_runtime_collect_lib_symlink_data (PvRuntime *self,
   return TRUE;
 }
 
+/*
+ * @details_arch: must be non-%NULL and of a kind that could be returned
+ *  by icd_details_get_architecture_by_index().
+ */
 static void
 collect_one_mesa_drirc (PvRuntime *self,
                         RuntimeArchitecture *arch,
                         const IcdDetails *details,
+                        const PvModulePerArch *details_arch,
                         PvRuntimeDataFlags flags,
                         PvRuntimeLibraryData *drirc_data_in_provider)
 {
   g_autofree gchar *symlink = NULL;
-  const gsize multiarch_index = arch->multiarch_index;
-  const PvModulePerArch *details_arch = &details->archs[multiarch_index];
   const char *resolved;
+
+  g_return_if_fail (details_arch != NULL);
 
   /* This is assumed to be called after collecting ICDs */
   resolved = details_arch->resolved_library;
@@ -5977,15 +5988,15 @@ collect_one_mesa_drirc (PvRuntime *self,
                                              flags, drirc_data_in_provider);
         break;
 
-      case ICD_KIND_NONEXISTENT:
-      case ICD_KIND_IGNORED:
       case ICD_KIND_META_LAYER:
         /* Nothing to do - we can't know the path because there is none */
         break;
 
+      case ICD_KIND_NONEXISTENT:
+      case ICD_KIND_IGNORED:
       case ICD_KIND_UNDECIDED:
       default:
-        g_warn_if_reached ();
+        g_return_if_reached ();
     }
 }
 
@@ -6008,14 +6019,20 @@ collect_mesa_drirc (PvRuntime *self,
                     PvRuntimeLibraryData *drirc_data_in_provider)
 {
   g_autoptr(SrtObjectList) dri_drivers = NULL;
+  const gsize multiarch_index = arch->multiarch_index;
 
   for (guint i = 0; i < egl_icd_details->len; i++)
     {
       IcdDetails *details = g_ptr_array_index (egl_icd_details, i);
-      const gsize multiarch_index = arch->multiarch_index;
-      const PvModulePerArch *details_arch = &details->archs[multiarch_index];
+      const PvModulePerArch *details_arch;
       const char *resolved;
       const char *base;
+
+      details_arch = icd_details_get_architecture_by_index (details,
+                                                            multiarch_index);
+
+      if (details_arch == NULL)
+        continue;
 
       /* This is assumed to be called after collecting ICDs */
       resolved = details_arch->resolved_library;
@@ -6026,7 +6043,7 @@ collect_mesa_drirc (PvRuntime *self,
       base = glnx_basename (resolved);
 
       if (strstr (base, "libEGL_mesa.so") != NULL)
-        collect_one_mesa_drirc (self, arch, details,
+        collect_one_mesa_drirc (self, arch, details, details_arch,
                                 PV_RUNTIME_DATA_FLAGS_NONE,
                                 drirc_data_in_provider);
       else
@@ -6036,12 +6053,19 @@ collect_mesa_drirc (PvRuntime *self,
   for (guint i = 0; i < vulkan_icd_details->len; i++)
     {
       IcdDetails *details = g_ptr_array_index (vulkan_icd_details, i);
+      const PvModulePerArch *details_arch;
+
+      details_arch = icd_details_get_architecture_by_index (details,
+                                                            multiarch_index);
+
+      if (details_arch == NULL)
+        continue;
 
       /* We don't know which Vulkan ICDs are from Mesa (currently
        * libvulkan_intel.so, libvulkan_lvp.so and libvulkan_radeon.so,
        * but there could be more in future), so we have to assume
        * that all of them are *potentially* Mesa. */
-      collect_one_mesa_drirc (self, arch, details,
+      collect_one_mesa_drirc (self, arch, details, details_arch,
                               PV_RUNTIME_DATA_FLAGS_IGNORE_MISSING,
                               drirc_data_in_provider);
     }
@@ -6737,8 +6761,16 @@ collect_dri_drivers (PvRuntime *self,
   while (j < details_arr->len)
     {
       IcdDetails *details = g_ptr_array_index (details_arr, j);
-      const PvModulePerArch *details_arch = &details->archs[multiarch_index];
-      const char *resolved = details_arch->resolved_library;
+      const PvModulePerArch *details_arch;
+      const char *resolved;
+
+      details_arch = icd_details_get_architecture_by_index (details,
+                                                            multiarch_index);
+
+      if (details_arch == NULL)
+        continue;
+
+      resolved = details_arch->resolved_library;
 
       if (SRT_IS_VA_API_DRIVER (details->icd)
           && g_str_has_suffix (resolved, "/nvidia_drv_video.so"))

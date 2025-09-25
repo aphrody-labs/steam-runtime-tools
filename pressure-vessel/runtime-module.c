@@ -197,12 +197,76 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
     }
   else
     {
+      gboolean failed_to_load = FALSE;
+
       resolved_library = _srt_base_graphics_module_resolve_library_path (module);
       g_return_if_fail (resolved_library != NULL);
 
+      /* TODO: Previously we only did this for Vulkan layers, but is it
+       * applicable to all file types? */
+      if (SRT_IS_VULKAN_LAYER (module) &&
+          strchr (resolved_library, '/') != NULL &&
+          (strstr (resolved_library, "$ORIGIN/") != NULL ||
+           strstr (resolved_library, "${ORIGIN}") != NULL ||
+           strstr (resolved_library, "$LIB/") != NULL ||
+           strstr (resolved_library, "${LIB}") != NULL ||
+           strstr (resolved_library, "$PLATFORM/") != NULL ||
+           strstr (resolved_library, "${PLATFORM}") != NULL))
+        {
+          /* When loading a library by its absolute or relative path
+           * (but not when searching the library path for its basename),
+           * glibc expands dynamic string tokens: LIB, PLATFORM, ORIGIN.
+           * libcapsule cannot expand these special tokens: the only thing
+           * that knows the correct magic values for them is glibc, which has
+           * no API to tell us. The only way we can find out the library's
+           * real location is to tell libdl to load (dlopen) the library, and
+           * see what the resulting path is. */
+          if (_srt_sysroot_is_direct (self->provider->in_current_ns))
+            {
+              g_autoptr(SrtLibrary) library = NULL;
+              SrtLibraryIssues issues;
+
+              /* It's in our current namespace, so we can dlopen it. */
+              g_info ("Evaluating dynamic string tokens in \"%s\"", resolved_library);
+              issues = srt_check_library_presence (resolved_library,
+                                                   tuple, NULL,
+                                                   SRT_LIBRARY_SYMBOLS_FORMAT_PLAIN,
+                                                   &library);
+              if (issues & (SRT_LIBRARY_ISSUES_CANNOT_LOAD |
+                            SRT_LIBRARY_ISSUES_UNKNOWN |
+                            SRT_LIBRARY_ISSUES_TIMEOUT))
+                {
+                  g_info ("Unable to load library %s: %s", resolved_library,
+                          srt_library_get_messages (library));
+                  failed_to_load = TRUE;
+                }
+              else
+                {
+                  g_info ("After evaluating dynamic string tokens: \"%s\"",
+                          srt_library_get_absolute_path (library));
+
+                  g_clear_pointer (&resolved_library, g_free);
+                  resolved_library = g_strdup (srt_library_get_absolute_path (library));
+                }
+            }
+          else
+            {
+              /* Sorry, we can't know how to load this. */
+              g_info ("Cannot support ld.so special tokens, e.g. ${LIB}, when provider "
+                      "is not the root filesystem: ignoring %s",
+                      resolved_library);
+              failed_to_load = TRUE;
+            }
+        }
+
       arch->resolved_library = g_steal_pointer (&resolved_library);
 
-      if (SRT_IS_BASE_JSON_GRAPHICS_MODULE (module))
+      if (failed_to_load)
+        {
+          arch->kind = ICD_KIND_NONEXISTENT;
+          g_clear_pointer (&arch->resolved_library, g_free);
+        }
+      else if (SRT_IS_BASE_JSON_GRAPHICS_MODULE (module))
         {
           /* arch->resolved_library could be either absolute or a basename */
           if (g_path_is_absolute (arch->resolved_library))
@@ -231,11 +295,10 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
 
       case ICD_KIND_IGNORED:
       case ICD_KIND_META_LAYER:
+      case ICD_KIND_NONEXISTENT:
         g_return_if_fail (arch->resolved_library == NULL);
         break;
 
-      /* This function can't currently have these results */
-      case ICD_KIND_NONEXISTENT:
       /* The purpose of this function is to set the @kind to
        * something other than %ICD_KIND_UNDECIDED */
       case ICD_KIND_UNDECIDED:

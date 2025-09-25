@@ -5053,12 +5053,10 @@ collect_json_based_drivers (PvRuntime *self,
   for (j = 0; j < details_arr->len; j++)
     {
       IcdDetails *details = g_ptr_array_index (details_arr, j);
-      PvModulePerArch *details_arch = &details->archs[multiarch_index];
 
       icd_details_populate_architecture_by_index (details,
                                                   multiarch_index,
                                                   arch->known_arch);
-      g_warn_if_fail (details_arch->kind != ICD_KIND_UNDECIDED);
     }
 
   if (!bind_icds (self, arch, bind_icds_subdir,

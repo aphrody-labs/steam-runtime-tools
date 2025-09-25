@@ -7775,18 +7775,18 @@ pv_runtime_get_ld_library_path (PvRuntime *self)
   g_autoptr(GString) ld_library_path = g_string_new ("");
   gsize i;
 
-  g_assert (pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES] == NULL);
-
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  for (i = 0; i < self->tuples->len; i++)
     {
+      GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
+      const char *tuple = g_quark_to_string (tuple_quark);
       g_autofree gchar *ld_path = NULL;
       g_autofree gchar *aliases = NULL;
 
       ld_path = g_build_filename (self->overrides_in_container, "lib",
-                                  pv_multiarch_tuples[i], NULL);
+                                  tuple, NULL);
 
       aliases = g_build_filename (self->overrides_in_container, "lib",
-                                  pv_multiarch_tuples[i], "aliases", NULL);
+                                  tuple, "aliases", NULL);
 
       pv_search_path_append (ld_library_path, ld_path);
       pv_search_path_append (ld_library_path, aliases);

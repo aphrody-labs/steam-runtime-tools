@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20250925.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20250926.0) steamrt; urgency=medium
 
   [ Simon McVittie ]
   * pressure-vessel:
@@ -63,7 +63,7 @@ steam-runtime-tools (0.20250925.0) UNRELEASED; urgency=medium
   [ Timo Witte ]
   * Fix a typo (ValveSoftware/steam-runtime#775)
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 25 Sep 2025 12:05:05 +0100
+ -- Simon McVittie <smcv@collabora.com>  Fri, 26 Sep 2025 18:58:22 +0100
 
 steam-runtime-tools (0.20250820.0) steamrt; urgency=medium
 

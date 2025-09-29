@@ -335,6 +335,8 @@ icd_stack_enumerate_openxr_1_runtimes (IcdStack *self,
                                        const gchar *which_system)
 {
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
+  const GQuark *tuples;
+  gsize n;
   gsize i;
 
   timer = _srt_profiling_start ("Enumerating OpenXR 1 runtimes on %s system",
@@ -347,11 +349,13 @@ icd_stack_enumerate_openxr_1_runtimes (IcdStack *self,
                                                             g_free,
                                                             (GDestroyNotify) icd_details_free);
 
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  tuples = pv_graphics_provider_get_architectures (provider, &n);
+
+  for (i = 0; i < n; i++)
     {
       g_autoptr(SrtOpenXr1Runtime) rt = NULL;
       g_autoptr(GError) local_error = NULL;
-      const char *multiarch_tuple = pv_multiarch_tuples[i];
+      const char *multiarch_tuple = g_quark_to_string (tuples[i]);
       const char *path;
 
       rt = srt_system_info_dup_openxr_1_runtime (system_info, multiarch_tuple);

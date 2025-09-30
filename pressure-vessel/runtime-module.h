@@ -78,22 +78,20 @@ typedef struct
 {
   gchar *resolved_library;
   gchar *path_in_container;
+  GQuark tuple;
   IcdKind kind;
 } PvModulePerArch;
 
-static inline void
-pv_module_per_arch_init (PvModulePerArch *self)
-{
-  self->resolved_library = NULL;
-  self->path_in_container = NULL;
-  self->kind = ICD_KIND_UNDECIDED;
-}
+#define PV_MODULE_PER_ARCH_INIT { NULL, NULL, 0, ICD_KIND_UNDECIDED }
 
 static inline void
-pv_module_per_arch_clear (PvModulePerArch *self)
+pv_module_per_arch_clear (void *p)
 {
+  PvModulePerArch *self = p;
+
   g_clear_pointer (&self->resolved_library, g_free);
   g_clear_pointer (&self->path_in_container, g_free);
+  self->tuple = 0;
   self->kind = ICD_KIND_UNDECIDED;
 }
 
@@ -110,8 +108,8 @@ G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (PvModulePerArch, pv_module_per_arch_clear)
  * @debug_name: Some sort of name for the module, to be used in diagnostic
  *  messages only. Assumed to be owned by @icd.
  * @provider: The graphics stack provider where we found this driver
- * @archs: A per-architecture array of details keyed by the index of
- *  a multiarch tuple in @pv_multiarch_tuples
+ * @archs: (element-type PvModulePerArch): Per-architecture information
+ *  in an unspecified order
  * @in_n_providers: Number of graphics stack providers with an identical
  *  JSON manifest, or 1 if this module is not JSON-based or if no
  *  deduplication was performed.
@@ -185,7 +183,7 @@ typedef struct
   gpointer icd;
   const char *debug_name;
   PvGraphicsProvider *provider;
-  PvModulePerArch archs[PV_N_SUPPORTED_ARCHITECTURES];
+  GArray *archs;
   gsize in_n_providers;
   bool has_library : 1;
   bool is_duplicate : 1;

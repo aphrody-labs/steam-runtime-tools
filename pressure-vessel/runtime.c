@@ -2266,7 +2266,7 @@ pv_runtime_capture_libraries (PvRuntime *self,
  * into `${libdir}`.
  *
  * If the module is %ICD_KIND_ABSOLUTE or %ICD_KIND_SONAME, change its
- * `details->archs[multiarch_index].path_in_container`
+ * `details->archs[x].path_in_container`
  * from %NULL to a non-%NULL path. Otherwise leave it %NULL.
  */
 static gboolean
@@ -2282,7 +2282,7 @@ bind_icds (PvRuntime *self,
 {
   static const char options[] = "if-exists:if-same-abi";
   g_autoptr(GHashTable) basename_set = NULL;
-  /* If details_arr[i]->archs[multiarch_index].kind is ICD_KIND_ABSOLUTE,
+  /* If details_arr[i]->archs[x].kind is ICD_KIND_ABSOLUTE,
    * then basenames[i] is the basename of the file; otherwise %NULL. */
   g_autofree const char **basenames = NULL;
   /* If details_arr[i] will not be passed to capsule-capture-libs because

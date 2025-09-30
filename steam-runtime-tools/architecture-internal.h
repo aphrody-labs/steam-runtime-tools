@@ -60,6 +60,8 @@ typedef struct
 
 void _srt_architecture_init_known (void);
 
+G_GNUC_INTERNAL gboolean _srt_architecture_check_plausible_tuple (const char *tuple,
+                                                                  GError **error);
 G_GNUC_INTERNAL const SrtKnownArchitecture *_srt_architecture_get_known (void);
 G_GNUC_INTERNAL const SrtKnownArchitecture *_srt_architecture_get_by_tuple (const char *multiarch_tuple);
 

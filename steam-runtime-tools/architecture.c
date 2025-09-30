@@ -180,6 +180,62 @@ _srt_architecture_init_known (void)
 }
 
 /*
+ * Carry out basic validation of a multiarch tuple.
+ * This intentionally does not detect every invalid multiarch tuple
+ * in order to avoid having to hard-code a table of supported architectures:
+ * it only detects tuples that are syntactically invalid (might cause
+ * problematic filenames, etc.) or are an obvious mistake.
+ *
+ * Returns: %TRUE if it is plausible that @tuple might be a valid
+ *  multiarch tuple
+ */
+gboolean
+_srt_architecture_check_plausible_tuple (const char *tuple,
+                                         GError **error)
+{
+  gsize i;
+  gboolean had_dash = FALSE;
+
+  g_return_val_if_fail (tuple != NULL, FALSE);
+
+  if (tuple[0] == '-')
+    return glnx_throw (error, "Multiarch tuples cannot start with a dash");
+
+  for (i = 0; tuple[i] != '\0'; i++)
+    {
+      if (tuple[i] == '-')
+        had_dash = TRUE;
+      else if (!g_ascii_isalnum (tuple[i]) && tuple[i] != '_')
+        return glnx_throw (error,
+                           "Multiarch tuples contain only letters, "
+                           "digits, dash and underscore");
+
+      if (tuple[i] >= 'A' && tuple[i] <= 'Z')
+        return glnx_throw (error, "Multiarch tuples must be lower-case");
+    }
+
+  /* Anything that is supportable by Steam has two dashes (foo-linux-gnu)
+   * but for completness let's assume that i386-gnu could conceivably be
+   * relevant somehow */
+  if (!had_dash)
+    return glnx_throw (error, "Multiarch tuples must contain a dash");
+
+  /* Catch some likely mistakes */
+  if (g_str_has_prefix (tuple, "i486-")
+      || g_str_has_prefix (tuple, "i586-")
+      || g_str_has_prefix (tuple, "i686-"))
+    return glnx_throw (error, "Multiarch tuple for 32-bit x86 is " SRT_ABI_I386);
+
+  if (g_str_has_prefix (tuple, "amd64-"))
+    return glnx_throw (error, "Multiarch tuple for AMD64 is " SRT_ABI_X86_64);
+
+  if (g_str_has_prefix (tuple, "arm64-"))
+    return glnx_throw (error, "Multiarch tuple for ARM64 is " SRT_ABI_AARCH64);
+
+  return TRUE;
+}
+
+/*
  * Returns: A table of known architectures, terminated by one
  *  with @multiarch_tuple set to %NULL.
  */

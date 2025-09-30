@@ -2320,18 +2320,13 @@ bind_icds (PvRuntime *self,
 
       g_return_val_if_fail (details_arch->path_in_container == NULL, FALSE);
 
-      g_info ("Capturing %s loadable module #%" G_GSIZE_FORMAT ": %s",
-              subdir, i, details->debug_name);
-
-      g_info ("Checking for implementation on %s: %s",
-              arch->tuple,
-              details_arch->resolved_library);
+      g_debug ("Capturing %s loadable module #%" G_GSIZE_FORMAT ": %s",
+               subdir, i, details->debug_name);
 
       if (details_arch->kind == ICD_KIND_SONAME)
         {
           g_autofree gchar *pattern = NULL;
 
-          g_debug ("Classified as SONAME");
           pattern = g_strdup_printf ("even-if-older:%s:soname:%s",
                                      options,
                                      details_arch->resolved_library);
@@ -2346,7 +2341,6 @@ bind_icds (PvRuntime *self,
           continue;
         }
 
-      g_debug ("Classified as path-based");
       g_assert (details_arch->kind == ICD_KIND_ABSOLUTE);
 
       /* We set subdir_relative_to_overrides non-NULL if and only if at least

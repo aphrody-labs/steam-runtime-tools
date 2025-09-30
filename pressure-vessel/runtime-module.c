@@ -41,11 +41,77 @@ icd_kind_to_string (IcdKind kind)
     }
 }
 
+static inline gboolean
+pv_module_per_arch_check (const PvModulePerArch *self,
+                          const IcdDetails *details,
+                          gboolean is_json_based)
+{
+  /* DRI, VA-API, VDPAU drivers are always ABSOLUTE or an error state,
+   * never SONAME. */
+  g_return_val_if_fail (is_json_based || self->kind != ICD_KIND_SONAME,
+                        FALSE);
+
+  switch (self->kind)
+    {
+      case ICD_KIND_UNDECIDED:
+        /* Architecture not yet populated */
+        g_return_val_if_fail (self->resolved_library == NULL, FALSE);
+        g_return_val_if_fail (self->path_in_container == NULL, FALSE);
+        break;
+
+      case ICD_KIND_ABSOLUTE:
+        /* Has a library, which should have been resolved to a
+         * concrete filename when the architecture details were
+         * populated. Might or might not have a path in the container,
+         * since this is filled later. */
+        g_return_val_if_fail (details->has_library, FALSE);
+        g_return_val_if_fail (self->resolved_library != NULL, FALSE);
+        g_return_val_if_fail (g_path_is_absolute (self->resolved_library),
+                              FALSE);
+        break;
+
+      case ICD_KIND_SONAME:
+        /* Similar to ABSOLUTE except that it it's just a basename */
+        g_return_val_if_fail (details->has_library, FALSE);
+        g_return_val_if_fail (self->resolved_library != NULL, FALSE);
+        g_return_val_if_fail (strchr (self->resolved_library, '/') == NULL,
+                              FALSE);
+        break;
+
+      case ICD_KIND_META_LAYER:
+        /* Meta-layers don't have a library. */
+        g_return_val_if_fail (!details->has_library, FALSE);
+        g_return_val_if_fail (self->resolved_library == NULL, FALSE);
+        break;
+
+      case ICD_KIND_IGNORED:
+      case ICD_KIND_NONEXISTENT:
+        /* We might already have filled in the resolved_library
+         * before we decided that actually this module is irrelevant,
+         * so make no assertion here. */
+        break;
+
+      default:
+        g_return_val_if_reached (FALSE);
+    }
+
+  return TRUE;
+}
+
+/*
+ * icd_details_check:
+ * @self: Details of a module
+ *
+ * Check that @self is internally consistent.
+ */
 static gboolean
 icd_details_check (const IcdDetails *self)
 {
   SrtBaseGraphicsModule *base;
+  gboolean is_json_based;
+  size_t i;
 
+  g_return_val_if_fail (self != NULL, FALSE);
   g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (self->provider), FALSE);
   g_return_val_if_fail (SRT_IS_BASE_GRAPHICS_MODULE (self->icd), FALSE);
   base = SRT_BASE_GRAPHICS_MODULE (self->icd);
@@ -59,6 +125,18 @@ icd_details_check (const IcdDetails *self)
     {
       g_return_val_if_fail (base->library_path == NULL, FALSE);
       g_return_val_if_fail (SRT_IS_VULKAN_LAYER (self->icd), FALSE);
+    }
+
+  is_json_based = SRT_IS_BASE_JSON_GRAPHICS_MODULE (base);
+
+  for (i = 0; i < G_N_ELEMENTS (self->archs); i++)
+    {
+      const PvModulePerArch *arch = &self->archs[i];
+
+      g_return_val_if_fail (pv_module_per_arch_check (arch,
+                                                      self,
+                                                      is_json_based),
+                            FALSE);
     }
 
   return TRUE;
@@ -179,9 +257,7 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
            self->provider->in_current_ns->path, self->debug_name, tuple);
   arch = &self->archs[multiarch_index];
   /* Precondition: We didn't already populate arch-specific info */
-  g_return_if_fail (arch->resolved_library == NULL);
   g_return_if_fail (arch->kind == ICD_KIND_UNDECIDED);
-  g_return_if_fail (arch->path_in_container == NULL);
 
   if (known != NULL && !icd_details_arch_is_applicable (self, known))
     {
@@ -284,19 +360,16 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
   g_info ("%s[%s]: %s",
           self->debug_name, tuple, icd_kind_to_string (arch->kind));
 
-  /* Postconditions */
   switch (arch->kind)
     {
       case ICD_KIND_ABSOLUTE:
       case ICD_KIND_SONAME:
-        g_return_if_fail (arch->resolved_library != NULL);
         g_info ("-> path in provider: %s", arch->resolved_library);
         break;
 
       case ICD_KIND_IGNORED:
       case ICD_KIND_META_LAYER:
       case ICD_KIND_NONEXISTENT:
-        g_return_if_fail (arch->resolved_library == NULL);
         break;
 
       /* The purpose of this function is to set the @kind to
@@ -305,6 +378,8 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
       default:
         g_return_if_reached ();
     }
+
+  g_return_if_fail (icd_details_check (self));
 }
 
 /*

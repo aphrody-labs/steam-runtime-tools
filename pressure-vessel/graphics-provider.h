@@ -31,7 +31,6 @@
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
 
 #include "runtime-flags.h"
-#include "supported-architectures.h"
 
 typedef struct _PvGraphicsProvider PvGraphicsProvider;
 typedef struct _PvGraphicsProviderClass PvGraphicsProviderClass;

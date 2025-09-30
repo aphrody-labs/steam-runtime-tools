@@ -25,6 +25,7 @@
 #include "steam-runtime-tools/utils-internal.h"
 
 #include "enumtypes.h"
+#include "supported-architectures.h"
 #include "utils.h"
 
 enum {

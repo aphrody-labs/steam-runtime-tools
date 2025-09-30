@@ -45,7 +45,6 @@
 #include "flatpak-utils-private.h"
 #include "graphics-provider.h"
 #include "runtime.h"
-#include "supported-architectures.h"
 #include "utils.h"
 #include "wrap-context.h"
 #include "wrap-flatpak.h"

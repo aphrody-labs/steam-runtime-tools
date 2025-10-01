@@ -66,7 +66,13 @@ const char *icd_kind_to_string (IcdKind kind);
  *
  * Details of a driver, Vulkan layer or similar thing discovered in a
  * graphics provider, for one specific architecture.
- * ```
+ *
+ * Note that the reason why @resolved_library appears here, and not in
+ * #IcdDetails, is that its value can be architecture-specific:
+ * for some module types, we expand dynamic string tokens like ${LIB}.
+ * The module might also be relevant to some architectures
+ * but %ICD_KIND_IGNORED on others, for example because they are using
+ * a different graphics stack provider.
  */
 typedef struct
 {
@@ -181,6 +187,7 @@ typedef struct
   PvGraphicsProvider *provider;
   PvModulePerArch archs[PV_N_SUPPORTED_ARCHITECTURES];
   gsize in_n_providers;
+  bool has_library : 1;
   bool is_duplicate : 1;
 } IcdDetails;
 
@@ -188,8 +195,11 @@ void icd_details_free (IcdDetails *self);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (IcdDetails, icd_details_free)
 
-gboolean icd_details_arch_is_applicable (const IcdDetails *self,
-                                         const SrtKnownArchitecture *known_arch);
+void icd_details_populate_architecture_by_index (IcdDetails *self,
+                                                 gsize multiarch_index,
+                                                 const SrtKnownArchitecture *known);
+PvModulePerArch *icd_details_get_architecture_by_index (IcdDetails *self,
+                                                        gsize multiarch_index);
 
 /*
  * icd_details_array_sized_new:
@@ -208,7 +218,8 @@ icd_details_array_sized_new (gsize n)
 void icd_details_fill_array_single_arch (GPtrArray *details_arr,
                                          PvGraphicsProvider *provider,
                                          const GList *drivers,
-                                         gsize multiarch_index);
+                                         gsize multiarch_index,
+                                         const SrtKnownArchitecture *known);
 
 /*
  * IcdStack:

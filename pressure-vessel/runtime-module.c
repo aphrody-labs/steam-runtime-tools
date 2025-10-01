@@ -41,15 +41,119 @@ icd_kind_to_string (IcdKind kind)
     }
 }
 
+static inline gboolean
+pv_module_per_arch_check (const PvModulePerArch *self,
+                          const IcdDetails *details,
+                          gboolean is_json_based)
+{
+  /* DRI, VA-API, VDPAU drivers are always ABSOLUTE or an error state,
+   * never SONAME. */
+  g_return_val_if_fail (is_json_based || self->kind != ICD_KIND_SONAME,
+                        FALSE);
+
+  switch (self->kind)
+    {
+      case ICD_KIND_UNDECIDED:
+        /* Architecture not yet populated */
+        g_return_val_if_fail (self->resolved_library == NULL, FALSE);
+        g_return_val_if_fail (self->path_in_container == NULL, FALSE);
+        break;
+
+      case ICD_KIND_ABSOLUTE:
+        /* Has a library, which should have been resolved to a
+         * concrete filename when the architecture details were
+         * populated. Might or might not have a path in the container,
+         * since this is filled later. */
+        g_return_val_if_fail (details->has_library, FALSE);
+        g_return_val_if_fail (self->resolved_library != NULL, FALSE);
+        g_return_val_if_fail (g_path_is_absolute (self->resolved_library),
+                              FALSE);
+        break;
+
+      case ICD_KIND_SONAME:
+        /* Similar to ABSOLUTE except that it it's just a basename */
+        g_return_val_if_fail (details->has_library, FALSE);
+        g_return_val_if_fail (self->resolved_library != NULL, FALSE);
+        g_return_val_if_fail (strchr (self->resolved_library, '/') == NULL,
+                              FALSE);
+        break;
+
+      case ICD_KIND_META_LAYER:
+        /* Meta-layers don't have a library. */
+        g_return_val_if_fail (!details->has_library, FALSE);
+        g_return_val_if_fail (self->resolved_library == NULL, FALSE);
+        break;
+
+      case ICD_KIND_IGNORED:
+      case ICD_KIND_NONEXISTENT:
+        /* We might already have filled in the resolved_library
+         * before we decided that actually this module is irrelevant,
+         * so make no assertion here. */
+        break;
+
+      default:
+        g_return_val_if_reached (FALSE);
+    }
+
+  return TRUE;
+}
+
+/*
+ * icd_details_check:
+ * @self: Details of a module
+ *
+ * Check that @self is internally consistent.
+ */
+static gboolean
+icd_details_check (const IcdDetails *self)
+{
+  SrtBaseGraphicsModule *base;
+  gboolean is_json_based;
+  size_t i;
+
+  g_return_val_if_fail (self != NULL, FALSE);
+  g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (self->provider), FALSE);
+  g_return_val_if_fail (SRT_IS_BASE_GRAPHICS_MODULE (self->icd), FALSE);
+  base = SRT_BASE_GRAPHICS_MODULE (self->icd);
+  g_return_val_if_fail (base->error == NULL, FALSE);
+
+  if (self->has_library)
+    {
+      g_return_val_if_fail (base->library_path != NULL, FALSE);
+    }
+  else
+    {
+      g_return_val_if_fail (base->library_path == NULL, FALSE);
+      g_return_val_if_fail (SRT_IS_VULKAN_LAYER (self->icd), FALSE);
+    }
+
+  is_json_based = SRT_IS_BASE_JSON_GRAPHICS_MODULE (base);
+
+  for (i = 0; i < G_N_ELEMENTS (self->archs); i++)
+    {
+      const PvModulePerArch *arch = &self->archs[i];
+
+      g_return_val_if_fail (pv_module_per_arch_check (arch,
+                                                      self,
+                                                      is_json_based),
+                            FALSE);
+    }
+
+  return TRUE;
+}
+
 static IcdDetails *
 icd_details_new (PvGraphicsProvider *provider,
                  gpointer icd)
 {
+  SrtBaseGraphicsModule *base;
   IcdDetails *self;
   gsize i;
   const char *name;
 
   g_return_val_if_fail (SRT_IS_BASE_GRAPHICS_MODULE (icd), NULL);
+  base = SRT_BASE_GRAPHICS_MODULE (icd);
+  g_return_val_if_fail (base->error == NULL, NULL);
 
   if (SRT_IS_BASE_JSON_GRAPHICS_MODULE (icd))
     {
@@ -57,13 +161,21 @@ icd_details_new (PvGraphicsProvider *provider,
 
       g_return_val_if_fail (j->json_path != NULL, NULL);
       name = j->json_path;
+
+      /* If it's a Vulkan layer, then either it has a library_path
+       * or it is a meta-layer (has component layers).
+       * Otherwise it must have a library path. */
+      if (SRT_IS_VULKAN_LAYER (icd))
+        g_return_val_if_fail (j->component_layers != NULL
+                              || base->library_path != NULL,
+                              NULL);
+      else
+        g_return_val_if_fail (base->library_path != NULL, NULL);
     }
   else if (SRT_IS_DRI_DRIVER (icd)
            || SRT_IS_VA_API_DRIVER (icd)
            || SRT_IS_VDPAU_DRIVER (icd))
     {
-      SrtBaseGraphicsModule *base = SRT_BASE_GRAPHICS_MODULE (icd);
-
       g_return_val_if_fail (base->library_path != NULL, NULL);
       name = base->library_path;
     }
@@ -77,6 +189,7 @@ icd_details_new (PvGraphicsProvider *provider,
   self->in_n_providers = 1;
   self->icd = g_object_ref (icd);
   self->debug_name = name;
+  self->has_library = (base->library_path != NULL);
 
   for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
     pv_module_per_arch_init (&self->archs[i]);
@@ -98,13 +211,10 @@ icd_details_free (IcdDetails *self)
   g_slice_free (IcdDetails, self);
 }
 
-gboolean
+static gboolean
 icd_details_arch_is_applicable (const IcdDetails *self,
                                 const SrtKnownArchitecture *known_arch)
 {
-  g_return_val_if_fail (SRT_IS_BASE_GRAPHICS_MODULE (self->icd), FALSE);
-  g_return_val_if_fail (known_arch != NULL, TRUE);
-
   if (SRT_IS_BASE_JSON_GRAPHICS_MODULE (self->icd))
     {
       SrtBaseJsonGraphicsModule *module = self->icd;
@@ -125,15 +235,203 @@ icd_details_arch_is_applicable (const IcdDetails *self,
 }
 
 /*
+ * icd_details_populate_architecture_by_index:
+ * @self: The module
+ * @multiarch_index: An index into @pv_multiarch_tuples
+ * @known: (nullable): Information about the architecture
+ *
+ * Fill in @kind and @resolved_library in `archs[multiarch_index]`.
+ */
+void
+icd_details_populate_architecture_by_index (IcdDetails *self,
+                                            gsize multiarch_index,
+                                            const SrtKnownArchitecture *known)
+{
+  SrtBaseGraphicsModule *module = self->icd;
+  PvModulePerArch *arch;
+  g_autofree gchar *resolved_library = NULL;
+  const char *tuple = pv_multiarch_tuples[multiarch_index];
+
+  g_return_if_fail (icd_details_check (self));
+  g_debug ("%s:%s: checking architecture %s",
+           self->provider->in_current_ns->path, self->debug_name, tuple);
+  arch = &self->archs[multiarch_index];
+  /* Precondition: We didn't already populate arch-specific info */
+  g_return_if_fail (arch->kind == ICD_KIND_UNDECIDED);
+
+  if (known != NULL && !icd_details_arch_is_applicable (self, known))
+    {
+      g_debug ("-> ignored due to architecture restriction");
+      arch->kind = ICD_KIND_IGNORED;
+    }
+  else if (!self->has_library)
+    {
+      /* If this is a Vulkan meta-layer with no associated library,
+       * there's nothing to do */
+      g_return_if_fail (SRT_IS_VULKAN_LAYER (module));
+      arch->kind = ICD_KIND_META_LAYER;
+    }
+  else
+    {
+      gboolean failed_to_load = FALSE;
+
+      resolved_library = _srt_base_graphics_module_resolve_library_path (module);
+      g_return_if_fail (resolved_library != NULL);
+
+      /* TODO: Previously we only did this for Vulkan layers, but is it
+       * applicable to all file types? */
+      if (SRT_IS_VULKAN_LAYER (module) &&
+          strchr (resolved_library, '/') != NULL &&
+          (strstr (resolved_library, "$ORIGIN/") != NULL ||
+           strstr (resolved_library, "${ORIGIN}") != NULL ||
+           strstr (resolved_library, "$LIB/") != NULL ||
+           strstr (resolved_library, "${LIB}") != NULL ||
+           strstr (resolved_library, "$PLATFORM/") != NULL ||
+           strstr (resolved_library, "${PLATFORM}") != NULL))
+        {
+          /* When loading a library by its absolute or relative path
+           * (but not when searching the library path for its basename),
+           * glibc expands dynamic string tokens: LIB, PLATFORM, ORIGIN.
+           * libcapsule cannot expand these special tokens: the only thing
+           * that knows the correct magic values for them is glibc, which has
+           * no API to tell us. The only way we can find out the library's
+           * real location is to tell libdl to load (dlopen) the library, and
+           * see what the resulting path is. */
+          if (_srt_sysroot_is_direct (self->provider->in_current_ns))
+            {
+              g_autoptr(SrtLibrary) library = NULL;
+              SrtLibraryIssues issues;
+
+              /* It's in our current namespace, so we can dlopen it. */
+              g_info ("Evaluating dynamic string tokens in \"%s\"", resolved_library);
+              issues = srt_check_library_presence (resolved_library,
+                                                   tuple, NULL,
+                                                   SRT_LIBRARY_SYMBOLS_FORMAT_PLAIN,
+                                                   &library);
+              if (issues & (SRT_LIBRARY_ISSUES_CANNOT_LOAD |
+                            SRT_LIBRARY_ISSUES_UNKNOWN |
+                            SRT_LIBRARY_ISSUES_TIMEOUT))
+                {
+                  g_info ("Unable to load library %s: %s", resolved_library,
+                          srt_library_get_messages (library));
+                  failed_to_load = TRUE;
+                }
+              else
+                {
+                  g_info ("After evaluating dynamic string tokens: \"%s\"",
+                          srt_library_get_absolute_path (library));
+
+                  g_clear_pointer (&resolved_library, g_free);
+                  resolved_library = g_strdup (srt_library_get_absolute_path (library));
+                }
+            }
+          else
+            {
+              /* Sorry, we can't know how to load this. */
+              g_info ("Cannot support ld.so special tokens, e.g. ${LIB}, when provider "
+                      "is not the root filesystem: ignoring %s",
+                      resolved_library);
+              failed_to_load = TRUE;
+            }
+        }
+
+      arch->resolved_library = g_steal_pointer (&resolved_library);
+
+      if (failed_to_load)
+        {
+          arch->kind = ICD_KIND_NONEXISTENT;
+          g_clear_pointer (&arch->resolved_library, g_free);
+        }
+      else if (SRT_IS_BASE_JSON_GRAPHICS_MODULE (module))
+        {
+          /* arch->resolved_library could be either absolute or a basename */
+          if (g_path_is_absolute (arch->resolved_library))
+            arch->kind = ICD_KIND_ABSOLUTE;
+          else
+            arch->kind = ICD_KIND_SONAME;
+        }
+      else
+        {
+          g_return_if_fail (g_path_is_absolute (arch->resolved_library));
+          arch->kind = ICD_KIND_ABSOLUTE;
+        }
+    }
+
+  g_info ("%s[%s]: %s",
+          self->debug_name, tuple, icd_kind_to_string (arch->kind));
+
+  switch (arch->kind)
+    {
+      case ICD_KIND_ABSOLUTE:
+      case ICD_KIND_SONAME:
+        g_info ("-> path in provider: %s", arch->resolved_library);
+        break;
+
+      case ICD_KIND_IGNORED:
+      case ICD_KIND_META_LAYER:
+      case ICD_KIND_NONEXISTENT:
+        break;
+
+      /* The purpose of this function is to set the @kind to
+       * something other than %ICD_KIND_UNDECIDED */
+      case ICD_KIND_UNDECIDED:
+      default:
+        g_return_if_reached ();
+    }
+
+  g_return_if_fail (icd_details_check (self));
+}
+
+/*
+ * icd_details_get_architecture_by_index:
+ * @self: A module
+ * @multiarch_index: An index into @pv_multiarch_tuples
+ *
+ * Return architecture-specific information with @kind set to
+ * %ICD_KIND_ABSOLUTE, %ICD_KIND_SONAME or %ICD_KIND_META_LAYER,
+ * or %NULL if the architecture is ignored or nonexistent.
+ *
+ * Returns: (nullable): Architecture-specific information
+ */
+PvModulePerArch *
+icd_details_get_architecture_by_index (IcdDetails *self,
+                                       gsize multiarch_index)
+{
+  PvModulePerArch *arch;
+
+  g_return_val_if_fail (icd_details_check (self), NULL);
+  g_return_val_if_fail (multiarch_index < G_N_ELEMENTS (self->archs), NULL);
+
+  arch = &self->archs[multiarch_index];
+
+  switch (arch->kind)
+    {
+      case ICD_KIND_ABSOLUTE:
+      case ICD_KIND_SONAME:
+      case ICD_KIND_META_LAYER:
+        return arch;
+
+      case ICD_KIND_IGNORED:
+      case ICD_KIND_NONEXISTENT:
+      case ICD_KIND_UNDECIDED:
+        return NULL;
+
+      default:
+        g_return_val_if_reached (NULL);
+    }
+}
+
+/*
  * icd_details_fill_array_single_arch:
  * @details_arr: (element-type IcdDetails): The array to populate,
  *  as returned by icd_details_array_sized_new()
  * @drivers: (element-type SrtBaseGraphicsModule): The drivers as discovered
  *  by #SrtSystemInfo, which must be DRI, VA-API or VDPAU
  * @multiarch_index: An index into @pv_multiarch_tuples
+ * @known: (nullable): Information about the architecture
  *
- * Build an array of #IcdDetails, and fill in the @resolved_library
- * for architecture @multiarch_index only.
+ * Build an array of #IcdDetails, and populate the architecture-specific
+ * details of architecture @multiarch_index only.
  *
  * Returns: (transfer container) (element-type IcdDetails): An array of
  *  representations of the drivers
@@ -142,7 +440,8 @@ void
 icd_details_fill_array_single_arch (GPtrArray *details_arr,
                                     PvGraphicsProvider *provider,
                                     const GList *drivers,
-                                    gsize multiarch_index)
+                                    gsize multiarch_index,
+                                    const SrtKnownArchitecture *known)
 {
   const GList *icd_iter;
   gsize j;
@@ -151,17 +450,16 @@ icd_details_fill_array_single_arch (GPtrArray *details_arr,
     {
       SrtBaseGraphicsModule *module = icd_iter->data;
       g_autoptr(IcdDetails) details = icd_details_new (provider, module);
-      PvModulePerArch *arch = &details->archs[multiarch_index];
 
       g_assert (SRT_IS_DRI_DRIVER (module)
                 || SRT_IS_VA_API_DRIVER (module)
                 || SRT_IS_VDPAU_DRIVER (module));
       g_assert (!SRT_IS_BASE_JSON_GRAPHICS_MODULE (module));
 
-      g_assert (arch->resolved_library == NULL);
-      arch->resolved_library = _srt_base_graphics_module_resolve_library_path (module);
-      g_assert (arch->resolved_library != NULL);
-      g_assert (g_path_is_absolute (arch->resolved_library));
+      icd_details_populate_architecture_by_index (details,
+                                                  multiarch_index,
+                                                  known);
+      g_return_if_fail (icd_details_check (details));
       g_ptr_array_add (details_arr, g_steal_pointer (&details));
     }
 }
@@ -176,6 +474,7 @@ icd_details_fill_array_single_arch (GPtrArray *details_arr,
  *  discovered by #SrtSystemInfo, which must be based on a JSON manifest
  *
  * Build an array of those @drivers that are not in an error state.
+ * No architecture-specific details are populated at this stage.
  *
  * Returns: (transfer container) (element-type IcdDetails): An array of
  *  representations of the drivers
@@ -191,6 +490,7 @@ icd_details_fill_array_json_based (GPtrArray *details_arr,
 
   for (icd_i = drivers, i = 0; icd_i != NULL; icd_i = icd_i->next, i++)
     {
+      g_autoptr(IcdDetails) details = NULL;
       SrtBaseJsonGraphicsModule *module = icd_i->data;
       SrtBaseGraphicsModule *base = &module->parent;
       const gchar *path;
@@ -215,7 +515,9 @@ icd_details_fill_array_json_based (GPtrArray *details_arr,
       g_info ("%s #%" G_GSIZE_FORMAT " at %s: %s",
               which, i, path, description);
 
-      g_ptr_array_add (details_arr, icd_details_new (provider, module));
+      details = icd_details_new (provider, module);
+      g_return_if_fail (icd_details_check (details));
+      g_ptr_array_add (details_arr, g_steal_pointer (&details));
     }
 }
 
@@ -355,6 +657,7 @@ icd_stack_enumerate_openxr_1_runtimes (IcdStack *self,
     {
       g_autoptr(SrtOpenXr1Runtime) rt = NULL;
       g_autoptr(GError) local_error = NULL;
+      g_autoptr(IcdDetails) details = NULL;
       const char *multiarch_tuple = g_quark_to_string (tuples[i]);
       const char *path;
 
@@ -376,12 +679,29 @@ icd_stack_enumerate_openxr_1_runtimes (IcdStack *self,
               multiarch_tuple, path,
               srt_openxr_1_runtime_get_library_path (rt));
 
+      details = icd_details_new (provider, rt);
+      g_return_if_fail (icd_details_check (details));
       g_hash_table_insert (self->openxr_1_runtime_details,
                            g_strdup (multiarch_tuple),
-                           icd_details_new (provider, rt));
+                           g_steal_pointer (&details));
     }
 }
 
+/*
+ * icd_stack_enumerate:
+ * @self: The stack
+ * @runtime_flags: Flags determining which types of driver we are
+ *  interested in
+ * @provider: A graphics stack provider
+ * @which_system: A string such as `"host"` or `"provider"` for
+ *  use in diagnostic messages
+ *
+ * Find all the JSON-manifest-based drivers provided by @provider.
+ * No architecture-specific details are populated at this stage.
+ *
+ * Returns: (transfer container) (element-type IcdDetails): An array of
+ *  representations of the drivers
+ */
 void
 icd_stack_enumerate (IcdStack *self,
                      PvRuntimeFlags runtime_flags,

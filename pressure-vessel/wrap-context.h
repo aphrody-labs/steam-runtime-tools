@@ -49,6 +49,7 @@ typedef struct
 
 typedef struct
 {
+  GArray *architectures;
   GStrv env_if_host;
   GStrv filesystems;
   gchar *freedesktop_app_id;
@@ -155,3 +156,28 @@ gboolean pv_wrap_context_export_if_allowed (PvWrapContext *self,
                                             const char *before,
                                             const char *after,
                                             PvWrapExportFlags flags);
+
+static inline const GQuark *
+pv_wrap_options_get_architectures (PvWrapOptions *self,
+                                   gsize *n)
+{
+  if (n != NULL)
+    *n = self->architectures->len;
+
+  return (const GQuark *) self->architectures->data;
+}
+
+static inline gboolean
+pv_wrap_options_has_architecture (PvWrapOptions *self,
+                                  GQuark q)
+{
+  gsize i;
+
+  for (i = 0; i < self->architectures->len; i++)
+    {
+      if (g_array_index (self->architectures, GQuark, i) == q)
+        return TRUE;
+    }
+
+  return FALSE;
+}

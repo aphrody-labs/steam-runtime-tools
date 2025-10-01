@@ -11,6 +11,7 @@
 #include "steam-runtime-tools/utils-internal.h"
 
 #include "pressure-vessel/exports.h"
+#include "pressure-vessel/supported-architectures.h"
 #include "pressure-vessel/utils.h"
 
 static Tristate
@@ -42,6 +43,9 @@ static void
 pv_wrap_options_init (PvWrapOptions *self)
 {
   self->pass_fds = g_array_new (FALSE, FALSE, sizeof (int));
+  self->architectures = g_array_new (TRUE,  /* add an extra 0 entry at the end */
+                                     TRUE,  /* zero-fill new entries */
+                                     sizeof (GQuark));
 
   self->preload_modules = g_array_new (FALSE, FALSE,
                                        sizeof (WrapPreloadModule));
@@ -85,6 +89,7 @@ pv_wrap_options_init (PvWrapOptions *self)
 static void
 pv_wrap_options_clear (PvWrapOptions *self)
 {
+  g_clear_pointer (&self->architectures, g_array_unref);
   g_clear_pointer (&self->arch_graphics_providers, g_hash_table_unref);
   g_clear_pointer (&self->env_if_host, g_strfreev);
   g_clear_pointer (&self->filesystems, g_strfreev);
@@ -1160,9 +1165,21 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
       return FALSE;
     }
 
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  /* If no architectures have been configured, the default is whatever
+   * architectures are hard-coded to be supported */
+  if (self->architectures->len == 0)
     {
-      GQuark tuple = g_quark_from_static_string (pv_multiarch_tuples[i]);
+      for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+        {
+          GQuark arch_quark = g_quark_from_static_string (pv_multiarch_tuples[i]);
+
+          g_array_append_val (self->architectures, arch_quark);
+        }
+    }
+
+  for (i = 0; i < self->architectures->len; i++)
+    {
+      GQuark tuple = g_array_index (self->architectures, GQuark, i);
       gconstpointer key = GUINT_TO_POINTER (tuple);
       gpointer value;
 

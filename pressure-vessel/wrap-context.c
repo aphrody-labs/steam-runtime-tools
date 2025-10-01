@@ -655,13 +655,21 @@ opt_graphics_provider_cb (const gchar *option_name,
 
   g_return_val_if_fail (value != NULL, FALSE);
 
-  /* --graphics-provider=/path/to/somewhere */
+  /* --graphics-provider=x86_64-linux-gnu=/path/to/somewhere */
   if (value != NULL
       && value[0] != '/'
       && (equals = strchr (value, '=')) != NULL)
     {
+      g_autoptr(GError) local_error = NULL;
       g_autofree gchar *tuple = g_strndup (value, equals - value);
       const char *path = equals + 1;
+
+      if (!_srt_architecture_check_plausible_tuple (tuple, &local_error))
+        {
+          g_set_error_literal (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE,
+                               local_error->message);
+          return FALSE;
+        }
 
       if (!pv_supported_architectures_include_tuple (tuple))
         {

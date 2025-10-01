@@ -694,7 +694,7 @@ runtime_architecture_init (RuntimeArchitecture *self,
   g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (provider), FALSE);
   self->provider = g_object_ref (provider);
 
-  /* Could in theory be %NULL, so be careful when dereferencing */
+  /* Could be %NULL, so be careful when dereferencing */
   self->known_arch = _srt_architecture_get_by_tuple (self->tuple);
 
   self->capsule_capture_libs_basename = g_strdup_printf ("%s-capsule-capture-libs",
@@ -4794,13 +4794,8 @@ setup_json_manifest (PvRuntime *self,
 
       arch = _srt_architecture_get_by_tuple (tuple);
 
-      /* The architectures supported by pressure-vessel are always a
-       * subset of the architectures that libsteam-runtime-tools knows
-       * about. */
-      g_assert (arch != NULL);
-      g_assert (arch->sizeof_pointer > 0);
-
-      arch_bits = g_strdup_printf ("%u", arch->sizeof_pointer * 8);
+      if (arch != NULL && arch->sizeof_pointer > 0)
+        arch_bits = g_strdup_printf ("%u", arch->sizeof_pointer * 8);
 
       if (write_per_architecture)
         {

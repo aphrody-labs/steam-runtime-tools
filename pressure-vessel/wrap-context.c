@@ -676,12 +676,6 @@ opt_graphics_provider_cb (const gchar *option_name,
           return FALSE;
         }
 
-      if (!pv_supported_architectures_include_tuple (tuple))
-        {
-          g_warning ("Not a supported multiarch tuple: %s", tuple);
-          return TRUE;
-        }
-
       pv_wrap_options_take_arch_graphics_provider (self,
                                                    g_quark_from_string (tuple),
                                                    g_strdup (path));
@@ -1218,6 +1212,23 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
 
           g_debug ("Architecture-specific graphics provider for %s: %s",
                    g_quark_to_string (tuple), path);
+        }
+    }
+
+  if (self->arch_graphics_providers != NULL)
+    {
+      GHashTableIter iter;
+      void *k;
+
+      g_hash_table_iter_init (&iter, self->arch_graphics_providers);
+
+      while (g_hash_table_iter_next (&iter, &k, NULL))
+        {
+          GQuark q = GPOINTER_TO_UINT (k);
+
+          if (!pv_wrap_options_has_architecture (self, q))
+            g_warning ("Not a configured multiarch tuple: %s",
+                       g_quark_to_string (q));
         }
     }
 

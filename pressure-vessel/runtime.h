@@ -64,6 +64,7 @@ GType pv_runtime_get_type (void);
 PvRuntime *pv_runtime_new (const char *source,
                            const char *variable_dir,
                            const char *bubblewrap,
+                           GArray *architectures,
                            GPtrArray *providers,
                            const char * const *original_environ,
                            PvRuntimeFlags flags,

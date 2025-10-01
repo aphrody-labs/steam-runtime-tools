@@ -148,6 +148,7 @@ struct _PvRuntimeClass
 
 enum {
   PROP_0,
+  PROP_ARCHITECTURES,
   PROP_BUBBLEWRAP,
   PROP_GRAPHICS_PROVIDERS,
   PROP_SOURCE,
@@ -791,6 +792,15 @@ pv_runtime_get_property (GObject *object,
 
   switch (prop_id)
     {
+      case PROP_ARCHITECTURES:
+          {
+            g_autoptr(GArray) arr = g_array_new (TRUE, TRUE, sizeof (GQuark));
+
+            g_array_append_vals (arr, self->tuples->data, self->tuples->len);
+            g_value_take_boxed (value, g_steal_pointer (&arr));
+          }
+        break;
+
       case PROP_BUBBLEWRAP:
         g_value_set_string (value, self->bubblewrap);
         break;
@@ -835,6 +845,18 @@ pv_runtime_set_property (GObject *object,
 
   switch (prop_id)
     {
+      case PROP_ARCHITECTURES:
+          {
+            const GArray *arr;
+
+            /* Construct-only */
+            g_return_if_fail (self->tuples->len == 0);
+
+            arr = g_value_get_boxed (value);
+            g_array_append_vals (self->tuples, arr->data, arr->len);
+          }
+        break;
+
       case PROP_BUBBLEWRAP:
         /* Construct-only */
         g_return_if_fail (self->bubblewrap == NULL);
@@ -909,22 +931,11 @@ static void
 pv_runtime_constructed (GObject *object)
 {
   PvRuntime *self = PV_RUNTIME (object);
-  gsize i;
 
   G_OBJECT_CLASS (pv_runtime_parent_class)->constructed (object);
 
   g_return_if_fail (self->original_environ != NULL);
   g_return_if_fail (self->source != NULL);
-
-  /* For the moment, they're still hard-coded
-   * (TODO: they should be a construct-time property). */
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-    {
-      GQuark arch_quark = g_quark_from_static_string (pv_multiarch_tuples[i]);
-
-      g_debug ("Supported architecture: %s", g_quark_to_string (arch_quark));
-      g_array_append_val (self->tuples, arch_quark);
-    }
 }
 
 static void
@@ -1294,6 +1305,7 @@ pv_runtime_initable_init (GInitable *initable,
   gsize len;
   PvMtreeApplyFlags mtree_flags = PV_MTREE_APPLY_FLAGS_NONE;
   struct stat ignore;
+  gsize i;
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
@@ -1302,6 +1314,20 @@ pv_runtime_initable_init (GInitable *initable,
 
   if (self->pv_prefix == NULL)
     return FALSE;
+
+  if (self->tuples == NULL || self->tuples->len == 0)
+    return glnx_throw (error, "No architectures configured");
+
+  for (i = 0; i < self->tuples->len; i++)
+    {
+      GQuark q = g_array_index (self->tuples, GQuark, i);
+      const char *tuple = g_quark_to_string (q);
+
+      g_debug ("Configured architecture: %s", tuple);
+
+      if (!_srt_architecture_check_plausible_tuple (tuple, error))
+        return FALSE;
+    }
 
   /* If we are in Flatpak container we don't expect to have a working bwrap */
   if (self->bubblewrap != NULL
@@ -1529,7 +1555,6 @@ pv_runtime_initable_init (GInitable *initable,
    * a merged-/usr, so we don't need to open-code this here */
   if (g_file_get_contents (os_release, &contents, &len, NULL))
     {
-      gsize i;
       g_autofree gchar *id = NULL;
       g_autofree gchar *version_id = NULL;
       char *beginning_of_line = contents;
@@ -1661,6 +1686,13 @@ pv_runtime_class_init (PvRuntimeClass *cls)
   object_class->dispose = pv_runtime_dispose;
   object_class->finalize = pv_runtime_finalize;
 
+  properties[PROP_ARCHITECTURES] =
+    g_param_spec_boxed ("architectures", "Architectures",
+                        "GArray of GQuark representing multiarch tuples",
+                        G_TYPE_ARRAY,
+                        (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS));
+
   properties[PROP_BUBBLEWRAP] =
     g_param_spec_string ("bubblewrap", "Bubblewrap",
                          "Bubblewrap executable",
@@ -1719,6 +1751,7 @@ PvRuntime *
 pv_runtime_new (const char *source,
                 const char *variable_dir,
                 const char *bubblewrap,
+                GArray *architectures,
                 GPtrArray *providers,
                 const char * const *original_environ,
                 PvRuntimeFlags flags,
@@ -1731,6 +1764,7 @@ pv_runtime_new (const char *source,
   return g_initable_new (PV_TYPE_RUNTIME,
                          NULL,
                          error,
+                         "architectures", architectures,
                          "bubblewrap", bubblewrap,
                          "graphics-providers", providers,
                          "original-environ", original_environ,

@@ -195,6 +195,7 @@ static void
 fixture_create_runtime (Fixture *f,
                         PvRuntimeFlags flags)
 {
+  g_autoptr(GArray) archs_arr = NULL;
   g_autoptr(GError) local_error = NULL;
   g_autoptr(GPtrArray) graphics_providers = NULL;
   PvGraphicsProvider *graphics_provider;
@@ -239,9 +240,12 @@ fixture_create_runtime (Fixture *f,
   for (i = 0; i < G_N_ELEMENTS (tuples); i++)
     g_assert_cmpstr (g_quark_to_string (tuples[i]), ==, g_quark_to_string (got_tuples[i]));
 
+  archs_arr = g_array_new (FALSE, FALSE, sizeof (GQuark));
+  g_array_append_vals (archs_arr, tuples, G_N_ELEMENTS (tuples));
   f->context->runtime = pv_runtime_new (f->mock_runtime,
                                         f->var,
                                         NULL,
+                                        archs_arr,
                                         graphics_providers,
                                         _srt_peek_environ_nonnull (),
                                         flags,
@@ -249,6 +253,17 @@ fixture_create_runtime (Fixture *f,
                                         &local_error);
   g_assert_no_error (local_error);
   g_assert_nonnull (f->context->runtime);
+
+  g_clear_pointer (&archs_arr, g_array_unref);
+  g_object_get (f->context->runtime,
+                "architectures", &archs_arr,
+                NULL);
+  g_assert_cmpuint (archs_arr->len, ==, G_N_ELEMENTS (tuples));
+  g_assert_cmpuint (g_array_index (archs_arr, GQuark, archs_arr->len), ==, 0);
+
+  for (i = 0; i < G_N_ELEMENTS (tuples); i++)
+    g_assert_cmpstr (g_quark_to_string (tuples[i]), ==,
+                     g_quark_to_string (g_array_index (archs_arr, GQuark, i)));
 }
 
 static void

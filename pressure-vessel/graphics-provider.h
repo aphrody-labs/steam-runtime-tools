@@ -78,6 +78,8 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (PvGraphicsProvider, g_object_unref)
 
 GPtrArray *pv_graphics_provider_build_array (const char *provider_path,
                                              GHashTable *quark_to_provider,
+                                             const GQuark *tuples,
+                                             gsize n_tuples,
                                              const SrtKnownArchitecture *host_machine,
                                              PvRuntimeFlags flags,
                                              GError **error);

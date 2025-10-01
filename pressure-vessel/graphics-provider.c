@@ -25,7 +25,6 @@
 #include "steam-runtime-tools/utils-internal.h"
 
 #include "enumtypes.h"
-#include "supported-architectures.h"
 #include "utils.h"
 
 enum {
@@ -861,6 +860,8 @@ pv_graphics_provider_choose_mount_point (const char *path_in_current_ns,
 GPtrArray *
 pv_graphics_provider_build_array (const char *provider_path,
                                   GHashTable *quark_to_provider,
+                                  const GQuark *tuples,
+                                  gsize n_tuples,
                                   const SrtKnownArchitecture *host_machine,
                                   PvRuntimeFlags flags,
                                   GError **error)
@@ -869,6 +870,9 @@ pv_graphics_provider_build_array (const char *provider_path,
   g_autoptr(PvGraphicsProvider) graphics_provider = NULL;
   g_autofree gchar *mount_point = NULL;
   gsize i;
+
+  g_return_val_if_fail (tuples != NULL, NULL);
+  g_return_val_if_fail (n_tuples > 0, NULL);
 
   mount_point = pv_graphics_provider_choose_mount_point (provider_path,
                                                          NULL,
@@ -886,11 +890,11 @@ pv_graphics_provider_build_array (const char *provider_path,
   if (graphics_provider == NULL)
     return NULL;
 
-  for (i = 0; i < G_N_ELEMENTS (pv_multiarch_details); i++)
+  for (i = 0; i < n_tuples; i++)
     {
       g_autoptr(PvGraphicsProvider) arch_provider = NULL;
-      const char *tuple = pv_multiarch_details[i].tuple;
-      GQuark q = g_quark_from_static_string (tuple);
+      GQuark q = tuples[i];
+      const char *tuple = g_quark_to_string (q);
       const char *arch_path = NULL;
 
       if (quark_to_provider != NULL)

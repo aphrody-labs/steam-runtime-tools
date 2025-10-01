@@ -601,6 +601,8 @@ main (int argc,
         {
           graphics_providers = pv_graphics_provider_build_array (self->options.graphics_provider,
                                                                  self->options.arch_graphics_providers,
+                                                                 tuples,
+                                                                 n_tuples,
                                                                  host_machine,
                                                                  flags,
                                                                  error);

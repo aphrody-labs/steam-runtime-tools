@@ -180,7 +180,13 @@ test_graphics_provider_search (Fixture *f,
   g_autoptr(GPtrArray) graphics_providers = NULL;
   PvGraphicsProvider *graphics_provider = NULL;
   g_autoptr(GError) error = NULL;
+  GQuark tuples[2];
+  const GQuark *got_tuples;
+  gsize n = 0;
   gsize i;
+
+  tuples[0] = g_quark_from_static_string ("s390x-linux-gnu");
+  tuples[1] = g_quark_from_static_string ("riscv64-linux-gnu");
 
   /* Assume the provider path in current ns is the tmpdir. In this way we have
    * a controlled environment that we can edit for our tests.
@@ -188,6 +194,8 @@ test_graphics_provider_search (Fixture *f,
    * graphics driver enumeration immediately. */
   graphics_providers = pv_graphics_provider_build_array (f->tmpdir,
                                                          NULL,
+                                                         tuples,
+                                                         G_N_ELEMENTS (tuples),
                                                          NULL,
                                                          PV_RUNTIME_FLAGS_SINGLE_THREAD,
                                                          &error);
@@ -197,6 +205,13 @@ test_graphics_provider_search (Fixture *f,
   graphics_provider = g_ptr_array_index (graphics_providers, 0);
   g_assert_cmpstr (graphics_provider->path_in_container_ns,
                    ==, "/run/gfx/main");
+  got_tuples = pv_graphics_provider_get_architectures (graphics_provider, &n);
+  g_assert_cmpuint (n, ==, G_N_ELEMENTS (tuples));
+  g_assert_cmpuint (got_tuples[n], ==, 0);
+
+  for (i = 0; i < G_N_ELEMENTS (tuples); i++)
+    g_assert_cmpstr (g_quark_to_string (tuples[i]), ==, g_quark_to_string (got_tuples[i]));
+
 
   for (i = 0; i < G_N_ELEMENTS (graphics_provider_test); i++)
     {

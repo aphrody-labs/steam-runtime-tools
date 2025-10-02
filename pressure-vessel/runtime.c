@@ -7041,10 +7041,9 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
           if (ld_so_in_runtime == NULL)
             {
-              g_info ("Container does not have %s so it cannot run "
-                      "%s binaries",
-                      arch->ld_so, arch->tuple);
-              continue;
+              g_info ("Container does not have %s, using interoperable path as-is",
+                      arch->ld_so);
+              ld_so_in_runtime = g_strdup (arch->ld_so);
             }
 
           /* Reserve a size of 128 to avoid frequent reallocation due to the

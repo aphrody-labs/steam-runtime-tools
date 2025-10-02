@@ -643,6 +643,21 @@ if `--runtime` and `--graphics-provider` are active.
 </dd>
 <dt>
 
+`PRESSURE_VESSEL_ARCHITECTURES` (`:`-separated list of multiarch tuples)
+
+</dt><dd>
+
+Experimental option to set the architectures to be supported in the
+container.
+The first architecture in the list is considered to be the most important
+(the primary architecture).
+The default is `x86_64-linux-gnu:i386-linux-gnu` if pressure-vessel
+was built on an x86 platform (x86\_64 or i386),
+or the multiarch tuple for which pressure-vessel was built otherwise.
+
+</dd>
+<dt>
+
 `PRESSURE_VESSEL_BATCH` (boolean)
 
 </dt><dd>

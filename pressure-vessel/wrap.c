@@ -183,6 +183,9 @@ main (int argc,
   g_assert (tuples != NULL);
   g_assert (tuples[0] != 0);
 
+  for (i = 0; i < n_tuples; i++)
+    g_info ("Architecture: %s", g_quark_to_string (tuples[i]));
+
   if (self->options.version_only || self->options.version)
     {
       if (original_stdout >= 0

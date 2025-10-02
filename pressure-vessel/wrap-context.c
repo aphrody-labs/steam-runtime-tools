@@ -694,6 +694,45 @@ pv_wrap_options_parse_environment (PvWrapOptions *self,
 {
   const char *value;
 
+  value = g_getenv ("PRESSURE_VESSEL_ARCHITECTURES");
+
+  if (value != NULL)
+    {
+      g_auto(GStrv) entries = g_strsplit (value, ":", -1);
+      gsize i;
+
+      for (i = 0; entries != NULL && entries[i] != NULL; i++)
+        {
+          g_autoptr(GError) local_error = NULL;
+          const SrtKnownArchitecture *known;
+          GQuark arch_quark;
+
+          arch_quark = _srt_architecture_guess_from_user_input (entries[i],
+                                                                &known,
+                                                                &local_error);
+
+          if (arch_quark == 0)
+            {
+              g_warning ("%s", local_error->message);
+              continue;
+            }
+
+          if (g_quark_try_string (entries[i]) != arch_quark)
+            g_warning ("Canonicalized architecture \"%s\" to \"%s\"",
+                       entries[i], g_quark_to_string (arch_quark));
+
+          if (known == NULL)
+            g_message ("Unknown architecture \"%s\", assuming you know what you're doing",
+                       g_quark_to_string (arch_quark));
+
+          g_array_append_val (self->architectures, arch_quark);
+        }
+
+      if (self->architectures->len == 0)
+        g_warning ("No valid architectures found in "
+                   "$PRESSURE_VESSEL_ARCHITECTURES, will use defaults");
+    }
+
   self->batch = _srt_boolean_environment ("PRESSURE_VESSEL_BATCH",
                                           self->batch);
 

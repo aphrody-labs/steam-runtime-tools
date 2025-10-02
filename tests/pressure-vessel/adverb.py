@@ -473,7 +473,7 @@ class TestAdverb(BaseTest):
     def test_wrong_options(self) -> None:
         for option in (
             '--an-unknown-option',
-            '--ld-preload=/nonexistent/libfoo.so:abi=hal9000-movieos',
+            '--ld-preload=/nonexistent/libfoo.so:abi=hal9000',
             '--ld-preload=/nonexistent/libfoo.so:abi=i386-linux-gnu:foo',
             '--ld-preload=/nonexistent/libfoo.so:foo=bar',
             '--fd=-1',

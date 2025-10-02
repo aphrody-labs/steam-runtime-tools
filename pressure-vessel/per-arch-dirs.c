@@ -26,8 +26,8 @@
 #include "steam-runtime-tools/utils-internal.h"
 
 static gchar *
-get_libdl_lib_or_mock (SrtSystemInfo *system_info,
-                       gsize abi,
+get_libdl_lib_or_mock (GQuark arch_quark,
+                       SrtSystemInfo *system_info,
                        GError **error)
 {
   if (g_getenv ("PRESSURE_VESSEL_TEST_STANDARDIZE_PLATFORM") != NULL)
@@ -39,32 +39,41 @@ get_libdl_lib_or_mock (SrtSystemInfo *system_info,
   else
     {
       return srt_system_info_dup_libdl_lib (system_info,
-                                            pv_multiarch_details[abi].tuple,
+                                            g_quark_to_string (arch_quark),
                                             error);
     }
 }
 
 static gchar *
-get_libdl_platform_or_mock (SrtSystemInfo *system_info,
-                            gsize abi,
+get_libdl_platform_or_mock (GQuark arch_quark,
+                            SrtSystemInfo *system_info,
                             GError **error)
 {
-  if (g_getenv ("PRESSURE_VESSEL_TEST_STANDARDIZE_PLATFORM") != NULL)
+  if (G_UNLIKELY (g_getenv ("PRESSURE_VESSEL_TEST_STANDARDIZE_PLATFORM") != NULL))
     {
       /* In unit tests it isn't straightforward to find the real
        * ${PLATFORM}, so we use a predictable mock implementation:
        * for x86 we use whichever platform happens to be listed first
        * and for all the other cases we simply use "mock". */
-#if defined(__i386__) || defined(__x86_64__)
-      return g_strdup (pv_multiarch_details[abi].platforms[0]);
-#else
+      const char *tuple = g_quark_to_string (arch_quark);
+      const SrtKnownArchitecture *known;
+
+      known = _srt_architecture_get_by_tuple (tuple);
+
+      if (g_str_equal (tuple, SRT_ABI_X86_64) || g_str_equal (tuple, SRT_ABI_I386))
+        {
+          g_assert (known != NULL);
+          g_assert (known->libdl_platform_expansions != NULL);
+          g_assert (known->libdl_platform_expansions[0] != NULL);
+          return g_strdup (known->libdl_platform_expansions[0]);
+        }
+
       return g_strdup("mock");
-#endif
     }
   else
     {
       return srt_system_info_dup_libdl_platform (system_info,
-                                                 pv_multiarch_details[abi].tuple,
+                                                 g_quark_to_string (arch_quark),
                                                  error);
     }
 }
@@ -133,6 +142,7 @@ pv_per_arch_dirs_supports_scheme (SrtSystemInfo *system_info,
     {
       g_autofree gchar *libdl_string = NULL;
       const char *multiarch_tuple = pv_multiarch_details[abi].tuple;
+      GQuark arch_quark = g_quark_from_static_string (multiarch_tuple);
 
       switch (scheme)
         {
@@ -143,11 +153,11 @@ pv_per_arch_dirs_supports_scheme (SrtSystemInfo *system_info,
           case PV_PER_ARCH_DIRS_SCHEME_ARCH:
           case PV_PER_ARCH_DIRS_SCHEME_LIBQUAL:
 #endif
-            libdl_string = get_libdl_lib_or_mock (system_info, abi, NULL);
+            libdl_string = get_libdl_lib_or_mock (arch_quark, system_info, NULL);
             break;
 
           case PV_PER_ARCH_DIRS_SCHEME_PLATFORM:
-            libdl_string = get_libdl_platform_or_mock (system_info, abi, NULL);
+            libdl_string = get_libdl_platform_or_mock (arch_quark, system_info, NULL);
             break;
 
           case PV_PER_ARCH_DIRS_SCHEME_NONE:
@@ -287,7 +297,9 @@ pv_per_arch_dirs_new (GError **error)
 
       for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
         {
-          g_autofree gchar *libdl_platform = get_libdl_platform_or_mock (info, abi, error);
+          const char *multiarch_tuple = pv_multiarch_details[abi].tuple;
+          GQuark arch_quark = g_quark_from_static_string (multiarch_tuple);
+          g_autofree gchar *libdl_platform = get_libdl_platform_or_mock (arch_quark, info, error);
 
           if (!libdl_platform)
             return glnx_prefix_error_null (error,

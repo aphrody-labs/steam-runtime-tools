@@ -940,7 +940,8 @@ main (int argc,
 
   /* In unit tests it isn't always straightforward to find the real
    * ${PLATFORM}, so use a predictable mock implementation that always
-   * uses PvMultiarchDetails.platforms[0] */
+   * uses SrtKnownArchitecture.libdl_platform_expansions[0] on x86
+   * or "mock" elsewhere */
   g_setenv ("PRESSURE_VESSEL_TEST_STANDARDIZE_PLATFORM", "1", TRUE);
 
   _srt_tests_init (&argc, &argv, NULL);

@@ -41,6 +41,17 @@ icd_kind_to_string (IcdKind kind)
     }
 }
 
+static inline void
+pv_module_per_arch_move_to_array (GArray *array,
+                                  PvModulePerArch *arch)
+{
+  const PvModulePerArch blank = PV_MODULE_PER_ARCH_INIT;
+
+  g_array_append_vals (array, arch, 1);
+  /* Ownership of the fields of *arch was taken by the array */
+  *arch = blank;
+}
+
 static inline gboolean
 pv_module_per_arch_check (const PvModulePerArch *self,
                           const IcdDetails *details,
@@ -53,12 +64,6 @@ pv_module_per_arch_check (const PvModulePerArch *self,
 
   switch (self->kind)
     {
-      case ICD_KIND_UNDECIDED:
-        /* Architecture not yet populated */
-        g_return_val_if_fail (self->resolved_library == NULL, FALSE);
-        g_return_val_if_fail (self->path_in_container == NULL, FALSE);
-        break;
-
       case ICD_KIND_ABSOLUTE:
         /* Has a library, which should have been resolved to a
          * concrete filename when the architecture details were
@@ -91,11 +96,36 @@ pv_module_per_arch_check (const PvModulePerArch *self,
          * so make no assertion here. */
         break;
 
+      case ICD_KIND_UNDECIDED:
       default:
         g_return_val_if_reached (FALSE);
     }
 
   return TRUE;
+}
+
+static inline PvModulePerArch *
+icd_details_get_nth_architecture (IcdDetails *self,
+                                  gsize i)
+{
+  return &g_array_index (self->archs, PvModulePerArch, i);
+}
+
+static inline PvModulePerArch *
+icd_details_lookup_architecture (IcdDetails *self,
+                                 GQuark tuple)
+{
+  gsize i;
+
+  for (i = 0; i < self->archs->len; i++)
+    {
+      PvModulePerArch *arch = icd_details_get_nth_architecture (self, i);
+
+      if (arch->tuple == tuple)
+        return arch;
+    }
+
+  return NULL;
 }
 
 /*
@@ -105,7 +135,7 @@ pv_module_per_arch_check (const PvModulePerArch *self,
  * Check that @self is internally consistent.
  */
 static gboolean
-icd_details_check (const IcdDetails *self)
+icd_details_check (IcdDetails *self)
 {
   SrtBaseGraphicsModule *base;
   gboolean is_json_based;
@@ -129,9 +159,11 @@ icd_details_check (const IcdDetails *self)
 
   is_json_based = SRT_IS_BASE_JSON_GRAPHICS_MODULE (base);
 
-  for (i = 0; i < G_N_ELEMENTS (self->archs); i++)
+  for (i = 0; i < self->archs->len; i++)
     {
-      const PvModulePerArch *arch = &self->archs[i];
+      PvModulePerArch *arch = icd_details_get_nth_architecture (self, i);
+
+      g_return_val_if_fail (arch->tuple != 0, FALSE);
 
       g_return_val_if_fail (pv_module_per_arch_check (arch,
                                                       self,
@@ -148,7 +180,6 @@ icd_details_new (PvGraphicsProvider *provider,
 {
   SrtBaseGraphicsModule *base;
   IcdDetails *self;
-  gsize i;
   const char *name;
 
   g_return_val_if_fail (SRT_IS_BASE_GRAPHICS_MODULE (icd), NULL);
@@ -191,8 +222,10 @@ icd_details_new (PvGraphicsProvider *provider,
   self->debug_name = name;
   self->has_library = (base->library_path != NULL);
 
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-    pv_module_per_arch_init (&self->archs[i]);
+  self->archs = g_array_new (FALSE,   /* don't allocate extra zeroed entry */
+                             TRUE,    /* do zero-fill newly added entries */
+                             sizeof (PvModulePerArch));
+  g_array_set_clear_func (self->archs, pv_module_per_arch_clear);
 
   return self;
 }
@@ -200,13 +233,9 @@ icd_details_new (PvGraphicsProvider *provider,
 void
 icd_details_free (IcdDetails *self)
 {
-  gsize i;
-
   g_object_unref (self->icd);
   g_object_unref (self->provider);
-
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-    pv_module_per_arch_clear (&self->archs[i]);
+  g_array_unref (self->archs);
 
   g_slice_free (IcdDetails, self);
 }
@@ -235,46 +264,54 @@ icd_details_arch_is_applicable (const IcdDetails *self,
 }
 
 /*
- * icd_details_populate_architecture_by_index:
+ * icd_details_populate_architecture:
  * @self: The module
- * @multiarch_index: An index into @pv_multiarch_tuples
+ * @quark: Interned string representing a multiarch tuple
  * @known: (nullable): Information about the architecture
  *
- * Fill in @kind and @resolved_library in `archs[multiarch_index]`.
+ * Add a new architecture to @archs (it must not already exist)
+ * with details of this module on the architecture given by @quark.
  */
 void
-icd_details_populate_architecture_by_index (IcdDetails *self,
-                                            gsize multiarch_index,
-                                            const SrtKnownArchitecture *known)
+icd_details_populate_architecture (IcdDetails *self,
+                                   GQuark quark,
+                                   const SrtKnownArchitecture *known)
 {
+  g_auto(PvModulePerArch) arch = PV_MODULE_PER_ARCH_INIT;
   SrtBaseGraphicsModule *module = self->icd;
-  PvModulePerArch *arch;
   g_autofree gchar *resolved_library = NULL;
-  const char *tuple = pv_multiarch_tuples[multiarch_index];
+  const char *tuple = g_quark_to_string (quark);
+  gboolean is_json_based;
 
   g_return_if_fail (icd_details_check (self));
   g_debug ("%s:%s: checking architecture %s",
            self->provider->in_current_ns->path, self->debug_name, tuple);
-  arch = &self->archs[multiarch_index];
   /* Precondition: We didn't already populate arch-specific info */
-  g_return_if_fail (arch->kind == ICD_KIND_UNDECIDED);
+  g_return_if_fail (icd_details_lookup_architecture (self, quark) == NULL);
+
+  is_json_based = SRT_IS_BASE_JSON_GRAPHICS_MODULE (module);
+
+  if (!pv_graphics_provider_has_architecture (self->provider, quark))
+    {
+      g_debug ("-> provider not relevant for %s, ignoring", tuple);
+      return;
+    }
 
   if (known != NULL && !icd_details_arch_is_applicable (self, known))
     {
       g_debug ("-> ignored due to architecture restriction");
-      arch->kind = ICD_KIND_IGNORED;
+      return;
     }
-  else if (!self->has_library)
+
+  if (!self->has_library)
     {
       /* If this is a Vulkan meta-layer with no associated library,
        * there's nothing to do */
       g_return_if_fail (SRT_IS_VULKAN_LAYER (module));
-      arch->kind = ICD_KIND_META_LAYER;
+      arch.kind = ICD_KIND_META_LAYER;
     }
   else
     {
-      gboolean failed_to_load = FALSE;
-
       resolved_library = _srt_base_graphics_module_resolve_library_path (module);
       g_return_if_fail (resolved_library != NULL);
 
@@ -314,7 +351,7 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
                 {
                   g_info ("Unable to load library %s: %s", resolved_library,
                           srt_library_get_messages (library));
-                  failed_to_load = TRUE;
+                  return;
                 }
               else
                 {
@@ -331,40 +368,34 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
               g_info ("Cannot support ld.so special tokens, e.g. ${LIB}, when provider "
                       "is not the root filesystem: ignoring %s",
                       resolved_library);
-              failed_to_load = TRUE;
+              return;
             }
         }
 
-      arch->resolved_library = g_steal_pointer (&resolved_library);
-
-      if (failed_to_load)
+      if (is_json_based)
         {
-          arch->kind = ICD_KIND_NONEXISTENT;
-          g_clear_pointer (&arch->resolved_library, g_free);
-        }
-      else if (SRT_IS_BASE_JSON_GRAPHICS_MODULE (module))
-        {
-          /* arch->resolved_library could be either absolute or a basename */
-          if (g_path_is_absolute (arch->resolved_library))
-            arch->kind = ICD_KIND_ABSOLUTE;
+          /* resolved_library could be either absolute or a basename */
+          if (g_path_is_absolute (resolved_library))
+            arch.kind = ICD_KIND_ABSOLUTE;
           else
-            arch->kind = ICD_KIND_SONAME;
+            arch.kind = ICD_KIND_SONAME;
         }
       else
         {
-          g_return_if_fail (g_path_is_absolute (arch->resolved_library));
-          arch->kind = ICD_KIND_ABSOLUTE;
+          g_return_if_fail (g_path_is_absolute (resolved_library));
+          arch.kind = ICD_KIND_ABSOLUTE;
         }
     }
 
   g_info ("%s[%s]: %s",
-          self->debug_name, tuple, icd_kind_to_string (arch->kind));
+          self->debug_name, tuple, icd_kind_to_string (arch.kind));
 
-  switch (arch->kind)
+  switch (arch.kind)
     {
       case ICD_KIND_ABSOLUTE:
       case ICD_KIND_SONAME:
-        g_info ("-> path in provider: %s", arch->resolved_library);
+        g_info ("-> path in provider %s: %s",
+                self->provider->in_current_ns->path, resolved_library);
         break;
 
       case ICD_KIND_IGNORED:
@@ -379,13 +410,20 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
         g_return_if_reached ();
     }
 
+  arch.resolved_library = g_steal_pointer (&resolved_library);
+  arch.tuple = quark;
+  g_return_if_fail (pv_module_per_arch_check (&arch, self, is_json_based));
+
+  pv_module_per_arch_move_to_array (self->archs, &arch);
+
+  /* Postcondition: this is redundant but for now let's be careful */
   g_return_if_fail (icd_details_check (self));
 }
 
 /*
- * icd_details_get_architecture_by_index:
+ * icd_details_get_architecture:
  * @self: A module
- * @multiarch_index: An index into @pv_multiarch_tuples
+ * @quark: Interned string representing a multiarch tuple
  *
  * Return architecture-specific information with @kind set to
  * %ICD_KIND_ABSOLUTE, %ICD_KIND_SONAME or %ICD_KIND_META_LAYER,
@@ -394,15 +432,18 @@ icd_details_populate_architecture_by_index (IcdDetails *self,
  * Returns: (nullable): Architecture-specific information
  */
 PvModulePerArch *
-icd_details_get_architecture_by_index (IcdDetails *self,
-                                       gsize multiarch_index)
+icd_details_get_architecture (IcdDetails *self,
+                              GQuark quark)
 {
   PvModulePerArch *arch;
 
   g_return_val_if_fail (icd_details_check (self), NULL);
-  g_return_val_if_fail (multiarch_index < G_N_ELEMENTS (self->archs), NULL);
+  g_return_val_if_fail (quark != 0, NULL);
 
-  arch = &self->archs[multiarch_index];
+  arch = icd_details_lookup_architecture (self, quark);
+
+  if (arch == NULL)
+    return NULL;
 
   switch (arch->kind)
     {
@@ -425,26 +466,28 @@ icd_details_get_architecture_by_index (IcdDetails *self,
  * icd_details_fill_array_single_arch:
  * @details_arr: (element-type IcdDetails): The array to populate,
  *  as returned by icd_details_array_sized_new()
+ * @tuple: Interned string representing a multiarch tuple
  * @drivers: (element-type SrtBaseGraphicsModule): The drivers as discovered
  *  by #SrtSystemInfo, which must be DRI, VA-API or VDPAU
- * @multiarch_index: An index into @pv_multiarch_tuples
  * @known: (nullable): Information about the architecture
  *
  * Build an array of #IcdDetails, and populate the architecture-specific
- * details of architecture @multiarch_index only.
+ * details of architecture @tuple only.
  *
  * Returns: (transfer container) (element-type IcdDetails): An array of
  *  representations of the drivers
  */
 void
 icd_details_fill_array_single_arch (GPtrArray *details_arr,
+                                    GQuark tuple,
                                     PvGraphicsProvider *provider,
                                     const GList *drivers,
-                                    gsize multiarch_index,
                                     const SrtKnownArchitecture *known)
 {
   const GList *icd_iter;
   gsize j;
+
+  g_return_if_fail (tuple != 0);
 
   for (icd_iter = drivers, j = 0; icd_iter != NULL; icd_iter = icd_iter->next, j++)
     {
@@ -456,9 +499,7 @@ icd_details_fill_array_single_arch (GPtrArray *details_arr,
                 || SRT_IS_VDPAU_DRIVER (module));
       g_assert (!SRT_IS_BASE_JSON_GRAPHICS_MODULE (module));
 
-      icd_details_populate_architecture_by_index (details,
-                                                  multiarch_index,
-                                                  known);
+      icd_details_populate_architecture (details, tuple, known);
       g_return_if_fail (icd_details_check (details));
       g_ptr_array_add (details_arr, g_steal_pointer (&details));
     }

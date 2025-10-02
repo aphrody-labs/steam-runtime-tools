@@ -651,6 +651,8 @@ typedef struct
   gchar *libdir_in_container;
   /* ABI's interoperable ld.so path, for example /lib64/ld-linux-x86-64.so.2 */
   gchar *ld_so;
+  /* Architecture tuple as a quark */
+  GQuark tuple_quark;
 } RuntimeArchitecture;
 
 static PvGraphicsProvider *
@@ -682,7 +684,6 @@ runtime_architecture_init (RuntimeArchitecture *self,
 {
   const gchar *argv[] = { NULL, "--print-ld.so", NULL };
   PvGraphicsProvider *provider;
-  GQuark tuple_quark;
 
   g_return_val_if_fail (self->multiarch_index < PV_N_SUPPORTED_ARCHITECTURES,
                         FALSE);
@@ -695,9 +696,9 @@ runtime_architecture_init (RuntimeArchitecture *self,
   g_return_val_if_fail (g_strcmp0 (pv_multiarch_tuples[self->multiarch_index],
                                    self->tuple) == 0, FALSE);
 
-  tuple_quark = g_quark_from_static_string (self->tuple);
-  g_return_val_if_fail (tuple_quark != 0, FALSE);
-  provider = pv_runtime_get_graphics_provider (runtime, tuple_quark);
+  self->tuple_quark = g_quark_from_static_string (self->tuple);
+  g_return_val_if_fail (self->tuple_quark != 0, FALSE);
+  provider = pv_runtime_get_graphics_provider (runtime, self->tuple_quark);
   g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (provider), FALSE);
   self->provider = g_object_ref (provider);
 
@@ -2266,7 +2267,7 @@ pv_runtime_capture_libraries (PvRuntime *self,
  * into `${libdir}`.
  *
  * If the module is %ICD_KIND_ABSOLUTE or %ICD_KIND_SONAME, change its
- * `details->archs[multiarch_index].path_in_container`
+ * `details->archs[x].path_in_container`
  * from %NULL to a non-%NULL path. Otherwise leave it %NULL.
  */
 static gboolean
@@ -2282,7 +2283,7 @@ bind_icds (PvRuntime *self,
 {
   static const char options[] = "if-exists:if-same-abi";
   g_autoptr(GHashTable) basename_set = NULL;
-  /* If details_arr[i]->archs[multiarch_index].kind is ICD_KIND_ABSOLUTE,
+  /* If details_arr[i]->archs[x].kind is ICD_KIND_ABSOLUTE,
    * then basenames[i] is the basename of the file; otherwise %NULL. */
   g_autofree const char **basenames = NULL;
   /* If details_arr[i] will not be passed to capsule-capture-libs because
@@ -2293,7 +2294,6 @@ bind_icds (PvRuntime *self,
   g_autofree gsize *captured_instead = NULL;
   g_autofree gchar *subdir_relative_to_overrides = NULL;
   glnx_autofd int subdir_fd = -1;
-  gsize multiarch_index;
   gsize i;
   int digits = pv_count_decimal_digits (n_details);
 
@@ -2304,8 +2304,6 @@ bind_icds (PvRuntime *self,
   g_return_val_if_fail (libdir_patterns != NULL, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
-  multiarch_index = arch->multiarch_index;
-
   /* Iterate through the drivers adding the SONAMEs to @patterns. */
   for (i = 0; i < n_details; i++)
     {
@@ -2315,36 +2313,20 @@ bind_icds (PvRuntime *self,
       if (!details->has_library)
         continue;
 
-      details_arch = icd_details_get_architecture_by_index (details,
-                                                            multiarch_index);
+      details_arch = icd_details_get_architecture (details, arch->tuple_quark);
 
       if (details_arch == NULL)
         continue;
 
       g_return_val_if_fail (details_arch->path_in_container == NULL, FALSE);
 
-      g_info ("Capturing %s loadable module #%" G_GSIZE_FORMAT ": %s",
-              subdir, i, details->debug_name);
-
-      if (details->provider != arch->provider)
-        {
-          g_debug ("Module found in \"%s\" but %s provider is \"%s\", ignoring",
-                   details->provider->in_current_ns->path,
-                   arch->tuple,
-                   arch->provider->in_current_ns->path);
-          details_arch->kind = ICD_KIND_IGNORED;
-          continue;
-        }
-
-      g_info ("Checking for implementation on %s: %s",
-              arch->tuple,
-              details_arch->resolved_library);
+      g_debug ("Capturing %s loadable module #%" G_GSIZE_FORMAT ": %s",
+               subdir, i, details->debug_name);
 
       if (details_arch->kind == ICD_KIND_SONAME)
         {
           g_autofree gchar *pattern = NULL;
 
-          g_debug ("Classified as SONAME");
           pattern = g_strdup_printf ("even-if-older:%s:soname:%s",
                                      options,
                                      details_arch->resolved_library);
@@ -2359,7 +2341,6 @@ bind_icds (PvRuntime *self,
           continue;
         }
 
-      g_debug ("Classified as path-based");
       g_assert (details_arch->kind == ICD_KIND_ABSOLUTE);
 
       /* We set subdir_relative_to_overrides non-NULL if and only if at least
@@ -2399,8 +2380,7 @@ bind_icds (PvRuntime *self,
       const PvModulePerArch *details_arch;
       const char *base;
 
-      details_arch = icd_details_get_architecture_by_index (details,
-                                                            multiarch_index);
+      details_arch = icd_details_get_architecture (details, arch->tuple_quark);
 
       if (details_arch == NULL
           || details_arch->kind != ICD_KIND_ABSOLUTE)
@@ -2459,8 +2439,7 @@ bind_icds (PvRuntime *self,
           struct stat stat_buf;
           glnx_autofd int fd = -1;
 
-          details_arch = icd_details_get_architecture_by_index (details,
-                                                                multiarch_index);
+          details_arch = icd_details_get_architecture (details, arch->tuple_quark);
 
           if (details_arch == NULL
               || details_arch->kind != ICD_KIND_ABSOLUTE)
@@ -2532,8 +2511,7 @@ bind_icds (PvRuntime *self,
       int dest_fd;
       struct stat stat_buf;
 
-      details_arch = icd_details_get_architecture_by_index (details,
-                                                            multiarch_index);
+      details_arch = icd_details_get_architecture (details, arch->tuple_quark);
 
       if (details_arch == NULL
           || details_arch->kind != ICD_KIND_ABSOLUTE)
@@ -2700,8 +2678,7 @@ success:
       IcdDetails *details = details_arr[i];
       const PvModulePerArch *details_arch;
 
-      details_arch = icd_details_get_architecture_by_index (details,
-                                                            multiarch_index);
+      details_arch = icd_details_get_architecture (details, arch->tuple_quark);
 
       if (details_arch == NULL)
         continue;
@@ -4743,11 +4720,13 @@ setup_json_manifest (PvRuntime *self,
       const PvModulePerArch *details_arch;
       const SrtKnownArchitecture *arch;
       const char *tuple;
+      GQuark tuple_quark;
       g_autofree gchar *arch_bits = NULL;
       gboolean write_per_architecture;
 
       tuple = pv_multiarch_tuples[i];
-      details_arch = icd_details_get_architecture_by_index (details, i);
+      tuple_quark = g_quark_from_static_string (tuple);
+      details_arch = icd_details_get_architecture (details, tuple_quark);
 
       if (details_arch == NULL)
         {
@@ -4794,7 +4773,7 @@ setup_json_manifest (PvRuntime *self,
           case ICD_KIND_IGNORED:
           case ICD_KIND_UNDECIDED:
           default:
-            /* icd_details_get_architecture_by_index() should not
+            /* icd_details_get_architecture() should not
              * return these types */
             g_warn_if_reached ();
             continue;
@@ -5041,7 +5020,6 @@ collect_json_based_drivers (PvRuntime *self,
   gsize j;
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
     _srt_profiling_start ("Collecting %s", description);
-  const gsize multiarch_index = arch->multiarch_index;
 
   g_return_val_if_fail (arch->provider != NULL, FALSE);
   g_return_val_if_fail (details_arr != NULL, FALSE);
@@ -5054,9 +5032,9 @@ collect_json_based_drivers (PvRuntime *self,
     {
       IcdDetails *details = g_ptr_array_index (details_arr, j);
 
-      icd_details_populate_architecture_by_index (details,
-                                                  multiarch_index,
-                                                  arch->known_arch);
+      icd_details_populate_architecture (details,
+                                         arch->tuple_quark,
+                                         arch->known_arch);
     }
 
   if (!bind_icds (self, arch, bind_icds_subdir,
@@ -5087,7 +5065,6 @@ collect_openxr_1_runtime (PvRuntime *self,
   /* We don't have to use multiple directories because there is at most one
    * active runtime per architecture, so filenames cannot collide */
   gboolean use_numbered_subdirs = FALSE;
-  const gsize multiarch_index = arch->multiarch_index;
 
   g_debug ("Collecting %s OpenXR 1 runtime from provider...", arch->tuple);
 
@@ -5099,9 +5076,9 @@ collect_openxr_1_runtime (PvRuntime *self,
 
   g_return_val_if_fail (srt_openxr_1_runtime_check_error (rt, NULL), TRUE);
 
-  icd_details_populate_architecture_by_index (details,
-                                              multiarch_index,
-                                              arch->known_arch);
+  icd_details_populate_architecture (details,
+                                     arch->tuple_quark,
+                                     arch->known_arch);
 
   if (!bind_icds (self, arch, "openxr/1", &details, 1, &use_numbered_subdirs,
                   patterns, NULL, error))
@@ -5947,7 +5924,7 @@ pv_runtime_collect_lib_symlink_data (PvRuntime *self,
 
 /*
  * @details_arch: must be non-%NULL and of a kind that could be returned
- *  by icd_details_get_architecture_by_index().
+ *  by icd_details_get_architecture().
  */
 static void
 collect_one_mesa_drirc (PvRuntime *self,
@@ -6017,7 +5994,6 @@ collect_mesa_drirc (PvRuntime *self,
                     PvRuntimeLibraryData *drirc_data_in_provider)
 {
   g_autoptr(SrtObjectList) dri_drivers = NULL;
-  const gsize multiarch_index = arch->multiarch_index;
 
   for (guint i = 0; i < egl_icd_details->len; i++)
     {
@@ -6026,8 +6002,8 @@ collect_mesa_drirc (PvRuntime *self,
       const char *resolved;
       const char *base;
 
-      details_arch = icd_details_get_architecture_by_index (details,
-                                                            multiarch_index);
+      details_arch = icd_details_get_architecture (details,
+                                                   arch->tuple_quark);
 
       if (details_arch == NULL)
         continue;
@@ -6053,8 +6029,7 @@ collect_mesa_drirc (PvRuntime *self,
       IcdDetails *details = g_ptr_array_index (vulkan_icd_details, i);
       const PvModulePerArch *details_arch;
 
-      details_arch = icd_details_get_architecture_by_index (details,
-                                                            multiarch_index);
+      details_arch = icd_details_get_architecture (details, arch->tuple_quark);
 
       if (details_arch == NULL)
         continue;
@@ -6653,7 +6628,6 @@ collect_vdpau_drivers (PvRuntime *self,
   /* The VDPAU loader looks up drivers by name, not by readdir(),
    * so order doesn't matter unless there are name collisions. */
   gboolean use_numbered_subdirs = FALSE;
-  const gsize multiarch_index = arch->multiarch_index;
 
   g_debug ("Enumerating %s VDPAU ICDs on provider...", arch->tuple);
     {
@@ -6671,9 +6645,9 @@ collect_vdpau_drivers (PvRuntime *self,
   self->any_vdpau_drivers = TRUE;
   details_arr = icd_details_array_sized_new (g_list_length (vdpau_drivers));
   icd_details_fill_array_single_arch (details_arr,
+                                      arch->tuple_quark,
                                       arch->provider,
                                       vdpau_drivers,
-                                      multiarch_index,
                                       arch->known_arch);
 
   /* In practice we won't actually use the sequence number for VDPAU
@@ -6709,7 +6683,6 @@ collect_dri_drivers (PvRuntime *self,
    * so order doesn't matter unless there are name collisions. */
   gboolean use_numbered_subdirs = FALSE;
   gsize j;
-  const gsize multiarch_index = arch->multiarch_index;
 
   g_debug ("Enumerating %s DRI drivers on provider...", arch->tuple);
     {
@@ -6734,14 +6707,14 @@ collect_dri_drivers (PvRuntime *self,
   details_arr = icd_details_array_sized_new (g_list_length (dri_drivers)
                                              + g_list_length (va_api_drivers));
   icd_details_fill_array_single_arch (details_arr,
+                                      arch->tuple_quark,
                                       arch->provider,
                                       dri_drivers,
-                                      multiarch_index,
                                       arch->known_arch);
   icd_details_fill_array_single_arch (details_arr,
+                                      arch->tuple_quark,
                                       arch->provider,
                                       va_api_drivers,
-                                      multiarch_index,
                                       arch->known_arch);
   j = 0;
 
@@ -6751,8 +6724,7 @@ collect_dri_drivers (PvRuntime *self,
       const PvModulePerArch *details_arch;
       const char *resolved;
 
-      details_arch = icd_details_get_architecture_by_index (details,
-                                                            multiarch_index);
+      details_arch = icd_details_get_architecture (details, arch->tuple_quark);
 
       if (details_arch == NULL)
         continue;
@@ -7004,7 +6976,6 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
       if (runtime_architecture_init (arch, self))
         {
-          GQuark arch_quark = g_quark_from_static_string (arch->tuple);
           g_autoptr(GPtrArray) dirs = NULL;
           g_autofree gchar *this_dri_path_in_container = g_build_filename (arch->libdir_in_container,
                                                                            "dri", NULL);
@@ -7113,7 +7084,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
             }
 
           arch_system_info = pv_graphics_provider_get_system_info (arch->provider,
-                                                                   arch_quark);
+                                                                   arch->tuple_quark);
 
           if ((self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
               && !collect_openxr_1_runtime (self, arch, provider_stack->openxr_1_runtime_details,

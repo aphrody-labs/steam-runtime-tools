@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20251001.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251002.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
     - Only enumerate OpenXR runtimes that belong to the appropriate
@@ -7,7 +7,7 @@ steam-runtime-tools (0.20251001.0) UNRELEASED; urgency=medium
     - Refactoring
       (steamrt/tasks#786)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 01 Oct 2025 19:16:50 +0100
+ -- Simon McVittie <smcv@collabora.com>  Thu, 02 Oct 2025 13:05:15 +0100
 
 steam-runtime-tools (0.20250926.0) steamrt; urgency=medium
 

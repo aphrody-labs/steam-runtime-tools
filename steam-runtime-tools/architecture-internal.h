@@ -33,6 +33,8 @@
 typedef struct
 {
   const char *multiarch_tuple;
+  /* $DEB_HOST_ARCHITECTURE */
+  const char *debian_architecture;
   const char *interoperable_runtime_linker;
   /* One of the values from:
    * https://registry.khronos.org/OpenXR/specs/1.1/loader.html#architecture-identifiers
@@ -52,6 +54,8 @@ typedef struct
   const char * const *libdl_platform_expansions;
   /* Directory used in Steam for gameoverlayrenderer.so. */
   const char *steam_gameoverlayrenderer_dir;
+  /* Any other names for the architecture not covered by the above */
+  const char * const *aliases;
   guint16 machine_type;
   guint8 elf_class;
   guint8 elf_encoding;
@@ -71,3 +75,7 @@ G_GNUC_INTERNAL gboolean _srt_architecture_can_run (SrtSubprocessRunner *runner,
 const gchar *_srt_architecture_guess_from_elf (int dfd,
                                                const char *file_path,
                                                GError **error);
+
+GQuark _srt_architecture_guess_from_user_input (const char *alias,
+                                                const SrtKnownArchitecture **known_out,
+                                                GError **error);

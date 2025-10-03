@@ -61,7 +61,9 @@ setup (Fixture *f,
 
   f->old_fds = tests_check_fd_leaks_enter ();
   f->bwrap = flatpak_bwrap_new (flatpak_bwrap_empty_env);
-  f->lib_temp_dirs = pv_per_arch_dirs_new (&f->lib_temp_dirs_error);
+  f->lib_temp_dirs = pv_per_arch_dirs_new ((const GQuark *) f->archs->data,
+                                           f->archs->len,
+                                           &f->lib_temp_dirs_error);
 #ifdef _SRT_TESTS_STRICT
   /* We allow this to fail because it might fail on particularly strange
    * OS configurations, but for platforms we actively support,

@@ -207,20 +207,15 @@ pv_per_arch_dirs_try_scheme (PvPerArchDirs *self,
 }
 
 PvPerArchDirs *
-pv_per_arch_dirs_new (GError **error)
+pv_per_arch_dirs_new (const GQuark *architectures,
+                      gsize n_architectures,
+                      GError **error)
 {
   g_autoptr(GError) lib_error = NULL;
   g_autoptr(GError) platform_error = NULL;
   g_autoptr(PvPerArchDirs) self = g_new0 (PvPerArchDirs, 1);
   g_autoptr(SrtSystemInfo) info = NULL;
-  GQuark architectures[PV_N_SUPPORTED_ARCHITECTURES];
-  gsize n_architectures;
   gsize abi;
-
-  for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
-    architectures[abi] = g_quark_from_static_string (pv_multiarch_tuples[abi]);
-
-  n_architectures = G_N_ELEMENTS (architectures);
 
   info = srt_system_info_new (NULL);
 

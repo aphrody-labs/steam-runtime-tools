@@ -811,6 +811,8 @@ main (int argc,
   g_autoptr(FlatpakBwrap) wrapped_command = NULL;
   g_autoptr(PvPerArchDirs) lib_temp_dirs = NULL;
   SrtSteamCompatFlags compat_flags;
+  GQuark tuples[PV_N_SUPPORTED_ARCHITECTURES];
+  gsize i;
 
   setlocale (LC_ALL, "");
 
@@ -1044,7 +1046,10 @@ main (int argc,
                              opt_set_ld_library_path, TRUE);
     }
 
-  lib_temp_dirs = pv_per_arch_dirs_new (error);
+  for (i = 0; i < G_N_ELEMENTS (tuples); i++)
+    tuples[i] = g_quark_from_static_string (pv_multiarch_tuples[i]);
+
+  lib_temp_dirs = pv_per_arch_dirs_new (tuples, G_N_ELEMENTS (tuples), error);
 
   if (lib_temp_dirs == NULL)
     {

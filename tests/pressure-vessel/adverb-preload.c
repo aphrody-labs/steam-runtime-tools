@@ -62,7 +62,9 @@ setup (Fixture *f,
 
   if (config->can_discover_platform)
     {
-      f->lib_temp_dirs = pv_per_arch_dirs_new (&local_error);
+      f->lib_temp_dirs = pv_per_arch_dirs_new ((const GQuark *) f->archs->data,
+                                               f->archs->len,
+                                               &local_error);
 #ifdef _SRT_TESTS_STRICT
       /* We allow this to fail because it might fail on particularly strange
        * OS configurations, but for platforms we actively support,

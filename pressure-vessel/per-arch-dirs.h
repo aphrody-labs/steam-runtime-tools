@@ -39,7 +39,9 @@ typedef struct
   GHashTable *abi_paths;
 } PvPerArchDirs;
 
-PvPerArchDirs *pv_per_arch_dirs_new (GError **error);
+PvPerArchDirs *pv_per_arch_dirs_new (const GQuark *architectures,
+                                     gsize n_architectures,
+                                     GError **error);
 void pv_per_arch_dirs_free (PvPerArchDirs *self);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (PvPerArchDirs, pv_per_arch_dirs_free)

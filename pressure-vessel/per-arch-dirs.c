@@ -267,7 +267,7 @@ pv_adverb_set_up_overrides (FlatpakBwrap *wrapped_command,
 
   for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
     {
-      const char *multiarch_tuple = pv_multiarch_details[abi].tuple;
+      const char *multiarch_tuple = pv_multiarch_tuples[abi];
       GQuark arch_quark = g_quark_from_static_string (multiarch_tuple);
       g_autofree gchar *abi_path = NULL;
       g_autofree gchar *target = NULL;

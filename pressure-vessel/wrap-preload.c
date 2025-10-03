@@ -239,7 +239,7 @@ append_preload_per_architecture (PvWrapContext *context,
     {
       g_autoptr(GString) mock_path = NULL;
       g_autoptr(SrtLibrary) details = NULL;
-      const gchar *multiarch_tuple = pv_multiarch_details[i].tuple;
+      const gchar *multiarch_tuple = pv_multiarch_tuples[i];
       GQuark arch_quark = g_quark_from_static_string (multiarch_tuple);
       const char *path = NULL;
 

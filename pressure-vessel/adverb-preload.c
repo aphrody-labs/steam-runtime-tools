@@ -79,7 +79,7 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
     {
       for (gsize abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
         {
-          GQuark arch_quark = g_quark_from_static_string (pv_multiarch_details[abi].tuple);
+          GQuark arch_quark = g_quark_from_static_string (pv_multiarch_tuples[abi]);
 
           if (architecture == arch_quark)
             {
@@ -117,7 +117,7 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
 
           if (g_str_has_suffix (preload, expected_suffix))
             {
-              architecture = g_quark_from_static_string (pv_multiarch_details[abi].tuple);
+              architecture = g_quark_from_static_string (pv_multiarch_tuples[abi]);
               abi_index = abi;
               break;
             }

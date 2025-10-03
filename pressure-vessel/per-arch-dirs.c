@@ -325,8 +325,11 @@ pv_adverb_set_up_overrides (FlatpakBwrap *wrapped_command,
   for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
     {
       const char *multiarch_tuple = pv_multiarch_details[abi].tuple;
-      gchar *abi_path = g_build_filename (lib_temp_dirs->abi_paths[abi], "vdpau", NULL);
-      gchar *target = g_build_filename (overrides, "lib", multiarch_tuple, "vdpau", NULL);
+      g_autofree gchar *abi_path = NULL;
+      g_autofree gchar *target = NULL;
+
+      abi_path = g_build_filename (lib_temp_dirs->abi_paths[abi], "vdpau", NULL);
+      target = g_build_filename (overrides, "lib", multiarch_tuple, "vdpau", NULL);
 
       if (!g_file_test (target, G_FILE_TEST_IS_DIR))
         continue;

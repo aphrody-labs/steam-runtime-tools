@@ -6,8 +6,6 @@
 #include "config.h"
 #include "adverb-sdl.h"
 
-#include "supported-architectures.h"
-
 /*
  * pv_adverb_set_up_dynamic_sdl:
  * @wrapped_command: The command to run and its environment
@@ -23,6 +21,8 @@
  */
 gboolean
 pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
+                              const GQuark *archs,
+                              gsize n_archs,
                               PvPerArchDirs *lib_temp_dirs,
                               const char *prefix,
                               const char *overrides,
@@ -52,10 +52,10 @@ pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
                        "Cannot set up dynamic %s without per-architecture directories",
                        soname);
 
-  for (abi_index = 0; abi_index < PV_N_SUPPORTED_ARCHITECTURES; abi_index++)
+  for (abi_index = 0; abi_index < n_archs; abi_index++)
     {
-      const char *multiarch_tuple = pv_multiarch_tuples[abi_index];
-      GQuark arch_quark = g_quark_from_static_string (multiarch_tuple);
+      GQuark arch_quark = archs[abi_index];
+      const char *multiarch_tuple = g_quark_to_string (arch_quark);
       g_autofree gchar *dest = NULL;
       g_autofree gchar *from_runtime = NULL;
       g_autofree gchar *override = NULL;
@@ -125,6 +125,8 @@ pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
 
 void
 pv_adverb_set_up_dynamic_sdls (FlatpakBwrap *wrapped_command,
+                               const GQuark *archs,
+                               gsize n_archs,
                                PvPerArchDirs *lib_temp_dirs,
                                const char *prefix,
                                const char *overrides,
@@ -168,6 +170,8 @@ pv_adverb_set_up_dynamic_sdls (FlatpakBwrap *wrapped_command,
           g_autoptr(GError) local_error = NULL;
 
           if (!pv_adverb_set_up_dynamic_sdl (wrapped_command,
+                                             archs,
+                                             n_archs,
                                              lib_temp_dirs,
                                              prefix,
                                              overrides,

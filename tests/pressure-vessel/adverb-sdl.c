@@ -231,6 +231,8 @@ test_basic (Fixture *f,
 
   g_test_message ("With no flags, not setup is done...");
   pv_adverb_set_up_dynamic_sdls (f->bwrap,
+                                 (const GQuark *) f->archs->data,
+                                 f->archs->len,
                                  f->lib_temp_dirs,
                                  f->mock_prefix.path,
                                  f->mock_overrides.path,
@@ -243,6 +245,8 @@ test_basic (Fixture *f,
 
   g_test_message ("SDL2 flag sets up SDL2...");
   pv_adverb_set_up_dynamic_sdls (f->bwrap,
+                                 (const GQuark *) f->archs->data,
+                                 f->archs->len,
                                  f->lib_temp_dirs,
                                  f->mock_prefix.path,
                                  f->mock_overrides.path,
@@ -255,6 +259,8 @@ test_basic (Fixture *f,
 
   g_test_message ("SDL3 flag additionally sets up SDL3...");
   pv_adverb_set_up_dynamic_sdls (f->bwrap,
+                                 (const GQuark *) f->archs->data,
+                                 f->archs->len,
                                  f->lib_temp_dirs,
                                  f->mock_prefix.path,
                                  f->mock_overrides.path,
@@ -273,6 +279,8 @@ test_basic (Fixture *f,
 
   g_test_message ("sdl2-compat flag sets up sdl2-compat...");
   pv_adverb_set_up_dynamic_sdls (f->bwrap,
+                                 (const GQuark *) f->archs->data,
+                                 f->archs->len,
                                  f->lib_temp_dirs,
                                  f->mock_prefix.path,
                                  f->mock_overrides.path,
@@ -288,6 +296,8 @@ test_basic (Fixture *f,
 
   g_test_message ("classic flag sets up classic SDL2...");
   pv_adverb_set_up_dynamic_sdls (f->bwrap,
+                                 (const GQuark *) f->archs->data,
+                                 f->archs->len,
                                  f->lib_temp_dirs,
                                  f->mock_prefix.path,
                                  f->mock_overrides.path,
@@ -318,6 +328,8 @@ test_cannot_symlink (Fixture *f,
 
   g_test_summary ("If we can't create the symlink, setup fails");
   res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+                                      (const GQuark *) f->archs->data,
+                                      f->archs->len,
                                       f->lib_temp_dirs,
                                       f->mock_prefix.path,
                                       f->mock_overrides.path,
@@ -347,6 +359,8 @@ test_impossible (Fixture *f,
   g_test_summary ("If we don't know the $LIB or $PLATFORM, nothing happens, "
                   "with a warning");
   res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+                                      (const GQuark *) f->archs->data,
+                                      f->archs->len,
                                       NULL,
                                       f->mock_prefix.path,
                                       f->mock_overrides.path,
@@ -388,6 +402,8 @@ test_in_gfx_stack (Fixture *f,
 
   g_test_summary ("We prefer SDL from the graphics provider if present");
   res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+                                      (const GQuark *) f->archs->data,
+                                      f->archs->len,
                                       f->lib_temp_dirs,
                                       f->mock_prefix.path,
                                       f->mock_overrides.path,
@@ -421,6 +437,8 @@ test_in_gfx_stack_only (Fixture *f,
 
   g_test_summary ("We use SDL from the graphics provider if necessary");
   res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+                                      (const GQuark *) f->archs->data,
+                                      f->archs->len,
                                       f->lib_temp_dirs,
                                       f->mock_prefix.path,
                                       f->mock_overrides.path,
@@ -449,6 +467,8 @@ test_missing (Fixture *f,
 
   g_test_summary ("If SDL is missing, nothing happens, with a warning");
   res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+                                      (const GQuark *) f->archs->data,
+                                      f->archs->len,
                                       f->lib_temp_dirs,
                                       f->mock_prefix.path,
                                       f->mock_overrides.path,
@@ -479,6 +499,8 @@ test_overridden (Fixture *f,
   g_test_summary ("Setting " SDL_DYNAMIC_API " takes precedence");
   flatpak_bwrap_set_env (f->bwrap, SDL_DYNAMIC_API, "/whatever", TRUE);
   res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+                                      (const GQuark *) f->archs->data,
+                                      f->archs->len,
                                       f->lib_temp_dirs,
                                       f->mock_prefix.path,
                                       f->mock_overrides.path,

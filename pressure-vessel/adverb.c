@@ -1058,7 +1058,9 @@ main (int argc,
     }
 
   compat_flags = _srt_steam_get_compat_flags (_srt_const_strv (envp));
-  pv_adverb_set_up_dynamic_sdls (wrapped_command, lib_temp_dirs,
+  pv_adverb_set_up_dynamic_sdls (wrapped_command,
+                                 tuples, G_N_ELEMENTS (tuples),
+                                 lib_temp_dirs,
                                  "/usr", opt_overrides, compat_flags);
 
   if (opt_overrides != NULL

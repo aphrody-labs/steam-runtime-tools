@@ -72,17 +72,3 @@ typedef enum
 GPtrArray *pv_known_architecture_get_libdirs (const char *tuple,
                                               const SrtKnownArchitecture *known,
                                               PvMultiarchLibdirsFlags flags);
-
-static inline const PvMultiarchDetails *
-pv_multiarch_details_get_by_tuple (const char *tuple)
-{
-  gsize i;
-
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-    {
-      if (g_str_equal (tuple, pv_multiarch_tuples[i]))
-        return &pv_multiarch_details[i];
-    }
-
-  return NULL;
-}

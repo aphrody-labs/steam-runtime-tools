@@ -1063,6 +1063,7 @@ main (int argc,
 
   if (opt_overrides != NULL
       && !pv_adverb_set_up_overrides (wrapped_command,
+                                      tuples, G_N_ELEMENTS (tuples),
                                       lib_temp_dirs,
                                       opt_overrides,
                                       error))

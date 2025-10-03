@@ -22,10 +22,9 @@
 
 #include <glib/gstdio.h>
 
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/system-info.h"
 #include "steam-runtime-tools/utils-internal.h"
-
-#include "supported-architectures.h"
 
 static gchar *
 get_libdl_lib_or_mock (GQuark arch_quark,
@@ -248,6 +247,8 @@ pv_per_arch_dirs_new (const GQuark *architectures,
 
 gboolean
 pv_adverb_set_up_overrides (FlatpakBwrap *wrapped_command,
+                            const GQuark *archs,
+                            gsize n_archs,
                             PvPerArchDirs *lib_temp_dirs,
                             const char *overrides,
                             GError **error)
@@ -260,10 +261,10 @@ pv_adverb_set_up_overrides (FlatpakBwrap *wrapped_command,
   if (lib_temp_dirs == NULL)
     return glnx_throw (error, "Unable to set up VDPAU driver search path");
 
-  for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
+  for (abi = 0; abi < n_archs; abi++)
     {
-      const char *multiarch_tuple = pv_multiarch_tuples[abi];
-      GQuark arch_quark = g_quark_from_static_string (multiarch_tuple);
+      GQuark arch_quark = archs[abi];
+      const char *multiarch_tuple = g_quark_to_string (arch_quark);
       g_autofree gchar *abi_path = NULL;
       g_autofree gchar *target = NULL;
       const char *abi_path_base;

@@ -54,6 +54,8 @@ pv_per_arch_dirs_get_abi_path (PvPerArchDirs *self,
 }
 
 gboolean pv_adverb_set_up_overrides (FlatpakBwrap *wrapped_command,
+                                     const GQuark *archs,
+                                     gsize n_archs,
                                      PvPerArchDirs *lib_temp_dirs,
                                      const char *overrides,
                                      GError **error);

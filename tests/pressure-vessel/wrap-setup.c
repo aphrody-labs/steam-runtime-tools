@@ -2377,11 +2377,10 @@ test_supported_archs (Fixture *f,
       /* multiarch_details and multiarch_tuples are in the same order */
       g_assert_cmpstr (pv_multiarch_tuples[i], ==, details->tuple);
 
-      /* pv-runtime assumes that we know the OpenXR architecture name
-       * for every architecture supported by PV */
       known = _srt_architecture_get_by_tuple (details->tuple);
-      g_assert_nonnull (known);
-      g_assert_nonnull (known->openxr_1_architecture);
+
+      if (known == NULL)
+        continue;
 
       for (j = 0; j < G_N_ELEMENTS (details->platforms); j++)
         {

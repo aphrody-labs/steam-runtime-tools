@@ -412,7 +412,6 @@ test_cli (Fixture *f,
         .architecture = NULL,
       },
     },
-#if defined(__x86_64__) || defined(__i386__)
     {
       .option = "/lib64/libpreload.so:abi=" SRT_ABI_X86_64,
       .expected = {
@@ -427,7 +426,13 @@ test_cli (Fixture *f,
         .architecture = SRT_ABI_I386,
       },
     },
-#endif
+    {
+      .option = "/lib/libpreload.so:abi=arm-linux-gnueabihf",
+      .expected = {
+        .name = "/lib/libpreload.so",
+        .architecture = "arm-linux-gnueabihf",
+      },
+    },
 #if defined(_SRT_MULTIARCH)
     {
       .option = "/tmp/libabi.so:abi=" _SRT_MULTIARCH,

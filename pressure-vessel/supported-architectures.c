@@ -47,33 +47,6 @@ const char * const pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES + 1] =
 };
 
 /*
- * More details, in the same order as pv_multiarch_tuples
- */
-const PvMultiarchDetails pv_multiarch_details[PV_N_SUPPORTED_ARCHITECTURES] =
-{
-  /* The conditional branches here need to be kept in sync with
-   * pv_multiarch_tuples and PV_N_SUPPORTED_ARCHITECTURES */
-#if defined(__i386__) || defined(__x86_64__)
-  {
-    .tuple = "x86_64-linux-gnu",
-  },
-  {
-    .tuple = "i386-linux-gnu",
-  },
-#elif defined(__aarch64__)
-  {
-    .tuple = "aarch64-linux-gnu",
-  },
-#elif defined(_SRT_MULTIARCH)
-  {
-    .tuple = _SRT_MULTIARCH,
-  },
-#else
-#error Architecture not supported by pressure-vessel
-#endif
-};
-
-/*
  * pv_known_architecture_get_libdirs:
  * @tuple: (nullable): A multiarch tuple, or %NULL
  * @known: (nullable): A known architecture, or %NULL

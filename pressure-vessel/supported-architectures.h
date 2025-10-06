@@ -38,13 +38,6 @@
 
 extern const char * const pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES + 1];
 
-typedef struct
-{
-  const char *tuple;
-} PvMultiarchDetails;
-
-extern const PvMultiarchDetails pv_multiarch_details[PV_N_SUPPORTED_ARCHITECTURES];
-
 /*
  * PvMultiarchLibdirsFlags:
  * @PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN:

@@ -2342,8 +2342,6 @@ static void
 test_supported_archs (Fixture *f,
                       gconstpointer context)
 {
-  gsize i;
-
 #if defined(__i386__) || defined(__x86_64__)
 
   /* The primary architecture is x86_64, followed by i386
@@ -2367,16 +2365,8 @@ test_supported_archs (Fixture *f,
 
 #endif /* !x86 */
 
-  /* multiarch_details and multiarch_tuples are in the same order */
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-    {
-      const PvMultiarchDetails *details = &pv_multiarch_details[i];
-
-      g_assert_cmpstr (pv_multiarch_tuples[i], ==, details->tuple);
-    }
-
   /* The array of tuples has one extra element, to make it a GStrv */
-  g_assert_cmpstr (pv_multiarch_tuples[i], ==, NULL);
+  g_assert_cmpstr (pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES], ==, NULL);
 }
 
 /*

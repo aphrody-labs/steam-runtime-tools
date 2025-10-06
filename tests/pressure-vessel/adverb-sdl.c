@@ -27,6 +27,9 @@ typedef struct
   GError *lib_temp_dirs_error;
   GLnxTmpDir mock_prefix;
   GLnxTmpDir mock_overrides;
+  const gchar *primary_arch_path;   /* borrowed from lib_temp_dirs */
+  GArray *archs;
+  GQuark primary_arch;
 } Fixture;
 
 typedef struct
@@ -41,6 +44,19 @@ setup (Fixture *f,
   G_GNUC_UNUSED const Config *config = context;
   g_autoptr(GError) local_error = NULL;
   gsize i;
+
+  f->archs = _srt_architecture_array_new ();
+  pv_architecture_array_populate_with_defaults (f->archs);
+  g_return_if_fail (f->archs->len > 0);
+  f->primary_arch = g_array_index (f->archs, GQuark, PV_PRIMARY_ARCHITECTURE);
+
+  /* For now we assume that
+   * pv_architecture_array_populate_with_defaults() uses the same
+   * items as pv_multiarch_tuples, in the same order.
+   * This assumption will be removed later. */
+  for (i = 0; i < f->archs->len; i++)
+    g_assert_cmpstr (g_quark_to_string (g_array_index (f->archs, GQuark, i)),
+                     ==, pv_multiarch_tuples[i]);
 
   f->old_fds = tests_check_fd_leaks_enter ();
   f->bwrap = flatpak_bwrap_new (flatpak_bwrap_empty_env);
@@ -58,10 +74,21 @@ setup (Fixture *f,
       g_test_message ("Cross-platform module prefix: %s",
                       f->lib_temp_dirs->libdl_token_path);
 
-      for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-        g_test_message ("Concrete path for %s architecture: %s",
-                        pv_multiarch_tuples[i],
-                        f->lib_temp_dirs->abi_paths[i]);
+      for (i = 0; i < f->archs->len; i++)
+        {
+          GQuark arch_quark = g_array_index (f->archs, GQuark, i);
+          const char *tuple = g_quark_to_string (arch_quark);
+          const char *abi_path;
+
+          abi_path = f->lib_temp_dirs->abi_paths[i];
+          /* If pv_per_arch_dirs_new() succeeded, it populates abi_paths fully */
+          g_assert_nonnull (abi_path);
+          g_test_message ("Concrete path for %s architecture: %s",
+                          tuple, abi_path);
+        }
+
+      f->primary_arch_path = f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE];
+      g_assert_nonnull (f->primary_arch_path);
     }
 
   glnx_mkdtemp ("usr-XXXXXX", 0700, &f->mock_prefix, &local_error);
@@ -82,6 +109,7 @@ teardown (Fixture *f,
   g_clear_pointer (&f->bwrap, flatpak_bwrap_free);
   glnx_tmpdir_cleanup (&f->mock_prefix);
   glnx_tmpdir_cleanup (&f->mock_overrides);
+  g_clear_pointer (&f->archs, g_array_unref);
   tests_check_fd_leaks_leave (f->old_fds);
 }
 
@@ -184,16 +212,16 @@ test_basic (Fixture *f,
   g_test_summary ("Basic setup of " SDL_DYNAMIC_API);
 
   touch (&sdl2_target,
-         f->mock_prefix.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_prefix.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_SONAME, NULL);
   touch (&sdl2_compat_target,
-         f->mock_prefix.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_prefix.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_COMPAT, NULL);
   touch (&sdl2_classic_target,
-         f->mock_prefix.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_prefix.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_CLASSIC, NULL);
   touch (&sdl3_target,
-         f->mock_prefix.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_prefix.path, "lib", g_quark_to_string (f->primary_arch),
          SDL3_SONAME, NULL);
 
   g_test_message ("With no flags, not setup is done...");
@@ -288,7 +316,7 @@ test_cannot_symlink (Fixture *f,
     }
 
   touch (&sdl2_target,
-         f->mock_prefix.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_prefix.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_SONAME, NULL);
   touch (NULL,
          f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
@@ -320,7 +348,7 @@ test_impossible (Fixture *f,
   gboolean res;
 
   touch (&sdl2_target,
-         f->mock_prefix.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_prefix.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_SONAME, NULL);
 
   g_test_summary ("If we don't know the $LIB or $PLATFORM, nothing happens, "
@@ -357,10 +385,10 @@ test_in_gfx_stack (Fixture *f,
     }
 
   touch (&sdl2_target,
-         f->mock_prefix.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_prefix.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_SONAME, NULL);
   touch (&gfx_sdl2_target,
-         f->mock_overrides.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_overrides.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_SONAME, NULL);
 
   g_test_summary ("We prefer SDL from the graphics provider if present");
@@ -394,7 +422,7 @@ test_in_gfx_stack_only (Fixture *f,
     }
 
   touch (&gfx_sdl2_target,
-         f->mock_overrides.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_overrides.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_SONAME, NULL);
 
   g_test_summary ("We use SDL from the graphics provider if necessary");

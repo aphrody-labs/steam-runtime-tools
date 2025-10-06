@@ -18,6 +18,9 @@ typedef struct
   TestsOpenFdSet old_fds;
   FlatpakBwrap *bwrap;
   PvPerArchDirs *lib_temp_dirs;
+  const gchar *primary_arch_path;   /* borrowed from lib_temp_dirs */
+  GArray *archs;
+  GQuark primary_arch;
 } Fixture;
 
 typedef struct
@@ -39,6 +42,19 @@ setup (Fixture *f,
 
   if (config == NULL)
     config = &default_config;
+
+  f->archs = _srt_architecture_array_new ();
+  pv_architecture_array_populate_with_defaults (f->archs);
+  g_return_if_fail (f->archs->len > 0);
+  f->primary_arch = g_array_index (f->archs, GQuark, PV_PRIMARY_ARCHITECTURE);
+
+  /* For now we assume that
+   * pv_architecture_array_populate_with_defaults() uses the same
+   * items as pv_multiarch_tuples, in the same order.
+   * This assumption will be removed later. */
+  for (i = 0; i < f->archs->len; i++)
+    g_assert_cmpstr (g_quark_to_string (g_array_index (f->archs, GQuark, i)),
+                     ==, pv_multiarch_tuples[i]);
 
   f->old_fds = tests_check_fd_leaks_enter ();
   f->bwrap = flatpak_bwrap_new (flatpak_bwrap_empty_env);
@@ -63,11 +79,21 @@ setup (Fixture *f,
       g_test_message ("Cross-platform module prefix: %s",
                       f->lib_temp_dirs->libdl_token_path);
 
-      for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-        g_test_message ("Concrete path for %s architecture: %s",
-                        pv_multiarch_tuples[i],
-                        f->lib_temp_dirs->abi_paths[i]);
+      for (i = 0; i < f->archs->len; i++)
+        {
+          GQuark arch_quark = g_array_index (f->archs, GQuark, i);
+          const char *tuple = g_quark_to_string (arch_quark);
+          const char *abi_path;
 
+          abi_path = f->lib_temp_dirs->abi_paths[i];
+          /* If pv_per_arch_dirs_new() succeeded, it populates abi_paths fully */
+          g_assert_nonnull (abi_path);
+          g_test_message ("Concrete path for %s architecture: %s",
+                          tuple, abi_path);
+        }
+
+      f->primary_arch_path = f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE];
+      g_assert_nonnull (f->primary_arch_path);
     }
   else
     {
@@ -83,6 +109,7 @@ teardown (Fixture *f,
 
   g_clear_pointer (&f->lib_temp_dirs, pv_per_arch_dirs_free);
   g_clear_pointer (&f->bwrap, flatpak_bwrap_free);
+  g_clear_pointer (&f->archs, g_array_unref);
   tests_check_fd_leaks_leave (f->old_fds);
 }
 
@@ -285,14 +312,17 @@ test_biarch (Fixture *f,
 
   g_assert_cmpstr (f->bwrap->envp[i], ==, NULL);
 
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  for (i = 0; i < f->archs->len; i++)
     {
       g_autofree gchar *target = NULL;
+      const char *abi_path;
 
       if (f->lib_temp_dirs == NULL)
         continue;
 
-      g_string_assign (path, f->lib_temp_dirs->abi_paths[i]);
+      abi_path = f->lib_temp_dirs->abi_paths[i];
+      g_assert_nonnull (abi_path);
+      g_string_assign (path, abi_path);
       g_string_append_c (path, G_DIR_SEPARATOR);
       g_string_append (path, "libpreload.so");
 
@@ -398,9 +428,12 @@ test_cli (Fixture *f,
 
           if (actual.abi_index != PV_UNSPECIFIED_ABI)
             {
+              GQuark arch_quark = g_array_index (f->archs, GQuark, actual.abi_index);
+
               g_assert_cmpuint (actual.abi_index, >=, 0);
-              g_assert_cmpuint (actual.abi_index, <, PV_N_SUPPORTED_ARCHITECTURES);
-              abi = pv_multiarch_details[actual.abi_index].tuple;
+              g_assert_cmpuint (actual.abi_index, <, f->archs->len);
+              abi = g_quark_to_string (arch_quark);
+              g_assert_cmpstr (abi, ==, pv_multiarch_tuples[actual.abi_index]);
             }
 
           g_test_message ("\"%s\" -> \"%s\", abi=%s",
@@ -491,7 +524,7 @@ test_gameoverlayrenderer (Fixture *f,
   gboolean ret;
   gsize i;
 
-  G_STATIC_ASSERT (PV_N_SUPPORTED_ARCHITECTURES == 2);
+  g_return_if_fail (f->archs->len == 2);
 
   ret = pv_adverb_set_up_preload_modules (f->bwrap,
                                           f->lib_temp_dirs,
@@ -528,14 +561,20 @@ test_gameoverlayrenderer (Fixture *f,
 
   g_assert_cmpstr (f->bwrap->envp[i], ==, NULL);
 
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  for (i = 0; i < f->archs->len; i++)
     {
+      GQuark arch_quark = g_array_index (f->archs, GQuark, i);
+      const char *tuple = g_quark_to_string (arch_quark);
       g_autofree gchar *target = NULL;
+      const SrtKnownArchitecture *known;
+      const char *abi_path;
 
       if (f->lib_temp_dirs == NULL)
         continue;
 
-      g_string_assign (path, f->lib_temp_dirs->abi_paths[i]);
+      abi_path = f->lib_temp_dirs->abi_paths[i];
+      g_assert_nonnull (abi_path);
+      g_string_assign (path, abi_path);
       g_string_append_c (path, G_DIR_SEPARATOR);
       g_string_append (path, "gameoverlayrenderer.so");
 
@@ -544,8 +583,10 @@ test_gameoverlayrenderer (Fixture *f,
       g_test_message ("%s -> %s", path->str, target);
 
       g_string_assign (expected, "");
+      known = _srt_architecture_get_by_tuple (tuple);
+      g_assert_nonnull (known);
       g_string_append_printf (expected, "/opt/steam/%s/gameoverlayrenderer.so",
-                              pv_multiarch_details[i].gameoverlayrenderer_dir);
+                              known->steam_gameoverlayrenderer_dir);
       g_assert_cmpstr (target, ==, expected->str);
     }
 #else
@@ -753,8 +794,10 @@ test_repetition (Fixture *f,
 
   /* The symlinks get created (but only once) */
 
-  for (i = 0; i < MIN (PV_N_SUPPORTED_ARCHITECTURES, 2); i++)
+  for (i = 0; i < MIN (f->archs->len, 2); i++)
     {
+      GQuark arch_quark = g_array_index (f->archs, GQuark, i);
+      const char *tuple = g_quark_to_string (arch_quark);
       gsize j;
 
       if (f->lib_temp_dirs == NULL)
@@ -767,7 +810,7 @@ test_repetition (Fixture *f,
           if (modules[j].abi_index != i)
             {
               g_test_message ("Not expecting a %s symlink for %s",
-                              pv_multiarch_tuples[i], modules[j].name);
+                              tuple, modules[j].name);
               continue;
             }
 
@@ -792,9 +835,12 @@ test_repetition (Fixture *f,
     }
 
 #if defined(__x86_64__) || defined(__i386__)
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  for (i = 0; i < f->archs->len; i++)
     {
+      GQuark arch_quark = g_array_index (f->archs, GQuark, i);
+      const char *tuple = g_quark_to_string (arch_quark);
       g_autofree gchar *target = NULL;
+      const SrtKnownArchitecture *known;
 
       if (f->lib_temp_dirs == NULL)
         continue;
@@ -808,8 +854,10 @@ test_repetition (Fixture *f,
       g_test_message ("%s -> %s", path->str, target);
 
       g_string_assign (expected, "");
+      known = _srt_architecture_get_by_tuple (tuple);
+      g_assert_nonnull (known);
       g_string_append_printf (expected, "/opt/steam/%s/gameoverlayrenderer.so",
-                              pv_multiarch_details[i].gameoverlayrenderer_dir);
+                              known->steam_gameoverlayrenderer_dir);
       g_assert_cmpstr (target, ==, expected->str);
     }
 #endif

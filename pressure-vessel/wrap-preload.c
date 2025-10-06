@@ -15,7 +15,6 @@
 
 #include "adverb-preload.h"
 #include "exports.h"
-#include "supported-architectures.h"
 #include "utils.h"
 
 /*
@@ -226,21 +225,15 @@ append_preload_per_architecture (PvWrapContext *context,
                                  PvAppendPreloadFlags flags)
 {
   g_autoptr(SrtSystemInfo) system_info = srt_system_info_new (NULL);
-  gsize n_supported_architectures = PV_N_SUPPORTED_ARCHITECTURES;
+  gsize n_supported_architectures = context->options.architectures->len;
   gsize i;
-
-  if (flags & PV_APPEND_PRELOAD_FLAGS_ONE_ARCHITECTURE)
-    {
-      G_STATIC_ASSERT (PV_N_SUPPORTED_ARCHITECTURES >= 1);
-      n_supported_architectures = 1;
-    }
 
   for (i = 0; i < n_supported_architectures; i++)
     {
       g_autoptr(GString) mock_path = NULL;
       g_autoptr(SrtLibrary) details = NULL;
-      const gchar *multiarch_tuple = pv_multiarch_tuples[i];
-      GQuark arch_quark = g_quark_from_static_string (multiarch_tuple);
+      GQuark arch_quark = g_array_index (context->options.architectures, GQuark, i);
+      const gchar *multiarch_tuple = g_quark_to_string (arch_quark);
       const char *path = NULL;
 
       if (!(flags & PV_APPEND_PRELOAD_FLAGS_IN_UNIT_TESTS))

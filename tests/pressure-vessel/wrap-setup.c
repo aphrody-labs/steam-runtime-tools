@@ -23,6 +23,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -80,6 +81,7 @@ typedef struct
 {
   PvRuntimeFlags runtime_flags;
   PvAppendPreloadFlags preload_flags;
+  bool one_architecture : 1;
 } Config;
 
 typedef struct
@@ -110,7 +112,7 @@ static const Config interpreter_root_config =
 };
 static const Config one_arch_config =
 {
-  .preload_flags = PV_APPEND_PRELOAD_FLAGS_ONE_ARCHITECTURE,
+  .one_architecture = true,
 };
 
 static int
@@ -272,6 +274,7 @@ setup (Fixture *f,
 {
   g_autoptr(GError) local_error = NULL;
   g_autofree gchar *mock_host = NULL;
+  gsize i;
 
   f->config = context;
 
@@ -311,6 +314,16 @@ setup (Fixture *f,
                                                    "STEAM_COMPAT_CLIENT_INSTALL_PATH",
                                                    "/steam",
                                                    TRUE);
+
+  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+    {
+      GQuark arch_quark = g_quark_from_static_string (pv_multiarch_tuples[i]);
+
+      g_array_append_val (f->context->options.architectures, arch_quark);
+
+      if (f->config != NULL && f->config->one_architecture)
+        break;
+    }
 }
 
 /*
@@ -633,7 +646,7 @@ assert_exports_match_expectations (Fixture *f,
   gboolean expect_i386 = FALSE;
 
 #if defined(__i386__) || defined(__x86_64__)
-  if (!(f->config->preload_flags & PV_APPEND_PRELOAD_FLAGS_ONE_ARCHITECTURE))
+  if (f->config == NULL || !f->config->one_architecture)
     expect_i386 = TRUE;
 #endif
 
@@ -753,7 +766,7 @@ setup_ld_preload (Fixture *f,
   fixture_populate_dir (f, f->mock_host->fd,
                         (const char * const *) touch->pdata, touch->len);
 
-  if (!(config->preload_flags & PV_APPEND_PRELOAD_FLAGS_ONE_ARCHITECTURE))
+  if (config == NULL || !config->one_architecture)
     {
 #if defined(__i386__) || defined(__x86_64__)
       fixture_populate_dir (f, f->mock_host->fd,
@@ -2143,7 +2156,7 @@ filter_expected_paths (const Config *config)
           if (g_str_has_prefix (path, "i386:"))
             {
 #if defined(__i386__) || defined(__x86_64__)
-              if (!(config->preload_flags & PV_APPEND_PRELOAD_FLAGS_ONE_ARCHITECTURE))
+              if (!config->one_architecture)
                 g_ptr_array_add (filtered, (char *) (path + strlen ("i386:")));
 #endif
             }

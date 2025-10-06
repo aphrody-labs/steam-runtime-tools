@@ -11,6 +11,7 @@
 
 #include "adverb-preload.h"
 #include "flatpak-utils-base-private.h"
+#include "supported-architectures.h"
 #include "tests/test-utils.h"
 
 typedef struct
@@ -85,14 +86,17 @@ setup (Fixture *f,
           const char *tuple = g_quark_to_string (arch_quark);
           const char *abi_path;
 
-          abi_path = f->lib_temp_dirs->abi_paths[i];
-          /* If pv_per_arch_dirs_new() succeeded, it populates abi_paths fully */
+          abi_path = pv_per_arch_dirs_get_abi_path (f->lib_temp_dirs,
+                                                    arch_quark);
+          /* If pv_per_arch_dirs_new() succeeded, it populates abi_paths with
+           * every architecture requested */
           g_assert_nonnull (abi_path);
           g_test_message ("Concrete path for %s architecture: %s",
                           tuple, abi_path);
         }
 
-      f->primary_arch_path = f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE];
+      f->primary_arch_path = pv_per_arch_dirs_get_abi_path (f->lib_temp_dirs,
+                                                            f->primary_arch);
       g_assert_nonnull (f->primary_arch_path);
     }
   else
@@ -254,7 +258,7 @@ test_basic (Fixture *f,
       if (modules[i].name[0] == '\0')
         continue;
 
-      g_string_assign (path, f->lib_temp_dirs->abi_paths[0]);
+      g_string_assign (path, f->primary_arch_path);
       g_string_append_c (path, G_DIR_SEPARATOR);
       g_string_append (path, glnx_basename (modules[i].name));
       target = flatpak_readlink (path->str, &local_error);
@@ -353,13 +357,15 @@ test_biarch (Fixture *f,
 
   for (i = 0; i < f->archs->len; i++)
     {
+      GQuark arch_quark = g_array_index (f->archs, GQuark, i);
       g_autofree gchar *target = NULL;
       const char *abi_path;
 
       if (f->lib_temp_dirs == NULL)
         continue;
 
-      abi_path = f->lib_temp_dirs->abi_paths[i];
+      abi_path = pv_per_arch_dirs_get_abi_path (f->lib_temp_dirs,
+                                                arch_quark);
       g_assert_nonnull (abi_path);
       g_string_assign (path, abi_path);
       g_string_append_c (path, G_DIR_SEPARATOR);
@@ -628,7 +634,8 @@ test_gameoverlayrenderer (Fixture *f,
       if (f->lib_temp_dirs == NULL)
         continue;
 
-      abi_path = f->lib_temp_dirs->abi_paths[i];
+      abi_path = pv_per_arch_dirs_get_abi_path (f->lib_temp_dirs,
+                                                arch_quark);
       g_assert_nonnull (abi_path);
       g_string_assign (path, abi_path);
       g_string_append_c (path, G_DIR_SEPARATOR);
@@ -861,9 +868,14 @@ test_repetition (Fixture *f,
       GQuark arch_quark = g_array_index (f->archs, GQuark, i);
       const char *tuple = g_quark_to_string (arch_quark);
       gsize j;
+      const char *abi_path;
 
       if (f->lib_temp_dirs == NULL)
         continue;
+
+      abi_path = pv_per_arch_dirs_get_abi_path (f->lib_temp_dirs,
+                                                arch_quark);
+      g_assert_nonnull (abi_path);
 
       for (j = 0; j < G_N_ELEMENTS (modules); j++)
         {
@@ -884,7 +896,7 @@ test_repetition (Fixture *f,
               continue;
             }
 
-          g_string_assign (path, f->lib_temp_dirs->abi_paths[i]);
+          g_string_assign (path, abi_path);
           g_string_append_c (path, G_DIR_SEPARATOR);
           g_string_append (path, glnx_basename (modules[j].name));
 
@@ -903,11 +915,16 @@ test_repetition (Fixture *f,
       const char *tuple = g_quark_to_string (arch_quark);
       g_autofree gchar *target = NULL;
       const SrtKnownArchitecture *known;
+      const char *abi_path;
 
       if (f->lib_temp_dirs == NULL)
         continue;
 
-      g_string_assign (path, f->lib_temp_dirs->abi_paths[i]);
+      abi_path = pv_per_arch_dirs_get_abi_path (f->lib_temp_dirs,
+                                                arch_quark);
+      g_assert_nonnull (abi_path);
+      g_string_assign (path, abi_path);
+
       g_string_append_c (path, G_DIR_SEPARATOR);
       g_string_append (path, "gameoverlayrenderer.so");
 

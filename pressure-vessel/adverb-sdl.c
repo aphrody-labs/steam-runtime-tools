@@ -6,6 +6,8 @@
 #include "config.h"
 #include "adverb-sdl.h"
 
+#include "supported-architectures.h"
+
 /*
  * pv_adverb_set_up_dynamic_sdl:
  * @wrapped_command: The command to run and its environment
@@ -53,9 +55,11 @@ pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
   for (abi_index = 0; abi_index < PV_N_SUPPORTED_ARCHITECTURES; abi_index++)
     {
       const char *multiarch_tuple = pv_multiarch_tuples[abi_index];
+      GQuark arch_quark = g_quark_from_static_string (multiarch_tuple);
       g_autofree gchar *dest = NULL;
       g_autofree gchar *from_runtime = NULL;
       g_autofree gchar *override = NULL;
+      const char *abi_path;
       const char *target;
 
       /* We assume a Debian multiarch layout here: in practice this
@@ -85,8 +89,11 @@ pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
           continue;
         }
 
-      dest = g_build_filename (lib_temp_dirs->abi_paths[abi_index],
-                               soname, NULL);
+      abi_path = pv_per_arch_dirs_get_abi_path (lib_temp_dirs, arch_quark);
+      /* If pv_per_arch_dirs_new() succeeded, it populates abi_paths with
+       * every architecture requested */
+      g_assert (abi_path != NULL);
+      dest = g_build_filename (abi_path, soname, NULL);
       g_info ("Creating symlink \"%s\" -> \"%s\" in container",
               dest, target);
 

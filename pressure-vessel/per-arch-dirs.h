@@ -23,10 +23,11 @@
 #include "libglnx.h"
 
 #include "flatpak-bwrap-private.h"
-#include "supported-architectures.h"
 
 /*
  * PvPerArchDirs:
+ * @abi_paths: (element-type GQuark filename): Map from interned string
+ *  representing an architecture to its unique per-architecture directory
  *
  * A set of directories that are created on a one-per-architecture basis,
  * but can be referred to by a single path that uses special libdl tokens.
@@ -35,14 +36,20 @@ typedef struct
 {
   gchar *root_path;
   gchar *libdl_token_path;
-  /* Same order as pv_multiarch_details */
-  gchar *abi_paths[PV_N_SUPPORTED_ARCHITECTURES];
+  GHashTable *abi_paths;
 } PvPerArchDirs;
 
 PvPerArchDirs *pv_per_arch_dirs_new (GError **error);
 void pv_per_arch_dirs_free (PvPerArchDirs *self);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (PvPerArchDirs, pv_per_arch_dirs_free)
+
+static inline const char *
+pv_per_arch_dirs_get_abi_path (PvPerArchDirs *self,
+                               GQuark architecture)
+{
+  return g_hash_table_lookup (self->abi_paths, GUINT_TO_POINTER (architecture));
+}
 
 gboolean pv_adverb_set_up_overrides (FlatpakBwrap *wrapped_command,
                                      PvPerArchDirs *lib_temp_dirs,

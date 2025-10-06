@@ -125,6 +125,7 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
 
   if (architecture != 0)
     {
+      const char *abi_path;
       g_autofree gchar *link = NULL;
       g_autofree gchar *platform_path = NULL;
       int saved_errno;
@@ -134,8 +135,12 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
                preload, g_quark_to_string (architecture));
       platform_path = g_build_filename (lib_temp_dirs->libdl_token_path,
                                         base, NULL);
-      link = g_build_filename (lib_temp_dirs->abi_paths[abi_index],
-                               base, NULL);
+      abi_path = g_hash_table_lookup (lib_temp_dirs->abi_paths,
+                                      GUINT_TO_POINTER (architecture));
+      /* If pv_per_arch_dirs_new() succeeded, it populates abi_paths with
+       * every architecture requested */
+      g_assert (abi_path != NULL);
+      link = g_build_filename (abi_path, base, NULL);
 
       if (symlink (preload, link) == 0)
         {

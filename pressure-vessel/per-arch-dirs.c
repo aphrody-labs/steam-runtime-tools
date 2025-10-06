@@ -25,6 +25,8 @@
 #include "steam-runtime-tools/system-info.h"
 #include "steam-runtime-tools/utils-internal.h"
 
+#include "supported-architectures.h"
+
 static gchar *
 get_libdl_lib_or_mock (GQuark arch_quark,
                        SrtSystemInfo *system_info,
@@ -94,17 +96,12 @@ typedef enum
 void
 pv_per_arch_dirs_free (PvPerArchDirs *self)
 {
-  gsize abi;
-
   if (self->root_path != NULL)
     _srt_rm_rf (self->root_path);
 
   g_clear_pointer (&self->root_path, g_free);
   g_clear_pointer (&self->libdl_token_path, g_free);
-
-  for (abi = 0; abi < G_N_ELEMENTS (self->abi_paths); abi++)
-    g_clear_pointer (&self->abi_paths[abi], g_free);
-
+  g_clear_pointer (&self->abi_paths, g_hash_table_unref);
   g_free (self);
 }
 
@@ -112,9 +109,6 @@ pv_per_arch_dirs_free (PvPerArchDirs *self)
  * If @scheme distinguishes between all the architectures in @architectures,
  * populate @libdl_token_path and @abi_paths, and return %TRUE.
  * Else return %FALSE.
- *
- * @architectures is assumed to contain the same architectures
- * as @pv_multiarch_tuples, in the same order (this is not checked).
  */
 static gboolean
 pv_per_arch_dirs_try_scheme (PvPerArchDirs *self,
@@ -196,12 +190,17 @@ pv_per_arch_dirs_try_scheme (PvPerArchDirs *self,
         g_return_val_if_reached (FALSE);
     }
 
+  self->abi_paths = g_hash_table_new_full (g_direct_hash, g_direct_equal,
+                                           NULL, g_free);
+
   for (i = 0; i < n_architectures; i++)
     {
       const char *libdl_string = g_ptr_array_index (ordered_strings, i);
 
       g_assert (libdl_string != NULL);
-      self->abi_paths[i] = g_build_filename (self->root_path, libdl_string, NULL);
+      g_hash_table_replace (self->abi_paths,
+                            GUINT_TO_POINTER (architectures[i]),
+                            g_build_filename (self->root_path, libdl_string, NULL));
     }
 
   return TRUE;
@@ -241,7 +240,7 @@ pv_per_arch_dirs_new (GError **error)
 
   for (abi = 0; abi < n_architectures; abi++)
     {
-      const char *abi_path = self->abi_paths[abi];
+      const char *abi_path = pv_per_arch_dirs_get_abi_path (self, architectures[abi]);
 
       g_return_val_if_fail (abi_path != NULL, NULL);
 
@@ -269,10 +268,14 @@ pv_adverb_set_up_overrides (FlatpakBwrap *wrapped_command,
   for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
     {
       const char *multiarch_tuple = pv_multiarch_details[abi].tuple;
+      GQuark arch_quark = g_quark_from_static_string (multiarch_tuple);
       g_autofree gchar *abi_path = NULL;
       g_autofree gchar *target = NULL;
+      const char *abi_path_base;
 
-      abi_path = g_build_filename (lib_temp_dirs->abi_paths[abi], "vdpau", NULL);
+      abi_path_base = pv_per_arch_dirs_get_abi_path (lib_temp_dirs, arch_quark);
+      g_assert (abi_path_base != NULL);
+      abi_path = g_build_filename (abi_path_base, "vdpau", NULL);
       target = g_build_filename (overrides, "lib", multiarch_tuple, "vdpau", NULL);
 
       if (!g_file_test (target, G_FILE_TEST_IS_DIR))

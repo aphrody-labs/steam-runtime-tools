@@ -1146,7 +1146,7 @@ new_connection_cb (SrtPortalListener *listener,
                    gpointer user_data)
 {
   PvLauncherServer *server = user_data;
-  GError *error = NULL;
+  g_autoptr(GError) error = NULL;
 
   g_return_val_if_fail (PV_IS_LAUNCHER_SERVER (server), G_DBUS_METHOD_INVOCATION_HANDLED);
   /* Paired with g_object_unref() in peer_connection_closed_cb() */

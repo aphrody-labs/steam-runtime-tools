@@ -113,54 +113,83 @@ teardown (Fixture *f,
   tests_check_fd_leaks_leave (f->old_fds);
 }
 
+typedef struct
+{
+  const char *name;
+  gsize index_in_preload_variables;
+  gsize abi_index;
+} PreloadInput;
+
+static void
+preload_inputs_to_modules (Fixture *f,
+                           const PreloadInput *inputs,
+                           gsize n_inputs,
+                           PvAdverbPreloadModule *modules,
+                           gsize n_modules)
+{
+  gsize i;
+
+  g_return_if_fail (n_inputs == n_modules);
+
+  for (i = 0; i < n_inputs; i++)
+    {
+      modules[i].name = g_strdup (inputs[i].name);
+      modules[i].index_in_preload_variables = inputs[i].index_in_preload_variables;
+      modules[i].abi_index = inputs[i].abi_index;
+    }
+}
+
 static void
 test_basic (Fixture *f,
             gconstpointer context)
 {
-  static const PvAdverbPreloadModule modules[] =
+  static const PreloadInput inputs[] =
   {
     {
-      .name = (char *) "",
+      .name = "",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_AUDIT,
       .abi_index = 0,
     },
     {
-      .name = (char *) "/opt/libaudit.so",
+      .name = "/opt/libaudit.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_AUDIT,
       .abi_index = 0,
     },
     {
-      .name = (char *) "",
+      .name = "",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_AUDIT,
       .abi_index = PV_UNSPECIFIED_ABI,
     },
     {
-      .name = (char *) "/opt/libpreload.so",
+      .name = "/opt/libpreload.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 0,
     },
     {
-      .name = (char *) "/opt/unspecified.so",
+      .name = "/opt/unspecified.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = PV_UNSPECIFIED_ABI,
     },
     {
-      .name = (char *) "/opt/libpreload2.so",
+      .name = "/opt/libpreload2.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 0,
     },
     {
-      .name = (char *) "/opt/unspecified2.so",
+      .name = "/opt/unspecified2.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = PV_UNSPECIFIED_ABI,
     },
   };
+  PvAdverbPreloadModule modules[G_N_ELEMENTS (inputs)] = { { NULL } };
   g_autoptr(GError) local_error = NULL;
   g_autoptr(GString) expected = g_string_new ("");
   g_autoptr(GString) path = g_string_new ("");
   gboolean ret;
   gsize i;
 
+  preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
+                             modules, G_N_ELEMENTS (modules));
   ret = pv_adverb_set_up_preload_modules (f->bwrap,
                                           f->lib_temp_dirs,
                                           modules,
@@ -242,6 +271,9 @@ test_basic (Fixture *f,
           g_clear_error (&local_error);
         }
     }
+
+  for (i = 0; i < G_N_ELEMENTS (modules); i++)
+    pv_adverb_preload_module_clear (&modules[i]);
 }
 
 static void
@@ -249,32 +281,35 @@ test_biarch (Fixture *f,
              gconstpointer context)
 {
 #if PV_N_SUPPORTED_ARCHITECTURES >= 2
-  static const PvAdverbPreloadModule modules[] =
+  static const PreloadInput inputs[] =
   {
     {
-      .name = (char *) "/opt/libpreload.so",
+      .name = "/opt/libpreload.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = PV_UNSPECIFIED_ABI,
     },
     /* In practice x86_64-linux-gnu */
     {
-      .name = (char *) "/opt/lib0/libpreload.so",
+      .name = "/opt/lib0/libpreload.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 0,
     },
     /* In practice i386-linux-gnu */
     {
-      .name = (char *) "/opt/lib1/libpreload.so",
+      .name = "/opt/lib1/libpreload.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 1,
     },
   };
+  PvAdverbPreloadModule modules[G_N_ELEMENTS (inputs)] = { { NULL } };
   g_autoptr(GError) local_error = NULL;
   g_autoptr(GString) expected = g_string_new ("");
   g_autoptr(GString) path = g_string_new ("");
   gboolean ret;
   gsize i;
 
+  preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
+                             modules, G_N_ELEMENTS (modules));
   ret = pv_adverb_set_up_preload_modules (f->bwrap,
                                           f->lib_temp_dirs,
                                           modules,
@@ -334,6 +369,9 @@ test_biarch (Fixture *f,
       g_string_append_printf (expected, "/opt/lib%zu/libpreload.so", i);
       g_assert_cmpstr (target, ==, expected->str);
     }
+
+  for (i = 0; i < G_N_ELEMENTS (modules); i++)
+    pv_adverb_preload_module_clear (&modules[i]);
 #else
   /* In practice this is reached on non-x86 */
   g_test_skip ("Biarch libraries not supported on this architecture");
@@ -343,7 +381,11 @@ test_biarch (Fixture *f,
 typedef struct
 {
   const char *option;
-  PvAdverbPreloadModule expected;
+  struct
+    {
+      const char *name;
+      const char *architecture;
+    } expected;
 } CommandLineTest;
 
 static void
@@ -355,30 +397,30 @@ test_cli (Fixture *f,
     {
       .option = "",
       .expected = {
-        .name = (char *) "",
-        .abi_index = PV_UNSPECIFIED_ABI,
+        .name = "",
+        .architecture = NULL,
       },
     },
     {
       .option = "libpreload.so",
       .expected = {
-        .name = (char *) "libpreload.so",
-        .abi_index = PV_UNSPECIFIED_ABI,
+        .name = "libpreload.so",
+        .architecture = NULL,
       },
     },
 #if defined(__x86_64__) || defined(__i386__)
     {
       .option = "/lib64/libpreload.so:abi=" SRT_ABI_X86_64,
       .expected = {
-        .name = (char *) "/lib64/libpreload.so",
-        .abi_index = 0,
+        .name = "/lib64/libpreload.so",
+        .architecture = SRT_ABI_X86_64,
       },
     },
     {
       .option = "/lib32/libpreload.so:abi=" SRT_ABI_I386,
       .expected = {
-        .name = (char *) "/lib32/libpreload.so",
-        .abi_index = 1,
+        .name = "/lib32/libpreload.so",
+        .architecture = SRT_ABI_I386,
       },
     },
 #endif
@@ -386,13 +428,8 @@ test_cli (Fixture *f,
     {
       .option = "/tmp/libabi.so:abi=" _SRT_MULTIARCH,
       .expected = {
-        .name = (char *) "/tmp/libabi.so",
-#if defined(__i386__)
-        /* On i386, we treat x86_64 as the primary architecture */
-        .abi_index = 1,
-#else
-        .abi_index = 0,
-#endif
+        .name = "/tmp/libabi.so",
+        .architecture = _SRT_MULTIARCH,
       },
     },
 #endif
@@ -425,6 +462,8 @@ test_cli (Fixture *f,
       if (ret)
         {
           const char *abi = "(unspecified)";
+
+          g_assert_no_error (local_error);
 
           if (actual.abi_index != PV_UNSPECIFIED_ABI)
             {
@@ -460,7 +499,22 @@ test_cli (Fixture *f,
           g_assert_no_error (local_error);
           g_assert_true (ret);
           g_assert_cmpstr (actual.name, ==, test->expected.name);
-          g_assert_cmpuint (actual.abi_index, ==, test->expected.abi_index);
+
+          if (test->expected.architecture != NULL)
+            {
+              GQuark arch_quark;
+
+              g_assert_cmpuint (actual.abi_index, >=, 0);
+              g_assert_cmpuint (actual.abi_index, <, f->archs->len);
+              arch_quark = g_array_index (f->archs, GQuark, actual.abi_index);
+              g_assert_cmpstr (g_quark_to_string (arch_quark),
+                               ==, test->expected.architecture);
+            }
+          else
+            {
+              g_assert_cmpuint (actual.abi_index, ==, PV_UNSPECIFIED_ABI);
+            }
+
           g_assert_cmpuint (actual.index_in_preload_variables, ==, which);
 
           /* Check that it round-trips */
@@ -478,7 +532,8 @@ test_cli (Fixture *f,
           g_assert_no_error (local_error);
           g_assert_true (ret);
           g_assert_cmpstr (reparsed.name, ==, test->expected.name);
-          g_assert_cmpuint (reparsed.abi_index, ==, test->expected.abi_index);
+          /* We already asserted that actual.abi_index is correct */
+          g_assert_cmpuint (reparsed.abi_index, ==, actual.abi_index);
           g_assert_cmpuint (reparsed.index_in_preload_variables, ==, which);
         }
     }
@@ -495,29 +550,30 @@ test_gameoverlayrenderer (Fixture *f,
                           gconstpointer context)
 {
 #if defined(__x86_64__) || defined(__i386__)
-  static const PvAdverbPreloadModule modules[] =
+  static const PreloadInput inputs[] =
   {
     {
-      .name = (char *) "/opt/steam/some-other-abi/gameoverlayrenderer.so",
+      .name = "/opt/steam/some-other-abi/gameoverlayrenderer.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = PV_UNSPECIFIED_ABI,
     },
     {
-      .name = (char *) "/opt/steam/ubuntu12_32/gameoverlayrenderer.so",
+      .name = "/opt/steam/ubuntu12_32/gameoverlayrenderer.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = PV_UNSPECIFIED_ABI,
     },
     {
-      .name = (char *) "/opt/steam/ubuntu12_64/gameoverlayrenderer.so",
+      .name = "/opt/steam/ubuntu12_64/gameoverlayrenderer.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = PV_UNSPECIFIED_ABI,
     },
     {
-      .name = (char *) "/opt/steam/some-other-abi/gameoverlayrenderer.so",
+      .name = "/opt/steam/some-other-abi/gameoverlayrenderer.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = PV_UNSPECIFIED_ABI,
     },
   };
+  PvAdverbPreloadModule modules[G_N_ELEMENTS (inputs)] = { { NULL } };
   g_autoptr(GError) local_error = NULL;
   g_autoptr(GString) expected = g_string_new ("");
   g_autoptr(GString) path = g_string_new ("");
@@ -526,6 +582,8 @@ test_gameoverlayrenderer (Fixture *f,
 
   g_return_if_fail (f->archs->len == 2);
 
+  preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
+                             modules, G_N_ELEMENTS (modules));
   ret = pv_adverb_set_up_preload_modules (f->bwrap,
                                           f->lib_temp_dirs,
                                           modules,
@@ -589,6 +647,9 @@ test_gameoverlayrenderer (Fixture *f,
                               known->steam_gameoverlayrenderer_dir);
       g_assert_cmpstr (target, ==, expected->str);
     }
+
+  for (i = 0; i < G_N_ELEMENTS (modules); i++)
+    pv_adverb_preload_module_clear (&modules[i]);
 #else
   g_test_skip ("gameoverlayrenderer special-case is only implemented on x86");
 #endif
@@ -603,88 +664,91 @@ static void
 test_repetition (Fixture *f,
                  gconstpointer context)
 {
-  static const PvAdverbPreloadModule modules[] =
+  static const PreloadInput inputs[] =
   {
     {
-      .name = (char *) "/opt/lib0/libfirst.so",
+      .name = "/opt/lib0/libfirst.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 0,
     },
     {
-      .name = (char *) "/opt/lib0/one/same-basename.so",
+      .name = "/opt/lib0/one/same-basename.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 0,
     },
     {
-      .name = (char *) "/opt/lib0/two/same-basename.so",
+      .name = "/opt/lib0/two/same-basename.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 0,
     },
     {
-      .name = (char *) "/opt/lib0/libpreload.so",
+      .name = "/opt/lib0/libpreload.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 0,
     },
 #if PV_N_SUPPORTED_ARCHITECTURES > 1
     {
-      .name = (char *) "/opt/lib1/libpreload.so",
+      .name = "/opt/lib1/libpreload.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 1,
     },
 #endif
 #if defined(__x86_64__) || defined(__i386__)
     {
-      .name = (char *) "/opt/steam/ubuntu12_32/gameoverlayrenderer.so",
+      .name = "/opt/steam/ubuntu12_32/gameoverlayrenderer.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = PV_UNSPECIFIED_ABI,
     },
     {
-      .name = (char *) "/opt/steam/ubuntu12_64/gameoverlayrenderer.so",
+      .name = "/opt/steam/ubuntu12_64/gameoverlayrenderer.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = PV_UNSPECIFIED_ABI,
     },
 #endif
     {
-      .name = (char *) "/opt/lib0/libmiddle.so",
+      .name = "/opt/lib0/libmiddle.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 0,
     },
     {
-      .name = (char *) "/opt/lib0/libpreload.so",
+      .name = "/opt/lib0/libpreload.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 0,
     },
 #if PV_N_SUPPORTED_ARCHITECTURES > 1
     {
-      .name = (char *) "/opt/lib1/libpreload.so",
+      .name = "/opt/lib1/libpreload.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 1,
     },
 #endif
 #if defined(__x86_64__) || defined(__i386__)
     {
-      .name = (char *) "/opt/steam/ubuntu12_32/gameoverlayrenderer.so",
+      .name = "/opt/steam/ubuntu12_32/gameoverlayrenderer.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = PV_UNSPECIFIED_ABI,
     },
     {
-      .name = (char *) "/opt/steam/ubuntu12_64/gameoverlayrenderer.so",
+      .name = "/opt/steam/ubuntu12_64/gameoverlayrenderer.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = PV_UNSPECIFIED_ABI,
     },
 #endif
     {
-      .name = (char *) "/opt/lib0/liblast.so",
+      .name = "/opt/lib0/liblast.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 0,
     },
   };
+  PvAdverbPreloadModule modules[G_N_ELEMENTS (inputs)] = { { NULL } };
   g_autoptr(GError) local_error = NULL;
   g_autoptr(GString) expected = g_string_new ("");
   g_autoptr(GString) path = g_string_new ("");
   gboolean ret;
   gsize i;
 
+  preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
+                             modules, G_N_ELEMENTS (modules));
   ret = pv_adverb_set_up_preload_modules (f->bwrap,
                                           f->lib_temp_dirs,
                                           modules,
@@ -861,6 +925,9 @@ test_repetition (Fixture *f,
       g_assert_cmpstr (target, ==, expected->str);
     }
 #endif
+
+  for (i = 0; i < G_N_ELEMENTS (modules); i++)
+    pv_adverb_preload_module_clear (&modules[i]);
 }
 
 static const Config cannot_discover_platform = {

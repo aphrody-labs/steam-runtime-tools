@@ -45,7 +45,6 @@
 #include "flatpak-utils-private.h"
 #include "graphics-provider.h"
 #include "runtime.h"
-#include "supported-architectures.h"
 #include "utils.h"
 #include "wrap-context.h"
 #include "wrap-flatpak.h"
@@ -109,6 +108,8 @@ main (int argc,
   SrtSteamCompatFlags compat_flags;
   PvWorkaroundFlags workarounds;
   const char *prefix = NULL;
+  const GQuark *tuples;
+  gsize n_tuples = 0;
 
   setlocale (LC_ALL, "");
 
@@ -176,6 +177,14 @@ main (int argc,
                                                      interpreter_root,
                                                      error))
     goto out;
+
+  tuples = pv_wrap_options_get_architectures (&self->options, &n_tuples);
+  g_assert (n_tuples > 0);
+  g_assert (tuples != NULL);
+  g_assert (tuples[0] != 0);
+
+  for (i = 0; i < n_tuples; i++)
+    g_info ("Architecture: %s", g_quark_to_string (tuples[i]));
 
   if (self->options.version_only || self->options.version)
     {
@@ -595,6 +604,8 @@ main (int argc,
         {
           graphics_providers = pv_graphics_provider_build_array (self->options.graphics_provider,
                                                                  self->options.arch_graphics_providers,
+                                                                 tuples,
+                                                                 n_tuples,
                                                                  host_machine,
                                                                  flags,
                                                                  error);
@@ -627,6 +638,7 @@ main (int argc,
       self->runtime = pv_runtime_new (runtime_path,
                                       self->options.variable_dir,
                                       bwrap_executable,
+                                      self->options.architectures,
                                       graphics_providers,
                                       _srt_const_strv (self->original_environ),
                                       flags,
@@ -791,13 +803,13 @@ main (int argc,
        * is compatible with the host's udevd. */
       if (self->runtime != NULL)
         {
-          for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+          for (i = 0; i < n_tuples; i++)
             {
               GStatBuf ignored;
               g_autofree gchar *override = NULL;
 
               override = g_build_filename (pv_runtime_get_overrides (self->runtime),
-                                           "lib", pv_multiarch_tuples[i],
+                                           "lib", g_quark_to_string (tuples[i]),
                                            "libudev.so.1", NULL);
 
               if (g_lstat (override, &ignored) == 0)

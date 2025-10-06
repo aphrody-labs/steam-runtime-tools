@@ -86,9 +86,3 @@ pv_multiarch_details_get_by_tuple (const char *tuple)
 
   return NULL;
 }
-
-static inline gboolean
-pv_supported_architectures_include_tuple (const char *tuple)
-{
-  return (pv_multiarch_details_get_by_tuple (tuple) != NULL);
-}

@@ -11,6 +11,7 @@
 #include "steam-runtime-tools/utils-internal.h"
 
 #include "pressure-vessel/exports.h"
+#include "pressure-vessel/supported-architectures.h"
 #include "pressure-vessel/utils.h"
 
 static Tristate
@@ -42,6 +43,9 @@ static void
 pv_wrap_options_init (PvWrapOptions *self)
 {
   self->pass_fds = g_array_new (FALSE, FALSE, sizeof (int));
+  self->architectures = g_array_new (TRUE,  /* add an extra 0 entry at the end */
+                                     TRUE,  /* zero-fill new entries */
+                                     sizeof (GQuark));
 
   self->preload_modules = g_array_new (FALSE, FALSE,
                                        sizeof (WrapPreloadModule));
@@ -85,6 +89,7 @@ pv_wrap_options_init (PvWrapOptions *self)
 static void
 pv_wrap_options_clear (PvWrapOptions *self)
 {
+  g_clear_pointer (&self->architectures, g_array_unref);
   g_clear_pointer (&self->arch_graphics_providers, g_hash_table_unref);
   g_clear_pointer (&self->env_if_host, g_strfreev);
   g_clear_pointer (&self->filesystems, g_strfreev);
@@ -655,18 +660,20 @@ opt_graphics_provider_cb (const gchar *option_name,
 
   g_return_val_if_fail (value != NULL, FALSE);
 
-  /* --graphics-provider=/path/to/somewhere */
+  /* --graphics-provider=x86_64-linux-gnu=/path/to/somewhere */
   if (value != NULL
       && value[0] != '/'
       && (equals = strchr (value, '=')) != NULL)
     {
+      g_autoptr(GError) local_error = NULL;
       g_autofree gchar *tuple = g_strndup (value, equals - value);
       const char *path = equals + 1;
 
-      if (!pv_supported_architectures_include_tuple (tuple))
+      if (!_srt_architecture_check_plausible_tuple (tuple, &local_error))
         {
-          g_warning ("Not a supported multiarch tuple: %s", tuple);
-          return TRUE;
+          g_set_error_literal (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE,
+                               local_error->message);
+          return FALSE;
         }
 
       pv_wrap_options_take_arch_graphics_provider (self,
@@ -686,6 +693,45 @@ pv_wrap_options_parse_environment (PvWrapOptions *self,
                                    GError **error)
 {
   const char *value;
+
+  value = g_getenv ("PRESSURE_VESSEL_ARCHITECTURES");
+
+  if (value != NULL)
+    {
+      g_auto(GStrv) entries = g_strsplit (value, ":", -1);
+      gsize i;
+
+      for (i = 0; entries != NULL && entries[i] != NULL; i++)
+        {
+          g_autoptr(GError) local_error = NULL;
+          const SrtKnownArchitecture *known;
+          GQuark arch_quark;
+
+          arch_quark = _srt_architecture_guess_from_user_input (entries[i],
+                                                                &known,
+                                                                &local_error);
+
+          if (arch_quark == 0)
+            {
+              g_warning ("%s", local_error->message);
+              continue;
+            }
+
+          if (g_quark_try_string (entries[i]) != arch_quark)
+            g_warning ("Canonicalized architecture \"%s\" to \"%s\"",
+                       entries[i], g_quark_to_string (arch_quark));
+
+          if (known == NULL)
+            g_message ("Unknown architecture \"%s\", assuming you know what you're doing",
+                       g_quark_to_string (arch_quark));
+
+          g_array_append_val (self->architectures, arch_quark);
+        }
+
+      if (self->architectures->len == 0)
+        g_warning ("No valid architectures found in "
+                   "$PRESSURE_VESSEL_ARCHITECTURES, will use defaults");
+    }
 
   self->batch = _srt_boolean_environment ("PRESSURE_VESSEL_BATCH",
                                           self->batch);
@@ -1152,9 +1198,21 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
       return FALSE;
     }
 
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  /* If no architectures have been configured, the default is whatever
+   * architectures are hard-coded to be supported */
+  if (self->architectures->len == 0)
     {
-      GQuark tuple = g_quark_from_static_string (pv_multiarch_tuples[i]);
+      for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+        {
+          GQuark arch_quark = g_quark_from_static_string (pv_multiarch_tuples[i]);
+
+          g_array_append_val (self->architectures, arch_quark);
+        }
+    }
+
+  for (i = 0; i < self->architectures->len; i++)
+    {
+      GQuark tuple = g_array_index (self->architectures, GQuark, i);
       gconstpointer key = GUINT_TO_POINTER (tuple);
       gpointer value;
 
@@ -1193,6 +1251,23 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
 
           g_debug ("Architecture-specific graphics provider for %s: %s",
                    g_quark_to_string (tuple), path);
+        }
+    }
+
+  if (self->arch_graphics_providers != NULL)
+    {
+      GHashTableIter iter;
+      void *k;
+
+      g_hash_table_iter_init (&iter, self->arch_graphics_providers);
+
+      while (g_hash_table_iter_next (&iter, &k, NULL))
+        {
+          GQuark q = GPOINTER_TO_UINT (k);
+
+          if (!pv_wrap_options_has_architecture (self, q))
+            g_warning ("Not a configured multiarch tuple: %s",
+                       g_quark_to_string (q));
         }
     }
 

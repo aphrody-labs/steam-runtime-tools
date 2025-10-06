@@ -277,6 +277,127 @@ test_architecture_get_by_tuple (Fixture *f,
   g_assert_null (arch);
 }
 
+static void
+test_architecture_guess_from_user_input (Fixture *f,
+                                         gconstpointer context)
+{
+  const struct
+  {
+    const char *input;
+    /* As a shorthand, "=" means the expected result equals the input */
+    const char *expected;
+  }
+  tests[] =
+  {
+    { SRT_ABI_I386, "=" },
+    { SRT_ABI_X86_64, "=" },
+    { SRT_ABI_AARCH64, "=" },
+    { "arm-linux-gnueabihf", "=" },
+    { "mips-netbsd", "=" },
+    { "x86_64", SRT_ABI_X86_64 },
+    { "x86-64", SRT_ABI_X86_64 },
+    { "X64", SRT_ABI_X86_64 },
+    { "ubuntu12_64", SRT_ABI_X86_64 },
+    { "i686", SRT_ABI_I386 },
+    { "ubuntu12_32", SRT_ABI_I386 },
+    { "i486-linux-gnu", SRT_ABI_I386 },
+    { "aarch64", SRT_ABI_AARCH64 },
+    { "arm64", SRT_ABI_AARCH64 },
+    { "x32", "x86_64-linux-gnux32" },
+    { "", NULL },
+    { "lib64", NULL },
+    { "linux", NULL },
+    { "-fomit-instructions", NULL },
+    { "$(rm -fr /)", NULL },
+  };
+  size_t i;
+
+  for (i = 0; i < G_N_ELEMENTS (tests); i++)
+    {
+      g_autoptr(GError) local_error = NULL;
+      const char *input = tests[i].input;
+      const char *expected = tests[i].expected;
+      GQuark output;
+      const SrtKnownArchitecture *known = NULL;
+
+      if (g_strcmp0 (expected, "=") == 0)
+        expected = input;
+
+      g_test_message ("user input: %s", input);
+      output = _srt_architecture_guess_from_user_input (input, &known, &local_error);
+
+      if (output == 0)
+        g_test_message ("-> error %s", local_error->message);
+      else
+        g_test_message ("-> normalized to %s", g_quark_to_string (output));
+
+      if (expected == NULL)
+        {
+          g_assert_nonnull (local_error);
+          g_assert_cmpuint (output, ==, 0);
+          g_assert_null (known);
+        }
+      else
+        {
+          g_assert_no_error (local_error);
+          g_assert_cmpstr (g_quark_to_string (output), ==, expected);
+          /* possibly null */
+          g_assert_true (known == _srt_architecture_get_by_tuple (expected));
+        }
+    }
+}
+
+static void
+test_architecture_plausible_tuple (Fixture *f,
+                                   gconstpointer context)
+{
+  const char * const plausible[] =
+  {
+    SRT_ABI_I386,
+    SRT_ABI_X86_64,
+    SRT_ABI_AARCH64,
+    "arm-linux-gnueabihf",
+    "m68k-freebsd",
+  };
+  const char * const not[] =
+  {
+    "",
+    "i686-linux-gnu",
+    "i386-Linux-GNU",
+    "arm64-linux",
+    "amd64-linux",
+    "x86_64",
+    "lib64",
+    "ubuntu12_32",
+    "linux",
+    "-fomit-instructions",
+    "$(rm -fr /)",
+  };
+  size_t i;
+
+  for (i = 0; i < G_N_ELEMENTS (plausible); i++)
+    {
+      g_autoptr(GError) local_error = NULL;
+      gboolean ok;
+
+      g_test_message ("architecture tuple: %s", plausible[i]);
+      ok = _srt_architecture_check_plausible_tuple (plausible[i], &local_error);
+      g_assert_no_error (local_error);
+      g_assert_true (ok);
+    }
+
+  for (i = 0; i < G_N_ELEMENTS (not); i++)
+    {
+      g_autoptr(GError) local_error = NULL;
+
+      g_test_message ("not architecture tuple: %s", not[i]);
+      g_assert_false (_srt_architecture_check_plausible_tuple (not[i],
+                                                               &local_error));
+      g_assert_nonnull (local_error);
+      g_test_message ("-> %s", local_error->message);
+    }
+}
+
 int
 main (int argc,
       char **argv)
@@ -284,6 +405,10 @@ main (int argc,
   _srt_tests_init (&argc, &argv, NULL);
   g_test_add ("/architecture/get_by_tuple", Fixture, NULL,
               setup, test_architecture_get_by_tuple, teardown);
+  g_test_add ("/architecture/guess_from_user_input", Fixture, NULL,
+              setup, test_architecture_guess_from_user_input, teardown);
+  g_test_add ("/architecture/plausible_tuple", Fixture, NULL,
+              setup, test_architecture_plausible_tuple, teardown);
 
   return g_test_run ();
 }

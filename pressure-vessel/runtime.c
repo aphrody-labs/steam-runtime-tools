@@ -121,6 +121,7 @@ struct _PvRuntime
   gchar *runtime_usr;           /* either runtime_files or that + "/usr" */
   gchar *runtime_app;           /* runtime_files + "/app" */
   gchar *runtime_files_on_host;
+  GArray *tuples;
   const gchar *adverb_in_container;
   GPtrArray *providers;
   SrtDirentCompareFunc arbitrary_dirent_order;
@@ -147,6 +148,7 @@ struct _PvRuntimeClass
 
 enum {
   PROP_0,
+  PROP_ARCHITECTURES,
   PROP_BUBBLEWRAP,
   PROP_GRAPHICS_PROVIDERS,
   PROP_SOURCE,
@@ -623,12 +625,8 @@ error:
 
 typedef struct
 {
-  /* Index into pv_multiarch_details, 0 <= x < PV_N_SUPPORTED_ARCHITECTURES */
-  gsize multiarch_index;
-  /* The relevant multiarch tuple */
+  /* g_quark_to_string (tuple_quark) */
   const char *tuple;
-  /* Always &pv_multiarch_details[self->multiarch_index] */
-  const PvMultiarchDetails *details;
   /* Architecture knowledge from libsteam-runtime-tools, if any */
   const SrtKnownArchitecture *known_arch;
   /* Graphics stack provider to use */
@@ -680,29 +678,24 @@ pv_runtime_get_graphics_provider (PvRuntime *self,
 
 static gboolean
 runtime_architecture_init (RuntimeArchitecture *self,
-                           PvRuntime *runtime)
+                           PvRuntime *runtime,
+                           GQuark tuple)
 {
   const gchar *argv[] = { NULL, "--print-ld.so", NULL };
   PvGraphicsProvider *provider;
 
-  g_return_val_if_fail (self->multiarch_index < PV_N_SUPPORTED_ARCHITECTURES,
-                        FALSE);
-  g_return_val_if_fail (self->details == NULL, FALSE);
+  g_return_val_if_fail (tuple != 0, FALSE);
+  g_return_val_if_fail (self->tuple == NULL, FALSE);
 
-  self->details = &pv_multiarch_details[self->multiarch_index];
-  g_return_val_if_fail (self->details != NULL, FALSE);
-  self->tuple = self->details->tuple;
+  self->tuple_quark = tuple;
+  self->tuple = g_quark_to_string (tuple);
   g_return_val_if_fail (self->tuple != NULL, FALSE);
-  g_return_val_if_fail (g_strcmp0 (pv_multiarch_tuples[self->multiarch_index],
-                                   self->tuple) == 0, FALSE);
 
-  self->tuple_quark = g_quark_from_static_string (self->tuple);
-  g_return_val_if_fail (self->tuple_quark != 0, FALSE);
   provider = pv_runtime_get_graphics_provider (runtime, self->tuple_quark);
   g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (provider), FALSE);
   self->provider = g_object_ref (provider);
 
-  /* Could in theory be %NULL, so be careful when dereferencing */
+  /* Could be %NULL, so be careful when dereferencing */
   self->known_arch = _srt_architecture_get_by_tuple (self->tuple);
 
   self->capsule_capture_libs_basename = g_strdup_printf ("%s-capsule-capture-libs",
@@ -737,8 +730,8 @@ runtime_architecture_init (RuntimeArchitecture *self,
 static gboolean
 runtime_architecture_check_valid (RuntimeArchitecture *self)
 {
-  g_return_val_if_fail (self->multiarch_index < PV_N_SUPPORTED_ARCHITECTURES, FALSE);
-  g_return_val_if_fail (self->details == &pv_multiarch_details[self->multiarch_index], FALSE);
+  g_return_val_if_fail (self->tuple != NULL, FALSE);
+  g_return_val_if_fail (self->tuple_quark != 0, FALSE);
   g_return_val_if_fail (self->provider != NULL, FALSE);
   g_return_val_if_fail (self->capsule_capture_libs_basename != NULL, FALSE);
   g_return_val_if_fail (self->capsule_capture_libs != NULL, FALSE);
@@ -752,8 +745,8 @@ runtime_architecture_check_valid (RuntimeArchitecture *self)
 static void
 runtime_architecture_clear (RuntimeArchitecture *self)
 {
-  self->multiarch_index = G_MAXSIZE;
-  self->details = NULL;
+  self->tuple = NULL;
+  self->tuple_quark = 0;
   g_clear_object (&self->provider);
   g_clear_pointer (&self->capsule_capture_libs_basename, g_free);
   g_clear_pointer (&self->capsule_capture_libs, g_free);
@@ -783,6 +776,10 @@ pv_runtime_init (PvRuntime *self)
   self->variable_dir_fd = -1;
   self->is_flatpak_env = g_file_test ("/.flatpak-info",
                                       G_FILE_TEST_IS_REGULAR);
+
+  self->tuples = g_array_new (TRUE,    /* allocate extra zeroed entry */
+                              TRUE,    /* zero-fill newly added entries */
+                              sizeof (GQuark));
 }
 
 static void
@@ -795,6 +792,15 @@ pv_runtime_get_property (GObject *object,
 
   switch (prop_id)
     {
+      case PROP_ARCHITECTURES:
+          {
+            g_autoptr(GArray) arr = g_array_new (TRUE, TRUE, sizeof (GQuark));
+
+            g_array_append_vals (arr, self->tuples->data, self->tuples->len);
+            g_value_take_boxed (value, g_steal_pointer (&arr));
+          }
+        break;
+
       case PROP_BUBBLEWRAP:
         g_value_set_string (value, self->bubblewrap);
         break;
@@ -839,6 +845,18 @@ pv_runtime_set_property (GObject *object,
 
   switch (prop_id)
     {
+      case PROP_ARCHITECTURES:
+          {
+            const GArray *arr;
+
+            /* Construct-only */
+            g_return_if_fail (self->tuples->len == 0);
+
+            arr = g_value_get_boxed (value);
+            g_array_append_vals (self->tuples, arr->data, arr->len);
+          }
+        break;
+
       case PROP_BUBBLEWRAP:
         /* Construct-only */
         g_return_if_fail (self->bubblewrap == NULL);
@@ -1287,6 +1305,7 @@ pv_runtime_initable_init (GInitable *initable,
   gsize len;
   PvMtreeApplyFlags mtree_flags = PV_MTREE_APPLY_FLAGS_NONE;
   struct stat ignore;
+  gsize i;
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
@@ -1295,6 +1314,20 @@ pv_runtime_initable_init (GInitable *initable,
 
   if (self->pv_prefix == NULL)
     return FALSE;
+
+  if (self->tuples == NULL || self->tuples->len == 0)
+    return glnx_throw (error, "No architectures configured");
+
+  for (i = 0; i < self->tuples->len; i++)
+    {
+      GQuark q = g_array_index (self->tuples, GQuark, i);
+      const char *tuple = g_quark_to_string (q);
+
+      g_debug ("Configured architecture: %s", tuple);
+
+      if (!_srt_architecture_check_plausible_tuple (tuple, error))
+        return FALSE;
+    }
 
   /* If we are in Flatpak container we don't expect to have a working bwrap */
   if (self->bubblewrap != NULL
@@ -1522,7 +1555,6 @@ pv_runtime_initable_init (GInitable *initable,
    * a merged-/usr, so we don't need to open-code this here */
   if (g_file_get_contents (os_release, &contents, &len, NULL))
     {
-      gsize i;
       g_autofree gchar *id = NULL;
       g_autofree gchar *version_id = NULL;
       char *beginning_of_line = contents;
@@ -1636,6 +1668,7 @@ pv_runtime_finalize (GObject *object)
   g_clear_pointer (&self->runtime_lock, srt_file_lock_free);
   g_free (self->source);
   g_free (self->source_files);
+  g_clear_pointer (&self->tuples, g_array_unref);
   g_free (self->variable_dir);
   glnx_close_fd (&self->variable_dir_fd);
 
@@ -1652,6 +1685,13 @@ pv_runtime_class_init (PvRuntimeClass *cls)
   object_class->constructed = pv_runtime_constructed;
   object_class->dispose = pv_runtime_dispose;
   object_class->finalize = pv_runtime_finalize;
+
+  properties[PROP_ARCHITECTURES] =
+    g_param_spec_boxed ("architectures", "Architectures",
+                        "GArray of GQuark representing multiarch tuples",
+                        G_TYPE_ARRAY,
+                        (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS));
 
   properties[PROP_BUBBLEWRAP] =
     g_param_spec_string ("bubblewrap", "Bubblewrap",
@@ -1711,6 +1751,7 @@ PvRuntime *
 pv_runtime_new (const char *source,
                 const char *variable_dir,
                 const char *bubblewrap,
+                GArray *architectures,
                 GPtrArray *providers,
                 const char * const *original_environ,
                 PvRuntimeFlags flags,
@@ -1723,6 +1764,7 @@ pv_runtime_new (const char *source,
   return g_initable_new (PV_TYPE_RUNTIME,
                          NULL,
                          error,
+                         "architectures", architectures,
                          "bubblewrap", bubblewrap,
                          "graphics-providers", providers,
                          "original-environ", original_environ,
@@ -1790,16 +1832,18 @@ pv_runtime_adverb_regenerate_ld_so_cache (PvRuntime *self,
    * pv_runtime_set_search_paths(), except that here, we split them up:
    * the directories containing SONAMEs go in ld.so.conf, and only the
    * directories containing aliases go in LD_LIBRARY_PATH. */
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  for (i = 0; i < self->tuples->len; i++)
     {
+      GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
+      const char *tuple = g_quark_to_string (tuple_quark);
       g_autofree gchar *ld_path = NULL;
       g_autofree gchar *aliases = NULL;
 
       ld_path = g_build_filename (self->overrides_in_container, "lib",
-                                  pv_multiarch_tuples[i], NULL);
+                                  tuple, NULL);
 
       aliases = g_build_filename (self->overrides_in_container, "lib",
-                                  pv_multiarch_tuples[i], "aliases", NULL);
+                                  tuple, "aliases", NULL);
 
       flatpak_bwrap_add_args (adverb_argv,
                               "--add-ld.so-path", ld_path,
@@ -3586,11 +3630,13 @@ bind_runtime_ld_so (PvRuntime *self,
        * does this. Again, for simplicity we direct all these to the same path:
        * it's OK to mix multiple architectures' libraries into one cache,
        * as done in upstream glibc (and Debian, Arch, etc.). */
-      for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+      for (i = 0; i < self->tuples->len; i++)
         {
+          GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
+          const char *tuple = g_quark_to_string (tuple_quark);
           const SrtKnownArchitecture *known;
 
-          known = _srt_architecture_get_by_tuple (pv_multiarch_tuples[i]);
+          known = _srt_architecture_get_by_tuple (tuple);
 
           if (known == NULL || known->extra_ld_so_caches == NULL)
             continue;
@@ -4576,7 +4622,8 @@ pv_runtime_take_ld_so_from_provider (PvRuntime *self,
  *  Required for other file types.
  */
 static char *
-get_manifest_relative_to_overrides (gpointer icd,
+get_manifest_relative_to_overrides (PvRuntime *self,
+                                    gpointer icd,
                                     const char *sub_dir,
                                     const SrtKnownArchitecture *arch,
                                     int digits,
@@ -4603,17 +4650,19 @@ get_manifest_relative_to_overrides (gpointer icd,
     }
   /* OpenXR 1 runtimes need to be in a fixed location, but each architecture has
    * at most one active runtime, so they can't collide with each other. */
-  else if (SRT_IS_OPENXR_1_RUNTIME (icd))
+  else if (SRT_IS_OPENXR_1_RUNTIME (icd)
+           && arch != NULL
+           && arch->openxr_1_architecture != NULL)
     {
-      g_assert (arch != NULL);
-      /* Assume that every architecture supported by PV also appears in OpenXR's
-       * table of architecture names. */
-      g_assert (arch->openxr_1_architecture != NULL);
+      GQuark primary_arch;
+
+      g_assert (self->tuples->len > 0);
+      primary_arch = g_array_index (self->tuples, GQuark, 0);
 
       /* Older versions of the OpenXR loader don't support architecture-specific
        * filenames, so name the primary architecture as the default instead,
        * that way at least it can be loaded as expected. */
-      if (g_str_equal (arch->multiarch_tuple, pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE]))
+      if (g_str_equal (arch->multiarch_tuple, g_quark_to_string (primary_arch)))
         return g_strdup_printf ("%s/active_runtime.json", sub_dir);
       else
         return g_strdup_printf ("%s/active_runtime.%s.json",
@@ -4715,17 +4764,15 @@ setup_json_manifest (PvRuntime *self,
   g_debug ("Setting up JSON manifest for \"%s\" loadable module \"%s\": \"%s\"",
            sub_dir, json_basename, details->debug_name);
 
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  for (i = 0; i < self->tuples->len; i++)
     {
+      GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
+      const char *tuple = g_quark_to_string (tuple_quark);
       const PvModulePerArch *details_arch;
       const SrtKnownArchitecture *arch;
-      const char *tuple;
-      GQuark tuple_quark;
       g_autofree gchar *arch_bits = NULL;
       gboolean write_per_architecture;
 
-      tuple = pv_multiarch_tuples[i];
-      tuple_quark = g_quark_from_static_string (tuple);
       details_arch = icd_details_get_architecture (details, tuple_quark);
 
       if (details_arch == NULL)
@@ -4781,13 +4828,8 @@ setup_json_manifest (PvRuntime *self,
 
       arch = _srt_architecture_get_by_tuple (tuple);
 
-      /* The architectures supported by pressure-vessel are always a
-       * subset of the architectures that libsteam-runtime-tools knows
-       * about. */
-      g_assert (arch != NULL);
-      g_assert (arch->sizeof_pointer > 0);
-
-      arch_bits = g_strdup_printf ("%u", arch->sizeof_pointer * 8);
+      if (arch != NULL && arch->sizeof_pointer > 0)
+        arch_bits = g_strdup_printf ("%u", arch->sizeof_pointer * 8);
 
       if (write_per_architecture)
         {
@@ -4798,7 +4840,8 @@ setup_json_manifest (PvRuntime *self,
 
           g_assert (details_arch->path_in_container != NULL);
 
-          relative_to_overrides = get_manifest_relative_to_overrides (details->icd,
+          relative_to_overrides = get_manifest_relative_to_overrides (self,
+                                                                      details->icd,
                                                                       sub_dir,
                                                                       arch,
                                                                       digits,
@@ -4903,7 +4946,8 @@ setup_json_manifest (PvRuntime *self,
       g_autofree gchar *relative_to_overrides = NULL;
       g_autofree gchar *json_in_container = NULL;
 
-      relative_to_overrides = get_manifest_relative_to_overrides (details->icd,
+      relative_to_overrides = get_manifest_relative_to_overrides (self,
+                                                                  details->icd,
                                                                   sub_dir,
                                                                   provider_json_arch,
                                                                   digits,
@@ -6422,6 +6466,10 @@ pv_runtime_handle_alias (PvRuntime *self,
   g_autofree gchar *target = NULL;
   struct stat stat_buf;
   const char *target_base;
+  GQuark primary_arch;
+
+  g_assert (self->tuples->len > 0);
+  primary_arch = g_array_index (self->tuples, GQuark, 0);
 
   soname_in_overrides = g_build_filename (arch->libdir_relative_to_overrides,
                                           soname, NULL);
@@ -6480,7 +6528,7 @@ pv_runtime_handle_alias (PvRuntime *self,
       target = g_build_filename ("/lib", arch->tuple, soname, NULL);
       g_info ("Found %s in runtime's /lib: %s", soname, target);
     }
-  else if (arch->multiarch_index == PV_PRIMARY_ARCHITECTURE)
+  else if (arch->tuple_quark == primary_arch)
     {
       return glnx_throw (error, "The expected library %s is missing from both the runtime "
                          "and the \"overrides\" directory", soname);
@@ -6963,18 +7011,18 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   pv_runtime_library_data_init (&nvidia_data_in_provider);
   pv_runtime_library_data_init (&gconv_in_provider);
 
-  g_assert (pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES] == NULL);
-
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  for (i = 0; i < self->tuples->len; i++)
     {
+      GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
+      const char *tuple = g_quark_to_string (tuple_quark);
       g_autoptr(GError) local_error = NULL;
-      g_auto (RuntimeArchitecture) arch_on_stack = { i };
+      g_auto (RuntimeArchitecture) arch_on_stack = { NULL };
       RuntimeArchitecture *arch = &arch_on_stack;
 
-      part_timer = _srt_profiling_start ("%s libraries", pv_multiarch_tuples[i]);
-      g_debug ("Checking for %s libraries...", pv_multiarch_tuples[i]);
+      part_timer = _srt_profiling_start ("%s libraries", tuple);
+      g_debug ("Checking for %s libraries...", tuple);
 
-      if (runtime_architecture_init (arch, self))
+      if (runtime_architecture_init (arch, self, tuple_quark))
         {
           g_autoptr(GPtrArray) dirs = NULL;
           g_autofree gchar *this_dri_path_in_container = g_build_filename (arch->libdir_in_container,
@@ -6993,10 +7041,9 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
           if (ld_so_in_runtime == NULL)
             {
-              g_info ("Container does not have %s so it cannot run "
-                      "%s binaries",
-                      arch->ld_so, arch->tuple);
-              continue;
+              g_info ("Container does not have %s, using interoperable path as-is",
+                      arch->ld_so);
+              ld_so_in_runtime = g_strdup (arch->ld_so);
             }
 
           /* Reserve a size of 128 to avoid frequent reallocation due to the
@@ -7260,14 +7307,14 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
     {
       GString *archs = g_string_new ("");
 
-      g_assert (pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES] == NULL);
-
-      for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+      for (i = 0; i < self->tuples->len; i++)
         {
+          GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
+
           if (archs->len > 0)
             g_string_append (archs, ", ");
 
-          g_string_append (archs, pv_multiarch_tuples[i]);
+          g_string_append (archs, g_quark_to_string (tuple_quark));
         }
 
       g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
@@ -7654,11 +7701,7 @@ pv_runtime_bind (PvRuntime *self,
           _SRT_GRAPHICS_EXPLICIT_VULKAN_LAYER_SUFFIX,
           _SRT_GRAPHICS_IMPLICIT_VULKAN_LAYER_SUFFIX,
         };
-      GQuark arch_quarks[G_N_ELEMENTS (pv_multiarch_details)];
       gsize i;
-
-      for (i = 0; i < G_N_ELEMENTS (pv_multiarch_details); i++)
-        arch_quarks[i] = g_quark_from_static_string (pv_multiarch_details[i].tuple);
 
       for (i = 0; i < G_N_ELEMENTS (layer_suffixes); i++)
         {
@@ -7668,8 +7711,8 @@ pv_runtime_bind (PvRuntime *self,
 
           search_path = _srt_graphics_get_vulkan_search_paths (self->real_root,
                                                                _srt_const_strv (self->original_environ),
-                                                               arch_quarks,
-                                                               G_N_ELEMENTS (arch_quarks),
+                                                               (const GQuark *) self->tuples->data,
+                                                               self->tuples->len,
                                                                suffix);
 
           for (j = 0; search_path != NULL && search_path[j] != NULL; j++)
@@ -7768,18 +7811,18 @@ pv_runtime_get_ld_library_path (PvRuntime *self)
   g_autoptr(GString) ld_library_path = g_string_new ("");
   gsize i;
 
-  g_assert (pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES] == NULL);
-
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  for (i = 0; i < self->tuples->len; i++)
     {
+      GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
+      const char *tuple = g_quark_to_string (tuple_quark);
       g_autofree gchar *ld_path = NULL;
       g_autofree gchar *aliases = NULL;
 
       ld_path = g_build_filename (self->overrides_in_container, "lib",
-                                  pv_multiarch_tuples[i], NULL);
+                                  tuple, NULL);
 
       aliases = g_build_filename (self->overrides_in_container, "lib",
-                                  pv_multiarch_tuples[i], "aliases", NULL);
+                                  tuple, "aliases", NULL);
 
       pv_search_path_append (ld_library_path, ld_path);
       pv_search_path_append (ld_library_path, aliases);
@@ -7912,16 +7955,16 @@ pv_runtime_has_library (PvRuntime *self,
 
   g_debug ("Checking whether runtime has library: %s", library);
 
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  for (i = 0; i < self->tuples->len; i++)
     {
-      const PvMultiarchDetails *details = &pv_multiarch_details[i];
-      GQuark arch_quark = g_quark_from_static_string (details->tuple);
+      GQuark arch_quark = g_array_index (self->tuples, GQuark, i);
+      const char *tuple = g_quark_to_string (arch_quark);
       g_autoptr(GPtrArray) dirs = NULL;
       const SrtKnownArchitecture *known;
       gsize j;
 
-      known = _srt_architecture_get_by_tuple (details->tuple);
-      dirs = pv_known_architecture_get_libdirs (details->tuple,
+      known = _srt_architecture_get_by_tuple (tuple);
+      dirs = pv_known_architecture_get_libdirs (tuple,
                                                 known,
                                                 PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
 

@@ -64,6 +64,7 @@ static const SrtKnownArchitecture known_architectures[] =
 {
     {
       .multiarch_tuple = SRT_ABI_X86_64,
+      .debian_architecture = "amd64",
       .interoperable_runtime_linker = "/lib64/ld-linux-x86-64.so.2",
       .openxr_1_architecture = "x86_64",
       .multilib_suffixes = ((const char * const[]){
@@ -83,6 +84,11 @@ static const SrtKnownArchitecture known_architectures[] =
           "x86_64",
           NULL
       }),
+      .aliases = ((const char * const[]){
+          "x64",
+          "x86-64",
+          NULL
+      }),
       .steam_gameoverlayrenderer_dir = "ubuntu12_64",
       .machine_type = EM_X86_64,
       .elf_class = ELFCLASS64,
@@ -92,6 +98,7 @@ static const SrtKnownArchitecture known_architectures[] =
 
     {
       .multiarch_tuple = SRT_ABI_I386,
+      .debian_architecture = "i386",
       .interoperable_runtime_linker = "/lib/ld-linux.so.2",
       .openxr_1_architecture = "i686",
       .multilib_suffixes = ((const char * const[]){
@@ -112,6 +119,13 @@ static const SrtKnownArchitecture known_architectures[] =
           "i386",
           NULL
       }),
+      .aliases = ((const char * const[]){
+          "x86",
+          "i686-linux-gnu",
+          "i586-linux-gnu",
+          "i486-linux-gnu",
+          NULL
+      }),
       .steam_gameoverlayrenderer_dir = "ubuntu12_32",
       .machine_type = EM_386,
       .elf_class = ELFCLASS32,
@@ -121,6 +135,7 @@ static const SrtKnownArchitecture known_architectures[] =
 
     {
       .multiarch_tuple = "x86_64-linux-gnux32",
+      .debian_architecture = "x32",
       .interoperable_runtime_linker = "/libx32/ld-linux-x32.so.2",
       .openxr_1_architecture = "x32",
       .multilib_suffixes = ((const char * const[]){ "libx32", NULL }),
@@ -136,6 +151,7 @@ static const SrtKnownArchitecture known_architectures[] =
 
     {
       .multiarch_tuple = SRT_ABI_AARCH64,
+      .debian_architecture = "arm64",
       .interoperable_runtime_linker = "/lib/ld-linux-aarch64.so.1",
       .openxr_1_architecture = "aarch64",
       .multilib_suffixes = ((const char * const[]){
@@ -177,6 +193,62 @@ _srt_architecture_init_known (void)
 #ifdef _SRT_MULTIARCH
   (void) g_quark_from_static_string (_SRT_MULTIARCH);
 #endif
+}
+
+/*
+ * Carry out basic validation of a multiarch tuple.
+ * This intentionally does not detect every invalid multiarch tuple
+ * in order to avoid having to hard-code a table of supported architectures:
+ * it only detects tuples that are syntactically invalid (might cause
+ * problematic filenames, etc.) or are an obvious mistake.
+ *
+ * Returns: %TRUE if it is plausible that @tuple might be a valid
+ *  multiarch tuple
+ */
+gboolean
+_srt_architecture_check_plausible_tuple (const char *tuple,
+                                         GError **error)
+{
+  gsize i;
+  gboolean had_dash = FALSE;
+
+  g_return_val_if_fail (tuple != NULL, FALSE);
+
+  if (tuple[0] == '-')
+    return glnx_throw (error, "Multiarch tuples cannot start with a dash");
+
+  for (i = 0; tuple[i] != '\0'; i++)
+    {
+      if (tuple[i] == '-')
+        had_dash = TRUE;
+      else if (!g_ascii_isalnum (tuple[i]) && tuple[i] != '_')
+        return glnx_throw (error,
+                           "Multiarch tuples contain only letters, "
+                           "digits, dash and underscore");
+
+      if (tuple[i] >= 'A' && tuple[i] <= 'Z')
+        return glnx_throw (error, "Multiarch tuples must be lower-case");
+    }
+
+  /* Anything that is supportable by Steam has two dashes (foo-linux-gnu)
+   * but for completness let's assume that i386-gnu could conceivably be
+   * relevant somehow */
+  if (!had_dash)
+    return glnx_throw (error, "Multiarch tuples must contain a dash");
+
+  /* Catch some likely mistakes */
+  if (g_str_has_prefix (tuple, "i486-")
+      || g_str_has_prefix (tuple, "i586-")
+      || g_str_has_prefix (tuple, "i686-"))
+    return glnx_throw (error, "Multiarch tuple for 32-bit x86 is " SRT_ABI_I386);
+
+  if (g_str_has_prefix (tuple, "amd64-"))
+    return glnx_throw (error, "Multiarch tuple for AMD64 is " SRT_ABI_X86_64);
+
+  if (g_str_has_prefix (tuple, "arm64-"))
+    return glnx_throw (error, "Multiarch tuple for ARM64 is " SRT_ABI_AARCH64);
+
+  return TRUE;
 }
 
 /*
@@ -432,4 +504,83 @@ _srt_architecture_guess_from_elf (int dfd,
                "ELF class, data encoding and machine (%u,%u,%u) are unknown",
                cls, data_encoding, machine);
   return NULL;
+}
+
+static GQuark
+known_as_quark (const SrtKnownArchitecture *known,
+                const SrtKnownArchitecture **known_out)
+{
+  if (known_out != NULL)
+    *known_out = known;
+
+  return g_quark_from_static_string (known->multiarch_tuple);
+}
+
+/*
+ * _srt_architecture_guess_from_user_input:
+ * @known_out: (out) (nullable) (optional): Set to a #SrtKnownArchitecture or %NULL
+ *
+ * Returns: A quark representing a plausible multiarch tuple, or 0 on error
+ */
+GQuark
+_srt_architecture_guess_from_user_input (const char *alias,
+                                         const SrtKnownArchitecture **known_out,
+                                         GError **error)
+{
+  g_autofree gchar *normalized = NULL;
+  const SrtKnownArchitecture *known;
+  gsize i;
+
+  if (known_out != NULL)
+    *known_out = 0;
+
+  g_return_val_if_fail (alias != NULL, 0);
+
+  normalized = g_ascii_strdown (alias, -1);
+  known = _srt_architecture_get_by_tuple (normalized);
+
+  if (known != NULL)
+    return known_as_quark (known, known_out);
+
+  for (i = 0; known_architectures[i].multiarch_tuple != NULL; i++)
+    {
+      known = &known_architectures[i];
+
+      if (g_strcmp0 (normalized, known->debian_architecture) == 0
+          || g_strcmp0 (normalized, known->openxr_1_architecture) == 0
+          || g_strcmp0 (normalized, known->steam_gameoverlayrenderer_dir) == 0)
+        return known_as_quark (known, known_out);
+
+      if (known->aliases != NULL)
+        {
+          gsize j;
+
+          for (j = 0; known->aliases[j] != NULL; j++)
+            {
+              if (g_str_equal (normalized, known->aliases[j]))
+                return known_as_quark (known, known_out);
+            }
+        }
+
+      if (known->libdl_platform_expansions != NULL)
+        {
+          gsize j;
+
+          for (j = 0; known->libdl_platform_expansions[j] != NULL; j++)
+            {
+              if (g_str_equal (normalized, known->libdl_platform_expansions[j]))
+                return known_as_quark (known, known_out);
+            }
+        }
+    }
+
+  if (!_srt_architecture_check_plausible_tuple (normalized, error))
+    {
+      g_prefix_error (error, "Invalid architecture \"%s\": ", normalized);
+      return 0;
+    }
+
+  /* We don't recognise this architecture but it looks plausible,
+   * give the user the benefit of the doubt */
+  return g_quark_from_string (normalized);
 }

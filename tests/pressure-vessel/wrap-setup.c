@@ -2371,35 +2371,8 @@ test_supported_archs (Fixture *f,
   for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
     {
       const PvMultiarchDetails *details = &pv_multiarch_details[i];
-      const SrtKnownArchitecture *known;
-      gsize j;
 
-      /* multiarch_details and multiarch_tuples are in the same order */
       g_assert_cmpstr (pv_multiarch_tuples[i], ==, details->tuple);
-
-      known = _srt_architecture_get_by_tuple (details->tuple);
-
-      if (known == NULL)
-        continue;
-
-      for (j = 0; j < G_N_ELEMENTS (details->platforms); j++)
-        {
-          if (details->platforms[j] == NULL)
-            {
-              if (j == 0)
-                g_assert_null (known->libdl_platform_expansions);
-              else
-                g_assert_null (known->libdl_platform_expansions[j]);
-
-              break;
-            }
-          else
-            {
-              g_assert_nonnull (known->libdl_platform_expansions);
-              g_assert_cmpstr (known->libdl_platform_expansions[j],
-                               ==, details->platforms[j]);
-            }
-        }
     }
 
   /* The array of tuples has one extra element, to make it a GStrv */

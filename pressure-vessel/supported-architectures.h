@@ -41,12 +41,6 @@ extern const char * const pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES + 1];
 typedef struct
 {
   const char *tuple;
-
-  /* Known values that ${PLATFORM} can expand to.
-   * Refer to sysdeps/x86/cpu-features.c and sysdeps/x86/dl-procinfo.c
-   * in glibc.
-   * Size is completely arbitrary, expand as needed */
-  const char *platforms[5];
 } PvMultiarchDetails;
 
 extern const PvMultiarchDetails pv_multiarch_details[PV_N_SUPPORTED_ARCHITECTURES];

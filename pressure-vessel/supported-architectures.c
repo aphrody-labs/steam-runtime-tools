@@ -56,16 +56,13 @@ const PvMultiarchDetails pv_multiarch_details[PV_N_SUPPORTED_ARCHITECTURES] =
 #if defined(__i386__) || defined(__x86_64__)
   {
     .tuple = "x86_64-linux-gnu",
-    .platforms = { "xeon_phi", "haswell", "x86_64", NULL },
   },
   {
     .tuple = "i386-linux-gnu",
-    .platforms = { "i686", "i586", "i486", "i386", NULL },
   },
 #elif defined(__aarch64__)
   {
     .tuple = "aarch64-linux-gnu",
-    .platforms = { "aarch64", NULL },
   },
 #elif defined(_SRT_MULTIARCH)
   {

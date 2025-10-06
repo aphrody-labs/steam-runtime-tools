@@ -259,14 +259,24 @@ append_preload_per_architecture (PvWrapContext *context,
            *
            * tests/pressure-vessel/wrap-setup.c is the other side of this. */
           g_autofree gchar *lib = NULL;
-          const char *platform = NULL;
+          const char *platform;
 
-#if defined(__i386__) || defined(__x86_64__)
-          /* As a mock ${PLATFORM}, use the first one listed. */
-          platform = pv_multiarch_details[i].platforms[0];
-#else
-          platform = "mock";
-#endif
+          if (g_str_equal (multiarch_tuple, SRT_ABI_X86_64)
+              || g_str_equal (multiarch_tuple, SRT_ABI_I386))
+            {
+              const SrtKnownArchitecture *known;
+
+              /* As a mock ${PLATFORM}, use the first one listed. */
+              known = _srt_architecture_get_by_tuple (multiarch_tuple);
+              g_assert (known != NULL);
+              g_assert (known->libdl_platform_expansions != NULL);
+              platform = known->libdl_platform_expansions[0];
+            }
+          else
+            {
+              platform = "mock";
+            }
+
           /* As a mock ${LIB}, behave like Debian or the fdo SDK. */
           lib = g_strdup_printf ("lib/%s", multiarch_tuple);
 

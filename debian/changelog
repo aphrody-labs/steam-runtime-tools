@@ -1,13 +1,18 @@
-steam-runtime-tools (0.20251002.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251006.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
+    - Fix a small memory leak in pv-adverb while setting up VDPAU drivers
+      (steam-runtime-tools!862, steamrt/tasks#786)
     - Only enumerate OpenXR runtimes that belong to the appropriate
       architecture's graphics provider
       (steamrt/tasks#785, steamrt/tasks#786)
+    - Add experimental option (currently only available as an environment
+      variable) to set the architectures used, and which one is treated as
+      primary (steamrt/tasks#786)
     - Refactoring
       (steamrt/tasks#786)
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 02 Oct 2025 13:05:15 +0100
+ -- Simon McVittie <smcv@collabora.com>  Mon, 06 Oct 2025 17:22:17 +0100
 
 steam-runtime-tools (0.20250926.0) steamrt; urgency=medium
 

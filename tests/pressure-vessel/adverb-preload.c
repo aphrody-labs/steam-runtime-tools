@@ -439,6 +439,12 @@ test_cli (Fixture *f,
         .name = NULL,
       },
     },
+    {
+      .option = "/tmp/libabi.so:abi=glados",
+      .expected = {
+        .name = NULL,
+      },
+    },
   };
   gsize i;
 

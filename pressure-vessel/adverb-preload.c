@@ -6,7 +6,8 @@
 #include "config.h"
 #include "adverb-preload.h"
 
-#include "supported-architectures.h"
+#include "steam-runtime-tools/architecture-internal.h"
+
 #include "utils.h"
 
 const PvPreloadVariable pv_preload_variables[] =
@@ -52,13 +53,14 @@ append_to_search_path (const gchar *item, GString *search_path)
 static void
 do_one_preload_module (const PvAdverbPreloadModule *module,
                        GPtrArray *search_path,
+                       const GQuark *archs,
+                       gsize n_archs,
                        PvPerArchDirs *lib_temp_dirs)
 {
   const char *preload = module->name;
   GQuark architecture = module->architecture;
   const PvPreloadVariable *which;
   const char *base;
-  gsize abi_index = PV_UNSPECIFIED_ABI;
 
   g_assert (preload != NULL);
 
@@ -75,39 +77,18 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
       return;
     }
 
-  if (architecture != 0)
-    {
-      for (gsize abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
-        {
-          GQuark arch_quark = g_quark_from_static_string (pv_multiarch_tuples[abi]);
-
-          if (architecture == arch_quark)
-            {
-              abi_index = abi;
-              break;
-            }
-        }
-
-      if (abi_index == PV_UNSPECIFIED_ABI)
-        {
-          g_debug ("Cannot handle %s as a separate architecture yet",
-                   g_quark_to_string (architecture));
-          architecture = 0;
-        }
-    }
-
   which = &pv_preload_variables[module->index_in_preload_variables];
 
-  if (abi_index == PV_UNSPECIFIED_ABI
+  if (architecture == 0
       && module->index_in_preload_variables == PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD
       && strcmp (base, "gameoverlayrenderer.so") == 0)
     {
-      for (gsize abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
+      for (gsize abi = 0; abi < n_archs; abi++)
         {
           g_autofree gchar *expected_suffix = NULL;
           const SrtKnownArchitecture *known;
 
-          known = _srt_architecture_get_by_tuple (pv_multiarch_tuples[abi]);
+          known = _srt_architecture_get_by_tuple (g_quark_to_string (archs[abi]));
 
           if (known == NULL)
             continue;
@@ -117,8 +98,7 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
 
           if (g_str_has_suffix (preload, expected_suffix))
             {
-              architecture = g_quark_from_static_string (pv_multiarch_tuples[abi]);
-              abi_index = abi;
+              architecture = archs[abi];
               break;
             }
         }
@@ -138,7 +118,6 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
       g_autofree gchar *platform_path = NULL;
       int saved_errno;
 
-      g_assert (abi_index != PV_UNSPECIFIED_ABI);
       g_debug ("Module %s is for %s",
                preload, g_quark_to_string (architecture));
       platform_path = g_build_filename (lib_temp_dirs->libdl_token_path,
@@ -185,7 +164,6 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
     }
   else
     {
-      g_assert (abi_index == PV_UNSPECIFIED_ABI);
       g_debug ("Module %s is for all architectures", preload);
       g_debug ("%s will include %s", which->variable, preload);
       g_ptr_array_add (search_path, g_strdup (preload));
@@ -194,6 +172,8 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
 
 gboolean
 pv_adverb_set_up_preload_modules (FlatpakBwrap *wrapped_command,
+                                  const GQuark *archs,
+                                  gsize n_archs,
                                   PvPerArchDirs *lib_temp_dirs,
                                   const PvAdverbPreloadModule *preload_modules,
                                   gsize n_preload_modules,
@@ -215,7 +195,7 @@ pv_adverb_set_up_preload_modules (FlatpakBwrap *wrapped_command,
             = g_ptr_array_new_full (n_preload_modules, g_free);
         }
 
-      do_one_preload_module (module, search_path, lib_temp_dirs);
+      do_one_preload_module (module, search_path, archs, n_archs, lib_temp_dirs);
     }
 
   /* Serialize search_paths[PRELOAD_VARIABLE_INDEX_LD_AUDIT] into

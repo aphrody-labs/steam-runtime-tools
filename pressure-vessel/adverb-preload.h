@@ -65,6 +65,8 @@ gboolean pv_adverb_preload_module_parse_adverb_cli (PvAdverbPreloadModule *self,
                                                     GError **error);
 
 gboolean pv_adverb_set_up_preload_modules (FlatpakBwrap *wrapped_command,
+                                           const GQuark *archs,
+                                           gsize n_archs,
                                            PvPerArchDirs *lib_temp_dirs,
                                            const PvAdverbPreloadModule *preload_modules,
                                            gsize n_preload_modules,

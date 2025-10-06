@@ -1076,6 +1076,7 @@ main (int argc,
 
   if (opt_preload_modules != NULL
       && !pv_adverb_set_up_preload_modules (wrapped_command,
+                                            tuples, G_N_ELEMENTS (tuples),
                                             lib_temp_dirs,
                                             (const PvAdverbPreloadModule *) opt_preload_modules->data,
                                             opt_preload_modules->len,

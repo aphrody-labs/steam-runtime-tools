@@ -104,8 +104,16 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
     {
       for (gsize abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
         {
-          g_autofree gchar *expected_suffix = g_strdup_printf ("/%s/gameoverlayrenderer.so",
-                                                               pv_multiarch_details[abi].gameoverlayrenderer_dir);
+          g_autofree gchar *expected_suffix = NULL;
+          const SrtKnownArchitecture *known;
+
+          known = _srt_architecture_get_by_tuple (pv_multiarch_tuples[abi]);
+
+          if (known == NULL)
+            continue;
+
+          expected_suffix = g_strdup_printf ("/%s/gameoverlayrenderer.so",
+                                             known->steam_gameoverlayrenderer_dir);
 
           if (g_str_has_suffix (preload, expected_suffix))
             {

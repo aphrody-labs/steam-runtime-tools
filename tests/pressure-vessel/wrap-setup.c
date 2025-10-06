@@ -2400,9 +2400,6 @@ test_supported_archs (Fixture *f,
                                ==, details->platforms[j]);
             }
         }
-
-      g_assert_cmpstr (details->gameoverlayrenderer_dir,
-                       ==, known->steam_gameoverlayrenderer_dir);
     }
 
   /* The array of tuples has one extra element, to make it a GStrv */

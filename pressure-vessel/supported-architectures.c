@@ -57,12 +57,10 @@ const PvMultiarchDetails pv_multiarch_details[PV_N_SUPPORTED_ARCHITECTURES] =
   {
     .tuple = "x86_64-linux-gnu",
     .platforms = { "xeon_phi", "haswell", "x86_64", NULL },
-    .gameoverlayrenderer_dir = "ubuntu12_64",
   },
   {
     .tuple = "i386-linux-gnu",
     .platforms = { "i686", "i586", "i486", "i386", NULL },
-    .gameoverlayrenderer_dir = "ubuntu12_32",
   },
 #elif defined(__aarch64__)
   {

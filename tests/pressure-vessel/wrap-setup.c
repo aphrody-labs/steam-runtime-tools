@@ -53,35 +53,15 @@
 #define MOCK_PLATFORM_64 "xeon_phi"
 #define MOCK_PLATFORM_GENERIC "mock"
 
-/* These match Debian multiarch, which is as good a thing as any for
+/* This matches Debian multiarch, which is as good a thing as any for
  * a mock implementation of srt_system_info_check_library() to use. */
 #define MOCK_LIB_32 "lib/" SRT_ABI_I386
-#define MOCK_LIB_64 "lib/" SRT_ABI_X86_64
-#define MOCK_LIB_GENERIC "lib/" _SRT_MULTIARCH
-
-#if defined(__i386__) || defined(__x86_64__)
-  /* On x86, we treat x86_64 as the primary architecture.
-   * This means it's the first one whenever we have a list of
-   * per-architecture things, and if we pretend to only support
-   * one architecture for test coverage purposes, that architecture
-   * will be x86_64. */
-# define PRIMARY_ABI SRT_ABI_X86_64
-# define PRIMARY_PLATFORM MOCK_PLATFORM_64
-# define PRIMARY_LIB MOCK_LIB_64
-#else
-  /* On non-x86, the mock implementation of srt_system_info_check_library()
-   * uses these expansions for ${PLATFORM} and ${LIB} instead of the
-   * real ones. */
-# define PRIMARY_ABI _SRT_MULTIARCH
-# define PRIMARY_PLATFORM MOCK_PLATFORM_GENERIC
-# define PRIMARY_LIB MOCK_LIB_GENERIC
-#endif
 
 typedef struct
 {
+  const char * const *architectures;
   PvRuntimeFlags runtime_flags;
   PvAppendPreloadFlags preload_flags;
-  bool one_architecture : 1;
 } Config;
 
 typedef struct
@@ -95,10 +75,26 @@ typedef struct
   gchar *tmpdir;
   gchar *mock_runtime;
   gchar *var;
+  GQuark primary_abi;
+  gchar *primary_platform;
+  gchar *primary_lib;
   int tmpdir_fd;
   int mock_runtime_fd;
   int var_fd;
 } Fixture;
+
+static const char * const x86_archs[] =
+{
+  SRT_ABI_X86_64,
+  SRT_ABI_I386,
+  NULL
+};
+
+static const char * const aarch64_archs[] =
+{
+  SRT_ABI_AARCH64,
+  NULL
+};
 
 static const Config default_config = {};
 static const Config copy_config =
@@ -110,9 +106,13 @@ static const Config interpreter_root_config =
   .runtime_flags = (PV_RUNTIME_FLAGS_COPY_RUNTIME
                     | PV_RUNTIME_FLAGS_INTERPRETER_ROOT),
 };
-static const Config one_arch_config =
+static const Config aarch64_config =
 {
-  .one_architecture = true,
+  .architectures = aarch64_archs,
+};
+static const Config x86_config =
+{
+  .architectures = x86_archs,
 };
 
 static int
@@ -126,6 +126,22 @@ open_or_die (const char *path,
     return g_steal_fd (&fd);
   else
     g_error ("open(%s, 0x%x): %s", path, flags, g_strerror (errno));
+}
+
+static gboolean
+fixture_has_arch (Fixture *f,
+                  const char *tuple)
+{
+  GQuark q = g_quark_from_string (tuple);
+  gsize i;
+
+  for (i = 0; i < f->context->options.architectures->len; i++)
+    {
+      if (g_array_index (f->context->options.architectures, GQuark, i) == q)
+        return TRUE;
+    }
+
+  return FALSE;
 }
 
 /*
@@ -276,7 +292,10 @@ setup (Fixture *f,
   g_autofree gchar *mock_host = NULL;
   gsize i;
 
-  f->config = context;
+  if (context != NULL)
+    f->config = context;
+  else
+    f->config = &default_config;
 
   f->old_fds = tests_check_fd_leaks_enter ();
   f->tmpdir = g_dir_make_tmp ("pressure-vessel-tests.XXXXXX", &local_error);
@@ -315,15 +334,36 @@ setup (Fixture *f,
                                                    "/steam",
                                                    TRUE);
 
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  if (f->config->architectures != NULL)
     {
-      GQuark arch_quark = g_quark_from_static_string (pv_multiarch_tuples[i]);
+      for (i = 0; f->config->architectures[i] != NULL; i++)
+        {
+          GQuark arch_quark = g_quark_from_static_string (f->config->architectures[i]);
 
-      g_array_append_val (f->context->options.architectures, arch_quark);
-
-      if (f->config != NULL && f->config->one_architecture)
-        break;
+          g_array_append_val (f->context->options.architectures, arch_quark);
+        }
     }
+  else
+    {
+      pv_architecture_array_populate_with_defaults (f->context->options.architectures);
+    }
+
+  g_assert_cmpuint (f->context->options.architectures->len, >=, 1);
+  f->primary_abi = g_array_index (f->context->options.architectures, GQuark, 0);
+  /* This matches Debian multiarch, which is as good a thing as any for
+   * a mock implementation of srt_system_info_check_library() to use. */
+  f->primary_lib = g_strdup_printf ("lib/%s", g_quark_to_string (f->primary_abi));
+
+  if (g_str_equal (g_quark_to_string (f->primary_abi), SRT_ABI_X86_64))
+    f->primary_platform = g_strdup (MOCK_PLATFORM_64);
+  else if (g_str_equal (g_quark_to_string (f->primary_abi), SRT_ABI_I386))
+    f->primary_platform = g_strdup (MOCK_PLATFORM_32);
+  else
+    f->primary_platform = g_strdup (MOCK_PLATFORM_GENERIC);
+
+  g_test_message ("Primary ABI: %s", g_quark_to_string (f->primary_abi));
+  g_test_message ("Primary mock ${PLATFORM}: %s", f->primary_platform);
+  g_test_message ("Primary mock ${LIB}: %s", f->primary_lib);
 }
 
 /*
@@ -403,7 +443,36 @@ typedef struct
   const char *touch_i386[2];
   const char *expected[2];
   const ExpectedPreloadExports expected_exports[6];
+  bool only_if_x86 : 1;
 } PreloadTest;
+
+static GString *
+fixture_substitute (Fixture *f,
+                    const char *path,
+                    const PreloadTest *t,
+                    gsize input_index)
+{
+  g_autoptr(GString) final_path = g_string_new (path);
+
+  if (t != NULL && g_str_equal (final_path->str, "="))
+    {
+      g_assert (input_index < G_N_ELEMENTS (t->input));
+      g_string_assign (final_path, t->input[input_index]);
+
+      if (g_str_has_prefix (final_path->str, "a:")
+          || g_str_has_prefix (final_path->str, "p:"))
+        g_string_erase (final_path, 0, 2);
+    }
+
+  g_string_replace (final_path, "@PRIMARY_ABI@",
+                    g_quark_to_string (f->primary_abi), 0);
+  g_string_replace (final_path, "@PRIMARY_PLATFORM@",
+                    f->primary_platform, 0);
+  g_string_replace (final_path, "@PRIMARY_LIB@",
+                    f->primary_lib, 0);
+
+  return g_steal_pointer (&final_path);
+}
 
 static const PreloadTest ld_preload_tests[] =
 {
@@ -431,17 +500,17 @@ static const PreloadTest ld_preload_tests[] =
   },
   {
     .input = { "/platform/plat-$PLATFORM/libpreloadP.so" },
-    .touch = { "/platform/plat-" PRIMARY_PLATFORM "/libpreloadP.so" },
+    .touch = { "/platform/plat-@PRIMARY_PLATFORM@/libpreloadP.so" },
     .touch_i386 = { "/platform/plat-" MOCK_PLATFORM_32 "/libpreloadP.so" },
     .expected = {
-      "/platform/plat-" PRIMARY_PLATFORM "/libpreloadP.so:abi=" PRIMARY_ABI,
+      "/platform/plat-@PRIMARY_PLATFORM@/libpreloadP.so:abi=@PRIMARY_ABI@",
       "i386:/platform/plat-" MOCK_PLATFORM_32 "/libpreloadP.so:abi=" SRT_ABI_I386,
     },
     /* We don't always export /platform, so we have to explicitly export this */
     .expected_exports = {
       { "/platform", EXPORT_NONE },
-      { "/platform/plat-" PRIMARY_PLATFORM, EXPORT_VISIBLE },
-      { "/platform/plat-" PRIMARY_PLATFORM "/libpreloadP.so", EXPORT_VISIBLE },
+      { "/platform/plat-@PRIMARY_PLATFORM@", EXPORT_VISIBLE },
+      { "/platform/plat-@PRIMARY_PLATFORM@/libpreloadP.so", EXPORT_VISIBLE },
       /* Same for i386, if supported */
       {
         "/platform/plat-" MOCK_PLATFORM_32,
@@ -455,10 +524,10 @@ static const PreloadTest ld_preload_tests[] =
   },
   {
     .input = { "/opt/${LIB}/libpreloadL.so" },
-    .touch = { "/opt/" PRIMARY_LIB "/libpreloadL.so" },
+    .touch = { "/opt/@PRIMARY_LIB@/libpreloadL.so" },
     .touch_i386 = { "/opt/" MOCK_LIB_32 "/libpreloadL.so" },
     .expected = {
-      "/opt/" PRIMARY_LIB "/libpreloadL.so:abi=" PRIMARY_ABI,
+      "/opt/@PRIMARY_LIB@/libpreloadL.so:abi=@PRIMARY_ABI@",
       "i386:/opt/" MOCK_LIB_32 "/libpreloadL.so:abi=" SRT_ABI_I386,
     },
     /* We don't always export /opt, so we have to explicitly export this */
@@ -468,8 +537,8 @@ static const PreloadTest ld_preload_tests[] =
        * unit test we're pretending that ${LIB} is Debian-style multiarch,
        * so /opt/lib/x86_64-linux-gnu/ or similar would be sufficient */
       { "/opt/lib", EXPORT_NONE },
-      { "/opt/" PRIMARY_LIB, EXPORT_VISIBLE },
-      { "/opt/" PRIMARY_LIB "/libpreloadL.so", EXPORT_VISIBLE },
+      { "/opt/@PRIMARY_LIB@", EXPORT_VISIBLE },
+      { "/opt/@PRIMARY_LIB@/libpreloadL.so", EXPORT_VISIBLE },
       /* Same for i386, if supported */
       { "/opt/" MOCK_LIB_32, EXPORT_VISIBLE | EXPORT_IF_I386 },
       { "/opt/" MOCK_LIB_32 "/libpreloadL.so", EXPORT_VISIBLE | EXPORT_IF_I386 },
@@ -538,7 +607,6 @@ static const PreloadTest ld_preload_tests[] =
       { "/steam/lib", EXPORT_NONE },
     },
   },
-#if defined(__i386__) || defined(__x86_64__)
   {
     .input = {
         "/steam/ubuntu12_64/gameoverlayrenderer.so",
@@ -570,7 +638,6 @@ static const PreloadTest ld_preload_tests[] =
       { "/steam/ubuntu12_64", EXPORT_NONE },
     },
   },
-#endif
   {
     .input = { "/overlay/libs/${ORIGIN}/../lib/libpreloadO.so" },
     .touch = { "=" },
@@ -615,7 +682,7 @@ static const PreloadTest ld_preload_tests[] =
      * the current namespace */
     .input = { "libfakeroot.so" },
     .expected = {
-      "/path/to/" PRIMARY_LIB "/libfakeroot.so:abi=" PRIMARY_ABI,
+      "/path/to/@PRIMARY_LIB@/libfakeroot.so:abi=@PRIMARY_ABI@",
       "i386:/path/to/" MOCK_LIB_32 "/libfakeroot.so:abi=" SRT_ABI_I386,
     },
   },
@@ -643,12 +710,7 @@ assert_exports_match_expectations (Fixture *f,
 {
   FlatpakExports *exports = f->context->exports;
   gsize i;
-  gboolean expect_i386 = FALSE;
-
-#if defined(__i386__) || defined(__x86_64__)
-  if (f->config == NULL || !f->config->one_architecture)
-    expect_i386 = TRUE;
-#endif
+  gboolean expect_i386 = fixture_has_arch (f, SRT_ABI_I386);
 
   g_assert_nonnull (exports);
 
@@ -663,28 +725,20 @@ assert_exports_match_expectations (Fixture *f,
           const char *path = expected->path;
           ExpectedPreloadExportsFlags flags = expected->flags;
           gboolean should_be_visible, is_visible;
+          g_autoptr(GString) final_path = NULL;
 
           if (path == NULL)
             continue;
 
-          if (g_str_equal (path, "="))
-            {
-              g_assert (j < G_N_ELEMENTS (test->input));
-              path = test->input[j];
-
-              if (g_str_has_prefix (path, "a:")
-                  || g_str_has_prefix (path, "p:"))
-                path += 2;
-            }
-
-          is_visible = flatpak_exports_path_is_visible (exports, path);
+          final_path = fixture_substitute (f, path, test, j);
+          is_visible = flatpak_exports_path_is_visible (exports, final_path->str);
           should_be_visible = ((flags & EXPORT_VISIBLE) != 0);
 
           if ((flags & EXPORT_IF_I386) && !expect_i386)
             should_be_visible = FALSE;
 
           g_test_message ("%s export status: expected %s, got %s%s",
-                          path,
+                          final_path->str,
                           should_be_visible ? "visible" : "hidden",
                           is_visible ? "visible" : "hidden",
                           (is_visible == should_be_visible) ? "" : " (!)");
@@ -694,7 +748,7 @@ assert_exports_match_expectations (Fixture *f,
               g_autofree gchar *message = NULL;
 
               message = g_strdup_printf ("%s should%s be exported, but is%s",
-                                         path,
+                                         final_path->str,
                                          should_be_visible ? "" : " not",
                                          is_visible ? "" : " not");
 
@@ -709,6 +763,7 @@ assert_exports_match_expectations (Fixture *f,
 
 static void
 collect_files_to_touch (GPtrArray *array,
+                        Fixture *f,
                         const char * const *touch,
                         gsize n,
                         const PreloadTest *test)
@@ -717,23 +772,13 @@ collect_files_to_touch (GPtrArray *array,
 
   for (j = 0; j < n; j++)
     {
-      if (g_strcmp0 (touch[j], "=") == 0)
-        {
-          const char *path;
+      g_autoptr(GString) final_path = NULL;
 
-          g_assert (j < G_N_ELEMENTS (test->input));
-          path = test->input[j];
+      if (touch[j] == NULL)
+        continue;
 
-          if (g_str_has_prefix (path, "a:")
-              || g_str_has_prefix (path, "p:"))
-            path += 2;
-
-          g_ptr_array_add (array, (char *) path);
-        }
-      else if (touch[j] != NULL)
-        {
-          g_ptr_array_add (array, (char *) touch[j]);
-        }
+      final_path = fixture_substitute (f, touch[j], test, j);
+      g_ptr_array_add (array, g_string_free (g_steal_pointer (&final_path), FALSE));
     }
 }
 
@@ -741,38 +786,32 @@ static void
 setup_ld_preload (Fixture *f,
                   gconstpointer context)
 {
-  const Config *config = context;
-  g_autoptr(GPtrArray) touch = g_ptr_array_new ();
-#if defined(__i386__) || defined(__x86_64__)
-  g_autoptr(GPtrArray) touch_i386 = g_ptr_array_new ();
-#endif
+  g_autoptr(GPtrArray) touch = g_ptr_array_new_with_free_func (g_free);
+  g_autoptr(GPtrArray) touch_i386 = g_ptr_array_new_with_free_func (g_free);
   gsize i;
+
+  setup (f, context);
 
   for (i = 0; i < G_N_ELEMENTS (ld_preload_tests); i++)
     {
       const PreloadTest *test = &ld_preload_tests[i];
 
-      collect_files_to_touch (touch,
+      collect_files_to_touch (touch, f,
                               test->touch, G_N_ELEMENTS (test->touch),
                               test);
-#if defined(__i386__) || defined(__x86_64__)
-      collect_files_to_touch (touch_i386,
+      collect_files_to_touch (touch_i386, f,
                               test->touch_i386, G_N_ELEMENTS (test->touch_i386),
                               test);
-#endif
     }
 
-  setup (f, context);
   fixture_populate_dir (f, f->mock_host->fd,
                         (const char * const *) touch->pdata, touch->len);
 
-  if (config == NULL || !config->one_architecture)
+  if (fixture_has_arch (f, SRT_ABI_I386))
     {
-#if defined(__i386__) || defined(__x86_64__)
       fixture_populate_dir (f, f->mock_host->fd,
                             (const char * const *) touch_i386->pdata,
                             touch_i386->len);
-#endif
     }
 }
 
@@ -800,6 +839,8 @@ teardown (Fixture *f,
   g_clear_pointer (&f->tmpdir, g_free);
   g_clear_pointer (&f->var, g_free);
   g_clear_pointer (&f->bwrap, flatpak_bwrap_free);
+  g_clear_pointer (&f->primary_platform, g_free);
+  g_clear_pointer (&f->primary_lib, g_free);
 
   tests_check_fd_leaks_leave (f->old_fds);
 }
@@ -2068,6 +2109,7 @@ populate_ld_preload (Fixture *f,
       for (j = 0; j < G_N_ELEMENTS (test->input); j++)
         {
           const char *input = test->input[j];
+          g_autoptr(GString) final_path = NULL;
 
           if (input == NULL)
             break;
@@ -2084,7 +2126,8 @@ populate_ld_preload (Fixture *f,
               input += 2;
             }
 
-          modules[j].preload = (char *) input;
+          final_path = fixture_substitute (f, input, test, j);
+          modules[j].preload = g_string_free (g_steal_pointer (&final_path), FALSE);
           n_modules++;
         }
 
@@ -2118,6 +2161,9 @@ populate_ld_preload (Fixture *f,
           g_test_assert_expected_messages ();
           g_log_set_always_fatal (old_fatal_mask);
         }
+
+      for (j = 0; j < G_N_ELEMENTS (modules); j++)
+        wrap_preload_module_clear (&modules[j]);
     }
 
   for (i = 0; i < argv->len; i++)
@@ -2128,7 +2174,7 @@ populate_ld_preload (Fixture *f,
 }
 
 static GPtrArray *
-filter_expected_paths (const Config *config)
+filter_expected_paths (Fixture *f)
 {
   g_autoptr(GPtrArray) filtered = g_ptr_array_new_with_free_func (NULL);
   gsize i, j;
@@ -2155,10 +2201,8 @@ filter_expected_paths (const Config *config)
 
           if (g_str_has_prefix (path, "i386:"))
             {
-#if defined(__i386__) || defined(__x86_64__)
-              if (!config->one_architecture)
+              if (fixture_has_arch (f, SRT_ABI_I386))
                 g_ptr_array_add (filtered, (char *) (path + strlen ("i386:")));
-#endif
             }
           else
             {
@@ -2166,6 +2210,10 @@ filter_expected_paths (const Config *config)
             }
         }
     }
+
+  for (i = 0; i < filtered->len; i++)
+    g_test_message ("expected[%zu]: %s", i,
+                    (const char *) g_ptr_array_index (filtered, i));
 
   return g_steal_pointer (&filtered);
 }
@@ -2197,7 +2245,7 @@ test_remap_ld_preload (Fixture *f,
   const Config *config = context;
   FlatpakExports *exports;
   g_autoptr(GPtrArray) argv = g_ptr_array_new_with_free_func (g_free);
-  g_autoptr(GPtrArray) filtered = filter_expected_paths (config);
+  g_autoptr(GPtrArray) filtered = filter_expected_paths (f);
   gsize i;
 
   fixture_create_exports (f);
@@ -2214,17 +2262,19 @@ test_remap_ld_preload (Fixture *f,
     {
       const char *expected = g_ptr_array_index (filtered, i);
       const char *argument = g_ptr_array_index (argv, i);
+      g_autoptr(GString) with_substs = NULL;
 
       assert_and_skip_ld_preload_option (&expected, &argument);
+      with_substs = fixture_substitute (f, expected, NULL, 0);
 
-      if (g_str_has_prefix (expected, "/lib/")
-          || g_str_has_prefix (expected, "/usr/lib/"))
+      if (g_str_has_prefix (with_substs->str, "/lib/")
+          || g_str_has_prefix (with_substs->str, "/usr/lib/"))
         {
           g_assert_true (g_str_has_prefix (argument, "/run/host/"));
           argument += strlen("/run/host");
         }
 
-      g_assert_cmpstr (argument, ==, expected);
+      g_assert_cmpstr (argument, ==, with_substs->str);
     }
 
   assert_exports_match_expectations (f, ld_preload_tests,
@@ -2237,7 +2287,7 @@ test_remap_ld_preload_flatpak (Fixture *f,
 {
   const Config *config = context;
   g_autoptr(GPtrArray) argv = g_ptr_array_new_with_free_func (g_free);
-  g_autoptr(GPtrArray) filtered = filter_expected_paths (config);
+  g_autoptr(GPtrArray) filtered = filter_expected_paths (f);
   gsize i;
 
   fixture_create_runtime (f, PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX);
@@ -2252,18 +2302,21 @@ test_remap_ld_preload_flatpak (Fixture *f,
     {
       const char *expected = g_ptr_array_index (filtered, i);
       const char *argument = g_ptr_array_index (argv, i);
+      g_autoptr(GString) with_substs = NULL;
 
       assert_and_skip_ld_preload_option (&expected, &argument);
 
-      if (g_str_has_prefix (expected, "/app/")
-          || g_str_has_prefix (expected, "/lib/")
-          || g_str_has_prefix (expected, "/usr/lib/"))
+      with_substs = fixture_substitute (f, expected, NULL, 0);
+
+      if (g_str_has_prefix (with_substs->str, "/app/")
+          || g_str_has_prefix (with_substs->str, "/lib/")
+          || g_str_has_prefix (with_substs->str, "/usr/lib/"))
         {
           g_assert_true (g_str_has_prefix (argument, "/run/parent/"));
           argument += strlen("/run/parent");
         }
 
-      g_assert_cmpstr (argument, ==, expected);
+      g_assert_cmpstr (argument, ==, with_substs->str);
     }
 }
 
@@ -2277,7 +2330,7 @@ test_remap_ld_preload_no_runtime (Fixture *f,
 {
   const Config *config = context;
   g_autoptr(GPtrArray) argv = g_ptr_array_new_with_free_func (g_free);
-  g_autoptr(GPtrArray) filtered = filter_expected_paths (config);
+  g_autoptr(GPtrArray) filtered = filter_expected_paths (f);
   FlatpakExports *exports;
   gsize i, j;
   gsize n_gameoverlays = 0;
@@ -2307,6 +2360,7 @@ test_remap_ld_preload_no_runtime (Fixture *f,
     {
       const char *expected = g_ptr_array_index (filtered, j);
       const char *argument = g_ptr_array_index (argv, i);
+      g_autoptr(GString) with_substs = NULL;
 
       while (g_str_has_suffix (expected, "/gameoverlayrenderer.so"))
         {
@@ -2315,7 +2369,8 @@ test_remap_ld_preload_no_runtime (Fixture *f,
         }
 
       assert_and_skip_ld_preload_option (&expected, &argument);
-      g_assert_cmpstr (argument, ==, expected);
+      with_substs = fixture_substitute (f, expected, NULL, 0);
+      g_assert_cmpstr (argument, ==, with_substs->str);
     }
 
   assert_exports_match_expectations (f, ld_preload_tests,
@@ -2328,7 +2383,7 @@ test_remap_ld_preload_flatpak_no_runtime (Fixture *f,
 {
   const Config *config = context;
   g_autoptr(GPtrArray) argv = g_ptr_array_new_with_free_func (g_free);
-  g_autoptr(GPtrArray) filtered = filter_expected_paths (config);
+  g_autoptr(GPtrArray) filtered = filter_expected_paths (f);
   gsize i;
 
   g_assert_null (f->context->runtime);
@@ -2342,9 +2397,11 @@ test_remap_ld_preload_flatpak_no_runtime (Fixture *f,
     {
       const char *expected = g_ptr_array_index (filtered, i);
       const char *argument = g_ptr_array_index (argv, i);
+      g_autoptr(GString) with_substs = NULL;
 
       assert_and_skip_ld_preload_option (&expected, &argument);
-      g_assert_cmpstr (argument, ==, expected);
+      with_substs = fixture_substitute (f, expected, NULL, 0);
+      g_assert_cmpstr (argument, ==, with_substs->str);
     }
 }
 
@@ -2712,13 +2769,22 @@ main (int argc,
   g_test_add ("/use-host-os", Fixture, NULL,
               setup, test_use_host_os, teardown);
 
-  g_test_add ("/one-arch/remap-ld-preload", Fixture, &one_arch_config,
+  g_test_add ("/aarch64/remap-ld-preload", Fixture, &aarch64_config,
               setup_ld_preload, test_remap_ld_preload, teardown);
-  g_test_add ("/one-arch/remap-ld-preload-flatpak", Fixture, &one_arch_config,
+  g_test_add ("/aarch64/remap-ld-preload-flatpak", Fixture, &aarch64_config,
               setup_ld_preload, test_remap_ld_preload_flatpak, teardown);
-  g_test_add ("/one-arch/remap-ld-preload-no-runtime", Fixture, &one_arch_config,
+  g_test_add ("/aarch64/remap-ld-preload-no-runtime", Fixture, &aarch64_config,
               setup_ld_preload, test_remap_ld_preload_no_runtime, teardown);
-  g_test_add ("/one-arch/remap-ld-preload-flatpak-no-runtime", Fixture, &one_arch_config,
+  g_test_add ("/aarch64/remap-ld-preload-flatpak-no-runtime", Fixture, &aarch64_config,
+              setup_ld_preload, test_remap_ld_preload_flatpak_no_runtime, teardown);
+
+  g_test_add ("/x86/remap-ld-preload", Fixture, &x86_config,
+              setup_ld_preload, test_remap_ld_preload, teardown);
+  g_test_add ("/x86/remap-ld-preload-flatpak", Fixture, &x86_config,
+              setup_ld_preload, test_remap_ld_preload_flatpak, teardown);
+  g_test_add ("/x86/remap-ld-preload-no-runtime", Fixture, &x86_config,
+              setup_ld_preload, test_remap_ld_preload_no_runtime, teardown);
+  g_test_add ("/x86/remap-ld-preload-flatpak-no-runtime", Fixture, &x86_config,
               setup_ld_preload, test_remap_ld_preload_flatpak_no_runtime, teardown);
 
   return g_test_run ();

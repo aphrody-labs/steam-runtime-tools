@@ -31,7 +31,7 @@ tristate_environment (const gchar *name)
   return TRISTATE_MAYBE;
 }
 
-static void
+void
 wrap_preload_module_clear (gpointer p)
 {
   WrapPreloadModule *self = p;

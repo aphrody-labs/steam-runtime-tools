@@ -833,6 +833,10 @@ main (int argc,
       goto out;
     }
 
+  /* Pre-cache known architecture strings as quarks before parsing
+   * command-line, to avoid having to duplicate and "leak" them */
+  _srt_architecture_init_known ();
+
   context = g_option_context_new (
       "COMMAND [ARG...]\n"
       "Run COMMAND [ARG...] with a lock held, a subreaper, or similar.\n");

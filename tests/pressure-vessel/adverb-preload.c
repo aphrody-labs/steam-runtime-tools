@@ -135,7 +135,11 @@ preload_inputs_to_modules (Fixture *f,
     {
       modules[i].name = g_strdup (inputs[i].name);
       modules[i].index_in_preload_variables = inputs[i].index_in_preload_variables;
-      modules[i].abi_index = inputs[i].abi_index;
+
+      if (inputs[i].abi_index == PV_UNSPECIFIED_ABI)
+        modules[i].architecture = 0;
+      else
+        modules[i].architecture = g_array_index (f->archs, GQuark, inputs[i].abi_index);
     }
 }
 
@@ -259,7 +263,7 @@ test_basic (Fixture *f,
        * (in practice those that originally had $LIB or $PLATFORM) need
        * symlinks created for them, because only those modules get their
        * LD_PRELOAD entries rewritten */
-      if (modules[i].abi_index == 0)
+      if (modules[i].architecture != 0)
         {
           g_assert_no_error (local_error);
           g_test_message ("%s -> %s", path->str, target);
@@ -471,15 +475,8 @@ test_cli (Fixture *f,
 
           g_assert_no_error (local_error);
 
-          if (actual.abi_index != PV_UNSPECIFIED_ABI)
-            {
-              GQuark arch_quark = g_array_index (f->archs, GQuark, actual.abi_index);
-
-              g_assert_cmpuint (actual.abi_index, >=, 0);
-              g_assert_cmpuint (actual.abi_index, <, f->archs->len);
-              abi = g_quark_to_string (arch_quark);
-              g_assert_cmpstr (abi, ==, pv_multiarch_tuples[actual.abi_index]);
-            }
+          if (actual.architecture != 0)
+            abi = g_quark_to_string (actual.architecture);
 
           g_test_message ("\"%s\" -> \"%s\", abi=%s",
                           test->option, actual.name, abi);
@@ -506,20 +503,10 @@ test_cli (Fixture *f,
           g_assert_true (ret);
           g_assert_cmpstr (actual.name, ==, test->expected.name);
 
-          if (test->expected.architecture != NULL)
-            {
-              GQuark arch_quark;
-
-              g_assert_cmpuint (actual.abi_index, >=, 0);
-              g_assert_cmpuint (actual.abi_index, <, f->archs->len);
-              arch_quark = g_array_index (f->archs, GQuark, actual.abi_index);
-              g_assert_cmpstr (g_quark_to_string (arch_quark),
-                               ==, test->expected.architecture);
-            }
-          else
-            {
-              g_assert_cmpuint (actual.abi_index, ==, PV_UNSPECIFIED_ABI);
-            }
+          /* Note that g_quark_to_string (0) is NULL, so this works even if
+           * test->expected.architecture is NULL */
+          g_assert_cmpstr (g_quark_to_string (actual.architecture),
+                           ==, test->expected.architecture);
 
           g_assert_cmpuint (actual.index_in_preload_variables, ==, which);
 
@@ -538,8 +525,8 @@ test_cli (Fixture *f,
           g_assert_no_error (local_error);
           g_assert_true (ret);
           g_assert_cmpstr (reparsed.name, ==, test->expected.name);
-          /* We already asserted that actual.abi_index is correct */
-          g_assert_cmpuint (reparsed.abi_index, ==, actual.abi_index);
+          g_assert_cmpstr (g_quark_to_string (reparsed.architecture),
+                           ==, test->expected.architecture);
           g_assert_cmpuint (reparsed.index_in_preload_variables, ==, which);
         }
     }
@@ -877,7 +864,7 @@ test_repetition (Fixture *f,
         {
           g_autofree gchar *target = NULL;
 
-          if (modules[j].abi_index != i)
+          if (modules[j].architecture != arch_quark)
             {
               g_test_message ("Not expecting a %s symlink for %s",
                               tuple, modules[j].name);

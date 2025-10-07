@@ -33,15 +33,15 @@ typedef struct
 {
   char *name;
   gsize index_in_preload_variables;
-  /* An index in pv_multiarch_details, or PV_UNSPECIFIED_ABI if unspecified */
-  gsize abi_index;
+  /* Multiarch tuple, or 0 if unspecified / applicable to all architectures */
+  GQuark architecture;
 } PvAdverbPreloadModule;
 
 #define PV_ADVERB_PRELOAD_MODULE_INIT \
 { \
   .name = NULL, \
   .index_in_preload_variables = 0, \
-  .abi_index = PV_UNSPECIFIED_ABI, \
+  .architecture = 0, \
 }
 
 static inline void

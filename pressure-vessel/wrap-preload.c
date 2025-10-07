@@ -79,9 +79,9 @@ static void
 append_preload_internal (PvWrapContext *context,
                          GPtrArray *argv,
                          PvPreloadVariableIndex which,
-                         gsize abi_index,
                          const char *export_path,
                          const char *original_path,
+                         GQuark architecture,
                          PvAppendPreloadFlags flags)
 {
   g_auto(PvAdverbPreloadModule) module = PV_ADVERB_PRELOAD_MODULE_INIT;
@@ -89,7 +89,7 @@ append_preload_internal (PvWrapContext *context,
   gboolean flatpak_subsandbox = ((flags & PV_APPEND_PRELOAD_FLAGS_FLATPAK_SUBSANDBOX) != 0);
 
   module.index_in_preload_variables = which;
-  module.abi_index = abi_index;
+  module.architecture = architecture;
 
   if (context->runtime != NULL
       && (g_str_has_prefix (original_path, "/usr/")
@@ -202,9 +202,9 @@ append_preload_unsupported_token (PvWrapContext *context,
   append_preload_internal (context,
                            argv,
                            which,
-                           PV_UNSPECIFIED_ABI,
                            export_path,
                            preload,
+                           0,   /* unspecified architecture */
                            flags);
 }
 
@@ -240,6 +240,7 @@ append_preload_per_architecture (PvWrapContext *context,
       g_autoptr(GString) mock_path = NULL;
       g_autoptr(SrtLibrary) details = NULL;
       const gchar *multiarch_tuple = pv_multiarch_details[i].tuple;
+      GQuark arch_quark = g_quark_from_static_string (multiarch_tuple);
       const char *path = NULL;
 
       if (!(flags & PV_APPEND_PRELOAD_FLAGS_IN_UNIT_TESTS))
@@ -302,9 +303,9 @@ append_preload_per_architecture (PvWrapContext *context,
           append_preload_internal (context,
                                    argv,
                                    which,
-                                   i,
                                    export_path,
                                    path,
+                                   arch_quark,
                                    flags);
         }
       else
@@ -355,9 +356,9 @@ append_preload_basename (PvWrapContext *context,
       append_preload_internal (context,
                                argv,
                                which,
-                               PV_UNSPECIFIED_ABI,
                                NULL,  /* don't export anything */
                                preload,
+                               0,     /* unspecified architecture */
                                flags);
     }
   else
@@ -467,9 +468,9 @@ pv_wrap_append_preload (PvWrapContext *context,
             append_preload_internal (context,
                                      argv,
                                      which,
-                                     PV_UNSPECIFIED_ABI,
                                      export_path,
                                      preload,
+                                     0,   /* unspecified architecture */
                                      flags);
           }
         break;

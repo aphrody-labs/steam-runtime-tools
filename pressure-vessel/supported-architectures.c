@@ -150,3 +150,17 @@ pv_known_architecture_get_libdirs (const char *tuple,
 
   return g_steal_pointer (&dirs);
 }
+
+void
+pv_architecture_array_populate_with_defaults (GArray *arch_quarks)
+{
+  gsize i;
+
+  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+    {
+      GQuark arch_quark = g_quark_from_static_string (pv_multiarch_tuples[i]);
+
+      g_return_if_fail (arch_quark != 0);
+      g_array_append_val (arch_quarks, arch_quark);
+    }
+}

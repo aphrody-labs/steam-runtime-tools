@@ -213,14 +213,12 @@ pv_launcher_server_class_init (PvLauncherServerClass *cls)
 static void
 skeleton_died_cb (gpointer data)
 {
-  PvLauncherServer *self = data;
+  /* this unref is paired with the ref in pv_launcher_server_export */
+  g_autoptr(PvLauncherServer) self = data;
 
   g_return_if_fail (PV_IS_LAUNCHER_SERVER (self));
   g_debug ("skeleton finalized");
   self->export_state = EXPORT_STATE_GONE;
-
-  /* paired with ref in pv_launcher_server_export */
-  g_object_unref (self);
 }
 
 static gboolean
@@ -1146,7 +1144,7 @@ new_connection_cb (SrtPortalListener *listener,
                    gpointer user_data)
 {
   PvLauncherServer *server = user_data;
-  GError *error = NULL;
+  g_autoptr(GError) error = NULL;
 
   g_return_val_if_fail (PV_IS_LAUNCHER_SERVER (server), G_DBUS_METHOD_INVOCATION_HANDLED);
   /* Paired with g_object_unref() in peer_connection_closed_cb() */

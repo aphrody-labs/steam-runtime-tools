@@ -116,11 +116,9 @@ jsonify_flags (JsonBuilder *builder,
 
   if (values)
     {
-      gchar *rest = g_strdup_printf ("0x%x", values);
+      g_autofree gchar *rest = g_strdup_printf ("0x%x", values);
 
       json_builder_add_string_value (builder, rest);
-
-      g_free (rest);
     }
 
   g_type_class_unref (class);
@@ -170,22 +168,18 @@ jsonify_flags_string_bool_map (JsonBuilder *builder,
 
   if (present)
     {
-      gchar *rest = g_strdup_printf ("0x%x", present);
+      g_autofree gchar *rest = g_strdup_printf ("0x%x", present);
 
       json_builder_set_member_name (builder, rest);
       json_builder_add_boolean_value (builder, TRUE);
-
-      g_free (rest);
     }
 
   if (known)
     {
-      gchar *rest = g_strdup_printf ("0x%x", known);
+      g_autofree gchar *rest = g_strdup_printf ("0x%x", known);
 
       json_builder_set_member_name (builder, rest);
       json_builder_add_boolean_value (builder, FALSE);
-
-      g_free (rest);
     }
 
   g_type_class_unref (class);
@@ -225,10 +219,9 @@ jsonify_enum (JsonBuilder *builder,
     }
   else
     {
-      gchar *fallback = g_strdup_printf ("(unknown value %d)", value);
+      g_autofree gchar *fallback = g_strdup_printf ("(unknown value %d)", value);
 
       json_builder_add_string_value (builder, fallback);
-      g_free (fallback);
     }
 }
 
@@ -354,7 +347,7 @@ print_graphics_details(JsonBuilder *builder,
   json_builder_begin_object (builder);
   for (GList *g = graphics_list; g != NULL; g = g->next)
     {
-      gchar *parameters = srt_graphics_dup_parameters_string (g->data);
+      g_autofree gchar *parameters = srt_graphics_dup_parameters_string (g->data);
       const char *messages;
       SrtGraphicsLibraryVendor library_vendor;
       SrtRenderingInterface rendering_interface;
@@ -474,7 +467,6 @@ print_graphics_details(JsonBuilder *builder,
         }
 
       json_builder_end_object (builder); // End object for parameters
-      g_free (parameters);
     }
   json_builder_end_object (builder); // End garphics-details
 }
@@ -491,7 +483,8 @@ print_dri_details (JsonBuilder *builder,
       for (iter = dri_list; iter != NULL; iter = iter->next)
         {
           const gchar *library;
-          gchar *resolved = NULL;
+          g_autofree gchar *resolved = NULL;
+
           json_builder_begin_object (builder);
           library = srt_dri_driver_get_library_path (iter->data);
           json_builder_set_member_name (builder, "library_path");
@@ -507,7 +500,6 @@ print_dri_details (JsonBuilder *builder,
               json_builder_set_member_name (builder, "is_extra");
               json_builder_add_boolean_value (builder, TRUE);
             }
-          g_free (resolved);
           json_builder_end_object (builder);
         }
     }
@@ -526,8 +518,9 @@ print_va_api_details (JsonBuilder *builder,
       for (iter = va_api_list; iter != NULL; iter = iter->next)
         {
           const gchar *library;
-          gchar *resolved = NULL;
+          g_autofree gchar *resolved = NULL;
           SrtVaApiVersion version;
+
           json_builder_begin_object (builder);
           library = srt_va_api_driver_get_library_path (iter->data);
           json_builder_set_member_name (builder, "library_path");
@@ -549,7 +542,6 @@ print_va_api_details (JsonBuilder *builder,
               json_builder_set_member_name (builder, "is_extra");
               json_builder_add_boolean_value (builder, TRUE);
             }
-          g_free (resolved);
           json_builder_end_object (builder);
         }
     }
@@ -568,7 +560,8 @@ print_vdpau_details (JsonBuilder *builder,
       for (iter = vdpau_list; iter != NULL; iter = iter->next)
         {
           const gchar *library;
-          gchar *resolved = NULL;
+          g_autofree gchar *resolved = NULL;
+
           json_builder_begin_object (builder);
           library = srt_vdpau_driver_get_library_path (iter->data);
           json_builder_set_member_name (builder, "library_path");
@@ -589,7 +582,6 @@ print_vdpau_details (JsonBuilder *builder,
               json_builder_set_member_name (builder, "is_extra");
               json_builder_add_boolean_value (builder, TRUE);
             }
-          g_free (resolved);
           json_builder_end_object (builder);
         }
     }
@@ -1008,7 +1000,7 @@ print_openxr_1_runtime_details (JsonBuilder *builder,
     {
       const gchar *library;
       const gchar *name;
-      gchar *tmp;
+      g_autofree gchar *tmp = NULL;
 
       library = srt_openxr_1_runtime_get_library_path (rt);
       json_builder_set_member_name (builder, "library_path");
@@ -1028,8 +1020,6 @@ print_openxr_1_runtime_details (JsonBuilder *builder,
           json_builder_set_member_name (builder, "name");
           json_builder_add_string_value (builder, name);
         }
-
-      g_free (tmp);
     }
   else
     {
@@ -1058,9 +1048,9 @@ int
 main (int argc,
       char **argv)
 {
-  FILE *original_stdout = NULL;
+  g_autoptr(FILE) original_stdout = NULL;
   int original_stdout_fd = -1;
-  GError *error = NULL;
+  g_autoptr(GError) error = NULL;
   g_autoptr(SrtSystemInfo) info = NULL;
   g_autoptr(SrtOsInfo) os_info = NULL;
   SrtLibraryIssues library_issues = SRT_LIBRARY_ISSUES_NONE;
@@ -1165,7 +1155,6 @@ main (int argc,
                                        &original_stdout_fd, NULL, &error))
     {
       g_warning ("%s", error->message);
-      g_clear_error (&error);
       return 1;
     }
 
@@ -1193,7 +1182,6 @@ main (int argc,
       if (info == NULL)
         {
           g_warning ("%s", error->message);
-          g_clear_error (&error);
           return 1;
         }
     }
@@ -1545,7 +1533,7 @@ main (int argc,
       if (srt_egl_icd_check_error (icd_iter->data, &error))
         {
           const gchar *library;
-          gchar *tmp;
+          g_autofree gchar *tmp = NULL;
 
           library = srt_egl_icd_get_library_path (icd_iter->data);
           json_builder_set_member_name (builder, "library_path");
@@ -1558,8 +1546,6 @@ main (int argc,
               json_builder_set_member_name (builder, "dlopen");
               json_builder_add_string_value (builder, tmp);
             }
-
-          g_free (tmp);
         }
       else
         {
@@ -1592,7 +1578,7 @@ main (int argc,
       if (srt_egl_external_platform_check_error (icd_iter->data, &error))
         {
           const gchar *library;
-          gchar *tmp;
+          g_autofree gchar *tmp = NULL;
 
           library = srt_egl_external_platform_get_library_path (icd_iter->data);
           json_builder_set_member_name (builder, "library_path");
@@ -1605,8 +1591,6 @@ main (int argc,
               json_builder_set_member_name (builder, "dlopen");
               json_builder_add_string_value (builder, tmp);
             }
-
-          g_free (tmp);
         }
       else
         {
@@ -1644,7 +1628,7 @@ main (int argc,
         {
           const gchar *library;
           const gchar *library_arch;
-          gchar *tmp;
+          g_autofree gchar *tmp = NULL;
 
           library = srt_vulkan_icd_get_library_path (icd_iter->data);
           json_builder_set_member_name (builder, "library_path");
@@ -1668,8 +1652,6 @@ main (int argc,
               json_builder_set_member_name (builder, "dlopen");
               json_builder_add_string_value (builder, tmp);
             }
-
-          g_free (tmp);
         }
       else
         {
@@ -1839,12 +1821,9 @@ main (int argc,
 
   if (!_srt_json_builder_print (builder, original_stdout,
                                 SRT_JSON_OUTPUT_FLAGS_PRETTY, &error))
-    {
-      g_warning ("%s", error->message);
-      g_clear_error (&error);
-    }
+    g_warning ("%s", error->message);
 
-  if (fclose (original_stdout) != 0)
+  if (fclose (g_steal_pointer (&original_stdout)) != 0)
     g_warning ("Unable to close stdout: %s", g_strerror (errno));
 
   return 0;

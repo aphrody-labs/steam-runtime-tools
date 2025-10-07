@@ -70,11 +70,9 @@ jsonify_flags (JsonBuilder *builder,
 
   if (values)
     {
-      gchar *rest = g_strdup_printf ("0x%x", values);
+      g_autofree gchar *rest = g_strdup_printf ("0x%x", values);
 
       json_builder_add_string_value (builder, rest);
-
-      g_free (rest);
     }
 
   g_type_class_unref (class);

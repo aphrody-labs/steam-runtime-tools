@@ -129,6 +129,22 @@ teardown (Fixture *f,
   tests_check_fd_leaks_leave (f->old_fds);
 }
 
+static gboolean
+fixture_has_arch (Fixture *f,
+                  const char *tuple)
+{
+  GQuark q = g_quark_from_string (tuple);
+  gsize i;
+
+  for (i = 0; i < f->archs->len; i++)
+    {
+      if (g_array_index (f->archs, GQuark, i) == q)
+        return TRUE;
+    }
+
+  return FALSE;
+}
+
 typedef struct
 {
   const char *name;
@@ -590,7 +606,6 @@ static void
 test_gameoverlayrenderer (Fixture *f,
                           gconstpointer context)
 {
-#if defined(__x86_64__) || defined(__i386__)
   static const PreloadInput inputs[] =
   {
     {
@@ -622,8 +637,6 @@ test_gameoverlayrenderer (Fixture *f,
   gboolean ret;
   gsize i;
 
-  g_return_if_fail (f->archs->len == 2);
-
   n_modules = preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
                                          modules, G_N_ELEMENTS (modules));
   g_assert_cmpuint (n_modules, ==, G_N_ELEMENTS (modules));
@@ -645,17 +658,19 @@ test_gameoverlayrenderer (Fixture *f,
   g_string_append (expected, "/opt/steam/some-other-abi/gameoverlayrenderer.so");
   g_string_append_c (expected, ':');
 
-  if (f->lib_temp_dirs != NULL)
-    {
-      g_string_append_printf (expected, "%s/gameoverlayrenderer.so",
-                              f->lib_temp_dirs->libdl_token_path);
-    }
-  else
+  if (f->lib_temp_dirs == NULL
+      || !fixture_has_arch (f, SRT_ABI_I386))
     {
       g_string_append (expected, "/opt/steam/ubuntu12_32/gameoverlayrenderer.so");
       g_string_append_c (expected, ':');
-      g_string_append (expected, "/opt/steam/ubuntu12_64/gameoverlayrenderer.so");
     }
+
+  if (f->lib_temp_dirs != NULL
+      && fixture_has_arch (f, SRT_ABI_X86_64))
+    g_string_append_printf (expected, "%s/gameoverlayrenderer.so",
+                            f->lib_temp_dirs->libdl_token_path);
+  else
+    g_string_append (expected, "/opt/steam/ubuntu12_64/gameoverlayrenderer.so");
 
   g_string_append_c (expected, ':');
   g_string_append (expected, "/opt/steam/some-other-abi/gameoverlayrenderer.so");
@@ -672,7 +687,9 @@ test_gameoverlayrenderer (Fixture *f,
       const SrtKnownArchitecture *known;
       const char *abi_path;
 
-      if (f->lib_temp_dirs == NULL)
+      if (f->lib_temp_dirs == NULL
+          || !(fixture_has_arch (f, SRT_ABI_X86_64)
+               || fixture_has_arch (f, SRT_ABI_I386)))
         continue;
 
       abi_path = pv_per_arch_dirs_get_abi_path (f->lib_temp_dirs,
@@ -696,9 +713,6 @@ test_gameoverlayrenderer (Fixture *f,
 
   for (i = 0; i < G_N_ELEMENTS (modules); i++)
     pv_adverb_preload_module_clear (&modules[i]);
-#else
-  g_test_skip ("gameoverlayrenderer special-case is only implemented on x86");
-#endif
 }
 
 /*
@@ -1097,7 +1111,7 @@ main (int argc,
 
   add_test_many_archs ("/basic", test_basic);
   add_test_many_archs ("/biarch", test_biarch);
-  add_test ("/gameoverlayrenderer", test_gameoverlayrenderer);
+  add_test_many_archs ("/gameoverlayrenderer", test_gameoverlayrenderer);
   add_test ("/repetition", test_repetition);
 
   /* This one isn't affected by whether we have the PvPerArchDirs or not */

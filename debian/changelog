@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20251006.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251007.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
     - Fix a small memory leak in pv-adverb while setting up VDPAU drivers
@@ -11,8 +11,13 @@ steam-runtime-tools (0.20251006.0) UNRELEASED; urgency=medium
       primary (steamrt/tasks#786)
     - Refactoring
       (steamrt/tasks#786)
+  * s-r-launcher-service:
+    - Avoid a small memory leak if an error occurs on the deprecated
+      `--socket` or `--socket-directory` code paths
+  * Diagnostic tools:
+    - Use automatic memory management in more places
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 06 Oct 2025 17:22:17 +0100
+ -- Simon McVittie <smcv@collabora.com>  Tue, 07 Oct 2025 21:24:10 +0100
 
 steam-runtime-tools (0.20250926.0) steamrt; urgency=medium
 

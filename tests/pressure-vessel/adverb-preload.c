@@ -746,14 +746,11 @@ test_repetition (Fixture *f,
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 0,
     },
-#if PV_N_SUPPORTED_ARCHITECTURES > 1
     {
       .name = "/opt/lib1/libpreload.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 1,
     },
-#endif
-#if defined(__x86_64__) || defined(__i386__)
     {
       .name = "/opt/steam/ubuntu12_32/gameoverlayrenderer.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
@@ -764,7 +761,6 @@ test_repetition (Fixture *f,
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = PV_UNSPECIFIED_ABI,
     },
-#endif
     {
       .name = "/opt/lib0/libmiddle.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
@@ -775,14 +771,11 @@ test_repetition (Fixture *f,
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 0,
     },
-#if PV_N_SUPPORTED_ARCHITECTURES > 1
     {
       .name = "/opt/lib1/libpreload.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 1,
     },
-#endif
-#if defined(__x86_64__) || defined(__i386__)
     {
       .name = "/opt/steam/ubuntu12_32/gameoverlayrenderer.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
@@ -793,7 +786,6 @@ test_repetition (Fixture *f,
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = PV_UNSPECIFIED_ABI,
     },
-#endif
     {
       .name = "/opt/lib0/liblast.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
@@ -810,7 +802,7 @@ test_repetition (Fixture *f,
 
   n_modules = preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
                                          modules, G_N_ELEMENTS (modules));
-  g_assert_cmpuint (n_modules, ==, G_N_ELEMENTS (modules));
+  g_assert_cmpuint (n_modules, <=, G_N_ELEMENTS (modules));
   ret = pv_adverb_set_up_preload_modules (f->bwrap,
                                           (const GQuark *) f->archs->data,
                                           f->archs->len,
@@ -855,27 +847,29 @@ test_repetition (Fixture *f,
   else
     {
       g_string_append (expected, "/opt/lib0/libpreload.so");
-#if PV_N_SUPPORTED_ARCHITECTURES > 1
-      g_string_append_c (expected, ':');
-      g_string_append (expected, "/opt/lib1/libpreload.so");
-#endif
+
+      if (f->archs->len > 1)
+        {
+          g_string_append_c (expected, ':');
+          g_string_append (expected, "/opt/lib1/libpreload.so");
+        }
     }
 
-#if defined(__x86_64__) || defined(__i386__)
+  if (f->lib_temp_dirs == NULL
+      || !fixture_has_arch (f, SRT_ABI_I386))
+    {
+      g_string_append_c (expected, ':');
+      g_string_append (expected, "/opt/steam/ubuntu12_32/gameoverlayrenderer.so");
+    }
+
   g_string_append_c (expected, ':');
 
-  if (f->lib_temp_dirs != NULL)
-    {
-      g_string_append_printf (expected, "%s/gameoverlayrenderer.so",
-                              f->lib_temp_dirs->libdl_token_path);
-    }
+  if (f->lib_temp_dirs != NULL
+      && fixture_has_arch (f, SRT_ABI_X86_64))
+    g_string_append_printf (expected, "%s/gameoverlayrenderer.so",
+                            f->lib_temp_dirs->libdl_token_path);
   else
-    {
-      g_string_append (expected, "/opt/steam/ubuntu12_32/gameoverlayrenderer.so");
-      g_string_append_c (expected, ':');
-      g_string_append (expected, "/opt/steam/ubuntu12_64/gameoverlayrenderer.so");
-    }
-#endif
+    g_string_append (expected, "/opt/steam/ubuntu12_64/gameoverlayrenderer.so");
 
   g_string_append_c (expected, ':');
 
@@ -887,33 +881,40 @@ test_repetition (Fixture *f,
 
   g_string_append_c (expected, ':');
 
-  if (f->lib_temp_dirs != NULL)
-    {
-      /* If we are able to split up the modules by architecture,
-       * then the duplicates don't appear in the search path a second time */
-      g_string_append_printf (expected, "%s/liblast.so",
-                              f->lib_temp_dirs->libdl_token_path);
-    }
-  else
+  if (f->lib_temp_dirs == NULL)
     {
       /* If we were unable to split up the modules by architecture,
        * we change as little as possible, so in this case we do not
        * deduplicate */
       g_string_append (expected, "/opt/lib0/libpreload.so");
       g_string_append_c (expected, ':');
-#if PV_N_SUPPORTED_ARCHITECTURES > 1
-      g_string_append (expected, "/opt/lib1/libpreload.so");
-      g_string_append_c (expected, ':');
-#endif
-#if defined(__x86_64__) || defined(__i386__)
+
+      if (f->archs->len > 1)
+        {
+          g_string_append (expected, "/opt/lib1/libpreload.so");
+          g_string_append_c (expected, ':');
+        }
+    }
+
+  if (f->lib_temp_dirs == NULL
+      || !fixture_has_arch (f, SRT_ABI_I386))
+    {
       g_string_append (expected, "/opt/steam/ubuntu12_32/gameoverlayrenderer.so");
       g_string_append_c (expected, ':');
+    }
+
+  if (f->lib_temp_dirs == NULL
+      || !fixture_has_arch (f, SRT_ABI_X86_64))
+    {
       g_string_append (expected, "/opt/steam/ubuntu12_64/gameoverlayrenderer.so");
       g_string_append_c (expected, ':');
-#endif
-
-      g_string_append (expected, "/opt/lib0/liblast.so");
     }
+
+  if (f->lib_temp_dirs != NULL)
+    g_string_append_printf (expected, "%s/liblast.so",
+                            f->lib_temp_dirs->libdl_token_path);
+  else
+    g_string_append (expected, "/opt/lib0/liblast.so");
 
   g_assert_cmpstr (f->bwrap->envp[i], ==, expected->str);
   i++;
@@ -967,7 +968,6 @@ test_repetition (Fixture *f,
         }
     }
 
-#if defined(__x86_64__) || defined(__i386__)
   for (i = 0; i < f->archs->len; i++)
     {
       GQuark arch_quark = g_array_index (f->archs, GQuark, i);
@@ -976,7 +976,10 @@ test_repetition (Fixture *f,
       const SrtKnownArchitecture *known;
       const char *abi_path;
 
-      if (f->lib_temp_dirs == NULL)
+      if (f->lib_temp_dirs == NULL
+          || !fixture_has_arch (f, tuple)
+          || !(g_str_equal (tuple, SRT_ABI_X86_64)
+               || g_str_equal (tuple, SRT_ABI_I386)))
         continue;
 
       abi_path = pv_per_arch_dirs_get_abi_path (f->lib_temp_dirs,
@@ -998,7 +1001,6 @@ test_repetition (Fixture *f,
                               known->steam_gameoverlayrenderer_dir);
       g_assert_cmpstr (target, ==, expected->str);
     }
-#endif
 
   for (i = 0; i < G_N_ELEMENTS (modules); i++)
     pv_adverb_preload_module_clear (&modules[i]);
@@ -1071,16 +1073,6 @@ main (int argc,
 
   _srt_tests_init (&argc, &argv, NULL);
 
-#define add_test(name, function) \
-  do { \
-    g_test_add (name, \
-                Fixture, NULL, \
-                setup, function, teardown); \
-    g_test_add (name "/cannot-discover-platform", \
-                Fixture, &cannot_discover_platform, \
-                setup, function, teardown); \
-  } while (0)
-
 #define add_test_many_archs(name, function) \
   do { \
     g_test_add (name, \
@@ -1112,7 +1104,7 @@ main (int argc,
   add_test_many_archs ("/basic", test_basic);
   add_test_many_archs ("/biarch", test_biarch);
   add_test_many_archs ("/gameoverlayrenderer", test_gameoverlayrenderer);
-  add_test ("/repetition", test_repetition);
+  add_test_many_archs ("/repetition", test_repetition);
 
   /* This one isn't affected by whether we have the PvPerArchDirs or not */
   g_test_add ("/cli", Fixture, NULL,

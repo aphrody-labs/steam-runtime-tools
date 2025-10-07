@@ -16,6 +16,13 @@
 
 typedef struct
 {
+  const char * const *architectures;
+  gboolean can_discover_platform;
+} Config;
+
+typedef struct
+{
+  const Config *config;
   TestsOpenFdSet old_fds;
   FlatpakBwrap *bwrap;
   PvPerArchDirs *lib_temp_dirs;
@@ -24,12 +31,8 @@ typedef struct
   GQuark primary_arch;
 } Fixture;
 
-typedef struct
-{
-  gboolean can_discover_platform;
-} Config;
-
 static const Config default_config = {
+  .architectures = NULL,
   .can_discover_platform = TRUE,
 };
 
@@ -44,18 +47,25 @@ setup (Fixture *f,
   if (config == NULL)
     config = &default_config;
 
+  f->config = config;
   f->archs = _srt_architecture_array_new ();
-  pv_architecture_array_populate_with_defaults (f->archs);
+
+  if (config->architectures != NULL)
+    {
+      for (i = 0; config->architectures[i] != NULL; i++)
+        {
+          GQuark arch_quark = g_quark_from_static_string (config->architectures[i]);
+
+          g_array_append_val (f->archs, arch_quark);
+        }
+    }
+  else
+    {
+      pv_architecture_array_populate_with_defaults (f->archs);
+    }
+
   g_return_if_fail (f->archs->len > 0);
   f->primary_arch = g_array_index (f->archs, GQuark, PV_PRIMARY_ARCHITECTURE);
-
-  /* For now we assume that
-   * pv_architecture_array_populate_with_defaults() uses the same
-   * items as pv_multiarch_tuples, in the same order.
-   * This assumption will be removed later. */
-  for (i = 0; i < f->archs->len; i++)
-    g_assert_cmpstr (g_quark_to_string (g_array_index (f->archs, GQuark, i)),
-                     ==, pv_multiarch_tuples[i]);
 
   f->old_fds = tests_check_fd_leaks_enter ();
   f->bwrap = flatpak_bwrap_new (flatpak_bwrap_empty_env);
@@ -955,7 +965,56 @@ test_repetition (Fixture *f,
     pv_adverb_preload_module_clear (&modules[i]);
 }
 
+static const char * const x86_archs[] =
+{
+  SRT_ABI_X86_64,
+  SRT_ABI_I386,
+  NULL
+};
+
+static const char * const x86_64_archs[] =
+{
+  SRT_ABI_X86_64,
+  NULL
+};
+
+static const char * const aarch64_archs[] =
+{
+  SRT_ABI_AARCH64,
+  NULL
+};
+
+static const Config aarch64_config = {
+  .architectures = aarch64_archs,
+  .can_discover_platform = TRUE,
+};
+
+static const Config x86_config = {
+  .architectures = x86_archs,
+  .can_discover_platform = TRUE,
+};
+
+static const Config x86_64_config = {
+  .architectures = x86_64_archs,
+  .can_discover_platform = TRUE,
+};
+
 static const Config cannot_discover_platform = {
+  .can_discover_platform = FALSE,
+};
+
+static const Config aarch64_cannot_discover_platform = {
+  .architectures = aarch64_archs,
+  .can_discover_platform = FALSE,
+};
+
+static const Config x86_cannot_discover_platform = {
+  .architectures = x86_archs,
+  .can_discover_platform = FALSE,
+};
+
+static const Config x86_64_cannot_discover_platform = {
+  .architectures = x86_64_archs,
   .can_discover_platform = FALSE,
 };
 
@@ -983,7 +1042,35 @@ main (int argc,
                 setup, function, teardown); \
   } while (0)
 
-  add_test ("/basic", test_basic);
+#define add_test_many_archs(name, function) \
+  do { \
+    g_test_add (name, \
+                Fixture, NULL, \
+                setup, function, teardown); \
+    g_test_add (name "/aarch64", \
+                Fixture, &aarch64_config, \
+                setup, function, teardown); \
+    g_test_add (name "/x86", \
+                Fixture, &x86_config, \
+                setup, function, teardown); \
+    g_test_add (name "/x86_64", \
+                Fixture, &x86_64_config, \
+                setup, function, teardown); \
+    g_test_add (name "/cannot-discover-platform", \
+                Fixture, &cannot_discover_platform, \
+                setup, function, teardown); \
+    g_test_add (name "/cannot-discover-platform/aarch64", \
+                Fixture, &aarch64_cannot_discover_platform, \
+                setup, function, teardown); \
+    g_test_add (name "/cannot-discover-platform/x86", \
+                Fixture, &x86_cannot_discover_platform, \
+                setup, function, teardown); \
+    g_test_add (name "/cannot-discover-platform/x86_64", \
+                Fixture, &x86_64_cannot_discover_platform, \
+                setup, function, teardown); \
+  } while (0)
+
+  add_test_many_archs ("/basic", test_basic);
   add_test ("/biarch", test_biarch);
   add_test ("/gameoverlayrenderer", test_gameoverlayrenderer);
   add_test ("/repetition", test_repetition);

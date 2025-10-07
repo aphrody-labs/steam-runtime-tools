@@ -136,7 +136,7 @@ typedef struct
   gsize abi_index;
 } PreloadInput;
 
-static void
+static gsize
 preload_inputs_to_modules (Fixture *f,
                            const PreloadInput *inputs,
                            gsize n_inputs,
@@ -144,19 +144,37 @@ preload_inputs_to_modules (Fixture *f,
                            gsize n_modules)
 {
   gsize i;
+  gsize used = 0;
 
-  g_return_if_fail (n_inputs == n_modules);
+  g_return_val_if_fail (n_inputs == n_modules, 0);
 
   for (i = 0; i < n_inputs; i++)
     {
-      modules[i].name = g_strdup (inputs[i].name);
-      modules[i].index_in_preload_variables = inputs[i].index_in_preload_variables;
+      if (inputs[i].abi_index != PV_UNSPECIFIED_ABI
+          && inputs[i].abi_index >= f->archs->len)
+        {
+          g_test_message ("Input ABI index not applicable, ignoring %s",
+                          inputs[i].name);
+          continue;
+        }
+
+      modules[used].name = g_strdup (inputs[i].name);
+      modules[used].index_in_preload_variables = inputs[i].index_in_preload_variables;
 
       if (inputs[i].abi_index == PV_UNSPECIFIED_ABI)
-        modules[i].architecture = 0;
+        {
+          modules[used].architecture = 0;
+        }
       else
-        modules[i].architecture = g_array_index (f->archs, GQuark, inputs[i].abi_index);
+        {
+          g_return_val_if_fail (inputs[i].abi_index < f->archs->len, 0);
+          modules[used].architecture = g_array_index (f->archs, GQuark, inputs[i].abi_index);
+        }
+
+      used++;
     }
+
+  return used;
 }
 
 static void
@@ -205,17 +223,19 @@ test_basic (Fixture *f,
   g_autoptr(GError) local_error = NULL;
   g_autoptr(GString) expected = g_string_new ("");
   g_autoptr(GString) path = g_string_new ("");
+  gsize n_modules;
   gboolean ret;
   gsize i;
 
-  preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
-                             modules, G_N_ELEMENTS (modules));
+  n_modules = preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
+                                         modules, G_N_ELEMENTS (modules));
+  g_assert_cmpuint (n_modules, <=, G_N_ELEMENTS (modules));
   ret = pv_adverb_set_up_preload_modules (f->bwrap,
                                           (const GQuark *) f->archs->data,
                                           f->archs->len,
                                           f->lib_temp_dirs,
                                           modules,
-                                          G_N_ELEMENTS (modules),
+                                          n_modules,
                                           &local_error);
   g_assert_no_error (local_error);
   g_assert_true (ret);
@@ -261,7 +281,7 @@ test_basic (Fixture *f,
 
   g_assert_cmpstr (f->bwrap->envp[i], ==, NULL);
 
-  for (i = 0; i < G_N_ELEMENTS (modules); i++)
+  for (i = 0; i < n_modules; i++)
     {
       g_autofree gchar *target = NULL;
 
@@ -302,7 +322,6 @@ static void
 test_biarch (Fixture *f,
              gconstpointer context)
 {
-#if PV_N_SUPPORTED_ARCHITECTURES >= 2
   static const PreloadInput inputs[] =
   {
     {
@@ -310,13 +329,13 @@ test_biarch (Fixture *f,
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = PV_UNSPECIFIED_ABI,
     },
-    /* In practice x86_64-linux-gnu */
+    /* In practice usually x86_64-linux-gnu */
     {
       .name = "/opt/lib0/libpreload.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
       .abi_index = 0,
     },
-    /* In practice i386-linux-gnu */
+    /* In practice usually i386-linux-gnu */
     {
       .name = "/opt/lib1/libpreload.so",
       .index_in_preload_variables = PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
@@ -327,17 +346,19 @@ test_biarch (Fixture *f,
   g_autoptr(GError) local_error = NULL;
   g_autoptr(GString) expected = g_string_new ("");
   g_autoptr(GString) path = g_string_new ("");
+  gsize n_modules;
   gboolean ret;
   gsize i;
 
-  preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
-                             modules, G_N_ELEMENTS (modules));
+  n_modules = preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
+                                         modules, G_N_ELEMENTS (modules));
+  g_assert_cmpuint (n_modules, <=, G_N_ELEMENTS (modules));
   ret = pv_adverb_set_up_preload_modules (f->bwrap,
                                           (const GQuark *) f->archs->data,
                                           f->archs->len,
                                           f->lib_temp_dirs,
                                           modules,
-                                          G_N_ELEMENTS (modules),
+                                          n_modules,
                                           &local_error);
   g_assert_no_error (local_error);
   g_assert_true (ret);
@@ -362,8 +383,12 @@ test_biarch (Fixture *f,
   else
     {
       g_string_append (expected, "/opt/lib0/libpreload.so");
-      g_string_append_c (expected, ':');
-      g_string_append (expected, "/opt/lib1/libpreload.so");
+
+      if (f->archs->len > 1)
+        {
+          g_string_append_c (expected, ':');
+          g_string_append (expected, "/opt/lib1/libpreload.so");
+        }
     }
 
   g_assert_cmpstr (f->bwrap->envp[i], ==, expected->str);
@@ -398,10 +423,6 @@ test_biarch (Fixture *f,
 
   for (i = 0; i < G_N_ELEMENTS (modules); i++)
     pv_adverb_preload_module_clear (&modules[i]);
-#else
-  /* In practice this is reached on non-x86 */
-  g_test_skip ("Biarch libraries not supported on this architecture");
-#endif
 }
 
 typedef struct
@@ -597,19 +618,21 @@ test_gameoverlayrenderer (Fixture *f,
   g_autoptr(GError) local_error = NULL;
   g_autoptr(GString) expected = g_string_new ("");
   g_autoptr(GString) path = g_string_new ("");
+  gsize n_modules;
   gboolean ret;
   gsize i;
 
   g_return_if_fail (f->archs->len == 2);
 
-  preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
-                             modules, G_N_ELEMENTS (modules));
+  n_modules = preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
+                                         modules, G_N_ELEMENTS (modules));
+  g_assert_cmpuint (n_modules, ==, G_N_ELEMENTS (modules));
   ret = pv_adverb_set_up_preload_modules (f->bwrap,
                                           (const GQuark *) f->archs->data,
                                           f->archs->len,
                                           f->lib_temp_dirs,
                                           modules,
-                                          G_N_ELEMENTS (modules),
+                                          n_modules,
                                           &local_error);
   g_assert_no_error (local_error);
   g_assert_true (ret);
@@ -767,17 +790,19 @@ test_repetition (Fixture *f,
   g_autoptr(GError) local_error = NULL;
   g_autoptr(GString) expected = g_string_new ("");
   g_autoptr(GString) path = g_string_new ("");
+  gsize n_modules;
   gboolean ret;
   gsize i;
 
-  preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
-                             modules, G_N_ELEMENTS (modules));
+  n_modules = preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
+                                         modules, G_N_ELEMENTS (modules));
+  g_assert_cmpuint (n_modules, ==, G_N_ELEMENTS (modules));
   ret = pv_adverb_set_up_preload_modules (f->bwrap,
                                           (const GQuark *) f->archs->data,
                                           f->archs->len,
                                           f->lib_temp_dirs,
                                           modules,
-                                          G_N_ELEMENTS (modules),
+                                          n_modules,
                                           &local_error);
   g_assert_no_error (local_error);
   g_assert_true (ret);
@@ -897,7 +922,7 @@ test_repetition (Fixture *f,
                                                 arch_quark);
       g_assert_nonnull (abi_path);
 
-      for (j = 0; j < G_N_ELEMENTS (modules); j++)
+      for (j = 0; j < n_modules; j++)
         {
           g_autofree gchar *target = NULL;
 
@@ -1071,7 +1096,7 @@ main (int argc,
   } while (0)
 
   add_test_many_archs ("/basic", test_basic);
-  add_test ("/biarch", test_biarch);
+  add_test_many_archs ("/biarch", test_biarch);
   add_test ("/gameoverlayrenderer", test_gameoverlayrenderer);
   add_test ("/repetition", test_repetition);
 

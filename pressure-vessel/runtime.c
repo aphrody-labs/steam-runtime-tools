@@ -7576,6 +7576,7 @@ pv_runtime_bind (PvRuntime *self,
                  SrtEnvOverlay *container_env,
                  GError **error)
 {
+  g_autoptr(GString) archs_string = NULL;
   const char *value;
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
@@ -7798,6 +7799,21 @@ pv_runtime_bind (PvRuntime *self,
     }
 
   pv_runtime_set_search_paths (self, container_env);
+
+  archs_string = g_string_new ("");
+
+  for (gsize i = 0; i < self->tuples->len; i++)
+    {
+      GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
+
+      if (i > 0)
+        g_string_append_c (archs_string, ':');
+
+      g_string_append (archs_string, g_quark_to_string (tuple_quark));
+    }
+
+  _srt_env_overlay_set (container_env, "PRESSURE_VESSEL_ARCHITECTURES",
+                        archs_string->str);
 
   return TRUE;
 }

@@ -49,15 +49,7 @@ setup (Fixture *f,
   f->archs = _srt_architecture_array_new ();
   pv_architecture_array_populate_with_defaults (f->archs);
   g_return_if_fail (f->archs->len > 0);
-  f->primary_arch = g_array_index (f->archs, GQuark, PV_PRIMARY_ARCHITECTURE);
-
-  /* For now we assume that
-   * pv_architecture_array_populate_with_defaults() uses the same
-   * items as pv_multiarch_tuples, in the same order.
-   * This assumption will be removed later. */
-  for (i = 0; i < f->archs->len; i++)
-    g_assert_cmpstr (g_quark_to_string (g_array_index (f->archs, GQuark, i)),
-                     ==, pv_multiarch_tuples[i]);
+  f->primary_arch = g_array_index (f->archs, GQuark, 0);
 
   f->old_fds = tests_check_fd_leaks_enter ();
   f->bwrap = flatpak_bwrap_new (flatpak_bwrap_empty_env);

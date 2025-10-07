@@ -65,7 +65,7 @@ setup (Fixture *f,
     }
 
   g_return_if_fail (f->archs->len > 0);
-  f->primary_arch = g_array_index (f->archs, GQuark, PV_PRIMARY_ARCHITECTURE);
+  f->primary_arch = g_array_index (f->archs, GQuark, 0);
 
   f->old_fds = tests_check_fd_leaks_enter ();
   f->bwrap = flatpak_bwrap_new (flatpak_bwrap_empty_env);

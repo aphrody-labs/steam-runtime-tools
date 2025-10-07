@@ -24,20 +24,6 @@
 #include "steam-runtime-tools/architecture.h"
 #include "steam-runtime-tools/architecture-internal.h"
 
-#if defined(__i386__) || defined(__x86_64__)
-#define PV_N_SUPPORTED_ARCHITECTURES 2
-#else
-/* x86 is a special case where we have a biarch setup. For all the other
- * cases we expect a single supported architecture */
-#define PV_N_SUPPORTED_ARCHITECTURES 1
-#endif
-
-/* Currently the 0'th architecture is always the primary one
- * (x86_64 on x86) */
-#define PV_PRIMARY_ARCHITECTURE 0
-
-extern const char * const pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES + 1];
-
 /*
  * PvMultiarchLibdirsFlags:
  * @PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN:

@@ -26,13 +26,8 @@
 #include "steam-runtime-tools/architecture.h"
 #include "libglnx.h"
 
-/*
- * Supported Debian-style multiarch tuples
- */
-const char * const pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES + 1] =
+static const char * const default_architectures[] =
 {
-  /* The conditional branches here need to be kept in sync with
-   * pv_multiarch_details and PV_N_SUPPORTED_ARCHITECTURES */
 #if defined(__i386__) || defined(__x86_64__)
   "x86_64-linux-gnu",
   "i386-linux-gnu",
@@ -41,9 +36,8 @@ const char * const pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES + 1] =
 #elif defined(_SRT_MULTIARCH)
   _SRT_MULTIARCH,
 #else
-#error Architecture not supported by pressure-vessel
+#error Please build with -Dmultiarch_tuple=...
 #endif
-  NULL
 };
 
 /*
@@ -124,9 +118,9 @@ pv_architecture_array_populate_with_defaults (GArray *arch_quarks)
 {
   gsize i;
 
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
+  for (i = 0; i < G_N_ELEMENTS (default_architectures); i++)
     {
-      GQuark arch_quark = g_quark_from_static_string (pv_multiarch_tuples[i]);
+      GQuark arch_quark = g_quark_from_static_string (default_architectures[i]);
 
       g_return_if_fail (arch_quark != 0);
       g_array_append_val (arch_quarks, arch_quark);

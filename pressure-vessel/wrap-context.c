@@ -43,10 +43,7 @@ static void
 pv_wrap_options_init (PvWrapOptions *self)
 {
   self->pass_fds = g_array_new (FALSE, FALSE, sizeof (int));
-  self->architectures = g_array_new (TRUE,  /* add an extra 0 entry at the end */
-                                     TRUE,  /* zero-fill new entries */
-                                     sizeof (GQuark));
-
+  self->architectures = _srt_architecture_array_new ();
   self->preload_modules = g_array_new (FALSE, FALSE,
                                        sizeof (WrapPreloadModule));
   g_array_set_clear_func (self->preload_modules, wrap_preload_module_clear);

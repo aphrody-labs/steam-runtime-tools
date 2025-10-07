@@ -776,10 +776,7 @@ pv_runtime_init (PvRuntime *self)
   self->variable_dir_fd = -1;
   self->is_flatpak_env = g_file_test ("/.flatpak-info",
                                       G_FILE_TEST_IS_REGULAR);
-
-  self->tuples = g_array_new (TRUE,    /* allocate extra zeroed entry */
-                              TRUE,    /* zero-fill newly added entries */
-                              sizeof (GQuark));
+  self->tuples = _srt_architecture_array_new ();
 }
 
 static void
@@ -794,7 +791,7 @@ pv_runtime_get_property (GObject *object,
     {
       case PROP_ARCHITECTURES:
           {
-            g_autoptr(GArray) arr = g_array_new (TRUE, TRUE, sizeof (GQuark));
+            g_autoptr(GArray) arr = _srt_architecture_array_new ();
 
             g_array_append_vals (arr, self->tuples->data, self->tuples->len);
             g_value_take_boxed (value, g_steal_pointer (&arr));

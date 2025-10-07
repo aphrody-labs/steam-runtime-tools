@@ -2406,37 +2406,38 @@ test_remap_ld_preload_flatpak_no_runtime (Fixture *f,
 }
 
 /*
- * Test that the table of supported architectures is internally consistent
+ * Test that the default architectures are what we expect
  */
 static void
 test_supported_archs (Fixture *f,
                       gconstpointer context)
 {
-#if defined(__i386__) || defined(__x86_64__)
+  g_autoptr(GArray) arr = _srt_architecture_array_new ();
 
+  pv_architecture_array_populate_with_defaults (arr);
+
+#if defined(__i386__) || defined(__x86_64__)
   /* The primary architecture is x86_64, followed by i386
    * (implicitly secondary) */
-  g_assert_cmpint (PV_N_SUPPORTED_ARCHITECTURES, ==, 2);
-  g_assert_cmpstr (pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE], ==,
+  g_assert_cmpuint (arr->len, ==, 2);
+  g_assert_cmpstr (g_quark_to_string (g_array_index (arr, GQuark, 0)), ==,
                    SRT_ABI_X86_64);
-  g_assert_cmpstr (pv_multiarch_tuples[1], ==, SRT_ABI_I386);
+  g_assert_cmpstr (g_quark_to_string (g_array_index (arr, GQuark, 1)), ==,
+                   SRT_ABI_I386);
 
 #else /* !x86 */
 
   /* The only supported architecture is the one we were compiled for */
-  g_assert_cmpint (PV_N_SUPPORTED_ARCHITECTURES, ==, 1);
+  g_assert_cmpuint (arr->len, ==, 1);
 #if defined(__aarch64__)
-  g_assert_cmpstr (pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE], ==,
+  g_assert_cmpstr (g_quark_to_string (g_array_index (arr, GQuark, 0)), ==,
                    SRT_ABI_AARCH64);
 #else /* !aarch64 */
-  g_assert_cmpstr (pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE], ==,
+  g_assert_cmpstr (g_quark_to_string (g_array_index (arr, GQuark, 0)), ==,
                    _SRT_MULTIARCH);
 #endif /* !aarch64 */
 
 #endif /* !x86 */
-
-  /* The array of tuples has one extra element, to make it a GStrv */
-  g_assert_cmpstr (pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES], ==, NULL);
 }
 
 /*

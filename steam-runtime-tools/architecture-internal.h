@@ -100,3 +100,5 @@ _srt_architecture_array_new (void)
                       TRUE,             /* zero-fill new entries */
                       sizeof (GQuark));
 }
+
+void _srt_architecture_array_populate_with_defaults (GArray *arch_quarks);

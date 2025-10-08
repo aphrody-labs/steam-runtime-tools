@@ -47,7 +47,7 @@ setup (Fixture *f,
   gsize i;
 
   f->archs = _srt_architecture_array_new ();
-  pv_architecture_array_populate_with_defaults (f->archs);
+  _srt_architecture_array_populate_with_defaults (f->archs);
   g_return_if_fail (f->archs->len > 0);
   f->primary_arch = g_array_index (f->archs, GQuark, 0);
 

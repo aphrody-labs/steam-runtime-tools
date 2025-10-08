@@ -345,7 +345,7 @@ setup (Fixture *f,
     }
   else
     {
-      pv_architecture_array_populate_with_defaults (f->context->options.architectures);
+      _srt_architecture_array_populate_with_defaults (f->context->options.architectures);
     }
 
   g_assert_cmpuint (f->context->options.architectures->len, >=, 1);
@@ -2414,7 +2414,7 @@ test_supported_archs (Fixture *f,
 {
   g_autoptr(GArray) arr = _srt_architecture_array_new ();
 
-  pv_architecture_array_populate_with_defaults (arr);
+  _srt_architecture_array_populate_with_defaults (arr);
 
 #if defined(__i386__) || defined(__x86_64__)
   /* The primary architecture is x86_64, followed by i386
@@ -2425,7 +2425,7 @@ test_supported_archs (Fixture *f,
   g_assert_cmpstr (g_quark_to_string (g_array_index (arr, GQuark, 1)), ==,
                    SRT_ABI_I386);
 
-#else /* !x86 */
+#elif defined(_SRT_MULTIARCH) || defined(__aarch64__)
 
   /* The only supported architecture is the one we were compiled for */
   g_assert_cmpuint (arr->len, ==, 1);
@@ -2437,7 +2437,7 @@ test_supported_archs (Fixture *f,
                    _SRT_MULTIARCH);
 #endif /* !aarch64 */
 
-#endif /* !x86 */
+#endif /* defined(_SRT_MULTIARCH) || defined(__aarch64__) */
 }
 
 /*

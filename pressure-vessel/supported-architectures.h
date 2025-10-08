@@ -40,5 +40,4 @@ GPtrArray *pv_known_architecture_get_libdirs (const char *tuple,
                                               const SrtKnownArchitecture *known,
                                               PvMultiarchLibdirsFlags flags);
 
-void pv_architecture_array_populate_with_defaults (GArray *arch_quarks);
 void pv_architecture_array_populate_from_environ (GArray *arch_quarks);

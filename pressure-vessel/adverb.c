@@ -913,7 +913,7 @@ main (int argc,
     }
 
   if (tuples->len == 0)
-    pv_architecture_array_populate_with_defaults (tuples);
+    _srt_architecture_array_populate_with_defaults (tuples);
 
   ret = EX_UNAVAILABLE;
 

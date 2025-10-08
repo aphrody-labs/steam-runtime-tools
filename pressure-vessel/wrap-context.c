@@ -1161,7 +1161,7 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
   /* If no architectures have been configured, the default is whatever
    * architectures are hard-coded to be supported */
   if (self->architectures->len == 0)
-    pv_architecture_array_populate_with_defaults (self->architectures);
+    _srt_architecture_array_populate_with_defaults (self->architectures);
 
   for (i = 0; i < self->architectures->len; i++)
     {

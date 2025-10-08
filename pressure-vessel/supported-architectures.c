@@ -26,20 +26,6 @@
 #include "steam-runtime-tools/architecture.h"
 #include "libglnx.h"
 
-static const char * const default_architectures[] =
-{
-#if defined(__i386__) || defined(__x86_64__)
-  "x86_64-linux-gnu",
-  "i386-linux-gnu",
-#elif defined(__aarch64__)
-  "aarch64-linux-gnu",
-#elif defined(_SRT_MULTIARCH)
-  _SRT_MULTIARCH,
-#else
-#error Please build with -Dmultiarch_tuple=...
-#endif
-};
-
 /*
  * pv_known_architecture_get_libdirs:
  * @tuple: (nullable): A multiarch tuple, or %NULL
@@ -111,20 +97,6 @@ pv_known_architecture_get_libdirs (const char *tuple,
   g_ptr_array_add (dirs, g_strdup ("/usr/lib"));
 
   return g_steal_pointer (&dirs);
-}
-
-void
-pv_architecture_array_populate_with_defaults (GArray *arch_quarks)
-{
-  gsize i;
-
-  for (i = 0; i < G_N_ELEMENTS (default_architectures); i++)
-    {
-      GQuark arch_quark = g_quark_from_static_string (default_architectures[i]);
-
-      g_return_if_fail (arch_quark != 0);
-      g_array_append_val (arch_quarks, arch_quark);
-    }
 }
 
 void

@@ -61,7 +61,7 @@ setup (Fixture *f,
     }
   else
     {
-      pv_architecture_array_populate_with_defaults (f->archs);
+      _srt_architecture_array_populate_with_defaults (f->archs);
     }
 
   g_return_if_fail (f->archs->len > 0);

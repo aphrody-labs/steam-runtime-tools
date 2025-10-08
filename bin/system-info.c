@@ -41,6 +41,7 @@
 
 #include <json-glib/json-glib.h>
 
+#include <steam-runtime-tools/architecture-internal.h>
 #include <steam-runtime-tools/json-glib-backports-internal.h>
 #include <steam-runtime-tools/json-utils-internal.h>
 #include <steam-runtime-tools/log-internal.h>
@@ -1081,16 +1082,8 @@ main (int argc,
   g_autofree gchar *bin32_path = NULL;
   g_autofree gchar *rt_path = NULL;
   int opt;
-
-#if defined(__i386__) || defined(__x86_64__)
-  static const char * const multiarch_tuples[] = { SRT_ABI_X86_64, SRT_ABI_I386, NULL };
-#elif defined(_SRT_MULTIARCH)
-  static const char * const multiarch_tuples[] = { _SRT_MULTIARCH, NULL };
-#else
-#warning Unknown architecture, steam-runtime-system-info will assume x86
-  static const char * const multiarch_tuples[] = { SRT_ABI_X86_64, SRT_ABI_I386, NULL };
-#endif
-
+  const GQuark *multiarch_tuples;
+  gsize n_multiarch_tuples;
   GList *icds;
   GList *desktop_entries;
   const GList *icd_iter;
@@ -1187,12 +1180,20 @@ main (int argc,
     }
   else
     {
+      g_autoptr(GArray) default_tuples = NULL;
+
       info = srt_system_info_new (expectations);
-      srt_system_info_set_multiarch_tuples (info, multiarch_tuples);
+      default_tuples = _srt_architecture_array_new ();
+      _srt_architecture_array_populate_with_defaults (default_tuples);
+      _srt_system_info_set_multiarch_quarks (info,
+                                             (const GQuark *) default_tuples->data,
+                                             default_tuples->len);
 
       /* For unit testing */
       srt_system_info_set_sysroot (info, g_getenv ("SRT_TEST_SYSROOT"));
     }
+
+  multiarch_tuples = _srt_system_info_get_multiarch_quarks (info, &n_multiarch_tuples);
 
   builder = json_builder_new ();
   json_builder_begin_object (builder);
@@ -1337,9 +1338,7 @@ main (int argc,
   json_builder_set_member_name (builder, "architectures");
   json_builder_begin_object (builder);
 
-  g_assert (multiarch_tuples[G_N_ELEMENTS (multiarch_tuples) - 1] == NULL);
-
-  for (gsize i = 0; i < G_N_ELEMENTS (multiarch_tuples) - 1; i++)
+  for (gsize i = 0; i < n_multiarch_tuples; i++)
     {
       GList *libraries = NULL;
       GList *dri_list = NULL;
@@ -1352,16 +1351,16 @@ main (int argc,
       g_autoptr(GError) libdl_lib_error = NULL;
       g_autoptr(GError) libdl_platform_error = NULL;
       const char *ld_so;
+      const char *tuple = g_quark_to_string (multiarch_tuples[i]);
 
-      json_builder_set_member_name (builder, multiarch_tuples[i]);
+      json_builder_set_member_name (builder, tuple);
       json_builder_begin_object (builder);
       json_builder_set_member_name (builder, "can-run");
-      can_run = srt_system_info_can_run (info, multiarch_tuples[i]);
+      can_run = srt_system_info_can_run (info, tuple);
       json_builder_add_boolean_value (builder, can_run);
 
       json_builder_set_member_name (builder, "libdl-LIB");
-      libdl_lib = srt_system_info_dup_libdl_lib (info, multiarch_tuples[i],
-                                                 &libdl_lib_error);
+      libdl_lib = srt_system_info_dup_libdl_lib (info, tuple, &libdl_lib_error);
       if (libdl_lib != NULL)
         {
           json_builder_add_string_value (builder, libdl_lib);
@@ -1374,8 +1373,7 @@ main (int argc,
         }
 
       json_builder_set_member_name (builder, "libdl-PLATFORM");
-      libdl_platform = srt_system_info_dup_libdl_platform (info,
-                                                           multiarch_tuples[i],
+      libdl_platform = srt_system_info_dup_libdl_platform (info, tuple,
                                                            &libdl_platform_error);
       if (libdl_platform != NULL)
         {
@@ -1388,7 +1386,7 @@ main (int argc,
           json_builder_end_object (builder);
         }
 
-      ld_so = srt_architecture_get_expected_runtime_linker (multiarch_tuples[i]);
+      ld_so = srt_architecture_get_expected_runtime_linker (tuple);
 
       if (ld_so != NULL)
         {
@@ -1401,8 +1399,7 @@ main (int argc,
               json_builder_set_member_name (builder, "path");
               json_builder_add_string_value (builder, ld_so);
 
-              if (srt_system_info_check_runtime_linker (info,
-                                                        multiarch_tuples[i],
+              if (srt_system_info_check_runtime_linker (info, tuple,
                                                         &real, &local_error))
                 {
                   json_builder_set_member_name (builder, "resolved");
@@ -1420,8 +1417,7 @@ main (int argc,
         {
           json_builder_set_member_name (builder, "library-issues-summary");
           json_builder_begin_array (builder);
-          library_issues = srt_system_info_check_libraries (info,
-                                                            multiarch_tuples[i],
+          library_issues = srt_system_info_check_libraries (info, tuple,
                                                             &libraries);
           jsonify_library_issues (builder, library_issues);
           json_builder_end_array (builder);
@@ -1434,28 +1430,27 @@ main (int argc,
         {
           g_autoptr(SrtObjectList) graphics_list = NULL;
 
-          graphics_list = srt_system_info_check_all_graphics (info,
-                                                              multiarch_tuples[i]);
+          graphics_list = srt_system_info_check_all_graphics (info, tuple);
           print_graphics_details (builder, graphics_list);
         }
 
-      dri_list = srt_system_info_list_dri_drivers (info, multiarch_tuples[i],
+      dri_list = srt_system_info_list_dri_drivers (info, tuple,
                                                    extra_driver_flags);
       print_dri_details (builder, dri_list);
 
-      va_api_list = srt_system_info_list_va_api_drivers (info, multiarch_tuples[i],
+      va_api_list = srt_system_info_list_va_api_drivers (info, tuple,
                                                          extra_driver_flags);
       print_va_api_details (builder, va_api_list);
 
-      vdpau_list = srt_system_info_list_vdpau_drivers (info, multiarch_tuples[i],
+      vdpau_list = srt_system_info_list_vdpau_drivers (info, tuple,
                                                        extra_driver_flags);
       print_vdpau_details (builder, vdpau_list);
 
-      glx_list = srt_system_info_list_glx_icds (info, multiarch_tuples[i],
+      glx_list = srt_system_info_list_glx_icds (info, tuple,
                                                 SRT_DRIVER_FLAGS_INCLUDE_ALL);
       print_glx_details (builder, glx_list);
 
-      openxr_1_rt = srt_system_info_dup_openxr_1_runtime (info, multiarch_tuples[i]);
+      openxr_1_rt = srt_system_info_dup_openxr_1_runtime (info, tuple);
       if (openxr_1_rt != NULL)
         {
           json_builder_set_member_name (builder, "openxr-1-runtime");
@@ -1699,7 +1694,13 @@ main (int argc,
    * the shorthand of passing in NULL to mean all of the SrtSystemInfo's
    * architectures, because it can't know whether we already called
    * srt_system_info_dup_openxr_1_runtime() for all of them */
-  icds = srt_system_info_list_inactive_openxr_1_runtimes (info, multiarch_tuples);
+    {
+      g_auto(GStrv) tuples = srt_system_info_dup_multiarch_tuples (info);
+
+      icds = srt_system_info_list_inactive_openxr_1_runtimes (info,
+                                                              _srt_const_strv (tuples));
+    }
+
   for (icd_iter = icds; icd_iter != NULL; icd_iter = icd_iter->next)
     print_openxr_1_runtime_details (builder, icd_iter->data);
 

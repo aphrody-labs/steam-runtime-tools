@@ -1900,6 +1900,7 @@ pv_runtime_adverb_regenerate_ld_so_cache (PvRuntime *self,
       const char *tuple = g_quark_to_string (tuple_quark);
       g_autofree gchar *ld_path = NULL;
       g_autofree gchar *aliases = NULL;
+      gboolean keep_in_ldlp = FALSE;
 
       ld_path = g_build_filename (self->overrides_in_container, "lib",
                                   tuple, NULL);
@@ -1921,6 +1922,25 @@ pv_runtime_adverb_regenerate_ld_so_cache (PvRuntime *self,
        * the ld.so.cache - this will not work for games that incorrectly
        * reset the LD_LIBRARY_PATH, but is better than nothing! */
       if (self->mutable_sysroot == NULL)
+        keep_in_ldlp = TRUE;
+
+      /* Each ldconfig(8) implementation will write its own libraries,
+       * and zero or more foreign architectures' libraries, into the
+       * ld.so.cache.
+       * For example x86_64 ldconfig(8) handles its own libraries,
+       * plus i386 and x32 libraries.
+       * If it does, we can remove the corresponding directories from the
+       * LD_LIBRARY_PATH to get a search order that more closely resembles
+       * the "real" host machine.
+       * Conversely, if it does not (for example aarch64 libraries when we
+       * are running an x86_64 ldconfig(8)), we will have to keep those
+       * directories in the LD_LIBRARY_PATH, otherwise the foreign
+       * architecture's libraries will not be found. */
+      if (!_srt_architecture_ldconfig_knows_architecture (self->ldconfig_architecture,
+                                                          tuple))
+        keep_in_ldlp = TRUE;
+
+      if (keep_in_ldlp)
         pv_search_path_append (ldlp_after_regen, ld_path);
 
       pv_search_path_append (ldlp_after_regen, aliases);

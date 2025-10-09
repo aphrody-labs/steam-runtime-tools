@@ -776,10 +776,7 @@ pv_runtime_init (PvRuntime *self)
   self->variable_dir_fd = -1;
   self->is_flatpak_env = g_file_test ("/.flatpak-info",
                                       G_FILE_TEST_IS_REGULAR);
-
-  self->tuples = g_array_new (TRUE,    /* allocate extra zeroed entry */
-                              TRUE,    /* zero-fill newly added entries */
-                              sizeof (GQuark));
+  self->tuples = _srt_architecture_array_new ();
 }
 
 static void
@@ -794,7 +791,7 @@ pv_runtime_get_property (GObject *object,
     {
       case PROP_ARCHITECTURES:
           {
-            g_autoptr(GArray) arr = g_array_new (TRUE, TRUE, sizeof (GQuark));
+            g_autoptr(GArray) arr = _srt_architecture_array_new ();
 
             g_array_append_vals (arr, self->tuples->data, self->tuples->len);
             g_value_take_boxed (value, g_steal_pointer (&arr));
@@ -7579,6 +7576,7 @@ pv_runtime_bind (PvRuntime *self,
                  SrtEnvOverlay *container_env,
                  GError **error)
 {
+  g_autoptr(GString) archs_string = NULL;
   const char *value;
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
@@ -7801,6 +7799,21 @@ pv_runtime_bind (PvRuntime *self,
     }
 
   pv_runtime_set_search_paths (self, container_env);
+
+  archs_string = g_string_new ("");
+
+  for (gsize i = 0; i < self->tuples->len; i++)
+    {
+      GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
+
+      if (i > 0)
+        g_string_append_c (archs_string, ':');
+
+      g_string_append (archs_string, g_quark_to_string (tuple_quark));
+    }
+
+  _srt_env_overlay_set (container_env, "PRESSURE_VESSEL_ARCHITECTURES",
+                        archs_string->str);
 
   return TRUE;
 }

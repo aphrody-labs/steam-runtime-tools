@@ -584,3 +584,34 @@ _srt_architecture_guess_from_user_input (const char *alias,
    * give the user the benefit of the doubt */
   return g_quark_from_string (normalized);
 }
+
+static const char * const default_architectures[] =
+{
+#if defined(__i386__) || defined(__x86_64__)
+  SRT_ABI_X86_64,
+  SRT_ABI_I386,
+#elif defined(__aarch64__)
+  SRT_ABI_AARCH64,
+#elif defined(_SRT_MULTIARCH)
+  _SRT_MULTIARCH,
+#else
+#warning Unknown architecture, please build with -Dmultiarch_tuple=...
+  /* Assuming we are interested in x86 is marginally better than nothing */
+  SRT_ABI_X86_64,
+  SRT_ABI_I386,
+#endif
+};
+
+void
+_srt_architecture_array_populate_with_defaults (GArray *arch_quarks)
+{
+  gsize i;
+
+  for (i = 0; i < G_N_ELEMENTS (default_architectures); i++)
+    {
+      GQuark arch_quark = g_quark_from_static_string (default_architectures[i]);
+
+      g_return_if_fail (arch_quark != 0);
+      g_array_append_val (arch_quarks, arch_quark);
+    }
+}

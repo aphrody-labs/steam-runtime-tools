@@ -15,6 +15,8 @@
 #include "per-arch-dirs.h"
 
 gboolean pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
+                                       const GQuark *archs,
+                                       gsize n_archs,
                                        PvPerArchDirs *lib_temp_dirs,
                                        const char *prefix,
                                        const char *overrides,
@@ -23,6 +25,8 @@ gboolean pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
                                        GError **error);
 
 void pv_adverb_set_up_dynamic_sdls (FlatpakBwrap *wrapped_command,
+                                    const GQuark *archs,
+                                    gsize n_archs,
                                     PvPerArchDirs *lib_temp_dirs,
                                     const char *prefix,
                                     const char *overrides,

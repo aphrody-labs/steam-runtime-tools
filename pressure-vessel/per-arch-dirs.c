@@ -22,12 +22,13 @@
 
 #include <glib/gstdio.h>
 
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/system-info.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 static gchar *
-get_libdl_lib_or_mock (SrtSystemInfo *system_info,
-                       gsize abi,
+get_libdl_lib_or_mock (GQuark arch_quark,
+                       SrtSystemInfo *system_info,
                        GError **error)
 {
   if (g_getenv ("PRESSURE_VESSEL_TEST_STANDARDIZE_PLATFORM") != NULL)
@@ -39,199 +40,178 @@ get_libdl_lib_or_mock (SrtSystemInfo *system_info,
   else
     {
       return srt_system_info_dup_libdl_lib (system_info,
-                                            pv_multiarch_details[abi].tuple,
+                                            g_quark_to_string (arch_quark),
                                             error);
     }
 }
 
 static gchar *
-get_libdl_platform_or_mock (SrtSystemInfo *system_info,
-                            gsize abi,
+get_libdl_platform_or_mock (GQuark arch_quark,
+                            SrtSystemInfo *system_info,
                             GError **error)
 {
-  if (g_getenv ("PRESSURE_VESSEL_TEST_STANDARDIZE_PLATFORM") != NULL)
+  if (G_UNLIKELY (g_getenv ("PRESSURE_VESSEL_TEST_STANDARDIZE_PLATFORM") != NULL))
     {
       /* In unit tests it isn't straightforward to find the real
        * ${PLATFORM}, so we use a predictable mock implementation:
        * for x86 we use whichever platform happens to be listed first
        * and for all the other cases we simply use "mock". */
-#if defined(__i386__) || defined(__x86_64__)
-      return g_strdup (pv_multiarch_details[abi].platforms[0]);
-#else
+      const char *tuple = g_quark_to_string (arch_quark);
+      const SrtKnownArchitecture *known;
+
+      known = _srt_architecture_get_by_tuple (tuple);
+
+      if (g_str_equal (tuple, SRT_ABI_X86_64) || g_str_equal (tuple, SRT_ABI_I386))
+        {
+          g_assert (known != NULL);
+          g_assert (known->libdl_platform_expansions != NULL);
+          g_assert (known->libdl_platform_expansions[0] != NULL);
+          return g_strdup (known->libdl_platform_expansions[0]);
+        }
+
       return g_strdup("mock");
-#endif
     }
   else
     {
       return srt_system_info_dup_libdl_platform (system_info,
-                                                 pv_multiarch_details[abi].tuple,
+                                                 g_quark_to_string (arch_quark),
                                                  error);
     }
 }
 
 /*
  * PvPerArchDirsScheme:
- * @PV_PER_ARCH_DIRS_SCHEME_MULTIARCH: Debian-style multiarch.
- *  `${LIB}` expands to `lib/x86_64-linux-gnu` or similar.
- * @PV_PER_ARCH_DIRS_SCHEME_UBUNTU_1204: An early implementation of multiarch.
- *  `${LIB}` expands to `x86_64-linux-gnu` or similar.
- * @PV_PER_ARCH_DIRS_SCHEME_FHS: FHS library directories, as used in Red Hat.
- *  `${LIB}` expands to `lib` on i386 and `lib64` on x86_64.
- * @PV_PER_ARCH_DIRS_SCHEME_ARCH: Arch Linux's variant of FHS library
- *  directories. `${LIB}` expands to `lib32` on i386 and `lib` on x86_64.
- *  Does not exist on non-x86: use %PV_PER_ARCH_DIRS_SCHEME_FHS instead.
- * @PV_PER_ARCH_DIRS_SCHEME_LIBQUAL: The variant of FHS library directories
- *  used in Clear Linux and Solus.
- *  `${LIB}` expands to `lib32` on i386 and `lib64` on x86_64.
- *  Does not exist on non-x86: use %PV_PER_ARCH_DIRS_SCHEME_FHS instead.
+ * @PV_PER_ARCH_DIRS_SCHEME_LIB: `${LIB}` expands to a known/supported
+ *  library directory.
  * @PV_PER_ARCH_DIRS_SCHEME_PLATFORM: `${PLATFORM}` expands to a
  *  known/supported platform alias.
- * @PV_PER_ARCH_DIRS_SCHEME_NONE: None of the above.
  */
 typedef enum
 {
-  PV_PER_ARCH_DIRS_SCHEME_NONE = 0,
-  PV_PER_ARCH_DIRS_SCHEME_MULTIARCH,
-  PV_PER_ARCH_DIRS_SCHEME_UBUNTU_1204,
-  PV_PER_ARCH_DIRS_SCHEME_FHS,
-#if defined(__i386__) || defined(__x86_64__)
-  PV_PER_ARCH_DIRS_SCHEME_ARCH,
-  PV_PER_ARCH_DIRS_SCHEME_LIBQUAL,
-#endif
+  PV_PER_ARCH_DIRS_SCHEME_LIB,
   PV_PER_ARCH_DIRS_SCHEME_PLATFORM,
 } PvPerArchDirsScheme;
-
-#if defined(__i386__) || defined(__x86_64__)
-  static const char * const multiarch_libs[] = { "lib/x86_64-linux-gnu", "lib/i386-linux-gnu" };
-  static const char * const fhs_libs[] = { "lib64", "lib" };
-  static const char * const arch_libs[] = { "lib", "lib32" };
-  static const char * const libqual_libs[] = { "lib64", "lib32" };
-#elif defined(__aarch64__)
-  static const char * const multiarch_libs[] = { "lib/aarch64-linux-gnu" };
-  static const char * const fhs_libs[] = { "lib" };
-#elif defined(_SRT_MULTIARCH)
-  static const char * const multiarch_libs[] = { "lib/" _SRT_MULTIARCH };
-  static const char * const fhs_libs[] = { "lib" };
-#else
-#error Architecture not supported by pressure-vessel
-#endif
-
-G_STATIC_ASSERT (G_N_ELEMENTS (multiarch_libs) == PV_N_SUPPORTED_ARCHITECTURES);
-G_STATIC_ASSERT (G_N_ELEMENTS (fhs_libs) == PV_N_SUPPORTED_ARCHITECTURES);
-#if defined(__i386__) || defined(__x86_64__)
-G_STATIC_ASSERT (G_N_ELEMENTS (arch_libs) == PV_N_SUPPORTED_ARCHITECTURES);
-G_STATIC_ASSERT (G_N_ELEMENTS (libqual_libs) == PV_N_SUPPORTED_ARCHITECTURES);
-#endif
-
-static gboolean
-pv_per_arch_dirs_supports_scheme (SrtSystemInfo *system_info,
-                                  PvPerArchDirsScheme scheme)
-{
-  gsize abi;
-
-  for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
-    {
-      g_autofree gchar *libdl_string = NULL;
-      const char *multiarch_tuple = pv_multiarch_details[abi].tuple;
-
-      switch (scheme)
-        {
-          case PV_PER_ARCH_DIRS_SCHEME_MULTIARCH:
-          case PV_PER_ARCH_DIRS_SCHEME_UBUNTU_1204:
-          case PV_PER_ARCH_DIRS_SCHEME_FHS:
-#if defined(__i386__) || defined(__x86_64__)
-          case PV_PER_ARCH_DIRS_SCHEME_ARCH:
-          case PV_PER_ARCH_DIRS_SCHEME_LIBQUAL:
-#endif
-            libdl_string = get_libdl_lib_or_mock (system_info, abi, NULL);
-            break;
-
-          case PV_PER_ARCH_DIRS_SCHEME_PLATFORM:
-            libdl_string = get_libdl_platform_or_mock (system_info, abi, NULL);
-            break;
-
-          case PV_PER_ARCH_DIRS_SCHEME_NONE:
-          default:
-            g_return_val_if_reached (FALSE);
-        }
-
-      switch (scheme)
-        {
-          case PV_PER_ARCH_DIRS_SCHEME_MULTIARCH:
-            g_return_val_if_fail (g_str_has_prefix (multiarch_libs[abi], "lib/"), FALSE);
-            g_return_val_if_fail (g_str_equal (multiarch_libs[abi] + 4, multiarch_tuple), FALSE);
-
-            if (libdl_string == NULL
-                || !g_str_equal (libdl_string, multiarch_libs[abi]))
-              return FALSE;
-
-            break;
-
-          case PV_PER_ARCH_DIRS_SCHEME_UBUNTU_1204:
-            if (libdl_string == NULL
-                || !g_str_equal (libdl_string, multiarch_tuple))
-              return FALSE;
-
-            break;
-
-          case PV_PER_ARCH_DIRS_SCHEME_FHS:
-            if (libdl_string == NULL
-                || !g_str_equal (libdl_string, fhs_libs[abi]))
-              return FALSE;
-
-            break;
-
-#if defined(__i386__) || defined(__x86_64__)
-          case PV_PER_ARCH_DIRS_SCHEME_ARCH:
-            if (libdl_string == NULL
-                || !g_str_equal (libdl_string, arch_libs[abi]))
-              return FALSE;
-
-            break;
-
-          case PV_PER_ARCH_DIRS_SCHEME_LIBQUAL:
-            if (libdl_string == NULL
-                || !g_str_equal (libdl_string, libqual_libs[abi]))
-              return FALSE;
-
-            break;
-#endif
-
-          case PV_PER_ARCH_DIRS_SCHEME_PLATFORM:
-            if (libdl_string == NULL)
-              return FALSE;
-
-            break;
-
-          case PV_PER_ARCH_DIRS_SCHEME_NONE:
-          default:
-            g_return_val_if_reached (FALSE);
-        }
-    }
-
-  return TRUE;
-}
 
 void
 pv_per_arch_dirs_free (PvPerArchDirs *self)
 {
-  gsize abi;
-
   if (self->root_path != NULL)
     _srt_rm_rf (self->root_path);
 
   g_clear_pointer (&self->root_path, g_free);
   g_clear_pointer (&self->libdl_token_path, g_free);
-
-  for (abi = 0; abi < G_N_ELEMENTS (self->abi_paths); abi++)
-    g_clear_pointer (&self->abi_paths[abi], g_free);
-
+  g_clear_pointer (&self->abi_paths, g_hash_table_unref);
   g_free (self);
 }
 
-PvPerArchDirs *
-pv_per_arch_dirs_new (GError **error)
+/*
+ * If @scheme distinguishes between all the architectures in @architectures,
+ * populate @libdl_token_path and @abi_paths, and return %TRUE.
+ * Else return %FALSE.
+ */
+static gboolean
+pv_per_arch_dirs_try_scheme (PvPerArchDirs *self,
+                             SrtSystemInfo *info,
+                             PvPerArchDirsScheme scheme,
+                             const GQuark *architectures,
+                             gsize n_architectures,
+                             GError **error)
 {
+  /* Values are owned by the array */
+  g_autoptr(GPtrArray) ordered_strings = NULL;
+  /* Values are borrowed from @ordered_strings */
+  g_autoptr(GHashTable) unique_strings = NULL;
+  gsize i;
+
+  ordered_strings = g_ptr_array_new_with_free_func (g_free);
+  unique_strings = g_hash_table_new (g_str_hash, g_str_equal);
+
+  for (i = 0; i < n_architectures; i++)
+    {
+      g_autofree gchar *libdl_string = NULL;
+      const char *label;
+
+      switch (scheme)
+        {
+          case PV_PER_ARCH_DIRS_SCHEME_LIB:
+            label = "${LIB}";
+            libdl_string = get_libdl_lib_or_mock (architectures[i], info, error);
+            break;
+          case PV_PER_ARCH_DIRS_SCHEME_PLATFORM:
+            label = "${PLATFORM}";
+            libdl_string = get_libdl_platform_or_mock (architectures[i], info, error);
+            break;
+          default:
+            g_return_val_if_reached (FALSE);
+        }
+
+      /* Short-circuit: if we failed to expand ${LIB}/${PLATFORM} on
+       * any one architecture, then it can't possibly be the case
+       * that we have a unique expansion on every architecture. */
+      if (libdl_string == NULL)
+        return glnx_prefix_error (error,
+                                  "Unable to determine %s for %s",
+                                  label, g_quark_to_string (architectures[i]));
+
+      g_assert (ordered_strings->len == i);
+      g_hash_table_add (unique_strings, libdl_string);
+      g_ptr_array_add (ordered_strings, g_steal_pointer (&libdl_string));
+    }
+
+  g_assert (ordered_strings->len == n_architectures);
+
+  /* Use the pigeonhole principle: tf we have fewer results than
+   * architectures, then that must mean two architectures expanded
+   * to the same value, which means we cannot use this token to distinguish
+   * between all the architectures we want to
+   *
+   * For example on Arch Linux, `${LIB}` is expected to expand to `lib`
+   * on both x86_64 and aarch64. */
+  if (g_hash_table_size (unique_strings) != n_architectures)
+    return glnx_throw (error,
+                       "Only %u unique expansions of ${LIB} for %zu architectures",
+                       g_hash_table_size (unique_strings),
+                       n_architectures);
+
+  /* Each architecture has a unique ${LIB}/${PLATFORM}, so we can use
+   * /tmp/pressure-vessel-libs-XXXXXX/${LIB}/libfoo.so or
+   * /tmp/pressure-vessel-libs-XXXXXX/${PLATFORM}/libfoo.so */
+
+  switch (scheme)
+    {
+      case PV_PER_ARCH_DIRS_SCHEME_LIB:
+        self->libdl_token_path = g_build_filename (self->root_path, "${LIB}", NULL);
+        break;
+      case PV_PER_ARCH_DIRS_SCHEME_PLATFORM:
+        self->libdl_token_path = g_build_filename (self->root_path, "${PLATFORM}", NULL);
+        break;
+      default:
+        g_return_val_if_reached (FALSE);
+    }
+
+  self->abi_paths = g_hash_table_new_full (g_direct_hash, g_direct_equal,
+                                           NULL, g_free);
+
+  for (i = 0; i < n_architectures; i++)
+    {
+      const char *libdl_string = g_ptr_array_index (ordered_strings, i);
+
+      g_assert (libdl_string != NULL);
+      g_hash_table_replace (self->abi_paths,
+                            GUINT_TO_POINTER (architectures[i]),
+                            g_build_filename (self->root_path, libdl_string, NULL));
+    }
+
+  return TRUE;
+}
+
+PvPerArchDirs *
+pv_per_arch_dirs_new (const GQuark *architectures,
+                      gsize n_architectures,
+                      GError **error)
+{
+  g_autoptr(GError) lib_error = NULL;
+  g_autoptr(GError) platform_error = NULL;
   g_autoptr(PvPerArchDirs) self = g_new0 (PvPerArchDirs, 1);
   g_autoptr(SrtSystemInfo) info = NULL;
   gsize abi;
@@ -243,63 +223,20 @@ pv_per_arch_dirs_new (GError **error)
     return glnx_prefix_error_null (error,
                                    "Cannot create temporary directory for platform specific libraries");
 
-  if (pv_per_arch_dirs_supports_scheme (info, PV_PER_ARCH_DIRS_SCHEME_MULTIARCH))
+  if (!pv_per_arch_dirs_try_scheme (self, info, PV_PER_ARCH_DIRS_SCHEME_LIB,
+                                    architectures, n_architectures, &lib_error)
+      && !pv_per_arch_dirs_try_scheme (self, info, PV_PER_ARCH_DIRS_SCHEME_PLATFORM,
+                                       architectures, n_architectures, &platform_error))
+    return glnx_null_throw (error,
+                            "Unable to identify uniquely identifying libdl tokens (%s; %s)",
+                            lib_error->message,
+                            platform_error->message);
+
+  for (abi = 0; abi < n_architectures; abi++)
     {
-      self->libdl_token_path = g_build_filename (self->root_path, "${LIB}", NULL);
+      const char *abi_path = pv_per_arch_dirs_get_abi_path (self, architectures[abi]);
 
-      for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
-        self->abi_paths[abi] = g_build_filename (self->root_path, multiarch_libs[abi], NULL);
-    }
-  else if (pv_per_arch_dirs_supports_scheme (info, PV_PER_ARCH_DIRS_SCHEME_UBUNTU_1204))
-    {
-      self->libdl_token_path = g_build_filename (self->root_path, "lib/${LIB}", NULL);
-
-      for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
-        self->abi_paths[abi] = g_build_filename (self->root_path, multiarch_libs[abi], NULL);
-    }
-  else if (pv_per_arch_dirs_supports_scheme (info, PV_PER_ARCH_DIRS_SCHEME_FHS))
-    {
-      self->libdl_token_path = g_build_filename (self->root_path, "${LIB}", NULL);
-
-      for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
-        self->abi_paths[abi] = g_build_filename (self->root_path, fhs_libs[abi], NULL);
-    }
-#if defined(__i386__) || defined(__x86_64__)
-  else if (pv_per_arch_dirs_supports_scheme (info, PV_PER_ARCH_DIRS_SCHEME_ARCH))
-    {
-      self->libdl_token_path = g_build_filename (self->root_path, "${LIB}", NULL);
-
-      for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
-        self->abi_paths[abi] = g_build_filename (self->root_path, arch_libs[abi], NULL);
-    }
-  else if (pv_per_arch_dirs_supports_scheme (info, PV_PER_ARCH_DIRS_SCHEME_LIBQUAL))
-    {
-      self->libdl_token_path = g_build_filename (self->root_path, "${LIB}", NULL);
-
-      for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
-        self->abi_paths[abi] = g_build_filename (self->root_path, libqual_libs[abi], NULL);
-    }
-#endif
-  else
-    {
-      self->libdl_token_path = g_build_filename (self->root_path,
-                                                 "${PLATFORM}", NULL);
-
-      for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
-        {
-          g_autofree gchar *libdl_platform = get_libdl_platform_or_mock (info, abi, error);
-
-          if (!libdl_platform)
-            return glnx_prefix_error_null (error,
-                                           "Unknown expansion of the dl string token $PLATFORM");
-
-          self->abi_paths[abi] = g_build_filename (self->root_path, libdl_platform, NULL);
-        }
-    }
-
-  for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
-    {
-      const char *abi_path = self->abi_paths[abi];
+      g_return_val_if_fail (abi_path != NULL, NULL);
 
       if (g_mkdir_with_parents (abi_path, 0700) != 0)
         return glnx_null_throw_errno_prefix (error, "Unable to create \"%s\"", abi_path);
@@ -310,6 +247,8 @@ pv_per_arch_dirs_new (GError **error)
 
 gboolean
 pv_adverb_set_up_overrides (FlatpakBwrap *wrapped_command,
+                            const GQuark *archs,
+                            gsize n_archs,
                             PvPerArchDirs *lib_temp_dirs,
                             const char *overrides,
                             GError **error)
@@ -322,13 +261,17 @@ pv_adverb_set_up_overrides (FlatpakBwrap *wrapped_command,
   if (lib_temp_dirs == NULL)
     return glnx_throw (error, "Unable to set up VDPAU driver search path");
 
-  for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
+  for (abi = 0; abi < n_archs; abi++)
     {
-      const char *multiarch_tuple = pv_multiarch_details[abi].tuple;
+      GQuark arch_quark = archs[abi];
+      const char *multiarch_tuple = g_quark_to_string (arch_quark);
       g_autofree gchar *abi_path = NULL;
       g_autofree gchar *target = NULL;
+      const char *abi_path_base;
 
-      abi_path = g_build_filename (lib_temp_dirs->abi_paths[abi], "vdpau", NULL);
+      abi_path_base = pv_per_arch_dirs_get_abi_path (lib_temp_dirs, arch_quark);
+      g_assert (abi_path_base != NULL);
+      abi_path = g_build_filename (abi_path_base, "vdpau", NULL);
       target = g_build_filename (overrides, "lib", multiarch_tuple, "vdpau", NULL);
 
       if (!g_file_test (target, G_FILE_TEST_IS_DIR))

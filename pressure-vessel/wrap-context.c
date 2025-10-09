@@ -31,7 +31,7 @@ tristate_environment (const gchar *name)
   return TRISTATE_MAYBE;
 }
 
-static void
+void
 wrap_preload_module_clear (gpointer p)
 {
   WrapPreloadModule *self = p;
@@ -43,10 +43,7 @@ static void
 pv_wrap_options_init (PvWrapOptions *self)
 {
   self->pass_fds = g_array_new (FALSE, FALSE, sizeof (int));
-  self->architectures = g_array_new (TRUE,  /* add an extra 0 entry at the end */
-                                     TRUE,  /* zero-fill new entries */
-                                     sizeof (GQuark));
-
+  self->architectures = _srt_architecture_array_new ();
   self->preload_modules = g_array_new (FALSE, FALSE,
                                        sizeof (WrapPreloadModule));
   g_array_set_clear_func (self->preload_modules, wrap_preload_module_clear);
@@ -694,44 +691,7 @@ pv_wrap_options_parse_environment (PvWrapOptions *self,
 {
   const char *value;
 
-  value = g_getenv ("PRESSURE_VESSEL_ARCHITECTURES");
-
-  if (value != NULL)
-    {
-      g_auto(GStrv) entries = g_strsplit (value, ":", -1);
-      gsize i;
-
-      for (i = 0; entries != NULL && entries[i] != NULL; i++)
-        {
-          g_autoptr(GError) local_error = NULL;
-          const SrtKnownArchitecture *known;
-          GQuark arch_quark;
-
-          arch_quark = _srt_architecture_guess_from_user_input (entries[i],
-                                                                &known,
-                                                                &local_error);
-
-          if (arch_quark == 0)
-            {
-              g_warning ("%s", local_error->message);
-              continue;
-            }
-
-          if (g_quark_try_string (entries[i]) != arch_quark)
-            g_warning ("Canonicalized architecture \"%s\" to \"%s\"",
-                       entries[i], g_quark_to_string (arch_quark));
-
-          if (known == NULL)
-            g_message ("Unknown architecture \"%s\", assuming you know what you're doing",
-                       g_quark_to_string (arch_quark));
-
-          g_array_append_val (self->architectures, arch_quark);
-        }
-
-      if (self->architectures->len == 0)
-        g_warning ("No valid architectures found in "
-                   "$PRESSURE_VESSEL_ARCHITECTURES, will use defaults");
-    }
+  pv_architecture_array_populate_from_environ (self->architectures);
 
   self->batch = _srt_boolean_environment ("PRESSURE_VESSEL_BATCH",
                                           self->batch);
@@ -1201,14 +1161,7 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
   /* If no architectures have been configured, the default is whatever
    * architectures are hard-coded to be supported */
   if (self->architectures->len == 0)
-    {
-      for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-        {
-          GQuark arch_quark = g_quark_from_static_string (pv_multiarch_tuples[i]);
-
-          g_array_append_val (self->architectures, arch_quark);
-        }
-    }
+    _srt_architecture_array_populate_with_defaults (self->architectures);
 
   for (i = 0; i < self->architectures->len; i++)
     {

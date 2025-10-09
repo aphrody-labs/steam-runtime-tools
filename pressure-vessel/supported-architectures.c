@@ -27,58 +27,6 @@
 #include "libglnx.h"
 
 /*
- * Supported Debian-style multiarch tuples
- */
-const char * const pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES + 1] =
-{
-  /* The conditional branches here need to be kept in sync with
-   * pv_multiarch_details and PV_N_SUPPORTED_ARCHITECTURES */
-#if defined(__i386__) || defined(__x86_64__)
-  "x86_64-linux-gnu",
-  "i386-linux-gnu",
-#elif defined(__aarch64__)
-  "aarch64-linux-gnu",
-#elif defined(_SRT_MULTIARCH)
-  _SRT_MULTIARCH,
-#else
-#error Architecture not supported by pressure-vessel
-#endif
-  NULL
-};
-
-/*
- * More details, in the same order as pv_multiarch_tuples
- */
-const PvMultiarchDetails pv_multiarch_details[PV_N_SUPPORTED_ARCHITECTURES] =
-{
-  /* The conditional branches here need to be kept in sync with
-   * pv_multiarch_tuples and PV_N_SUPPORTED_ARCHITECTURES */
-#if defined(__i386__) || defined(__x86_64__)
-  {
-    .tuple = "x86_64-linux-gnu",
-    .platforms = { "xeon_phi", "haswell", "x86_64", NULL },
-    .gameoverlayrenderer_dir = "ubuntu12_64",
-  },
-  {
-    .tuple = "i386-linux-gnu",
-    .platforms = { "i686", "i586", "i486", "i386", NULL },
-    .gameoverlayrenderer_dir = "ubuntu12_32",
-  },
-#elif defined(__aarch64__)
-  {
-    .tuple = "aarch64-linux-gnu",
-    .platforms = { "aarch64", NULL },
-  },
-#elif defined(_SRT_MULTIARCH)
-  {
-    .tuple = _SRT_MULTIARCH,
-  },
-#else
-#error Architecture not supported by pressure-vessel
-#endif
-};
-
-/*
  * pv_known_architecture_get_libdirs:
  * @tuple: (nullable): A multiarch tuple, or %NULL
  * @known: (nullable): A known architecture, or %NULL
@@ -149,4 +97,49 @@ pv_known_architecture_get_libdirs (const char *tuple,
   g_ptr_array_add (dirs, g_strdup ("/usr/lib"));
 
   return g_steal_pointer (&dirs);
+}
+
+void
+pv_architecture_array_populate_from_environ (GArray *arch_quarks)
+{
+  const char *value;
+
+  value = g_getenv ("PRESSURE_VESSEL_ARCHITECTURES");
+
+  if (value != NULL)
+    {
+      g_auto(GStrv) entries = g_strsplit (value, ":", -1);
+      gsize i;
+
+      for (i = 0; entries != NULL && entries[i] != NULL; i++)
+        {
+          g_autoptr(GError) local_error = NULL;
+          const SrtKnownArchitecture *known;
+          GQuark arch_quark;
+
+          arch_quark = _srt_architecture_guess_from_user_input (entries[i],
+                                                                &known,
+                                                                &local_error);
+
+          if (arch_quark == 0)
+            {
+              g_warning ("%s", local_error->message);
+              continue;
+            }
+
+          if (g_quark_try_string (entries[i]) != arch_quark)
+            g_warning ("Canonicalized architecture \"%s\" to \"%s\"",
+                       entries[i], g_quark_to_string (arch_quark));
+
+          if (known == NULL)
+            g_message ("Unknown architecture \"%s\", assuming you know what you're doing",
+                       g_quark_to_string (arch_quark));
+
+          g_array_append_val (arch_quarks, arch_quark);
+        }
+
+      if (arch_quarks->len == 0)
+        g_warning ("No valid architectures found in "
+                   "$PRESSURE_VESSEL_ARCHITECTURES, will use defaults");
+    }
 }

@@ -320,7 +320,7 @@ pv_graphics_provider_init (PvGraphicsProvider *self)
 {
   PvGraphicsProviderPrivate *priv = pv_graphics_provider_get_instance_private (self);
 
-  priv->tuples = g_array_new (TRUE, TRUE, sizeof (GQuark));
+  priv->tuples = _srt_architecture_array_new ();
   priv->main_thread = g_thread_self ();
 }
 

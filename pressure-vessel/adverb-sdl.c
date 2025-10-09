@@ -21,6 +21,8 @@
  */
 gboolean
 pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
+                              const GQuark *archs,
+                              gsize n_archs,
                               PvPerArchDirs *lib_temp_dirs,
                               const char *prefix,
                               const char *overrides,
@@ -50,12 +52,14 @@ pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
                        "Cannot set up dynamic %s without per-architecture directories",
                        soname);
 
-  for (abi_index = 0; abi_index < PV_N_SUPPORTED_ARCHITECTURES; abi_index++)
+  for (abi_index = 0; abi_index < n_archs; abi_index++)
     {
-      const char *multiarch_tuple = pv_multiarch_tuples[abi_index];
+      GQuark arch_quark = archs[abi_index];
+      const char *multiarch_tuple = g_quark_to_string (arch_quark);
       g_autofree gchar *dest = NULL;
       g_autofree gchar *from_runtime = NULL;
       g_autofree gchar *override = NULL;
+      const char *abi_path;
       const char *target;
 
       /* We assume a Debian multiarch layout here: in practice this
@@ -85,8 +89,11 @@ pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
           continue;
         }
 
-      dest = g_build_filename (lib_temp_dirs->abi_paths[abi_index],
-                               soname, NULL);
+      abi_path = pv_per_arch_dirs_get_abi_path (lib_temp_dirs, arch_quark);
+      /* If pv_per_arch_dirs_new() succeeded, it populates abi_paths with
+       * every architecture requested */
+      g_assert (abi_path != NULL);
+      dest = g_build_filename (abi_path, soname, NULL);
       g_info ("Creating symlink \"%s\" -> \"%s\" in container",
               dest, target);
 
@@ -118,6 +125,8 @@ pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
 
 void
 pv_adverb_set_up_dynamic_sdls (FlatpakBwrap *wrapped_command,
+                               const GQuark *archs,
+                               gsize n_archs,
                                PvPerArchDirs *lib_temp_dirs,
                                const char *prefix,
                                const char *overrides,
@@ -161,6 +170,8 @@ pv_adverb_set_up_dynamic_sdls (FlatpakBwrap *wrapped_command,
           g_autoptr(GError) local_error = NULL;
 
           if (!pv_adverb_set_up_dynamic_sdl (wrapped_command,
+                                             archs,
+                                             n_archs,
                                              lib_temp_dirs,
                                              prefix,
                                              overrides,

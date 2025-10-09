@@ -79,3 +79,26 @@ const gchar *_srt_architecture_guess_from_elf (int dfd,
 GQuark _srt_architecture_guess_from_user_input (const char *alias,
                                                 const SrtKnownArchitecture **known_out,
                                                 GError **error);
+
+/*
+ * _srt_architecture_array_new:
+ *
+ * Return an empty array of GQuark (interned strings) representing
+ * architectures/ABIs by their Debian-style multiarch tuple.
+ *
+ * The array has an additional item `g_array_index (arr, GQuark, arr->len)`
+ * with value 0, so `arr->data` can be used as a 0-terminated array of GQuark.
+ *
+ * Newly added items are cleared to 0.
+ *
+ * Returns: An empty array to hold GQuark
+ */
+static inline GArray *
+_srt_architecture_array_new (void)
+{
+  return g_array_new (TRUE,             /* add an extra 0 entry at the end */
+                      TRUE,             /* zero-fill new entries */
+                      sizeof (GQuark));
+}
+
+void _srt_architecture_array_populate_with_defaults (GArray *arch_quarks);

@@ -24,39 +24,6 @@
 #include "steam-runtime-tools/architecture.h"
 #include "steam-runtime-tools/architecture-internal.h"
 
-#if defined(__i386__) || defined(__x86_64__)
-#define PV_N_SUPPORTED_ARCHITECTURES 2
-#else
-/* x86 is a special case where we have a biarch setup. For all the other
- * cases we expect a single supported architecture */
-#define PV_N_SUPPORTED_ARCHITECTURES 1
-#endif
-
-/* Currently the 0'th architecture is always the primary one
- * (x86_64 on x86) */
-#define PV_PRIMARY_ARCHITECTURE 0
-
-extern const char * const pv_multiarch_tuples[PV_N_SUPPORTED_ARCHITECTURES + 1];
-
-typedef struct
-{
-  const char *tuple;
-
-  /* Known values that ${PLATFORM} can expand to.
-   * Refer to sysdeps/x86/cpu-features.c and sysdeps/x86/dl-procinfo.c
-   * in glibc.
-   * Size is completely arbitrary, expand as needed */
-  const char *platforms[5];
-
-  /* Directory used in Steam for gameoverlayrenderer.so. */
-  const char *gameoverlayrenderer_dir;
-} PvMultiarchDetails;
-
-extern const PvMultiarchDetails pv_multiarch_details[PV_N_SUPPORTED_ARCHITECTURES];
-
-extern const char * const pv_other_ld_so_cache[];
-extern const char * const pv_other_ld_so_conf[];
-
 /*
  * PvMultiarchLibdirsFlags:
  * @PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN:
@@ -73,16 +40,4 @@ GPtrArray *pv_known_architecture_get_libdirs (const char *tuple,
                                               const SrtKnownArchitecture *known,
                                               PvMultiarchLibdirsFlags flags);
 
-static inline const PvMultiarchDetails *
-pv_multiarch_details_get_by_tuple (const char *tuple)
-{
-  gsize i;
-
-  for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-    {
-      if (g_str_equal (tuple, pv_multiarch_tuples[i]))
-        return &pv_multiarch_details[i];
-    }
-
-  return NULL;
-}
+void pv_architecture_array_populate_from_environ (GArray *arch_quarks);

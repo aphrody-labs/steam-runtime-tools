@@ -15,7 +15,6 @@
 
 #include "adverb-preload.h"
 #include "exports.h"
-#include "supported-architectures.h"
 #include "utils.h"
 
 /*
@@ -79,9 +78,9 @@ static void
 append_preload_internal (PvWrapContext *context,
                          GPtrArray *argv,
                          PvPreloadVariableIndex which,
-                         gsize abi_index,
                          const char *export_path,
                          const char *original_path,
+                         GQuark architecture,
                          PvAppendPreloadFlags flags)
 {
   g_auto(PvAdverbPreloadModule) module = PV_ADVERB_PRELOAD_MODULE_INIT;
@@ -89,7 +88,7 @@ append_preload_internal (PvWrapContext *context,
   gboolean flatpak_subsandbox = ((flags & PV_APPEND_PRELOAD_FLAGS_FLATPAK_SUBSANDBOX) != 0);
 
   module.index_in_preload_variables = which;
-  module.abi_index = abi_index;
+  module.architecture = architecture;
 
   if (context->runtime != NULL
       && (g_str_has_prefix (original_path, "/usr/")
@@ -202,9 +201,9 @@ append_preload_unsupported_token (PvWrapContext *context,
   append_preload_internal (context,
                            argv,
                            which,
-                           PV_UNSPECIFIED_ABI,
                            export_path,
                            preload,
+                           0,   /* unspecified architecture */
                            flags);
 }
 
@@ -226,20 +225,15 @@ append_preload_per_architecture (PvWrapContext *context,
                                  PvAppendPreloadFlags flags)
 {
   g_autoptr(SrtSystemInfo) system_info = srt_system_info_new (NULL);
-  gsize n_supported_architectures = PV_N_SUPPORTED_ARCHITECTURES;
+  gsize n_supported_architectures = context->options.architectures->len;
   gsize i;
-
-  if (flags & PV_APPEND_PRELOAD_FLAGS_ONE_ARCHITECTURE)
-    {
-      G_STATIC_ASSERT (PV_N_SUPPORTED_ARCHITECTURES >= 1);
-      n_supported_architectures = 1;
-    }
 
   for (i = 0; i < n_supported_architectures; i++)
     {
       g_autoptr(GString) mock_path = NULL;
       g_autoptr(SrtLibrary) details = NULL;
-      const gchar *multiarch_tuple = pv_multiarch_details[i].tuple;
+      GQuark arch_quark = g_array_index (context->options.architectures, GQuark, i);
+      const gchar *multiarch_tuple = g_quark_to_string (arch_quark);
       const char *path = NULL;
 
       if (!(flags & PV_APPEND_PRELOAD_FLAGS_IN_UNIT_TESTS))
@@ -258,14 +252,24 @@ append_preload_per_architecture (PvWrapContext *context,
            *
            * tests/pressure-vessel/wrap-setup.c is the other side of this. */
           g_autofree gchar *lib = NULL;
-          const char *platform = NULL;
+          const char *platform;
 
-#if defined(__i386__) || defined(__x86_64__)
-          /* As a mock ${PLATFORM}, use the first one listed. */
-          platform = pv_multiarch_details[i].platforms[0];
-#else
-          platform = "mock";
-#endif
+          if (g_str_equal (multiarch_tuple, SRT_ABI_X86_64)
+              || g_str_equal (multiarch_tuple, SRT_ABI_I386))
+            {
+              const SrtKnownArchitecture *known;
+
+              /* As a mock ${PLATFORM}, use the first one listed. */
+              known = _srt_architecture_get_by_tuple (multiarch_tuple);
+              g_assert (known != NULL);
+              g_assert (known->libdl_platform_expansions != NULL);
+              platform = known->libdl_platform_expansions[0];
+            }
+          else
+            {
+              platform = "mock";
+            }
+
           /* As a mock ${LIB}, behave like Debian or the fdo SDK. */
           lib = g_strdup_printf ("lib/%s", multiarch_tuple);
 
@@ -302,9 +306,9 @@ append_preload_per_architecture (PvWrapContext *context,
           append_preload_internal (context,
                                    argv,
                                    which,
-                                   i,
                                    export_path,
                                    path,
+                                   arch_quark,
                                    flags);
         }
       else
@@ -355,9 +359,9 @@ append_preload_basename (PvWrapContext *context,
       append_preload_internal (context,
                                argv,
                                which,
-                               PV_UNSPECIFIED_ABI,
                                NULL,  /* don't export anything */
                                preload,
+                               0,     /* unspecified architecture */
                                flags);
     }
   else
@@ -467,9 +471,9 @@ pv_wrap_append_preload (PvWrapContext *context,
             append_preload_internal (context,
                                      argv,
                                      which,
-                                     PV_UNSPECIFIED_ABI,
                                      export_path,
                                      preload,
+                                     0,   /* unspecified architecture */
                                      flags);
           }
         break;

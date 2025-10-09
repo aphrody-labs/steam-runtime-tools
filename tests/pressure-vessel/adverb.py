@@ -62,7 +62,9 @@ class TestAdverb(BaseTest):
                 '-u', 'LD_PRELOAD',
                 # In unit tests it isn't straightforward to find the real
                 # ${PLATFORM}, so we use a predictable mock implementation
-                # that always uses PvMultiarchDetails.platforms[0].
+                # that always uses
+                # SrtKnownArchitecture.libdl_platform_expansions[0] on x86
+                # or "mock" elsewhere.
                 'PRESSURE_VESSEL_TEST_STANDARDIZE_PLATFORM=1',
                 os.path.join(
                     self.top_builddir,
@@ -125,8 +127,8 @@ class TestAdverb(BaseTest):
                  ':abi=x86_64-linux-gnu'),
             ]
             # The hard-coded i686 and xeon_phi here must match up with
-            # pv_multiarch_details[i].platforms[0], which is what is used
-            # as a mock implementation under
+            # SrtKnownArchitecture.libdl_platform_expansions[0],
+            # which is what is used as a mock implementation on x86 under
             # PRESSURE_VESSEL_TEST_STANDARDIZE_PLATFORM=1.
             script_for_loop = r'''
                 for item in $ld_preload; do
@@ -473,7 +475,7 @@ class TestAdverb(BaseTest):
     def test_wrong_options(self) -> None:
         for option in (
             '--an-unknown-option',
-            '--ld-preload=/nonexistent/libfoo.so:abi=hal9000-movieos',
+            '--ld-preload=/nonexistent/libfoo.so:abi=hal9000',
             '--ld-preload=/nonexistent/libfoo.so:abi=i386-linux-gnu:foo',
             '--ld-preload=/nonexistent/libfoo.so:foo=bar',
             '--fd=-1',

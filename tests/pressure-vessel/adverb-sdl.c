@@ -10,6 +10,7 @@
 #include "libglnx.h"
 
 #include "adverb-sdl.h"
+#include "supported-architectures.h"
 #include "tests/test-utils.h"
 
 #define SDL_DYNAMIC_API "SDL_DYNAMIC_API"
@@ -27,6 +28,9 @@ typedef struct
   GError *lib_temp_dirs_error;
   GLnxTmpDir mock_prefix;
   GLnxTmpDir mock_overrides;
+  const gchar *primary_arch_path;   /* borrowed from lib_temp_dirs */
+  GArray *archs;
+  GQuark primary_arch;
 } Fixture;
 
 typedef struct
@@ -42,9 +46,16 @@ setup (Fixture *f,
   g_autoptr(GError) local_error = NULL;
   gsize i;
 
+  f->archs = _srt_architecture_array_new ();
+  _srt_architecture_array_populate_with_defaults (f->archs);
+  g_return_if_fail (f->archs->len > 0);
+  f->primary_arch = g_array_index (f->archs, GQuark, 0);
+
   f->old_fds = tests_check_fd_leaks_enter ();
   f->bwrap = flatpak_bwrap_new (flatpak_bwrap_empty_env);
-  f->lib_temp_dirs = pv_per_arch_dirs_new (&f->lib_temp_dirs_error);
+  f->lib_temp_dirs = pv_per_arch_dirs_new ((const GQuark *) f->archs->data,
+                                           f->archs->len,
+                                           &f->lib_temp_dirs_error);
 #ifdef _SRT_TESTS_STRICT
   /* We allow this to fail because it might fail on particularly strange
    * OS configurations, but for platforms we actively support,
@@ -58,10 +69,23 @@ setup (Fixture *f,
       g_test_message ("Cross-platform module prefix: %s",
                       f->lib_temp_dirs->libdl_token_path);
 
-      for (i = 0; i < PV_N_SUPPORTED_ARCHITECTURES; i++)
-        g_test_message ("Concrete path for %s architecture: %s",
-                        pv_multiarch_tuples[i],
-                        f->lib_temp_dirs->abi_paths[i]);
+      for (i = 0; i < f->archs->len; i++)
+        {
+          GQuark arch_quark = g_array_index (f->archs, GQuark, i);
+          const char *tuple = g_quark_to_string (arch_quark);
+          const char *abi_path;
+
+          abi_path = pv_per_arch_dirs_get_abi_path (f->lib_temp_dirs, arch_quark);
+          /* If pv_per_arch_dirs_new() succeeded, it populates abi_paths with
+           * every architecture requested */
+          g_assert_nonnull (abi_path);
+          g_test_message ("Concrete path for %s architecture: %s",
+                          tuple, abi_path);
+        }
+
+      f->primary_arch_path = pv_per_arch_dirs_get_abi_path (f->lib_temp_dirs,
+                                                            f->primary_arch);
+      g_assert_nonnull (f->primary_arch_path);
     }
 
   glnx_mkdtemp ("usr-XXXXXX", 0700, &f->mock_prefix, &local_error);
@@ -82,6 +106,7 @@ teardown (Fixture *f,
   g_clear_pointer (&f->bwrap, flatpak_bwrap_free);
   glnx_tmpdir_cleanup (&f->mock_prefix);
   glnx_tmpdir_cleanup (&f->mock_overrides);
+  g_clear_pointer (&f->archs, g_array_unref);
   tests_check_fd_leaks_leave (f->old_fds);
 }
 
@@ -184,91 +209,92 @@ test_basic (Fixture *f,
   g_test_summary ("Basic setup of " SDL_DYNAMIC_API);
 
   touch (&sdl2_target,
-         f->mock_prefix.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_prefix.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_SONAME, NULL);
   touch (&sdl2_compat_target,
-         f->mock_prefix.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_prefix.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_COMPAT, NULL);
   touch (&sdl2_classic_target,
-         f->mock_prefix.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_prefix.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_CLASSIC, NULL);
   touch (&sdl3_target,
-         f->mock_prefix.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_prefix.path, "lib", g_quark_to_string (f->primary_arch),
          SDL3_SONAME, NULL);
 
   g_test_message ("With no flags, not setup is done...");
   pv_adverb_set_up_dynamic_sdls (f->bwrap,
+                                 (const GQuark *) f->archs->data,
+                                 f->archs->len,
                                  f->lib_temp_dirs,
                                  f->mock_prefix.path,
                                  f->mock_overrides.path,
                                  SRT_STEAM_COMPAT_FLAGS_NONE);
-  assert_symlink (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                  SDL2_SONAME, NULL, G_IO_ERROR_NOT_FOUND);
-  assert_symlink (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                  SDL3_SONAME, NULL, G_IO_ERROR_NOT_FOUND);
+
+  assert_symlink (f->primary_arch_path, SDL2_SONAME, NULL, G_IO_ERROR_NOT_FOUND);
+  assert_symlink (f->primary_arch_path, SDL3_SONAME, NULL, G_IO_ERROR_NOT_FOUND);
   assert_env (f->bwrap->envp, SDL_DYNAMIC_API, NULL, NULL);
   assert_env (f->bwrap->envp, SDL3_DYNAMIC_API, NULL, NULL);
 
   g_test_message ("SDL2 flag sets up SDL2...");
   pv_adverb_set_up_dynamic_sdls (f->bwrap,
+                                 (const GQuark *) f->archs->data,
+                                 f->archs->len,
                                  f->lib_temp_dirs,
                                  f->mock_prefix.path,
                                  f->mock_overrides.path,
                                  SRT_STEAM_COMPAT_FLAGS_RUNTIME_SDL2);
-  assert_symlink (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                  SDL2_SONAME, sdl2_target, 0);
-  assert_symlink (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                  SDL3_SONAME, NULL, G_IO_ERROR_NOT_FOUND);
+  assert_symlink (f->primary_arch_path, SDL2_SONAME, sdl2_target, 0);
+  assert_symlink (f->primary_arch_path, SDL3_SONAME, NULL, G_IO_ERROR_NOT_FOUND);
   assert_env (f->bwrap->envp, SDL_DYNAMIC_API,
               f->lib_temp_dirs->libdl_token_path, SDL2_SONAME);
   assert_env (f->bwrap->envp, SDL3_DYNAMIC_API, NULL, NULL);
 
   g_test_message ("SDL3 flag additionally sets up SDL3...");
   pv_adverb_set_up_dynamic_sdls (f->bwrap,
+                                 (const GQuark *) f->archs->data,
+                                 f->archs->len,
                                  f->lib_temp_dirs,
                                  f->mock_prefix.path,
                                  f->mock_overrides.path,
                                  SRT_STEAM_COMPAT_FLAGS_RUNTIME_SDL3);
-  assert_symlink (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                  SDL2_SONAME, sdl2_target, 0);
-  assert_symlink (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                  SDL3_SONAME, sdl3_target, 0);
+  assert_symlink (f->primary_arch_path, SDL2_SONAME, sdl2_target, 0);
+  assert_symlink (f->primary_arch_path, SDL3_SONAME, sdl3_target, 0);
   assert_env (f->bwrap->envp, SDL_DYNAMIC_API,
               f->lib_temp_dirs->libdl_token_path, SDL2_SONAME);
   assert_env (f->bwrap->envp, SDL3_DYNAMIC_API,
               f->lib_temp_dirs->libdl_token_path, SDL3_SONAME);
 
   flatpak_bwrap_unset_env (f->bwrap, SDL_DYNAMIC_API);
-  sdl2_symlink = g_build_filename (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                                   SDL2_SONAME, NULL);
+  sdl2_symlink = g_build_filename (f->primary_arch_path, SDL2_SONAME, NULL);
   unlink (sdl2_symlink);
   g_clear_pointer (&sdl2_symlink, g_free);
 
   g_test_message ("sdl2-compat flag sets up sdl2-compat...");
   pv_adverb_set_up_dynamic_sdls (f->bwrap,
+                                 (const GQuark *) f->archs->data,
+                                 f->archs->len,
                                  f->lib_temp_dirs,
                                  f->mock_prefix.path,
                                  f->mock_overrides.path,
                                  SRT_STEAM_COMPAT_FLAGS_RUNTIME_SDL2_COMPAT);
-  assert_symlink (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                  SDL2_SONAME, sdl2_compat_target, 0);
+  assert_symlink (f->primary_arch_path, SDL2_SONAME, sdl2_compat_target, 0);
   assert_env (f->bwrap->envp, SDL_DYNAMIC_API,
               f->lib_temp_dirs->libdl_token_path, SDL2_SONAME);
 
   flatpak_bwrap_unset_env (f->bwrap, SDL_DYNAMIC_API);
-  sdl2_symlink = g_build_filename (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                                   SDL2_SONAME, NULL);
+  sdl2_symlink = g_build_filename (f->primary_arch_path, SDL2_SONAME, NULL);
   unlink (sdl2_symlink);
   g_clear_pointer (&sdl2_symlink, g_free);
 
   g_test_message ("classic flag sets up classic SDL2...");
   pv_adverb_set_up_dynamic_sdls (f->bwrap,
+                                 (const GQuark *) f->archs->data,
+                                 f->archs->len,
                                  f->lib_temp_dirs,
                                  f->mock_prefix.path,
                                  f->mock_overrides.path,
                                  SRT_STEAM_COMPAT_FLAGS_RUNTIME_SDL2_CLASSIC);
-  assert_symlink (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                  SDL2_SONAME, sdl2_classic_target, 0);
+  assert_symlink (f->primary_arch_path, SDL2_SONAME, sdl2_classic_target, 0);
   assert_env (f->bwrap->envp, SDL_DYNAMIC_API,
               f->lib_temp_dirs->libdl_token_path, SDL2_SONAME);
 }
@@ -288,14 +314,14 @@ test_cannot_symlink (Fixture *f,
     }
 
   touch (&sdl2_target,
-         f->mock_prefix.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_prefix.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_SONAME, NULL);
-  touch (NULL,
-         f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-         SDL2_SONAME, NULL);
+  touch (NULL, f->primary_arch_path, SDL2_SONAME, NULL);
 
   g_test_summary ("If we can't create the symlink, setup fails");
   res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+                                      (const GQuark *) f->archs->data,
+                                      f->archs->len,
                                       f->lib_temp_dirs,
                                       f->mock_prefix.path,
                                       f->mock_overrides.path,
@@ -306,8 +332,7 @@ test_cannot_symlink (Fixture *f,
   /* pv-adverb would log the GError as a warning */
   g_test_message ("%s", local_error->message);
   g_assert_false (res);
-  assert_symlink (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                  SDL2_SONAME, NULL, G_IO_ERROR_INVALID_ARGUMENT);
+  assert_symlink (f->primary_arch_path, SDL2_SONAME, NULL, G_IO_ERROR_INVALID_ARGUMENT);
   assert_env (f->bwrap->envp, SDL_DYNAMIC_API, NULL, NULL);
 }
 
@@ -320,12 +345,14 @@ test_impossible (Fixture *f,
   gboolean res;
 
   touch (&sdl2_target,
-         f->mock_prefix.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_prefix.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_SONAME, NULL);
 
   g_test_summary ("If we don't know the $LIB or $PLATFORM, nothing happens, "
                   "with a warning");
   res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+                                      (const GQuark *) f->archs->data,
+                                      f->archs->len,
                                       NULL,
                                       f->mock_prefix.path,
                                       f->mock_overrides.path,
@@ -336,8 +363,10 @@ test_impossible (Fixture *f,
   /* pv-adverb would log the GError as a warning */
   g_test_message ("%s", local_error->message);
   g_assert_false (res);
-  assert_symlink (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                  SDL2_SONAME, NULL, G_IO_ERROR_NOT_FOUND);
+
+  if (f->primary_arch_path != NULL)
+    assert_symlink (f->primary_arch_path, SDL2_SONAME, NULL, G_IO_ERROR_NOT_FOUND);
+
   assert_env (f->bwrap->envp, SDL_DYNAMIC_API, NULL, NULL);
 }
 
@@ -357,14 +386,16 @@ test_in_gfx_stack (Fixture *f,
     }
 
   touch (&sdl2_target,
-         f->mock_prefix.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_prefix.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_SONAME, NULL);
   touch (&gfx_sdl2_target,
-         f->mock_overrides.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_overrides.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_SONAME, NULL);
 
   g_test_summary ("We prefer SDL from the graphics provider if present");
   res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+                                      (const GQuark *) f->archs->data,
+                                      f->archs->len,
                                       f->lib_temp_dirs,
                                       f->mock_prefix.path,
                                       f->mock_overrides.path,
@@ -373,8 +404,7 @@ test_in_gfx_stack (Fixture *f,
                                       &local_error);
   g_assert_no_error (local_error);
   g_assert_true (res);
-  assert_symlink (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                  SDL2_SONAME, gfx_sdl2_target, 0);
+  assert_symlink (f->primary_arch_path, SDL2_SONAME, gfx_sdl2_target, 0);
   assert_env (f->bwrap->envp, SDL_DYNAMIC_API,
               f->lib_temp_dirs->libdl_token_path, SDL2_SONAME);
 }
@@ -394,11 +424,13 @@ test_in_gfx_stack_only (Fixture *f,
     }
 
   touch (&gfx_sdl2_target,
-         f->mock_overrides.path, "lib", pv_multiarch_tuples[PV_PRIMARY_ARCHITECTURE],
+         f->mock_overrides.path, "lib", g_quark_to_string (f->primary_arch),
          SDL2_SONAME, NULL);
 
   g_test_summary ("We use SDL from the graphics provider if necessary");
   res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+                                      (const GQuark *) f->archs->data,
+                                      f->archs->len,
                                       f->lib_temp_dirs,
                                       f->mock_prefix.path,
                                       f->mock_overrides.path,
@@ -407,8 +439,7 @@ test_in_gfx_stack_only (Fixture *f,
                                       &local_error);
   g_assert_no_error (local_error);
   g_assert_true (res);
-  assert_symlink (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                  SDL2_SONAME, gfx_sdl2_target, 0);
+  assert_symlink (f->primary_arch_path, SDL2_SONAME, gfx_sdl2_target, 0);
   assert_env (f->bwrap->envp, SDL_DYNAMIC_API,
               f->lib_temp_dirs->libdl_token_path, SDL2_SONAME);
 }
@@ -428,6 +459,8 @@ test_missing (Fixture *f,
 
   g_test_summary ("If SDL is missing, nothing happens, with a warning");
   res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+                                      (const GQuark *) f->archs->data,
+                                      f->archs->len,
                                       f->lib_temp_dirs,
                                       f->mock_prefix.path,
                                       f->mock_overrides.path,
@@ -438,8 +471,7 @@ test_missing (Fixture *f,
   /* pv-adverb would log the GError as a warning */
   g_test_message ("%s", local_error->message);
   g_assert_false (res);
-  assert_symlink (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                  SDL2_SONAME, NULL, G_IO_ERROR_NOT_FOUND);
+  assert_symlink (f->primary_arch_path, SDL2_SONAME, NULL, G_IO_ERROR_NOT_FOUND);
   assert_env (f->bwrap->envp, SDL_DYNAMIC_API, NULL, NULL);
 }
 
@@ -459,6 +491,8 @@ test_overridden (Fixture *f,
   g_test_summary ("Setting " SDL_DYNAMIC_API " takes precedence");
   flatpak_bwrap_set_env (f->bwrap, SDL_DYNAMIC_API, "/whatever", TRUE);
   res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+                                      (const GQuark *) f->archs->data,
+                                      f->archs->len,
                                       f->lib_temp_dirs,
                                       f->mock_prefix.path,
                                       f->mock_overrides.path,
@@ -467,8 +501,7 @@ test_overridden (Fixture *f,
                                       &local_error);
   g_assert_no_error (local_error);
   g_assert_true (res);
-  assert_symlink (f->lib_temp_dirs->abi_paths[PV_PRIMARY_ARCHITECTURE],
-                  SDL2_SONAME, NULL, G_IO_ERROR_NOT_FOUND);
+  assert_symlink (f->primary_arch_path, SDL2_SONAME, NULL, G_IO_ERROR_NOT_FOUND);
   assert_env (f->bwrap->envp, SDL_DYNAMIC_API, "/whatever", NULL);
 }
 
@@ -480,7 +513,8 @@ main (int argc,
 
   /* In unit tests it isn't always straightforward to find the real
    * ${PLATFORM}, so use a predictable mock implementation that always
-   * uses PvMultiarchDetails.platforms[0] */
+   * uses SrtKnownArchitecture.libdl_platform_expansions[0] on x86
+   * or "mock" elsewhere */
   g_setenv ("PRESSURE_VESSEL_TEST_STANDARDIZE_PLATFORM", "1", TRUE);
 
   _srt_tests_init (&argc, &argv, NULL);

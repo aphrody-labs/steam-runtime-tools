@@ -6,7 +6,8 @@
 #include "config.h"
 #include "adverb-preload.h"
 
-#include "supported-architectures.h"
+#include "steam-runtime-tools/architecture-internal.h"
+
 #include "utils.h"
 
 const PvPreloadVariable pv_preload_variables[] =
@@ -52,12 +53,14 @@ append_to_search_path (const gchar *item, GString *search_path)
 static void
 do_one_preload_module (const PvAdverbPreloadModule *module,
                        GPtrArray *search_path,
+                       const GQuark *archs,
+                       gsize n_archs,
                        PvPerArchDirs *lib_temp_dirs)
 {
   const char *preload = module->name;
+  GQuark architecture = module->architecture;
   const PvPreloadVariable *which;
   const char *base;
-  gsize abi_index = module->abi_index;
 
   g_assert (preload != NULL);
 
@@ -76,23 +79,31 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
 
   which = &pv_preload_variables[module->index_in_preload_variables];
 
-  if (abi_index == PV_UNSPECIFIED_ABI
+  if (architecture == 0
       && module->index_in_preload_variables == PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD
       && strcmp (base, "gameoverlayrenderer.so") == 0)
     {
-      for (gsize abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
+      for (gsize abi = 0; abi < n_archs; abi++)
         {
-          g_autofree gchar *expected_suffix = g_strdup_printf ("/%s/gameoverlayrenderer.so",
-                                                               pv_multiarch_details[abi].gameoverlayrenderer_dir);
+          g_autofree gchar *expected_suffix = NULL;
+          const SrtKnownArchitecture *known;
+
+          known = _srt_architecture_get_by_tuple (g_quark_to_string (archs[abi]));
+
+          if (known == NULL)
+            continue;
+
+          expected_suffix = g_strdup_printf ("/%s/gameoverlayrenderer.so",
+                                             known->steam_gameoverlayrenderer_dir);
 
           if (g_str_has_suffix (preload, expected_suffix))
             {
-              abi_index = abi;
+              architecture = archs[abi];
               break;
             }
         }
 
-      if (abi_index == PV_UNSPECIFIED_ABI)
+      if (architecture == 0)
         {
           g_debug ("Preloading %s from an unexpected path \"%s\", "
                    "just leave it as is without adjusting",
@@ -100,18 +111,23 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
         }
     }
 
-  if (abi_index != PV_UNSPECIFIED_ABI)
+  if (architecture != 0)
     {
+      const char *abi_path;
       g_autofree gchar *link = NULL;
       g_autofree gchar *platform_path = NULL;
       int saved_errno;
 
       g_debug ("Module %s is for %s",
-               preload, pv_multiarch_details[abi_index].tuple);
+               preload, g_quark_to_string (architecture));
       platform_path = g_build_filename (lib_temp_dirs->libdl_token_path,
                                         base, NULL);
-      link = g_build_filename (lib_temp_dirs->abi_paths[abi_index],
-                               base, NULL);
+      abi_path = g_hash_table_lookup (lib_temp_dirs->abi_paths,
+                                      GUINT_TO_POINTER (architecture));
+      /* If pv_per_arch_dirs_new() succeeded, it populates abi_paths with
+       * every architecture requested */
+      g_assert (abi_path != NULL);
+      link = g_build_filename (abi_path, base, NULL);
 
       if (symlink (preload, link) == 0)
         {
@@ -156,6 +172,8 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
 
 gboolean
 pv_adverb_set_up_preload_modules (FlatpakBwrap *wrapped_command,
+                                  const GQuark *archs,
+                                  gsize n_archs,
                                   PvPerArchDirs *lib_temp_dirs,
                                   const PvAdverbPreloadModule *preload_modules,
                                   gsize n_preload_modules,
@@ -177,7 +195,7 @@ pv_adverb_set_up_preload_modules (FlatpakBwrap *wrapped_command,
             = g_ptr_array_new_full (n_preload_modules, g_free);
         }
 
-      do_one_preload_module (module, search_path, lib_temp_dirs);
+      do_one_preload_module (module, search_path, archs, n_archs, lib_temp_dirs);
     }
 
   /* Serialize search_paths[PRELOAD_VARIABLE_INDEX_LD_AUDIT] into
@@ -223,11 +241,10 @@ pv_adverb_preload_module_parse_adverb_cli (PvAdverbPreloadModule *self,
 {
   g_auto(GStrv) parts = NULL;
   const char *architecture = NULL;
-  gsize abi_index = PV_UNSPECIFIED_ABI;
-  gsize abi;
+  GQuark arch_quark = 0;
 
   g_return_val_if_fail (self->name == NULL, FALSE);
-  g_return_val_if_fail (self->abi_index == PV_UNSPECIFIED_ABI, FALSE);
+  g_return_val_if_fail (self->architecture == 0, FALSE);
 
   parts = g_strsplit (value, ":", 0);
 
@@ -239,22 +256,18 @@ pv_adverb_preload_module_parse_adverb_cli (PvAdverbPreloadModule *self,
         {
           if (g_str_has_prefix (parts[i], "abi="))
             {
+              g_autoptr(GError) local_error = NULL;
+
               architecture = parts[i] + strlen ("abi=");
 
-              for (abi = 0; abi < PV_N_SUPPORTED_ARCHITECTURES; abi++)
-                {
-                  if (strcmp (architecture, pv_multiarch_tuples[abi]) == 0)
-                    {
-                      abi_index = abi;
-                      break;
-                    }
-                }
+              arch_quark = _srt_architecture_guess_from_user_input (architecture,
+                                                                    NULL,
+                                                                    &local_error);
 
-              if (abi_index == PV_UNSPECIFIED_ABI)
+              if (arch_quark == 0)
                 {
-                  g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE,
-                               "Unsupported ABI %s",
-                               architecture);
+                  g_set_error_literal (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE,
+                                       local_error->message);
                   return FALSE;
                 }
 
@@ -274,7 +287,7 @@ pv_adverb_preload_module_parse_adverb_cli (PvAdverbPreloadModule *self,
 
   self->index_in_preload_variables = which;
   self->name = g_strdup (value);
-  self->abi_index = abi_index;
+  self->architecture = arch_quark;
   return TRUE;
 }
 
@@ -286,19 +299,20 @@ pv_adverb_preload_module_to_adverb_cli (PvAdverbPreloadModule *self)
 
   g_return_val_if_fail (self->index_in_preload_variables < G_N_ELEMENTS (pv_preload_variables), NULL);
   g_return_val_if_fail (self->name != NULL, NULL);
-  g_return_val_if_fail (self->abi_index == PV_UNSPECIFIED_ABI
-                        || self->abi_index < PV_N_SUPPORTED_ARCHITECTURES,
-                        NULL);
 
   variable = &pv_preload_variables[self->index_in_preload_variables];
   buf = g_string_new (variable->adverb_option);
   g_string_append_c (buf, '=');
   g_string_append (buf, self->name);
 
-  if (self->abi_index != PV_UNSPECIFIED_ABI)
+  if (self->architecture != 0)
     {
+      const char *tuple = g_quark_to_string (self->architecture);
+
+      g_return_val_if_fail (_srt_architecture_check_plausible_tuple (tuple, NULL),
+                            NULL);
       g_string_append (buf, ":abi=");
-      g_string_append (buf, pv_multiarch_tuples[self->abi_index]);
+      g_string_append (buf, tuple);
     }
 
   return g_string_free (g_steal_pointer (&buf), FALSE);

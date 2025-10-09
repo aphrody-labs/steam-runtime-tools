@@ -811,6 +811,7 @@ main (int argc,
   g_autoptr(FlatpakBwrap) wrapped_command = NULL;
   g_autoptr(PvPerArchDirs) lib_temp_dirs = NULL;
   SrtSteamCompatFlags compat_flags;
+  g_autoptr(GArray) tuples = NULL;
 
   setlocale (LC_ALL, "");
 
@@ -832,6 +833,13 @@ main (int argc,
       ret = EX_UNAVAILABLE;
       goto out;
     }
+
+  /* Pre-cache known architecture strings as quarks before parsing
+   * command-line, to avoid having to duplicate and "leak" them */
+  _srt_architecture_init_known ();
+
+  tuples = _srt_architecture_array_new ();
+  pv_architecture_array_populate_from_environ (tuples);
 
   context = g_option_context_new (
       "COMMAND [ARG...]\n"
@@ -903,6 +911,9 @@ main (int argc,
                   g_get_prgname ());
       goto out;
     }
+
+  if (tuples->len == 0)
+    _srt_architecture_array_populate_with_defaults (tuples);
 
   ret = EX_UNAVAILABLE;
 
@@ -1040,7 +1051,8 @@ main (int argc,
                              opt_set_ld_library_path, TRUE);
     }
 
-  lib_temp_dirs = pv_per_arch_dirs_new (error);
+  lib_temp_dirs = pv_per_arch_dirs_new ((const GQuark *) tuples->data,
+                                        tuples->len, error);
 
   if (lib_temp_dirs == NULL)
     {
@@ -1049,11 +1061,14 @@ main (int argc,
     }
 
   compat_flags = _srt_steam_get_compat_flags (_srt_const_strv (envp));
-  pv_adverb_set_up_dynamic_sdls (wrapped_command, lib_temp_dirs,
+  pv_adverb_set_up_dynamic_sdls (wrapped_command,
+                                 (const GQuark *) tuples->data, tuples->len,
+                                 lib_temp_dirs,
                                  "/usr", opt_overrides, compat_flags);
 
   if (opt_overrides != NULL
       && !pv_adverb_set_up_overrides (wrapped_command,
+                                      (const GQuark *) tuples->data, tuples->len,
                                       lib_temp_dirs,
                                       opt_overrides,
                                       error))
@@ -1064,6 +1079,7 @@ main (int argc,
 
   if (opt_preload_modules != NULL
       && !pv_adverb_set_up_preload_modules (wrapped_command,
+                                            (const GQuark *) tuples->data, tuples->len,
                                             lib_temp_dirs,
                                             (const PvAdverbPreloadModule *) opt_preload_modules->data,
                                             opt_preload_modules->len,

@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20251007.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251009.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
     - Fix a small memory leak in pv-adverb while setting up VDPAU drivers
@@ -6,18 +6,35 @@ steam-runtime-tools (0.20251007.0) UNRELEASED; urgency=medium
     - Only enumerate OpenXR runtimes that belong to the appropriate
       architecture's graphics provider
       (steamrt/tasks#785, steamrt/tasks#786)
+    - Change how we handle per-architecture modules for LD_PRELOAD,
+      LD_AUDIT, VDPAU drivers, SDL_DYNAMIC_API and SDL3_DYNAMIC_API,
+      enabling it to scale to more than two architectures at a time
+      (steamrt/tasks#786)
     - Add experimental option (currently only available as an environment
       variable) to set the architectures used, and which one is treated as
       primary (steamrt/tasks#786)
-    - Refactoring
+    - Stop hard-coding an array of supported architectures.
+      Instead, we have a hard-coded array of default architectures,
+      in practice the same list as before, but any architecture for which
+      steam-runtime-tools was successfully compiled can in principle
+      be used to run a runtime for any other architecture, as long as
+      transparent emulation (binfmt_misc) is available.
       (steamrt/tasks#786)
+    - Refactoring (steamrt/tasks#786)
   * s-r-launcher-service:
     - Avoid a small memory leak if an error occurs on the deprecated
       `--socket` or `--socket-directory` code paths
   * Diagnostic tools:
     - Use automatic memory management in more places
+  * Library code:
+    - Further refactoring of architecture handling (steamrt/tasks#786)
+  * Tests:
+    - Now that the supported architectures are not hard-coded, we can
+      test some of the aarch64 code paths even if pressure-vessel was
+      compiled for x86, and vice versa (steamrt/tasks#786)
+    - Improve coverage (steamrt/tasks#786)
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 07 Oct 2025 21:24:10 +0100
+ -- Simon McVittie <smcv@collabora.com>  Thu, 09 Oct 2025 18:27:15 +0100
 
 steam-runtime-tools (0.20250926.0) steamrt; urgency=medium
 

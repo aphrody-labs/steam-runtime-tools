@@ -474,9 +474,9 @@ _srt_architecture_read_elf (int dfd,
  * @error: On failure set to GIOErrorEnum or SrtArchitectureError, used to
  *  describe the error
  *
- * Returns: (nullable): The multiarch tuple or %NULL on error.
+ * Returns: (nullable): The known architecture object, or %NULL on error
  */
-const gchar *
+const SrtKnownArchitecture *
 _srt_architecture_guess_from_elf (int dfd,
                                   const char *file_path,
                                   GError **error)
@@ -497,7 +497,7 @@ _srt_architecture_guess_from_elf (int dfd,
           && machine == known_architectures[i].machine_type
           && cls == known_architectures[i].elf_class
           && data_encoding == known_architectures[i].elf_encoding)
-        return known_architectures[i].multiarch_tuple;
+        return &known_architectures[i];
     }
 
   g_set_error (error, SRT_ARCHITECTURE_ERROR, SRT_ARCHITECTURE_ERROR_NO_INFORMATION,

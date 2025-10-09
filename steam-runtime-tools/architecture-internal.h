@@ -72,9 +72,9 @@ G_GNUC_INTERNAL const SrtKnownArchitecture *_srt_architecture_get_by_tuple (cons
 G_GNUC_INTERNAL gboolean _srt_architecture_can_run (SrtSubprocessRunner *runner,
                                                     const char *multiarch);
 
-const gchar *_srt_architecture_guess_from_elf (int dfd,
-                                               const char *file_path,
-                                               GError **error);
+const SrtKnownArchitecture *_srt_architecture_guess_from_elf (int dfd,
+                                                              const char *file_path,
+                                                              GError **error);
 
 GQuark _srt_architecture_guess_from_user_input (const char *alias,
                                                 const SrtKnownArchitecture **known_out,

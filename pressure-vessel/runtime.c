@@ -62,6 +62,11 @@
 #define PKGLIBEXECDIR "libexec/steam-runtime-tools-" _SRT_API_MAJOR
 
 /*
+ * Location of pv-adverb specifically, relative to the $PRESSURE_VESSEL_PREFIX
+ */
+#define PV_ADVERB_IN_PREFIX PKGLIBEXECDIR "/pv-adverb"
+
+/*
  * Parent of the location where the $PRESSURE_VESSEL_PREFIX gets mounted
  * when using the mutable_sysroot code path
  */
@@ -75,7 +80,7 @@
  * Path to pv-adverb as it is mounted inside the container when using
  * the mutable_sysroot code path
  */
-#define PV_ADVERB_IN_MUTABLE_SYSROOT PV_FROM_HOST_IN_MUTABLE_SYSROOT "/" PKGLIBEXECDIR "/pv-adverb"
+#define PV_ADVERB_IN_MUTABLE_SYSROOT PV_FROM_HOST_IN_MUTABLE_SYSROOT "/" PV_ADVERB_IN_PREFIX
 
 /*
  * Location where the $PRESSURE_VESSEL_PREFIX gets mounted when not
@@ -86,7 +91,7 @@
  * Path to pv-adverb as it is mounted inside the container when not
  * using the mutable_sysroot code path
  */
-#define PV_ADVERB_WITHOUT_MUTABLE_SYSROOT PV_FROM_HOST_WITHOUT_MUTABLE_SYSROOT "/" PKGLIBEXECDIR "/pv-adverb"
+#define PV_ADVERB_WITHOUT_MUTABLE_SYSROOT PV_FROM_HOST_WITHOUT_MUTABLE_SYSROOT "/" PV_ADVERB_IN_PREFIX
 
 /*
  * PvRuntime:

@@ -48,6 +48,9 @@ typedef struct
    * - Red-Hat- or Arch-style lib<QUAL>
    * - etc. */
   const char * const *multilib_suffixes;
+  /* If not NULL, this architecture's ldconfig(8) also supports
+   * libraries from these architectures, given as multiarch tuples. */
+  const char * const *extra_ld_so_architectures;
   /* Alternative paths for ld.so.cache, other than ld.so.cache itself. */
   const char * const *extra_ld_so_caches;
   /* Known values that ${PLATFORM} can expand to. */
@@ -76,6 +79,8 @@ const SrtKnownArchitecture *_srt_architecture_get_current (void);
 const SrtKnownArchitecture *_srt_architecture_guess_from_elf (int dfd,
                                                               const char *file_path,
                                                               GError **error);
+gboolean _srt_architecture_ldconfig_knows_architecture (const SrtKnownArchitecture *maybe_known,
+                                                        const char *tuple);
 
 GQuark _srt_architecture_guess_from_user_input (const char *alias,
                                                 const SrtKnownArchitecture **known_out,

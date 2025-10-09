@@ -379,6 +379,52 @@ test_architecture_guess_from_user_input (Fixture *f,
 }
 
 static void
+test_architecture_ldconfig_knows_arch (Fixture *f,
+                                       gconstpointer context)
+{
+  const struct
+  {
+    const char *ldconfig;
+    const char *libraries;
+    gboolean expected;
+  }
+  tests[] =
+  {
+    { NULL, SRT_ABI_X86_64, FALSE },
+    { SRT_ABI_X86_64, SRT_ABI_X86_64, TRUE },
+    { SRT_ABI_I386, SRT_ABI_I386, TRUE },
+    { SRT_ABI_X86_64, SRT_ABI_I386, TRUE },
+    { SRT_ABI_I386, SRT_ABI_X86_64, TRUE },
+    { SRT_ABI_AARCH64, SRT_ABI_X86_64, FALSE },
+    { SRT_ABI_X86_64, SRT_ABI_AARCH64, FALSE },
+  };
+
+  for (size_t i = 0; i < G_N_ELEMENTS (tests); i++)
+    {
+      const SrtKnownArchitecture *known;
+      gboolean res;
+
+      if (tests[i].ldconfig != NULL)
+        {
+          known = _srt_architecture_get_by_tuple (tests[i].ldconfig);
+          g_assert_nonnull (known);
+          g_assert_cmpstr (known->multiarch_tuple, ==, tests[i].ldconfig);
+        }
+      else
+        {
+          known = NULL;
+        }
+
+      res = _srt_architecture_ldconfig_knows_architecture (known, tests[i].libraries);
+      g_test_message ("%s ldconfig knows architecture %s -> %s",
+                      tests[i].ldconfig ?: "unknown",
+                      tests[i].libraries,
+                      res ? "yes" : "no");
+      g_assert_cmpint (res, ==, tests[i].expected);
+    }
+}
+
+static void
 test_architecture_plausible_tuple (Fixture *f,
                                    gconstpointer context)
 {
@@ -440,6 +486,8 @@ main (int argc,
               setup, test_architecture_get_current, teardown);
   g_test_add ("/architecture/guess_from_user_input", Fixture, NULL,
               setup, test_architecture_guess_from_user_input, teardown);
+  g_test_add ("/architecture/ldconfig_knows_arch", Fixture, NULL,
+              setup, test_architecture_ldconfig_knows_arch, teardown);
   g_test_add ("/architecture/plausible_tuple", Fixture, NULL,
               setup, test_architecture_plausible_tuple, teardown);
 

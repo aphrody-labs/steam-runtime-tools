@@ -533,7 +533,8 @@ class TestContainers(BaseTest):
         fake_home: bool = False,
         gc: bool = True,
         locales: bool = False,
-        only_prepare: bool = False
+        only_prepare: bool = False,
+        workarounds: typing.Iterable[str] = ()
     ) -> None:
         self._test_container(
             test_name,
@@ -544,6 +545,7 @@ class TestContainers(BaseTest):
             is_scout=True,
             locales=locales,
             only_prepare=only_prepare,
+            workarounds=workarounds,
         )
 
     def _test_soldier(
@@ -555,7 +557,8 @@ class TestContainers(BaseTest):
         fake_home: bool = False,
         gc: bool = True,
         locales: bool = False,
-        only_prepare: bool = False
+        only_prepare: bool = False,
+        workarounds: typing.Iterable[str] = ()
     ) -> None:
         self._test_container(
             test_name,
@@ -565,6 +568,7 @@ class TestContainers(BaseTest):
             is_soldier=True,
             locales=locales,
             only_prepare=only_prepare,
+            workarounds=workarounds,
         )
 
     def _test_container(
@@ -578,7 +582,8 @@ class TestContainers(BaseTest):
         is_scout: bool = False,
         is_soldier: bool = False,
         locales: bool = False,
-        only_prepare: bool = False
+        only_prepare: bool = False,
+        workarounds: typing.Iterable[str] = ()
     ) -> None:
         if self.bwrap is None and not only_prepare:
             self.skipTest('Unable to run bwrap (in a container?)')
@@ -607,6 +612,14 @@ class TestContainers(BaseTest):
             os.path.join(self.G_TEST_SRCDIR, 'mock-drivers', 'share'),
             data_dirs,
         ])
+
+        if workarounds:
+            if 'PRESSURE_VESSEL_WORKAROUNDS' in env:
+                workarounds = [
+                    env['PRESSURE_VESSEL_WORKAROUNDS'],
+                ] + list(workarounds)
+
+            env['PRESSURE_VESSEL_WORKAROUNDS'] = ' '.join(workarounds)
 
         argv = [
             self.pv_wrap,
@@ -1251,9 +1264,13 @@ class TestContainers(BaseTest):
                 'soldier_copy', soldier, copy=True, locales=True,
             )
 
-        with self.subTest('fake-home'):
+        with self.subTest('fake-home,bwrap-setuid'):
             self._test_soldier(
-                'soldier_fake_home', soldier, copy=True, fake_home=True,
+                'soldier_fake_home',
+                soldier,
+                copy=True,
+                fake_home=True,
+                workarounds=['+bwrap-setuid'],
             )
 
         with self.subTest('transient'):

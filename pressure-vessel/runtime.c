@@ -111,6 +111,7 @@ struct _PvRuntime
   SrtFileLock *runtime_lock;
   GStrv original_environ;
 
+  const SrtKnownArchitecture *adverb_architecture;
   gchar *libcapsule_knowledge;  /* relative to runtime_files */
   gchar *runtime_abi_json;
   gchar *variable_dir;
@@ -1300,7 +1301,9 @@ pv_runtime_initable_init (GInitable *initable,
                           GError **error)
 {
   PvRuntime *self = PV_RUNTIME (initable);
+  g_autoptr(GError) local_error = NULL;
   g_autoptr(SrtFileLock) mutable_lock = NULL;
+  g_autofree gchar *adverb = NULL;
   g_autofree gchar *contents = NULL;
   g_autofree gchar *os_release = NULL;
   g_autofree gchar *usr_mtree = NULL;
@@ -1329,6 +1332,39 @@ pv_runtime_initable_init (GInitable *initable,
 
       if (!_srt_architecture_check_plausible_tuple (tuple, error))
         return FALSE;
+    }
+
+  adverb = g_build_filename (self->pv_prefix, PV_ADVERB_IN_PREFIX, NULL);
+  self->adverb_architecture = _srt_architecture_guess_from_elf (AT_FDCWD,
+                                                                adverb,
+                                                                &local_error);
+
+  if (G_LIKELY (self->adverb_architecture != NULL))
+    {
+      g_debug ("pv-adverb is a %s executable",
+               self->adverb_architecture->multiarch_tuple);
+    }
+  else
+    {
+      self->adverb_architecture = _srt_architecture_get_current ();
+
+      if (self->adverb_architecture != NULL)
+        {
+          _srt_log_warning ("Unable to determine architecture of pv-adverb, assuming %s: %s",
+                            self->adverb_architecture->multiarch_tuple,
+                            local_error->message);
+          g_clear_error (&local_error);
+        }
+      else
+        {
+          /* In practice this can't happen in official builds, because
+           * we do define _SRT_MULTIARCH in official builds, and we also
+           * don't do official builds for any architecture that isn't
+           * in the SrtKnownArchitecture table. */
+          g_propagate_prefixed_error (error, g_steal_pointer (&local_error),
+                                      "Unable to determine architecture of pv-adverb: ");
+          return FALSE;
+        }
     }
 
   /* If we are in Flatpak container we don't expect to have a working bwrap */
@@ -1421,8 +1457,6 @@ pv_runtime_initable_init (GInitable *initable,
   if (self->variable_dir_fd >= 0
       && (self->flags & PV_RUNTIME_FLAGS_GC_RUNTIMES))
     {
-      g_autoptr(GError) local_error = NULL;
-
       /* Take out an exclusive lock for GC so that we will not conflict
        * with other concurrent processes that are halfway through
        * deploying or unpacking a runtime. */
@@ -1894,32 +1928,22 @@ pv_runtime_get_adverb (PvRuntime *self,
   if (self->workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID)
     {
       g_autofree char *ld_library_path = pv_runtime_get_ld_library_path (self);
-      const char *ld_so;
-      const char *tuple;
+      const char *ld_so = NULL;
+
+      /* This should have been set in pv_runtime_initable_init() */
+      g_return_val_if_fail (self->adverb_architecture != NULL, FALSE);
 
       /* We can't rely on LD_LIBRARY_PATH staying in the environment,
        * which means we can't run anything until we have invoked
        * ldconfig to regenerate ld.so.cache, which is a chicken-and-egg
        * problem because pv-adverb needs to load shared libraries.
-       * Resolve this by using ld.so(8) to invoke pv-adverb, which we
-       * assume is of the same architecture as pv-wrap. */
-#if defined(_SRT_MULTIARCH)
-      tuple = _SRT_MULTIARCH;
-#elif defined(__x86_64__)
-      tuple = SRT_ABI_X86_64;
-#elif defined(__i386__)
-      tuple = SRT_ABI_I386;
-#elif defined(__aarch64__)
-      tuple = SRT_ABI_AARCH64;
-#else
-#error Unsupported architecture
-#endif
-      ld_so = srt_architecture_get_expected_runtime_linker (tuple);
+       * Resolve this by using ld.so(8) to invoke pv-adverb. */
+      ld_so = self->adverb_architecture->interoperable_runtime_linker;
 
       if (ld_so == NULL)
         return glnx_throw (error,
                            "Runtime linker for architecture %s not known",
-                           tuple);
+                           self->adverb_architecture->multiarch_tuple);
 
       g_debug ("Using runtime linker %s to run pv-adverb", ld_so);
       flatpak_bwrap_add_args (bwrap,

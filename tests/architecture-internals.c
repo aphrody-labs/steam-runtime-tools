@@ -5,6 +5,7 @@
 
 #include <steam-runtime-tools/steam-runtime-tools.h>
 #include "steam-runtime-tools/architecture-internal.h"
+#include "steam-runtime-tools/elf-utils-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 #include <gelf.h>
@@ -475,6 +476,123 @@ test_architecture_plausible_tuple (Fixture *f,
     }
 }
 
+static void
+dump_elf_or_error (const char *input,
+                   gboolean ok,
+                   int fd,
+                   Elf *elf,
+                   GError *error)
+{
+  GElf_Ehdr eh;
+
+  if (ok)
+    g_test_message ("%s -> success, fd %d, Elf %s: %s",
+                    input, fd,
+                    elf != NULL ? "non-null" : "null",
+                    error != NULL ? error->message : "<no error>");
+  else
+    g_test_message ("%s -> error, fd %d, Elf %s: %s",
+                    input, fd,
+                    elf != NULL ? "non-null" : "null",
+                    error != NULL ? error->message : "<no error>");
+
+  if (elf == NULL)
+    return;
+
+  if (gelf_getehdr (elf, &eh) != NULL)
+    g_test_message ("ELF class 0x%x, data encoding 0x%x, machine type 0x%x",
+                    eh.e_ident[EI_CLASS], eh.e_ident[EI_DATA], eh.e_machine);
+  else
+    g_test_message ("gelf_getehdr() -> %s", elf_errmsg (elf_errno ()));
+}
+
+static void
+test_elf_utils_open (Fixture *f,
+                     gconstpointer context)
+{
+    {
+      g_autoptr(GError) local_error = NULL;
+      g_autoptr(Elf) elf = NULL;
+      glnx_autofd int fd = -1;
+      gboolean ok;
+
+      /* A file we can't open */
+      ok = _srt_open_elf (AT_FDCWD, "/nonexistent", &fd, &elf, &local_error);
+      dump_elf_or_error ("/nonexistent", ok, fd, elf, local_error);
+      g_assert_nonnull (local_error);
+      g_assert_false (ok);
+      g_assert_cmpint (fd, <, 0);
+      g_assert_null (elf);
+    }
+
+    {
+      const SrtKnownArchitecture *native_architecture;
+      g_autofree gchar *mock_true = NULL;
+      g_autoptr(GError) local_error = NULL;
+      g_autoptr(Elf) elf = NULL;
+      GElf_Ehdr eh;
+      glnx_autofd int fd = -1;
+      gboolean ok;
+
+      mock_true = g_test_build_filename (G_TEST_BUILT, "mock-true", NULL);
+      ok = _srt_open_elf (AT_FDCWD, mock_true, &fd, &elf, &local_error);
+      dump_elf_or_error ("mock-true executable", ok, fd, elf, local_error);
+      g_assert_no_error (local_error);
+      g_assert_true (ok);
+      g_assert_cmpint (fd, >=, 0);
+      g_assert_nonnull (elf);
+      g_assert_nonnull (gelf_getehdr (elf, &eh));
+
+      native_architecture = _srt_architecture_get_current ();
+#if defined(_SRT_MULTIARCH)
+      g_assert_nonnull (native_architecture);
+#endif
+
+      if (native_architecture != NULL)
+        {
+          if (native_architecture->elf_class != ELFCLASSNONE)
+            g_assert_cmpuint (native_architecture->elf_class,
+                              ==, eh.e_ident[EI_CLASS]);
+
+          if (native_architecture->elf_encoding != ELFDATANONE)
+            g_assert_cmpuint (native_architecture->elf_encoding,
+                              ==, eh.e_ident[EI_DATA]);
+
+          if (native_architecture->machine_type != SRT_MACHINE_TYPE_UNKNOWN)
+            g_assert_cmpuint (native_architecture->machine_type,
+                              ==, eh.e_machine);
+        }
+    }
+
+    {
+      g_autofree gchar *check_sh = NULL;
+      g_autoptr(GError) local_error = NULL;
+      g_autoptr(Elf) elf = NULL;
+      glnx_autofd int fd = -1;
+      gboolean ok;
+
+      check_sh = g_test_build_filename (G_TEST_DIST, "check-sh.sh", NULL);
+      ok = _srt_open_elf (AT_FDCWD, check_sh, &fd, &elf, &local_error);
+      dump_elf_or_error ("check-sh.sh script", ok, fd, elf, local_error);
+
+      /* libelf currently reports success for a non-ELF executable
+       * (shell script) for some reason (?) but even if it does,
+       * it shouldn't be able to parse the ELF header */
+      if (ok)
+        {
+          GElf_Ehdr eh;
+
+          g_assert_nonnull (elf);
+          g_assert_null (gelf_getehdr (elf, &eh));
+        }
+      else
+        {
+          g_assert_nonnull (local_error);
+          g_assert_null (elf);
+        }
+    }
+}
+
 int
 main (int argc,
       char **argv)
@@ -490,6 +608,8 @@ main (int argc,
               setup, test_architecture_ldconfig_knows_arch, teardown);
   g_test_add ("/architecture/plausible_tuple", Fixture, NULL,
               setup, test_architecture_plausible_tuple, teardown);
+  g_test_add ("/elf-utils/open", Fixture, NULL,
+              setup, test_elf_utils_open, teardown);
 
   return g_test_run ();
 }

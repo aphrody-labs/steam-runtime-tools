@@ -525,21 +525,44 @@ test_elf_utils_open (Fixture *f,
       g_assert_null (elf);
     }
 
+  for (gsize use_fd = 0; use_fd < 2; use_fd++)
     {
       const SrtKnownArchitecture *native_architecture;
       g_autofree gchar *mock_true = NULL;
       g_autoptr(GError) local_error = NULL;
       g_autoptr(Elf) elf = NULL;
       GElf_Ehdr eh;
+      glnx_autofd int already_open_fd = -1;
       glnx_autofd int fd = -1;
       gboolean ok;
 
       mock_true = g_test_build_filename (G_TEST_BUILT, "mock-true", NULL);
-      ok = _srt_open_elf (AT_FDCWD, mock_true, &fd, &elf, &local_error);
+
+      if (use_fd != 0)
+        {
+          ok = glnx_openat_rdonly (AT_FDCWD, mock_true,
+                                   TRUE, /* follow symlinks */
+                                   &already_open_fd,
+                                   &local_error);
+          g_assert_no_error (local_error);
+          g_assert_true (ok);
+
+          ok = _srt_open_elf (already_open_fd, NULL, &fd, &elf, &local_error);
+        }
+      else
+        {
+          ok = _srt_open_elf (AT_FDCWD, mock_true, &fd, &elf, &local_error);
+        }
+
       dump_elf_or_error ("mock-true executable", ok, fd, elf, local_error);
       g_assert_no_error (local_error);
       g_assert_true (ok);
-      g_assert_cmpint (fd, >=, 0);
+
+      if (use_fd)
+        g_assert_cmpint (fd, ==, -1);
+      else
+        g_assert_cmpint (fd, >=, 0);
+
       g_assert_nonnull (elf);
       g_assert_nonnull (gelf_getehdr (elf, &eh));
 

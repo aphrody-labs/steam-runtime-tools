@@ -6309,6 +6309,7 @@ pv_runtime_provide_glibc_executable (PvRuntime *self,
   g_autofree char *provider_impl = NULL;
   g_autofree char *target_path_alloc = NULL;
   const char *target_path = exe->target_path;
+  const gchar *search_paths = NULL;
   PvGraphicsProvider *provider = NULL;
   TakeFromProviderFlags flags;
   gsize provider_index;
@@ -6317,8 +6318,6 @@ pv_runtime_provide_glibc_executable (PvRuntime *self,
        provider_index < self->providers->len;
        provider_index++)
     {
-      const gchar *search_paths = NULL;
-
       provider = g_ptr_array_index (self->providers, provider_index);
 
       if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
@@ -6326,12 +6325,15 @@ pv_runtime_provide_glibc_executable (PvRuntime *self,
 
       if (_srt_sysroot_is_direct (provider->in_current_ns))
         search_paths = g_environ_getenv (self->original_environ, "PATH");
+      else
+        search_paths = NULL;
 
       provider_impl = pv_graphics_provider_search_in_path_and_bin (provider,
                                                                    search_paths,
                                                                    exe->executable);
 
-      /* Leaves provider set to this one */
+      /* Leaves provider and search_paths set appropriately if a match was
+       * found (we will use this later) */
       if (provider_impl != NULL)
         break;
     }
@@ -6379,6 +6381,39 @@ pv_runtime_provide_glibc_executable (PvRuntime *self,
         }
     }
 
+  if (g_str_equal (exe->executable, "ldconfig"))
+    {
+      /* In Ubuntu and very old Debian releases (Debian 8 or older),
+       * /sbin/ldconfig is a shell script wrapper around the real binary
+       * /sbin/ldconfig.real, working around lack of dpkg trigger support
+       * in old library packages. This means we might need
+       * /sbin/ldconfig.real as well. */
+      g_autofree char *real_impl = NULL;
+
+      real_impl = pv_graphics_provider_search_in_path_and_bin (provider,
+                                                               search_paths,
+                                                               "ldconfig.real");
+
+      if (real_impl == NULL)
+        {
+          g_debug ("Did not find accompanying ldconfig.real in the same provider");
+        }
+      else if (pv_runtime_take_from_provider (self,
+                                              provider, real_impl,
+                                              bwrap, "/sbin/ldconfig.real",
+                                              flags,
+                                              &local_error))
+        {
+          g_debug ("Using accompanying ldconfig.real from the same provider");
+        }
+      else
+        {
+          g_debug ("Cannot take ldconfig.real from same provider, ignoring: %s",
+                   local_error->message);
+          g_clear_error (&local_error);
+        }
+    }
+
   return TRUE;
 }
 
@@ -6421,10 +6456,6 @@ pv_runtime_finish_libc_family (PvRuntime *self,
     { "getent" },
     { "iconv" },
     { "ldconfig", .priority = ESSENTIAL, .target_path = "/sbin/ldconfig" },
-    /* In Ubuntu and old Debian releases (Debian 8 or older), /sbin/ldconfig
-     * is a shell script wrapper around the real binary /sbin/ldconfig.real,
-     * working around lack of dpkg trigger support in old library packages. */
-    { "ldconfig.real", .target_path = "/sbin/ldconfig.real" },
     { "ldd", .priority = IMPORTANT },
     { "locale", .priority = IMPORTANT },
     { "localedef", .priority = IMPORTANT },

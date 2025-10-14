@@ -59,11 +59,14 @@ dump_strv (const char *title,
 }
 
 static void
-dump_architecture (const SrtKnownArchitecture *arch)
+dump_architecture (const char *label,
+                   const SrtKnownArchitecture *arch)
 {
   const char *description;
 
-  g_test_message ("Known architecture: %s", arch->multiarch_tuple);
+  g_test_message ("%s: %s",
+                  label ?: "Known architecture",
+                  arch->multiarch_tuple);
   g_test_message ("\tld.so(8): %s",
                   arch->interoperable_runtime_linker ?: "(unknown)");
   g_test_message ("\tIn OpenXR vocabulary: %s",
@@ -138,7 +141,7 @@ test_architecture_get_by_tuple (Fixture *f,
 
   arch = x86_64_arch = _srt_architecture_get_by_tuple (SRT_ABI_X86_64);
   g_assert_nonnull (x86_64_arch);
-  dump_architecture (arch);
+  dump_architecture ("x86_64 architecture", arch);
   g_assert_cmpstr (x86_64_arch->multiarch_tuple, ==, SRT_ABI_X86_64);
   g_assert_cmpstr (x86_64_arch->interoperable_runtime_linker, ==,
                    "/lib64/ld-linux-x86-64.so.2");
@@ -175,7 +178,7 @@ test_architecture_get_by_tuple (Fixture *f,
 
   arch = i386_arch = _srt_architecture_get_by_tuple (SRT_ABI_I386);
   g_assert_nonnull (i386_arch);
-  dump_architecture (arch);
+  dump_architecture ("i386 architecture", arch);
   g_assert_cmpstr (i386_arch->multiarch_tuple, ==, SRT_ABI_I386);
   g_assert_cmpstr (i386_arch->interoperable_runtime_linker, ==,
                    "/lib/ld-linux.so.2");
@@ -212,7 +215,7 @@ test_architecture_get_by_tuple (Fixture *f,
 
   arch = aarch64_arch = _srt_architecture_get_by_tuple (SRT_ABI_AARCH64);
   g_assert_nonnull (arch);
-  dump_architecture (arch);
+  dump_architecture ("aarch64 architecture", arch);
   g_assert_cmpstr (arch->multiarch_tuple, ==, SRT_ABI_AARCH64);
   g_assert_cmpstr (arch->interoperable_runtime_linker, ==,
                    "/lib/ld-linux-aarch64.so.1");
@@ -246,7 +249,7 @@ test_architecture_get_by_tuple (Fixture *f,
   /* Used in unit tests */
   arch = _srt_architecture_get_by_tuple ("x86_64-mock-abi");
   g_assert_nonnull (arch);
-  dump_architecture (arch);
+  dump_architecture ("Mock architecture for unit tests", arch);
   g_assert_cmpstr (arch->multiarch_tuple, ==, "x86_64-mock-abi");
   g_assert_cmpstr (arch->interoperable_runtime_linker, ==, NULL);
   g_assert_cmpstr (arch->openxr_1_architecture, ==, NULL);

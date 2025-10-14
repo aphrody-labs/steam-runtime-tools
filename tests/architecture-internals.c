@@ -130,6 +130,34 @@ dump_architecture (const char *label,
 }
 
 static void
+test_architecture_get_current (Fixture *f,
+                               gconstpointer context)
+{
+  const SrtKnownArchitecture *arch = _srt_architecture_get_current ();
+
+  dump_architecture ("Current architecture", arch);
+
+#if defined(__x86_64__) && defined(__LP64__)
+  g_assert_cmpstr (arch->multiarch_tuple, ==, SRT_ABI_X86_64);
+  g_assert_cmpstr (arch->interoperable_runtime_linker,
+                   ==, "/lib64/ld-linux-x86-64.so.2");
+#elif defined(__i386__)
+  g_assert_cmpstr (arch->multiarch_tuple, ==, SRT_ABI_I386);
+  g_assert_cmpstr (arch->interoperable_runtime_linker,
+                   ==, "/lib/ld-linux.so.2");
+#elif defined(__aarch64__)
+  g_assert_cmpstr (arch->multiarch_tuple, ==, SRT_ABI_AARCH64);
+  g_assert_cmpstr (arch->interoperable_runtime_linker,
+                   ==, "/lib/ld-linux-aarch64.so.1");
+#endif
+
+#if defined(_SRT_MULTIARCH)
+  g_assert_cmpstr (arch->multiarch_tuple, ==, _SRT_MULTIARCH);
+  g_assert_cmpuint (arch->sizeof_pointer, ==, sizeof (void *));
+#endif
+}
+
+static void
 test_architecture_get_by_tuple (Fixture *f,
                                 gconstpointer context)
 {
@@ -408,6 +436,8 @@ main (int argc,
   _srt_tests_init (&argc, &argv, NULL);
   g_test_add ("/architecture/get_by_tuple", Fixture, NULL,
               setup, test_architecture_get_by_tuple, teardown);
+  g_test_add ("/architecture/get_current", Fixture, NULL,
+              setup, test_architecture_get_current, teardown);
   g_test_add ("/architecture/guess_from_user_input", Fixture, NULL,
               setup, test_architecture_guess_from_user_input, teardown);
   g_test_add ("/architecture/plausible_tuple", Fixture, NULL,

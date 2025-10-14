@@ -615,3 +615,35 @@ _srt_architecture_array_populate_with_defaults (GArray *arch_quarks)
       g_array_append_val (arch_quarks, arch_quark);
     }
 }
+
+#if defined(__x86_64__)
+#define CURRENT_TUPLE SRT_ABI_X86_64
+#elif defined(__i386__)
+#define CURRENT_TUPLE SRT_ABI_I386
+#elif defined(__aarch64__)
+#define CURRENT_TUPLE SRT_ABI_AARCH64
+#elif defined(_SRT_MULTIARCH)
+#define CURRENT_TUPLE _SRT_MULTIARCH
+#else
+#warning Unknown architecture, please build with -Dmultiarch_tuple=...
+#endif
+
+/*
+ * Return the architecture for which the current process was compiled.
+ *
+ * If the current architecture's multiarch tuple cannot be determined,
+ * instead return 0.
+ * This can only happen on unusual architectures and only if
+ * steam-runtime-tools was configured without `-Dmultiarch_tuple`.
+ *
+ * Returns: interned string representing a multiarch tuple, or 0 if unknown
+ */
+const SrtKnownArchitecture *
+_srt_architecture_get_current (void)
+{
+#ifdef CURRENT_TUPLE
+  return _srt_architecture_get_by_tuple (CURRENT_TUPLE);
+#else
+  return 0;
+#endif
+}

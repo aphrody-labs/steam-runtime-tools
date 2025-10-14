@@ -6353,12 +6353,17 @@ pv_runtime_provide_glibc_executable (PvRuntime *self,
         g_warning ("Cannot find %s", exe->executable);
       else
         g_debug ("Cannot find %s", exe->executable);
+
+      /* TODO: If we can't find the implementation of an ESSENTIAL
+       * executable like ldconfig, should we just fail? */
+      return TRUE;
     }
-  else if (!pv_runtime_take_from_provider (self,
-                                           provider, provider_impl,
-                                           bwrap, target_path,
-                                           flags,
-                                           &local_error))
+
+  if (!pv_runtime_take_from_provider (self,
+                                      provider, provider_impl,
+                                      bwrap, target_path,
+                                      flags,
+                                      &local_error))
     {
       if (exe->priority >= IMPORTANT)
         {
@@ -6370,6 +6375,7 @@ pv_runtime_provide_glibc_executable (PvRuntime *self,
           g_debug ("Cannot take %s from provider, ignoring: %s",
                    provider_impl, local_error->message);
           g_clear_error (&local_error);
+          return TRUE;
         }
     }
 

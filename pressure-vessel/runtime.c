@@ -112,6 +112,7 @@ struct _PvRuntime
   GStrv original_environ;
 
   const SrtKnownArchitecture *adverb_architecture;
+  const SrtKnownArchitecture *ldconfig_architecture;
   gchar *libcapsule_knowledge;  /* relative to runtime_files */
   gchar *runtime_abi_json;
   gchar *variable_dir;
@@ -1578,6 +1579,31 @@ pv_runtime_initable_init (GInitable *initable,
   if (fstatat (self->runtime_files_fd, self->libcapsule_knowledge,
                &ignore, AT_SYMLINK_NOFOLLOW) != 0)
     g_clear_pointer (&self->libcapsule_knowledge, g_free);
+
+  /* We assume that in any runtime we might want to ship (unlike the
+   * graphics stack, which is outside our control), ldconfig(8) will
+   * be at its canonical path, /sbin/ldconfig.
+   * Later, we might parachute in the ldconfig(8) from the graphics
+   * provider, to go with a glibc from the graphics provider.
+   * If so, we'll overwrite self->ldconfig_architecture with the
+   * architecture of the replacement ldconfig. */
+  self->ldconfig_architecture = _srt_architecture_guess_from_elf (self->runtime_files_fd,
+                                                                  "sbin/ldconfig",
+                                                                  &local_error);
+
+  if (G_LIKELY (self->ldconfig_architecture != NULL))
+    {
+      g_debug ("runtime's ldconfig(8) is a %s executable",
+               self->ldconfig_architecture->multiarch_tuple);
+    }
+  else
+    {
+      /* Not a g_warning() because during unit testing, our mock sysroot
+       * legitimately doesn't have a real ldconfig */
+      _srt_log_warning ("Unable to determine architecture of runtime's ldconfig: %s",
+                        local_error->message);
+      g_clear_error (&local_error);
+    }
 
   self->runtime_abi_json = g_build_filename (self->runtime_usr, "lib", "steamrt",
                                              "steam-runtime-abi.json", NULL);
@@ -6285,6 +6311,51 @@ pv_runtime_take_misc_data_from_provider (PvRuntime *self,
   return TRUE;
 }
 
+static const SrtKnownArchitecture *
+pv_runtime_get_provider_ldconfig_architecture (PvRuntime *self,
+                                               PvGraphicsProvider *provider,
+                                               const char *ldconfig,
+                                               const char *ldconfig_real,
+                                               GError **error)
+{
+  glnx_autofd int fd = -1;
+  char buf[4] = { 0, 0, 0, 0 };
+  size_t n_read;
+
+  fd = _srt_sysroot_open (provider->in_current_ns, ldconfig,
+                          SRT_RESOLVE_FLAGS_READABLE,
+                          NULL, error);
+
+  if (fd < 0)
+    return NULL;
+
+  if (!_srt_fd_read_loop (fd, buf, sizeof (buf), &n_read, error))
+    return NULL;
+
+  if (n_read < 4 || memcmp (buf, "\177ELF", 4) != 0)
+    {
+      g_debug ("ldconfig(8) \"%s\" in \"%s\" is not an ELF executable",
+               ldconfig, provider->in_current_ns->path);
+
+      if (ldconfig_real != NULL
+          && n_read >= 2
+          && memcmp (buf, "#!", 2) == 0)
+        {
+          g_debug ("ldconfig is a script and ldconfig.real exists, "
+                   "trying to get architecture from ldconfig.real instead");
+          glnx_close_fd (&fd);
+          fd = _srt_sysroot_open (provider->in_current_ns, ldconfig_real,
+                                  SRT_RESOLVE_FLAGS_READABLE,
+                                  NULL, error);
+
+          if (fd < 0)
+            return NULL;
+        }
+    }
+
+  return _srt_architecture_guess_from_elf (fd, NULL, error);
+}
+
 typedef enum
 {
   OPTIONAL,
@@ -6410,6 +6481,28 @@ pv_runtime_provide_glibc_executable (PvRuntime *self,
         {
           g_debug ("Cannot take ldconfig.real from same provider, ignoring: %s",
                    local_error->message);
+          g_clear_error (&local_error);
+          g_clear_pointer (&real_impl, g_free);
+        }
+
+      self->ldconfig_architecture =
+        pv_runtime_get_provider_ldconfig_architecture (self,
+                                                       provider,
+                                                       provider_impl,
+                                                       real_impl,
+                                                       &local_error);
+
+      if (G_LIKELY (self->ldconfig_architecture != NULL))
+        {
+          g_debug ("provider %s ldconfig(8) is a %s executable",
+                   provider->in_current_ns->path,
+                   self->ldconfig_architecture->multiarch_tuple);
+        }
+      else
+        {
+          _srt_log_warning ("Unable to determine architecture of provider %s ldconfig: %s",
+                            provider->in_current_ns->path,
+                            local_error->message);
           g_clear_error (&local_error);
         }
     }

@@ -6285,6 +6285,97 @@ pv_runtime_take_misc_data_from_provider (PvRuntime *self,
   return TRUE;
 }
 
+typedef enum
+{
+  OPTIONAL,
+  IMPORTANT,
+  ESSENTIAL
+} ComponentPriority;
+
+typedef struct
+{
+  const char *executable;
+  const char *target_path;
+  ComponentPriority priority;
+} GlibcExecutable;
+
+static gboolean
+pv_runtime_provide_glibc_executable (PvRuntime *self,
+                                     const GlibcExecutable *exe,
+                                     FlatpakBwrap *bwrap,
+                                     GError **error)
+{
+  g_autoptr(GError) local_error = NULL;
+  g_autofree char *provider_impl = NULL;
+  g_autofree char *target_path_alloc = NULL;
+  const char *target_path = exe->target_path;
+  PvGraphicsProvider *provider = NULL;
+  TakeFromProviderFlags flags;
+  gsize provider_index;
+
+  for (provider_index = 0;
+       provider_index < self->providers->len;
+       provider_index++)
+    {
+      const gchar *search_paths = NULL;
+
+      provider = g_ptr_array_index (self->providers, provider_index);
+
+      if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+        continue;
+
+      if (_srt_sysroot_is_direct (provider->in_current_ns))
+        search_paths = g_environ_getenv (self->original_environ, "PATH");
+
+      provider_impl = pv_graphics_provider_search_in_path_and_bin (provider,
+                                                                   search_paths,
+                                                                   exe->executable);
+
+      /* Leaves provider set to this one */
+      if (provider_impl != NULL)
+        break;
+    }
+
+  if (target_path == NULL)
+    {
+      target_path_alloc = g_build_filename ("/usr/bin", exe->executable, NULL);
+      target_path = target_path_alloc;
+    }
+
+  if (exe->priority >= ESSENTIAL)
+    flags = TAKE_FROM_PROVIDER_FLAGS_NONE;
+  else
+    flags = TAKE_FROM_PROVIDER_FLAGS_IF_CONTAINER_COMPATIBLE;
+
+  if (provider_impl == NULL)
+    {
+      if (exe->priority >= IMPORTANT)
+        g_warning ("Cannot find %s", exe->executable);
+      else
+        g_debug ("Cannot find %s", exe->executable);
+    }
+  else if (!pv_runtime_take_from_provider (self,
+                                           provider, provider_impl,
+                                           bwrap, target_path,
+                                           flags,
+                                           &local_error))
+    {
+      if (exe->priority >= IMPORTANT)
+        {
+          g_propagate_error (error, g_steal_pointer (&local_error));
+          return FALSE;
+        }
+      else
+        {
+          g_debug ("Cannot take %s from provider, ignoring: %s",
+                   provider_impl, local_error->message);
+          g_clear_error (&local_error);
+        }
+    }
+
+  return TRUE;
+}
+
 static gboolean
 pv_runtime_finish_libc_family (PvRuntime *self,
                                FlatpakBwrap *bwrap,
@@ -6314,12 +6405,7 @@ pv_runtime_finish_libc_family (PvRuntime *self,
     "/usr/share/i18n",
     NULL
   };
-  static const struct
-  {
-    const char *executable;
-    const char *target_path;
-    enum { OPTIONAL, IMPORTANT, ESSENTIAL } priority;
-  } glibc_executables[] =
+  static const GlibcExecutable glibc_executables[] =
   {
     /* This is basically the libc-bin Debian package, which is
      * marked Essential. At least ldd can fail to work if it is too
@@ -6385,74 +6471,11 @@ pv_runtime_finish_libc_family (PvRuntime *self,
 
       for (i = 0; i < G_N_ELEMENTS (glibc_executables); i++)
         {
-          g_autoptr(GError) local_error = NULL;
-          const char *executable = glibc_executables[i].executable;
-          g_autofree char *provider_impl = NULL;
-          g_autofree char *target_path_alloc = NULL;
-          const char *target_path = glibc_executables[i].target_path;
-          PvGraphicsProvider *provider = NULL;
-          TakeFromProviderFlags flags;
-          gsize provider_index;
-
-          for (provider_index = 0;
-               provider_index < self->providers->len;
-               provider_index++)
-            {
-              const gchar *search_paths = NULL;
-
-              provider = g_ptr_array_index (self->providers, provider_index);
-
-              if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
-                continue;
-
-              if (_srt_sysroot_is_direct (provider->in_current_ns))
-                search_paths = g_environ_getenv (self->original_environ, "PATH");
-
-              provider_impl = pv_graphics_provider_search_in_path_and_bin (provider,
-                                                                           search_paths,
-                                                                           executable);
-
-              /* Leaves provider set to this one */
-              if (provider_impl != NULL)
-                break;
-            }
-
-          if (target_path == NULL)
-            {
-              target_path_alloc = g_build_filename ("/usr/bin", executable, NULL);
-              target_path = target_path_alloc;
-            }
-
-          if (glibc_executables[i].priority >= ESSENTIAL)
-            flags = TAKE_FROM_PROVIDER_FLAGS_NONE;
-          else
-            flags = TAKE_FROM_PROVIDER_FLAGS_IF_CONTAINER_COMPATIBLE;
-
-          if (provider_impl == NULL)
-            {
-              if (glibc_executables[i].priority >= IMPORTANT)
-                g_warning ("Cannot find %s", executable);
-              else
-                g_debug ("Cannot find %s", executable);
-            }
-          else if (!pv_runtime_take_from_provider (self,
-                                                   provider, provider_impl,
-                                                   bwrap, target_path,
-                                                   flags,
-                                                   &local_error))
-            {
-              if (glibc_executables[i].priority >= IMPORTANT)
-                {
-                  g_propagate_error (error, g_steal_pointer (&local_error));
-                  return FALSE;
-                }
-              else
-                {
-                  g_debug ("Cannot take %s from provider, ignoring: %s",
-                           provider_impl, local_error->message);
-                  g_clear_error (&local_error);
-                }
-            }
+          if (!pv_runtime_provide_glibc_executable (self,
+                                                    &glibc_executables[i],
+                                                    bwrap,
+                                                    error))
+            return FALSE;
         }
 
       g_debug ("Making provider gconv modules visible in container");

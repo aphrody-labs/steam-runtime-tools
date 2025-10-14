@@ -522,8 +522,11 @@ _srt_architecture_get_by_tuple (const char *tuple)
 }
 
 /*
- * @dfd: a directory file descriptor, `AT_FDCWD` or -1
- * @file_path: (type filename):
+ * @dfd: a directory file descriptor, `AT_FDCWD` or -1,
+ *  or an open file descriptor for the library or executable itself
+ *  if @file_path is %NULL
+ * @file_path: (type filename): Filename to open, or %NULL if @dfd
+ *  is an open file descriptor for the executable or library
  * @cls: (not optional) (out): ELF class, normally `ELFCLASS32` or `ELFCLASS64`
  * @data_encoding: (not optional) (out): ELF data encoding, normally
  *  `ELFDATA2LSB` or `ELFDATA2MSB`
@@ -545,7 +548,8 @@ _srt_architecture_read_elf (int dfd,
   g_autoptr(Elf) elf = NULL;
   GElf_Ehdr eh;
 
-  g_return_val_if_fail (file_path != NULL, FALSE);
+  g_return_val_if_fail (file_path == NULL || file_path[0] != '\0', FALSE);
+  g_return_val_if_fail (file_path != NULL || dfd >= 0, FALSE);
   g_return_val_if_fail (cls != NULL, FALSE);
   g_return_val_if_fail (machine != NULL, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
@@ -565,8 +569,11 @@ _srt_architecture_read_elf (int dfd,
 }
 
 /*
- * @dfd: a directory file descriptor, `AT_FDCWD` or -1
- * @file_path: (type filename):
+ * @dfd: a directory file descriptor, `AT_FDCWD` or -1,
+ *  or an open file descriptor for the library or executable itself
+ *  if @file_path is %NULL
+ * @file_path: (type filename): Filename to open, or %NULL if @dfd
+ *  is an open file descriptor for the executable or library
  * @error: On failure set to GIOErrorEnum or SrtArchitectureError, used to
  *  describe the error
  *
@@ -582,7 +589,8 @@ _srt_architecture_guess_from_elf (int dfd,
   guint16 machine = EM_NONE;
   gsize i;
 
-  g_return_val_if_fail (file_path != NULL, NULL);
+  g_return_val_if_fail (file_path == NULL || file_path[0] != '\0', NULL);
+  g_return_val_if_fail (file_path != NULL || dfd >= 0, NULL);
 
   if (!_srt_architecture_read_elf (dfd, file_path, &cls, &data_encoding, &machine, error))
     return NULL;

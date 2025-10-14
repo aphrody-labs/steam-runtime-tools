@@ -310,6 +310,109 @@ test_architecture_get_by_tuple (Fixture *f,
 }
 
 static void
+dump_guessed_arch (const char *input,
+                   const SrtKnownArchitecture *arch,
+                   const GError *error)
+{
+  if (arch != NULL)
+    g_test_message ("%s -> guessed %s", input, arch->multiarch_tuple);
+  else
+    g_test_message ("%s -> cannot guess: %s", input,
+                    error != NULL ? error->message : "<no error>");
+}
+
+static void
+test_architecture_guess_from_elf (Fixture *f,
+                                  gconstpointer context)
+{
+  const SrtKnownArchitecture *arch;
+
+    {
+      g_autoptr(GError) local_error = NULL;
+
+      arch = _srt_architecture_guess_from_elf (AT_FDCWD, "/nonexistent",
+                                               &local_error);
+      dump_guessed_arch ("/nonexistent", arch, local_error);
+      g_assert_nonnull (local_error);
+      g_assert_null (arch);
+    }
+
+  for (gsize use_fd = 0; use_fd < 2; use_fd++)
+    {
+      const SrtKnownArchitecture *native_architecture;
+      g_autofree gchar *mock_true = NULL;
+      g_autoptr(GError) local_error = NULL;
+      glnx_autofd int already_open_fd = -1;
+
+      mock_true = g_test_build_filename (G_TEST_BUILT, "mock-true", NULL);
+
+      if (use_fd != 0)
+        {
+          gboolean ok;
+
+          ok = glnx_openat_rdonly (AT_FDCWD, mock_true,
+                                   TRUE, /* follow symlinks */
+                                   &already_open_fd,
+                                   &local_error);
+          g_assert_no_error (local_error);
+          g_assert_true (ok);
+
+          arch = _srt_architecture_guess_from_elf (already_open_fd, NULL,
+                                                   &local_error);
+        }
+      else
+        {
+          arch = _srt_architecture_guess_from_elf (AT_FDCWD, mock_true,
+                                                   &local_error);
+        }
+
+      dump_guessed_arch ("mock-true ELF executable", arch, local_error);
+
+      native_architecture = _srt_architecture_get_current ();
+#if defined(_SRT_MULTIARCH) \
+    || (defined(__x86_64__) && defined(__LP64__)) \
+    || defined(__i386__) \
+    || defined(__aarch64__)
+      g_assert_nonnull (native_architecture);
+#endif
+
+      if (native_architecture != NULL)
+        {
+          if (native_architecture->elf_class != ELFCLASSNONE
+              && native_architecture->elf_encoding != ELFDATANONE
+              && native_architecture->machine_type != SRT_MACHINE_TYPE_UNKNOWN)
+            {
+              g_assert_nonnull (arch);
+              g_assert_cmpstr (arch->multiarch_tuple,
+                               ==, native_architecture->multiarch_tuple);
+              g_assert_true (arch == native_architecture);
+            }
+          else
+            {
+#if (defined(__x86_64__) && defined(__LP64__)) \
+    || defined(__i386__) \
+    || defined(__aarch64__)
+              g_error ("This architecture should be identifiable");
+#endif
+            }
+        }
+    }
+
+    {
+      g_autofree gchar *check_sh = NULL;
+      g_autoptr(GError) local_error = NULL;
+
+      /* A shell script's architecture can't be guessed */
+      check_sh = g_test_build_filename (G_TEST_DIST, "check-sh.sh", NULL);
+      arch = _srt_architecture_guess_from_elf (AT_FDCWD, check_sh,
+                                               &local_error);
+      dump_guessed_arch ("check-sh.sh shell script", arch, local_error);
+      g_assert_nonnull (local_error);
+      g_assert_null (arch);
+    }
+}
+
+static void
 test_architecture_guess_from_user_input (Fixture *f,
                                          gconstpointer context)
 {
@@ -625,6 +728,8 @@ main (int argc,
               setup, test_architecture_get_by_tuple, teardown);
   g_test_add ("/architecture/get_current", Fixture, NULL,
               setup, test_architecture_get_current, teardown);
+  g_test_add ("/architecture/guess_from_elf", Fixture, NULL,
+              setup, test_architecture_guess_from_elf, teardown);
   g_test_add ("/architecture/guess_from_user_input", Fixture, NULL,
               setup, test_architecture_guess_from_user_input, teardown);
   g_test_add ("/architecture/ldconfig_knows_arch", Fixture, NULL,

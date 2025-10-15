@@ -638,7 +638,7 @@ _srt_architecture_guess_from_user_input (const char *alias,
   if (known_out != NULL)
     *known_out = 0;
 
-  g_return_val_if_fail (alias != NULL, 0);
+  g_return_val_if_fail (alias != NULL, SRT_ARCHITECTURE_QUARK_NONE);
 
   normalized = g_ascii_strdown (alias, -1);
   known = _srt_architecture_get_by_tuple (normalized);
@@ -681,7 +681,7 @@ _srt_architecture_guess_from_user_input (const char *alias,
   if (!_srt_architecture_check_plausible_tuple (normalized, error))
     {
       g_prefix_error (error, "Invalid architecture \"%s\": ", normalized);
-      return 0;
+      return SRT_ARCHITECTURE_QUARK_NONE;
     }
 
   /* We don't recognise this architecture but it looks plausible,
@@ -715,7 +715,7 @@ _srt_architecture_array_populate_with_defaults (GArray *arch_quarks)
     {
       GQuark arch_quark = g_quark_from_static_string (default_architectures[i]);
 
-      g_return_if_fail (arch_quark != 0);
+      g_return_if_fail (arch_quark != SRT_ARCHITECTURE_QUARK_NONE);
       g_array_append_val (arch_quarks, arch_quark);
     }
 }

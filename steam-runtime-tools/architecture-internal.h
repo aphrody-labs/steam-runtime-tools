@@ -30,6 +30,16 @@
 
 #include "steam-runtime-tools/subprocess-internal.h"
 
+/*
+ * SRT_ARCHITECTURE_QUARK_NONE:
+ *
+ * Represents "no particular architecture", "unspecified architecture",
+ * the native architecture of the machine, or similar concepts.
+ *
+ * This is the #GQuark with value 0, corresponding to a %NULL string.
+ */
+#define SRT_ARCHITECTURE_QUARK_NONE ((GQuark) 0)
+
 typedef struct
 {
   const char *multiarch_tuple;
@@ -93,9 +103,10 @@ GQuark _srt_architecture_guess_from_user_input (const char *alias,
  * architectures/ABIs by their Debian-style multiarch tuple.
  *
  * The array has an additional item `g_array_index (arr, GQuark, arr->len)`
- * with value 0, so `arr->data` can be used as a 0-terminated array of GQuark.
+ * with value %SRT_ARCHITECTURE_QUARK_NONE (which is 0),
+ * so `arr->data` can be used as a 0-terminated array of GQuark.
  *
- * Newly added items are cleared to 0.
+ * Newly added items are cleared to %SRT_ARCHITECTURE_QUARK_NONE.
  *
  * Returns: An empty array to hold GQuark
  */

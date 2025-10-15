@@ -25,7 +25,7 @@
 
 #include "steam-runtime-tools/locale.h"
 
-#include "steam-runtime-tools/architecture.h"
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/enums.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/json-glib-backports-internal.h"
@@ -191,7 +191,7 @@ srt_locale_class_init (SrtLocaleClass *cls)
 /*
  * _srt_check_locale:
  * @runner: Execution environment
- * @multiarch_tuple: Multiarch tuple of helper executable to use
+ * @arch_quark: Multiarch tuple of helper executable to use
  * @requested_name: The locale name to check for
  * @error: Used to return an error if %NULL is returned
  *
@@ -204,7 +204,7 @@ srt_locale_class_init (SrtLocaleClass *cls)
  */
 SrtLocale *
 _srt_check_locale (SrtSubprocessRunner *runner,
-                   const char *multiarch_tuple,
+                   GQuark arch_quark,
                    const char *requested_name,
                    GError **error)
 {
@@ -220,15 +220,11 @@ _srt_check_locale (SrtSubprocessRunner *runner,
 
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (runner), NULL);
+  g_return_val_if_fail (arch_quark != SRT_ARCHITECTURE_QUARK_NONE, NULL);
   g_return_val_if_fail (requested_name != NULL, NULL);
   g_return_val_if_fail (_srt_check_not_setuid (), NULL);
 
-#if defined(_SRT_MULTIARCH)
-  if (multiarch_tuple == NULL)
-    multiarch_tuple = _SRT_MULTIARCH;
-#endif
-
-  argv = _srt_subprocess_runner_get_helper (runner, multiarch_tuple,
+  argv = _srt_subprocess_runner_get_helper (runner, g_quark_to_string (arch_quark),
                                             "check-locale", helper_flags,
                                             error);
 

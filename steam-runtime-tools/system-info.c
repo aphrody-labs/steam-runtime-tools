@@ -3323,7 +3323,7 @@ srt_system_info_check_locale (SrtSystemInfo *self,
       SrtLocale *locale = NULL;
 
       locale = _srt_check_locale (self->runner,
-                                  srt_system_info_get_primary_multiarch_tuple (self),
+                                  _srt_system_info_get_primary_multiarch_quark (self),
                                   g_quark_to_string (quark),
                                   &local_error);
 

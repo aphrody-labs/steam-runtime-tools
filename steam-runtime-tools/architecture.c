@@ -636,7 +636,7 @@ _srt_architecture_guess_from_user_input (const char *alias,
   gsize i;
 
   if (known_out != NULL)
-    *known_out = 0;
+    *known_out = NULL;
 
   g_return_val_if_fail (alias != NULL, SRT_ARCHITECTURE_QUARK_NONE);
 

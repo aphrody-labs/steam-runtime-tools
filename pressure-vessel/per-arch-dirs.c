@@ -206,17 +206,15 @@ pv_per_arch_dirs_try_scheme (PvPerArchDirs *self,
 }
 
 PvPerArchDirs *
-pv_per_arch_dirs_new (const GQuark *architectures,
+pv_per_arch_dirs_new (SrtSystemInfo *info,
+                      const GQuark *architectures,
                       gsize n_architectures,
                       GError **error)
 {
   g_autoptr(GError) lib_error = NULL;
   g_autoptr(GError) platform_error = NULL;
   g_autoptr(PvPerArchDirs) self = g_new0 (PvPerArchDirs, 1);
-  g_autoptr(SrtSystemInfo) info = NULL;
   gsize abi;
-
-  info = srt_system_info_new (NULL);
 
   self->root_path = g_dir_make_tmp ("pressure-vessel-libs-XXXXXX", error);
   if (self->root_path == NULL)

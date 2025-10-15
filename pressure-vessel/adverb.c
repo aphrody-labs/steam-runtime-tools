@@ -812,6 +812,7 @@ main (int argc,
   g_autoptr(PvPerArchDirs) lib_temp_dirs = NULL;
   SrtSteamCompatFlags compat_flags;
   g_autoptr(GArray) tuples = NULL;
+  g_autoptr(SrtSystemInfo) info = NULL;
 
   setlocale (LC_ALL, "");
 
@@ -1051,7 +1052,8 @@ main (int argc,
                              opt_set_ld_library_path, TRUE);
     }
 
-  lib_temp_dirs = pv_per_arch_dirs_new ((const GQuark *) tuples->data,
+  info = srt_system_info_new (NULL);
+  lib_temp_dirs = pv_per_arch_dirs_new (info, (const GQuark *) tuples->data,
                                         tuples->len, error);
 
   if (lib_temp_dirs == NULL)

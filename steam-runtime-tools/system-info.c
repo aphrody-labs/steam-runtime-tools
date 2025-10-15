@@ -4460,7 +4460,7 @@ ensure_display_info (SrtSystemInfo *self)
 
   if (self->display_info == NULL && self->from_report == NULL)
     self->display_info = _srt_check_display (self->runner,
-                                             srt_system_info_get_primary_multiarch_tuple (self));
+                                             _srt_system_info_get_primary_multiarch_quark (self));
 }
 
 /**

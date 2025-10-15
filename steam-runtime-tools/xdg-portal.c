@@ -25,6 +25,7 @@
 
 #include "steam-runtime-tools/xdg-portal.h"
 
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/container-internal.h"
 #include "steam-runtime-tools/enums.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
@@ -474,7 +475,8 @@ srt_xdg_portal_class_init (SrtXdgPortalClass *cls)
 /**
  * _srt_check_xdg_portals:
  * @runner: The execution environment
- * @multiarch_tuple: Multiarch tuple of helper executable to use
+ * @arch_quark: Nonzero quark representing multiarch tuple of helper
+ *  executable to use
  * @details_out: The SrtXdgPortal object containing the details of the check.
  *
  * Return the problems found when checking the available XDG portals.
@@ -485,7 +487,7 @@ srt_xdg_portal_class_init (SrtXdgPortalClass *cls)
 G_GNUC_INTERNAL SrtXdgPortalIssues
 _srt_check_xdg_portals (SrtSubprocessRunner *runner,
                         SrtContainerType container_type,
-                        const char *multiarch_tuple,
+                        GQuark arch_quark,
                         SrtXdgPortal **details_out)
 {
   g_autoptr(GError) local_error = NULL;
@@ -507,11 +509,12 @@ _srt_check_xdg_portals (SrtSubprocessRunner *runner,
   gboolean has_implementation = FALSE;
 
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (runner), SRT_XDG_PORTAL_ISSUES_UNKNOWN);
-  g_return_val_if_fail (multiarch_tuple != NULL, SRT_XDG_PORTAL_ISSUES_UNKNOWN);
+  g_return_val_if_fail (arch_quark != SRT_ARCHITECTURE_QUARK_NONE,
+                        SRT_XDG_PORTAL_ISSUES_UNKNOWN);
   g_return_val_if_fail (details_out == NULL || *details_out == NULL,
                         SRT_XDG_PORTAL_ISSUES_UNKNOWN);
 
-  argv = _srt_subprocess_runner_get_helper (runner, multiarch_tuple,
+  argv = _srt_subprocess_runner_get_helper (runner, g_quark_to_string (arch_quark),
                                             "check-xdg-portal", helper_flags,
                                             &local_error);
 

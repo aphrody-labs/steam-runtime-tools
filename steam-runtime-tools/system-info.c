@@ -4592,7 +4592,7 @@ ensure_xdg_portals_cached (SrtSystemInfo *self)
       ensure_container_info (self);
       _srt_check_xdg_portals (self->runner,
                               srt_container_info_get_container_type (self->container_info),
-                              srt_system_info_get_primary_multiarch_tuple (self),
+                              _srt_system_info_get_primary_multiarch_quark (self),
                               &self->xdg_portal_data);
     }
 }

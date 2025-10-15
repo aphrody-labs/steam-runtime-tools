@@ -60,6 +60,7 @@ tests = [
   {'name': 'os-release', 'static': true},
   {'name': 'process-manager', 'static': true},
   {'name': 'resolve-in-sysroot', 'static': true},
+  {'name': 'subprocess', 'static': true},
   {'name': 'system-info', 'static': true},
   {'name': 'utils', 'static': true},
   {'name': 'virtualization', 'static': true},

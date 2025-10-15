@@ -30,11 +30,11 @@
 #include "steam-runtime-tools/subprocess-internal.h"
 
 G_GNUC_INTERNAL gchar *_srt_libdl_detect_platform (SrtSubprocessRunner *runner,
-                                                   const char *multiarch_tuple,
+                                                   GQuark arch_quark,
                                                    GError **error);
 
 G_GNUC_INTERNAL gchar *_srt_libdl_detect_lib (SrtSubprocessRunner *runner,
-                                              const char *multiarch_tuple,
+                                              GQuark arch_quark,
                                               GError **error);
 
 typedef enum

@@ -4848,12 +4848,14 @@ srt_system_info_dup_libdl_lib (SrtSystemInfo *self,
                                const char *multiarch_tuple,
                                GError **error)
 {
+  GQuark arch_quark;
   Abi *abi = NULL;
 
   g_return_val_if_fail (SRT_IS_SYSTEM_INFO (self), NULL);
   g_return_val_if_fail (multiarch_tuple != NULL, NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
+  arch_quark = g_quark_from_string (multiarch_tuple);
   abi = ensure_abi_unless_immutable (self, multiarch_tuple);
 
   if (abi == NULL)
@@ -4877,7 +4879,7 @@ srt_system_info_dup_libdl_lib (SrtSystemInfo *self,
                             multiarch_tuple);
 
   abi->libdl_lib = _srt_libdl_detect_lib (self->runner,
-                                          multiarch_tuple,
+                                          arch_quark,
                                           &abi->libdl_lib_error);
 
   if (abi->libdl_lib_error != NULL && error != NULL)
@@ -4919,12 +4921,14 @@ srt_system_info_dup_libdl_platform (SrtSystemInfo *self,
                                     const char *multiarch_tuple,
                                     GError **error)
 {
+  GQuark arch_quark;
   Abi *abi = NULL;
 
   g_return_val_if_fail (SRT_IS_SYSTEM_INFO (self), NULL);
   g_return_val_if_fail (multiarch_tuple != NULL, NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
+  arch_quark = g_quark_from_string (multiarch_tuple);
   abi = ensure_abi_unless_immutable (self, multiarch_tuple);
 
   if (abi == NULL)
@@ -4948,7 +4952,7 @@ srt_system_info_dup_libdl_platform (SrtSystemInfo *self,
                             multiarch_tuple);
 
   abi->libdl_platform = _srt_libdl_detect_platform (self->runner,
-                                                    multiarch_tuple,
+                                                    arch_quark,
                                                     &abi->libdl_platform_error);
 
   if (abi->libdl_platform_error != NULL && error != NULL)

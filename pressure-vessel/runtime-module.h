@@ -81,7 +81,13 @@ typedef struct
   IcdKind kind;
 } PvModulePerArch;
 
-#define PV_MODULE_PER_ARCH_INIT { NULL, NULL, 0, ICD_KIND_UNDECIDED }
+#define PV_MODULE_PER_ARCH_INIT \
+{ \
+  .resolved_library = NULL, \
+  .path_in_container = NULL, \
+  .tuple = SRT_ARCHITECTURE_QUARK_NONE, \
+  .kind = ICD_KIND_UNDECIDED, \
+}
 
 static inline void
 pv_module_per_arch_clear (void *p)
@@ -90,7 +96,7 @@ pv_module_per_arch_clear (void *p)
 
   g_clear_pointer (&self->resolved_library, g_free);
   g_clear_pointer (&self->path_in_container, g_free);
-  self->tuple = 0;
+  self->tuple = SRT_ARCHITECTURE_QUARK_NONE;
   self->kind = ICD_KIND_UNDECIDED;
 }
 

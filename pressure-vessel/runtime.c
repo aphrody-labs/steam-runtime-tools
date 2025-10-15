@@ -669,7 +669,7 @@ pv_runtime_get_graphics_provider (PvRuntime *self,
   if (self->providers == NULL)
     return NULL;
 
-  if (multiarch_tuple == 0)
+  if (multiarch_tuple == SRT_ARCHITECTURE_QUARK_NONE)
     return NULL;
 
   for (i = 0; i < self->providers->len; i++)
@@ -691,7 +691,7 @@ runtime_architecture_init (RuntimeArchitecture *self,
   const gchar *argv[] = { NULL, "--print-ld.so", NULL };
   PvGraphicsProvider *provider;
 
-  g_return_val_if_fail (tuple != 0, FALSE);
+  g_return_val_if_fail (tuple != SRT_ARCHITECTURE_QUARK_NONE, FALSE);
   g_return_val_if_fail (self->tuple == NULL, FALSE);
 
   self->tuple_quark = tuple;
@@ -738,7 +738,7 @@ static gboolean
 runtime_architecture_check_valid (RuntimeArchitecture *self)
 {
   g_return_val_if_fail (self->tuple != NULL, FALSE);
-  g_return_val_if_fail (self->tuple_quark != 0, FALSE);
+  g_return_val_if_fail (self->tuple_quark != SRT_ARCHITECTURE_QUARK_NONE, FALSE);
   g_return_val_if_fail (self->provider != NULL, FALSE);
   g_return_val_if_fail (self->capsule_capture_libs_basename != NULL, FALSE);
   g_return_val_if_fail (self->capsule_capture_libs != NULL, FALSE);
@@ -753,7 +753,7 @@ static void
 runtime_architecture_clear (RuntimeArchitecture *self)
 {
   self->tuple = NULL;
-  self->tuple_quark = 0;
+  self->tuple_quark = SRT_ARCHITECTURE_QUARK_NONE;
   g_clear_object (&self->provider);
   g_clear_pointer (&self->capsule_capture_libs_basename, g_free);
   g_clear_pointer (&self->capsule_capture_libs, g_free);

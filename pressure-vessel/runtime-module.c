@@ -163,8 +163,7 @@ icd_details_check (IcdDetails *self)
     {
       PvModulePerArch *arch = icd_details_get_nth_architecture (self, i);
 
-      g_return_val_if_fail (arch->tuple != 0, FALSE);
-
+      g_return_val_if_fail (arch->tuple != SRT_ARCHITECTURE_QUARK_NONE, FALSE);
       g_return_val_if_fail (pv_module_per_arch_check (arch,
                                                       self,
                                                       is_json_based),
@@ -438,7 +437,7 @@ icd_details_get_architecture (IcdDetails *self,
   PvModulePerArch *arch;
 
   g_return_val_if_fail (icd_details_check (self), NULL);
-  g_return_val_if_fail (quark != 0, NULL);
+  g_return_val_if_fail (quark != SRT_ARCHITECTURE_QUARK_NONE, NULL);
 
   arch = icd_details_lookup_architecture (self, quark);
 
@@ -487,7 +486,7 @@ icd_details_fill_array_single_arch (GPtrArray *details_arr,
   const GList *icd_iter;
   gsize j;
 
-  g_return_if_fail (tuple != 0);
+  g_return_if_fail (tuple != SRT_ARCHITECTURE_QUARK_NONE);
 
   for (icd_iter = drivers, j = 0; icd_iter != NULL; icd_iter = icd_iter->next, j++)
     {
@@ -751,7 +750,7 @@ icd_stack_enumerate (IcdStack *self,
 {
   SrtSystemInfo *system_info;
 
-  system_info = pv_graphics_provider_get_system_info (provider, 0);
+  system_info = pv_graphics_provider_get_system_info (provider, SRT_ARCHITECTURE_QUARK_NONE);
   icd_stack_enumerate_egl_icds (self, provider, system_info, which_system);
   icd_stack_enumerate_egl_ext_platforms (self, provider, system_info, which_system);
   icd_stack_enumerate_vulkan_icds (self, provider, system_info, which_system);

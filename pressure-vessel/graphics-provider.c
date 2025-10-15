@@ -268,7 +268,7 @@ enumeration_thread_start_arch (EnumerationThread *self,
   g_return_if_fail (self->cancellable == NULL);
   g_return_if_fail (self->system_info == NULL);
   g_return_if_fail (self->thread == NULL);
-  g_return_if_fail (tuple != 0);
+  g_return_if_fail (tuple != SRT_ARCHITECTURE_QUARK_NONE);
 
   self->arch_tuple = tuple;
   self->cancellable = g_cancellable_new ();
@@ -293,7 +293,7 @@ enumeration_thread_start_indep (EnumerationThread *self,
   self->cancellable = g_cancellable_new ();
   self->thread = g_thread_new (thread_name == NULL ? "cross-architecture" : thread_name,
                                enumerate_indep,
-                               enumeration_thread_inputs_new (0,
+                               enumeration_thread_inputs_new (SRT_ARCHITECTURE_QUARK_NONE,
                                                               flags,
                                                               provider,
                                                               self->cancellable));
@@ -585,7 +585,7 @@ pv_graphics_provider_create_system_info (PvGraphicsProvider *self,
 
   system_info = srt_system_info_new (NULL);
 
-  if (single_arch != 0)
+  if (single_arch != SRT_ARCHITECTURE_QUARK_NONE)
     {
       _srt_system_info_set_multiarch_quarks (system_info, &single_arch, 1);
     }
@@ -632,7 +632,7 @@ pv_graphics_provider_has_architecture (PvGraphicsProvider *self,
  * @n: (out) (optional): Number of nonzero items in the result
  *
  * Returns: (transfer none) (array zero-terminated=1): An array of `*n` quarks
- *  representing multiarch tuples, followed by `0`
+ *  representing multiarch tuples, followed by %SRT_ARCHITECTURE_QUARK_NONE
  */
 const GQuark *
 pv_graphics_provider_get_architectures (PvGraphicsProvider *self,
@@ -661,7 +661,7 @@ pv_graphics_provider_add_architecture (PvGraphicsProvider *self,
   gsize i;
 
   g_return_if_fail (PV_IS_GRAPHICS_PROVIDER (self));
-  g_return_if_fail (tuple != 0);
+  g_return_if_fail (tuple != SRT_ARCHITECTURE_QUARK_NONE);
 
   for (i = 0; i < priv->tuples->len; i++)
     {
@@ -781,12 +781,12 @@ pv_graphics_provider_get_system_info (PvGraphicsProvider *self,
           || priv->indep_thread.system_info != NULL)
         priv->system_info = g_object_ref (enumeration_thread_join (&priv->indep_thread));
       else
-        priv->system_info = pv_graphics_provider_create_system_info (self, 0);
+        priv->system_info = pv_graphics_provider_create_system_info (self, SRT_ARCHITECTURE_QUARK_NONE);
     }
 
   g_return_val_if_fail (SRT_IS_SYSTEM_INFO (priv->system_info), NULL);
 
-  if (arch_specific != 0 && priv->arch_threads != NULL)
+  if (arch_specific != SRT_ARCHITECTURE_QUARK_NONE && priv->arch_threads != NULL)
     {
       /* If we already started enumerating Mesa DRI drivers, etc. for the
        * requested architecture, finish doing that now,

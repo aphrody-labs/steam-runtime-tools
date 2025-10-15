@@ -1184,11 +1184,13 @@ gboolean
 srt_system_info_can_run (SrtSystemInfo *self,
                          const char *multiarch_tuple)
 {
+  GQuark arch_quark;
   Abi *abi = NULL;
 
   g_return_val_if_fail (SRT_IS_SYSTEM_INFO (self), FALSE);
   g_return_val_if_fail (multiarch_tuple != NULL, FALSE);
 
+  arch_quark = g_quark_from_string (multiarch_tuple);
   abi = ensure_abi_unless_immutable (self, multiarch_tuple);
 
   if (abi == NULL)
@@ -1196,7 +1198,7 @@ srt_system_info_can_run (SrtSystemInfo *self,
 
   if (abi->can_run == TRI_MAYBE)
     {
-      if (_srt_architecture_can_run (self->runner, multiarch_tuple))
+      if (_srt_architecture_can_run (self->runner, arch_quark))
         abi->can_run = TRI_YES;
       else
         abi->can_run = TRI_NO;

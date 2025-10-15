@@ -2963,6 +2963,12 @@ srt_system_info_set_helpers_path (SrtSystemInfo *self,
   _srt_system_info_set_subprocess_runner (self, runner);
 }
 
+static inline GQuark
+_srt_system_info_get_primary_multiarch_quark (SrtSystemInfo *self)
+{
+  return g_array_index (self->multiarch_tuples, GQuark, 0);
+}
+
 /**
  * srt_system_info_get_primary_multiarch_tuple:
  * @self: The #SrtSystemInfo
@@ -2980,7 +2986,7 @@ srt_system_info_get_primary_multiarch_tuple (SrtSystemInfo *self)
 {
   g_return_val_if_fail (SRT_IS_SYSTEM_INFO (self), NULL);
 
-  return g_quark_to_string (g_array_index (self->multiarch_tuples, GQuark, 0));
+  return g_quark_to_string (_srt_system_info_get_primary_multiarch_quark (self));
 }
 
 /**

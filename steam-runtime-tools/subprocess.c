@@ -1258,6 +1258,9 @@ _srt_subprocess_runner_run_sync (SrtSubprocessRunner *self,
 {
   g_auto(SrtSubprocess) subprocess = SRT_SUBPROCESS_INIT;
 
+  g_return_val_if_fail (argv != NULL, NULL);
+  g_return_val_if_fail (argv[0] != NULL, NULL);
+
   if (!_srt_subprocess_runner_spawn (self,
                                      flags, argv, stdout_mode, stderr_mode,
                                      &subprocess, error))

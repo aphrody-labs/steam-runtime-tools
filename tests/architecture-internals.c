@@ -135,6 +135,77 @@ dump_architecture (const char *label,
 }
 
 static void
+test_architecture_array (Fixture *f,
+                         gconstpointer context)
+{
+  g_autoptr(GArray) arr = NULL;
+  g_autoptr(GArray) none = NULL;
+  GQuark inputs[3];
+  const GQuark *contents;
+  size_t n;
+
+  inputs[0] = g_quark_from_static_string (SRT_ABI_X86_64);
+  inputs[1] = g_quark_from_static_string (SRT_ABI_I386);
+  inputs[2] = g_quark_from_static_string (SRT_ABI_AARCH64);
+
+  none = _srt_architecture_array_new ();
+  g_assert_false (_srt_architecture_array_has (none, inputs[0]));
+  g_assert_false (_srt_architecture_array_has (none, inputs[1]));
+  g_assert_false (_srt_architecture_array_has (none, inputs[2]));
+
+  contents = _srt_architecture_array_peek_data (none, &n);
+  g_assert_nonnull (contents);
+  g_assert_cmpuint (n, ==, 0);
+  g_assert_cmpuint (contents[0], ==, SRT_ARCHITECTURE_QUARK_NONE);
+
+  arr = _srt_architecture_array_new_from_quarks (inputs, 2);
+  g_assert_true (_srt_architecture_array_has (arr, inputs[0]));
+  g_assert_true (_srt_architecture_array_has (arr, inputs[1]));
+  /* It doesn't read beyond the given @n */
+  g_assert_false (_srt_architecture_array_has (arr, inputs[2]));
+
+  contents = _srt_architecture_array_peek_data (arr, &n);
+  g_assert_nonnull (contents);
+  g_assert_cmpuint (n, ==, 2);
+  g_assert_cmpstr (g_quark_to_string (contents[0]), ==, SRT_ABI_X86_64);
+  g_assert_cmpstr (g_quark_to_string (contents[1]), ==, SRT_ABI_I386);
+  g_assert_cmpuint (contents[2], ==, SRT_ARCHITECTURE_QUARK_NONE);
+
+  /* These are already present */
+  g_assert_false (_srt_architecture_array_add (arr, inputs[0]));
+  g_assert_false (_srt_architecture_array_add (arr, inputs[1]));
+  /* This wasn't present before, but it is after this call */
+  g_assert_true (_srt_architecture_array_add (arr, inputs[2]));
+
+  contents = _srt_architecture_array_peek_data (arr, NULL);
+  g_assert_nonnull (contents);
+  g_assert_cmpstr (g_quark_to_string (contents[0]), ==, SRT_ABI_X86_64);
+  g_assert_cmpstr (g_quark_to_string (contents[1]), ==, SRT_ABI_I386);
+  g_assert_cmpstr (g_quark_to_string (contents[2]), ==, SRT_ABI_AARCH64);
+  g_assert_cmpuint (contents[3], ==, SRT_ARCHITECTURE_QUARK_NONE);
+
+    {
+      g_autofree GQuark *copy = NULL;
+
+      copy = _srt_architecture_array_copy_data (arr, &n);
+      g_assert_cmpuint (n, ==, 3);
+      g_assert_nonnull (copy);
+      g_assert_cmpstr (g_quark_to_string (copy[0]), ==, SRT_ABI_X86_64);
+      g_assert_cmpstr (g_quark_to_string (copy[1]), ==, SRT_ABI_I386);
+      g_assert_cmpstr (g_quark_to_string (copy[2]), ==, SRT_ABI_AARCH64);
+      g_assert_cmpuint (copy[3], ==, SRT_ARCHITECTURE_QUARK_NONE);
+    }
+
+    {
+      g_autofree GQuark *copy = NULL;
+
+      copy = _srt_architecture_array_copy_data (none, NULL);
+      g_assert_nonnull (copy);
+      g_assert_cmpuint (copy[0], ==, SRT_ARCHITECTURE_QUARK_NONE);
+    }
+}
+
+static void
 test_architecture_get_current (Fixture *f,
                                gconstpointer context)
 {
@@ -728,6 +799,8 @@ main (int argc,
       char **argv)
 {
   _srt_tests_init (&argc, &argv, NULL);
+  g_test_add ("/architecture/array", Fixture, NULL,
+              setup, test_architecture_array, teardown);
   g_test_add ("/architecture/get_by_tuple", Fixture, NULL,
               setup, test_architecture_get_by_tuple, teardown);
   g_test_add ("/architecture/get_current", Fixture, NULL,

@@ -1208,6 +1208,31 @@ _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
   return argv;
 }
 
+typedef struct
+{
+  SrtHelperFlags flags;
+} ChildSetupData;
+
+static void
+_srt_subprocess_runner_child_setup_cb (gpointer user_data)
+{
+  const ChildSetupData *data = user_data;
+
+  /* Note that we can't use the GError here, because a GSpawnChildSetupFunc
+   * needs to follow signal-safety(7) rules.
+   *
+   * Reporting this internal error as though terminated by SIGABRT is somewhat
+   * arbitrary. */
+  if ((data->flags & SRT_HELPER_FLAGS_TERMINATE_WITH_PARENT)
+      && !_srt_raise_on_parent_death (SIGTERM, NULL))
+    _srt_async_signal_safe_error ("srt-subprocess-runner",
+                                  "Failed to set up parent-death signal",
+                                  128 + SIGABRT);
+
+  /* Unblock all signals and reset signal disposition to SIG_DFL */
+  _srt_child_setup_unblock_signals (NULL);
+}
+
 static gboolean
 _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
                               SrtHelperFlags flags,
@@ -1219,6 +1244,7 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
                               GError **error)
 {
   g_auto(GStrv) my_environ = NULL;
+  ChildSetupData child_setup_data = { .flags = flags };
   GSpawnFlags spawn_flags = G_SPAWN_DO_NOT_REAP_CHILD;
   int *stdout_fdp = NULL;
   int *stderr_fdp = NULL;
@@ -1322,8 +1348,8 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
                                    (gchar **) argv,
                                    my_environ != NULL ? my_environ : self->envp,
                                    spawn_flags,
-                                   _srt_child_setup_unblock_signals,
-                                   NULL,        /* user data */
+                                   _srt_subprocess_runner_child_setup_cb,
+                                   &child_setup_data,
                                    &subprocess->pid,
                                    NULL,
                                    stdout_fdp,

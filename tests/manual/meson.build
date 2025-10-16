@@ -18,6 +18,7 @@ endforeach
 
 foreach program : [
   'elf-info',
+  'subprocess-die-with-parent',
 ]
   executable(
     program,

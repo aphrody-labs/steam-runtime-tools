@@ -23,6 +23,20 @@ gstring_free0 (GString *str)
     g_string_free (str, TRUE);
 }
 
+/*
+ * SrtCompletedSubprocess:
+ *
+ * Object representing a subprocess that has finished running,
+ * similar to Python `subprocess.CompletedProcess`.
+ * It has standard output (if captured),
+ * standard error (if captured),
+ * and a wait status which encodes whether it exited normally or was
+ * killed by a signal.
+ *
+ * Unlike the equivalent Python object, this object also has an
+ * indication of whether it timed out.
+ */
+
 struct _SrtCompletedSubprocess
 {
   GObject parent;
@@ -202,30 +216,62 @@ _srt_completed_subprocess_timed_out (SrtCompletedSubprocess *self)
   return ret;
 }
 
+/*
+ * Return what the subprocess wrote to stdout.
+ * If _srt_completed_subprocess_steal_stdout() was previously called,
+ * or if the output mode was INHERIT or SILENCE, then this will be %NULL.
+ * Otherwise it will be non-%NULL (but possibly empty).
+ *
+ * Returns: (transfer none):
+ */
 const char *
 _srt_completed_subprocess_get_stdout (SrtCompletedSubprocess *self)
 {
   return self->out;
 }
 
+/*
+ * Same as _srt_completed_subprocess_get_stdout(), but for stderr.
+ *
+ * Returns: (transfer none):
+ */
 const char *
 _srt_completed_subprocess_get_stderr (SrtCompletedSubprocess *self)
 {
   return self->err;
 }
 
+/*
+ * Return what the subprocess wrote to stdout, the same as
+ * _srt_completed_subprocess_get_stdout(), but without copying.
+ * The caller is given ownership of the result, and subsequent calls to
+ * _srt_completed_subprocess_steal_stdout() will return %NULL.
+ *
+ * Returns: (transfer full):
+ */
 gchar *
 _srt_completed_subprocess_steal_stdout (SrtCompletedSubprocess *self)
 {
   return g_steal_pointer (&self->out);
 }
 
+/*
+ * Same as _srt_completed_subprocess_steal_stdout(), but for stderr.
+ *
+ * Returns: (transfer full):
+ */
 gchar *
 _srt_completed_subprocess_steal_stderr (SrtCompletedSubprocess *self)
 {
   return g_steal_pointer (&self->err);
 }
 
+/*
+ * SrtSubprocess:
+ *
+ * Internal data structure representing a subprocess that has been launched
+ * and might not yet have completed.
+ */
 typedef struct
 {
   /* Thread safety: Not thread safe.
@@ -703,6 +749,14 @@ _srt_completed_subprocess_new_from_subprocess (SrtSubprocess *self)
   return g_steal_pointer (&completed);
 }
 
+/*
+ * SrtSubprocessRunner:
+ *
+ * Object representing a context in which subprocesses can be run.
+ *
+ * Because all members are read-only (immutable) after construction,
+ * this object may be used concurrently in more than one thread.
+ */
 struct _SrtSubprocessRunner
 {
   GObject parent;
@@ -1174,6 +1228,26 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
                                    error);
 }
 
+/*
+ * _srt_subprocess_runner_run_sync:
+ * @self: The subprocess runner
+ * @flags: Flags affecting how we run @argv
+ * @argv: The executable and arguments to run
+ * @stdout_mode: Whether to capture stdout, send it to the stdout of the
+ *  current process, or send it to /dev/null
+ * @stderr_mode: Same as @stdout_mode, but for stderr
+ * @error: Used to raise an error on failure
+ *
+ * Run a subprocess and wait for it to finish.
+ * If a subprocess was run (even if it timed out, crashed, or exited with a
+ * nonzero status), return a non-%NULL #SrtCompletedSubprocess object.
+ * If no subprocess could be run, return %NULL with @error set.
+ *
+ * This is functionally similar to Python `subprocess.run(check=False)`.
+ *
+ * Returns: (transfer full): an object representing the completed subprocess,
+ *  or %NULL on failure to start it
+ */
 SrtCompletedSubprocess *
 _srt_subprocess_runner_run_sync (SrtSubprocessRunner *self,
                                  SrtHelperFlags flags,

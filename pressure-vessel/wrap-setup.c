@@ -85,9 +85,10 @@ pv_wrap_check_bwrap (gboolean only_prepare,
     return NULL;
 
   /* We're just running this so that the output ends up in the
-   * debug log, so it's OK that the exit status and stdout are ignored. */
+   * debug log, so it's OK that the exit status and stdout are ignored.
+   * bwrap is assumed to be directly executable without emulation. */
   argv[0] = bwrap;
-  pv_run_sync (argv, NULL, NULL, NULL, NULL);
+  pv_run_sync (SRT_ARCHITECTURE_QUARK_NONE, argv, NULL, NULL, NULL, NULL);
 
   return g_steal_pointer (&bwrap);
 }
@@ -559,6 +560,9 @@ pv_wrap_move_into_scope (const char *steam_app_id)
  * For this reason if the current system is using the proprietary Nvidia
  * drivers, and `nvidia_uvm.ko` has not been already loaded, we should execute
  * `nvidia-modprobe` before entering in the container environment.
+ *
+ * nvidia-modprobe is assumed to be directly executable in the current
+ * execution environment, without non-transparent emulation.
  */
 gboolean
 pv_wrap_maybe_load_nvidia_modules (GError **error)
@@ -575,7 +579,8 @@ pv_wrap_maybe_load_nvidia_modules (GError **error)
 
   if (g_file_test ("/sys/module/nvidia/version", G_FILE_TEST_IS_REGULAR)
       && !g_file_test ("/sys/module/nvidia_uvm", G_FILE_TEST_IS_DIR))
-    return pv_run_sync (nvidia_modprobe_argv, NULL, NULL, NULL, error);
+    return pv_run_sync (SRT_ARCHITECTURE_QUARK_NONE,
+                        nvidia_modprobe_argv, NULL, NULL, NULL, error);
 
   return TRUE;
 }

@@ -723,7 +723,7 @@ runtime_architecture_init (RuntimeArchitecture *self,
    * assume that this is the same as whether we can run them
    * on the host, if different. */
   argv[0] = self->capsule_capture_libs;
-  pv_run_sync (argv, NULL, NULL, &self->ld_so, NULL);
+  pv_run_sync (tuple, argv, NULL, NULL, &self->ld_so, NULL);
 
   if (self->ld_so == NULL)
     {
@@ -5303,7 +5303,10 @@ pv_runtime_get_ld_so (PvRuntime *self,
                               NULL);
       flatpak_bwrap_finish (temp_bwrap);
 
-      pv_run_sync ((const char * const *) temp_bwrap->argv->pdata,
+      /* Assume bwrap can be run without a special emulator (native
+       * executable or transparent emulation) */
+      pv_run_sync (SRT_ARCHITECTURE_QUARK_NONE,
+                   (const char * const *) temp_bwrap->argv->pdata,
                    (const char * const *) temp_bwrap->envp, NULL,
                    ld_so_in_runtime, NULL);
     }

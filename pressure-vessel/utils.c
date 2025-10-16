@@ -231,7 +231,8 @@ pv_search_path_append (GString *search_path,
 }
 
 gboolean
-pv_run_sync (const char * const * argv,
+pv_run_sync (GQuark architecture,
+             const char * const * argv,
              const char * const * envp,
              int *exit_status_out,
              char **output_out,

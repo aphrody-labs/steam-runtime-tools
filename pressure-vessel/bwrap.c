@@ -40,6 +40,8 @@
  * Try to run a command. It inherits pressure-vessel's own file
  * descriptors.
  *
+ * The command is assumed to be directly executable without emulation.
+ *
  * Returns: %TRUE if the subprocess runs to completion
  */
 gboolean
@@ -52,7 +54,8 @@ pv_bwrap_run_sync (FlatpakBwrap *bwrap,
   g_return_val_if_fail (pv_bwrap_was_finished (bwrap), FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
-  return pv_run_sync ((const char * const *) bwrap->argv->pdata,
+  return pv_run_sync (SRT_ARCHITECTURE_QUARK_NONE,
+                      (const char * const *) bwrap->argv->pdata,
                       (const char * const *) bwrap->envp,
                       exit_status_out, NULL, error);
 }
@@ -67,6 +70,9 @@ pv_bwrap_run_sync (FlatpakBwrap *bwrap,
  *
  * Attempt to replace the current process with the given bwrap command.
  * If unable to do so, raise an error.
+ *
+ * The bwrap command is assumed to be directly executable without emulation
+ * (in practice, it is either `srt-bwrap` or `steam-runtime-launch-client`).
  *
  * Returns: %FALSE
  */

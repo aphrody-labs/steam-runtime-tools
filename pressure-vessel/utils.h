@@ -71,7 +71,8 @@ PvWorkaroundFlags pv_get_workarounds (SrtBwrapFlags bwrap_flags,
 void pv_search_path_append (GString *search_path,
                             const gchar *item);
 
-gboolean pv_run_sync (const char * const * argv,
+gboolean pv_run_sync (GQuark architecture,
+                      const char * const * argv,
                       const char * const * envp,
                       int *exit_status_out,
                       char **output_out,

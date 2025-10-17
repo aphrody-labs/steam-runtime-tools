@@ -106,6 +106,7 @@ struct _PvWrapContext
   gchar **original_argv;
   gchar **original_environ;
   gchar *current_home;
+  SrtSubprocessRunner *run_in_current_context;
 
   PvWrapOptions options;
 
@@ -150,6 +151,9 @@ gboolean pv_wrap_options_parse_argv (PvWrapOptions *self,
 gboolean pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
                                                        SrtSysroot *interpreter_root,
                                                        GError **error);
+
+gboolean pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
+                                                  GError **error);
 
 gboolean pv_wrap_context_export_if_allowed (PvWrapContext *self,
                                             FlatpakFilesystemMode export_mode,

@@ -37,7 +37,8 @@
 #include "wrap-openxr.h"
 #include "wrap-pipewire.h"
 
-gchar *pv_wrap_check_bwrap (gboolean only_prepare,
+gchar *pv_wrap_check_bwrap (SrtSubprocessRunner *runner,
+                            gboolean only_prepare,
                             SrtBwrapFlags *flags_out,
                             GError **error);
 

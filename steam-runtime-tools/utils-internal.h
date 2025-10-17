@@ -462,12 +462,8 @@ typedef enum
 /*
  * Open a pipe, as if via pipe2 with O_CLOEXEC.
  */
-static inline gboolean
-_srt_pipe_open (SrtPipe *self,
-                GError **error)
-{
-  return g_unix_open_pipe (self->fds, FD_CLOEXEC, error);
-}
+gboolean _srt_pipe_open (SrtPipe *self,
+                         GError **error);
 
 /*
  * Return one of the ends of the pipe. It remains owned by @self.

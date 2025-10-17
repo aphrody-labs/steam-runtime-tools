@@ -2053,6 +2053,17 @@ _srt_find_next_executable (const char *search_path,
   return NULL;
 }
 
+gboolean
+_srt_pipe_open (SrtPipe *self,
+                GError **error)
+{
+#if GLIB_CHECK_VERSION (2, 78, 0)
+  return g_unix_open_pipe (self->fds, O_CLOEXEC, error);
+#else
+  return g_unix_open_pipe (self->fds, FD_CLOEXEC, error);
+#endif
+}
+
 /*
  * _srt_fd_read_loop:
  * @fd: A file descriptor open for reading

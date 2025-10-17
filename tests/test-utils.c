@@ -92,7 +92,7 @@ _srt_global_teardown_private_xdg_dirs (void)
   gboolean result;
   g_return_val_if_fail (fake_home_parent != NULL, FALSE);
 
-  result = _srt_rm_rf (fake_home_parent);
+  result = glnx_shutil_rm_rf_at (AT_FDCWD, fake_home_parent, NULL, NULL);
   g_free (fake_home_parent);
   fake_home_parent = NULL;
 
@@ -183,7 +183,7 @@ _srt_global_teardown_sysroots (void)
   gboolean result;
   g_return_val_if_fail (sysroots_parent != NULL, FALSE);
 
-  result = _srt_rm_rf (sysroots_parent);
+  result = glnx_shutil_rm_rf_at (AT_FDCWD, sysroots_parent, NULL, NULL);
   g_free (sysroots_parent);
   sysroots_parent = NULL;
 
@@ -403,5 +403,8 @@ _srt_show_diff (const char *expected,
                   expected_path, actual_path);
 
   if (tmpdir != NULL)
-    _srt_rm_rf (tmpdir);
+    {
+      glnx_shutil_rm_rf_at (AT_FDCWD, tmpdir, NULL, &error);
+      g_assert_no_error (error);
+    }
 }

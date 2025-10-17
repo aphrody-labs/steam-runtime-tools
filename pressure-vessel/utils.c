@@ -238,12 +238,9 @@ pv_run_sync (GQuark architecture,
              char **output_out,
              GError **error)
 {
-  gsize len;
-  gint wait_status;
-  g_autofree gchar *output = NULL;
-  g_autofree gchar *errors = NULL;
-  gsize i;
-  g_autoptr(GString) command = g_string_new ("");
+  g_autoptr(SrtSubprocessRunner) runner = NULL;
+  g_autoptr(SrtCompletedSubprocess) completed = NULL;
+  SrtHelperFlags flags;
 
   g_return_val_if_fail (argv != NULL, FALSE);
   g_return_val_if_fail (argv[0] != NULL, FALSE);
@@ -253,53 +250,39 @@ pv_run_sync (GQuark architecture,
   if (exit_status_out != NULL)
     *exit_status_out = -1;
 
-  for (i = 0; argv[i] != NULL; i++)
-    {
-      g_autofree gchar *quoted = g_shell_quote (argv[i]);
+  runner = _srt_subprocess_runner_new_full (envp,
+                                            NULL,   /* ./bin */
+                                            NULL,   /* ./libexec/s-r-t-0 */
+                                            SRT_TEST_FLAGS_NONE,
+                                            NULL);  /* cwd */
 
-      g_string_append_printf (command, " %s", quoted);
-    }
+  flags = SRT_HELPER_FLAGS_SEARCH_PATH | SRT_HELPER_FLAGS_CHOMP;
 
-  g_debug ("run:%s", command->str);
-
-  /* We use LEAVE_DESCRIPTORS_OPEN to work around a deadlock in older GLib,
+  /* We use LEAVE_FDS_OPEN to work around a deadlock in older GLib,
    * and to avoid wasting a lot of time closing fds if the rlimit for
    * maximum open file descriptors is high. Because we're waiting for the
    * subprocess to finish anyway, it doesn't really matter that any fds
    * that are not close-on-execute will get leaked into the child. */
-  if (!g_spawn_sync (NULL,  /* cwd */
-                     (char **) argv,
-                     (char **) envp,
-                     (G_SPAWN_SEARCH_PATH |
-                      G_SPAWN_LEAVE_DESCRIPTORS_OPEN),
-                     NULL, NULL,
-                     &output,
-                     &errors,
-                     &wait_status,
-                     error))
+  flags |= SRT_HELPER_FLAGS_LEAVE_FDS_OPEN;
+
+  completed = _srt_subprocess_runner_run_sync (runner,
+                                               flags,
+                                               architecture,
+                                               argv,
+                                               SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
+                                               SRT_SUBPROCESS_OUTPUT_INHERIT,
+                                               error);
+
+  if (completed == NULL)
     return FALSE;
 
-  g_printerr ("%s", errors);
+  _srt_completed_subprocess_report (completed, NULL, exit_status_out, NULL, NULL);
 
-  if (exit_status_out != NULL)
-    {
-      if (WIFEXITED (wait_status))
-        *exit_status_out = WEXITSTATUS (wait_status);
-    }
-
-  len = strlen (output);
-
-  /* Emulate shell $() */
-  if (len > 0 && output[len - 1] == '\n')
-    output[len - 1] = '\0';
-
-  g_debug ("-> %s", output);
-
-  if (!g_spawn_check_wait_status (wait_status, error))
+  if (!_srt_completed_subprocess_check (completed, error))
     return FALSE;
 
   if (output_out != NULL)
-    *output_out = g_steal_pointer (&output);
+    *output_out = _srt_completed_subprocess_steal_stdout (completed);
 
   return TRUE;
 }

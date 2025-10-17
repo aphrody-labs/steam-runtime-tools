@@ -1038,7 +1038,7 @@ srt_system_info_new_from_json (const char *path,
           get_runtime_linker_from_report (info, abi, json_arch_obj);
 
           _srt_graphics_get_from_report (json_arch_obj,
-                                         l->data,
+                                         g_quark_from_string (l->data),
                                          &abi->cached_graphics_results);
 
           abi->graphics_modules[SRT_GRAPHICS_DRI_MODULE].modules = _srt_dri_driver_get_from_report (json_arch_obj);
@@ -1685,6 +1685,7 @@ srt_system_info_check_libraries (SrtSystemInfo *self,
                                  const gchar *multiarch_tuple,
                                  GList **libraries_out)
 {
+  GQuark arch_quark;
   Abi *abi = NULL;
   gchar *dir_path = NULL;
   const gchar *filename = NULL;
@@ -1701,6 +1702,7 @@ srt_system_info_check_libraries (SrtSystemInfo *self,
   g_return_val_if_fail (libraries_out == NULL || *libraries_out == NULL,
                         SRT_LIBRARY_ISSUES_UNKNOWN);
 
+  arch_quark = g_quark_from_string (multiarch_tuple);
   abi = ensure_abi_unless_immutable (self, multiarch_tuple);
 
   if (abi == NULL)
@@ -1776,7 +1778,7 @@ srt_system_info_check_libraries (SrtSystemInfo *self,
               gchar **hidden_deps = g_hash_table_lookup (self->cached_hidden_deps, soname);
               abi->cached_combined_issues |= _srt_check_library_presence (self->runner,
                                                                           soname,
-                                                                          multiarch_tuple,
+                                                                          arch_quark,
                                                                           symbols_file,
                                                                           (const gchar * const *)hidden_deps,
                                                                           self->check_flags,
@@ -1836,6 +1838,7 @@ srt_system_info_check_library (SrtSystemInfo *self,
                                const gchar *requested_name,
                                SrtLibrary **more_details_out)
 {
+  GQuark arch_quark;
   Abi *abi = NULL;
   SrtLibrary *library = NULL;
   const gchar *filename = NULL;
@@ -1856,6 +1859,7 @@ srt_system_info_check_library (SrtSystemInfo *self,
   g_return_val_if_fail (more_details_out == NULL || *more_details_out == NULL,
                         SRT_LIBRARY_ISSUES_UNKNOWN);
 
+  arch_quark = g_quark_from_string (multiarch_tuple);
   abi = ensure_abi_unless_immutable (self, multiarch_tuple);
 
   if (abi == NULL)
@@ -1921,7 +1925,7 @@ srt_system_info_check_library (SrtSystemInfo *self,
                   gchar **hidden_deps = g_hash_table_lookup (self->cached_hidden_deps, requested_name);
                   issues = _srt_check_library_presence (self->runner,
                                                         soname_found,
-                                                        multiarch_tuple,
+                                                        arch_quark,
                                                         symbols_file,
                                                         (const gchar * const *)hidden_deps,
                                                         self->check_flags,
@@ -1947,7 +1951,7 @@ srt_system_info_check_library (SrtSystemInfo *self,
    * We do instead a simple absence/presence check. */
   issues = _srt_check_library_presence (self->runner,
                                         requested_name,
-                                        multiarch_tuple,
+                                        arch_quark,
                                         NULL,
                                         NULL,
                                         self->check_flags,
@@ -2050,6 +2054,7 @@ srt_system_info_check_graphics (SrtSystemInfo *self,
                                 SrtRenderingInterface rendering_interface,
                                 SrtGraphics **details_out)
 {
+  GQuark arch_quark;
   Abi *abi = NULL;
   SrtGraphicsIssues issues;
 
@@ -2060,6 +2065,7 @@ srt_system_info_check_graphics (SrtSystemInfo *self,
   g_return_val_if_fail (((unsigned) window_system) < SRT_N_WINDOW_SYSTEMS, SRT_GRAPHICS_ISSUES_UNKNOWN);
   g_return_val_if_fail (((unsigned) rendering_interface) < SRT_N_RENDERING_INTERFACES, SRT_GRAPHICS_ISSUES_UNKNOWN);
 
+  arch_quark = g_quark_from_string (multiarch_tuple);
   abi = ensure_abi_unless_immutable (self, multiarch_tuple);
 
   if (abi == NULL)
@@ -2080,7 +2086,7 @@ srt_system_info_check_graphics (SrtSystemInfo *self,
 
   graphics = NULL;
   issues = _srt_check_graphics (self->runner,
-                                multiarch_tuple,
+                                arch_quark,
                                 window_system,
                                 rendering_interface,
                                 &graphics);
@@ -3772,6 +3778,7 @@ _srt_system_info_list_graphics_modules (SrtSystemInfo *self,
                                         SrtDriverFlags flags,
                                         SrtGraphicsModule which)
 {
+  GQuark arch_quark;
   Abi *abi = NULL;
   GList *ret = NULL;
   const GList *iter;
@@ -3781,6 +3788,7 @@ _srt_system_info_list_graphics_modules (SrtSystemInfo *self,
   g_return_val_if_fail ((int) which >= 0, NULL);
   g_return_val_if_fail ((int) which < NUM_SRT_GRAPHICS_MODULES, NULL);
 
+  arch_quark = g_quark_from_string (multiarch_tuple);
   abi = ensure_abi_unless_immutable (self, multiarch_tuple);
 
   if (abi == NULL)
@@ -3790,7 +3798,7 @@ _srt_system_info_list_graphics_modules (SrtSystemInfo *self,
     {
       abi->graphics_modules[which].modules = _srt_list_graphics_modules (self->sysroot,
                                                                          self->runner,
-                                                                         multiarch_tuple,
+                                                                         arch_quark,
                                                                          self->check_flags,
                                                                          which);
       abi->graphics_modules[which].available = TRUE;

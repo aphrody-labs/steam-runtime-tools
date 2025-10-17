@@ -662,7 +662,8 @@ srt_check_library_presence (const char *requested_name,
 {
   g_autoptr(SrtSubprocessRunner) runner = _srt_subprocess_runner_new ();
 
-  return _srt_check_library_presence (runner, requested_name, multiarch,
+  return _srt_check_library_presence (runner, requested_name,
+                                      g_quark_from_string (multiarch),
                                       symbols_path, NULL, SRT_CHECK_FLAGS_NONE,
                                       symbols_format, more_details_out);
 }
@@ -677,7 +678,7 @@ static SrtLibraryIssues
 _srt_inspect_library (SrtSubprocessRunner *runner,
                       gchar **argv,
                       const char *requested_name,
-                      const char *multiarch,
+                      GQuark arch_quark,
                       SrtLibraryIssues issues,
                       SrtLibrary *details_in,
                       SrtLibrary **more_details_out)
@@ -905,7 +906,7 @@ out:
     }
 
   if (more_details_out != NULL)
-    *more_details_out = _srt_library_new (multiarch,
+    *more_details_out = _srt_library_new (arch_quark,
                                           absolute_path,
                                           originally_requested_name,
                                           issues,
@@ -964,7 +965,7 @@ _srt_add_inspect_library_arguments (GPtrArray *argv,
 SrtLibraryIssues
 _srt_check_library_presence (SrtSubprocessRunner *runner,
                              const char *requested_name,
-                             const char *multiarch,
+                             GQuark arch_quark,
                              const char *symbols_path,
                              const char * const *hidden_deps,
                              SrtCheckFlags check_flags,
@@ -979,10 +980,12 @@ _srt_check_library_presence (SrtSubprocessRunner *runner,
   g_autoptr(SrtLibrary) details = NULL;
   g_autoptr(SrtLibrary) details_libelf = NULL;
   const gchar *library_absolute_path = NULL;
+  const char *multiarch;
 
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (runner), SRT_LIBRARY_ISSUES_UNKNOWN);
   g_return_val_if_fail (requested_name != NULL, SRT_LIBRARY_ISSUES_UNKNOWN);
-  g_return_val_if_fail (multiarch != NULL, SRT_LIBRARY_ISSUES_UNKNOWN);
+  g_return_val_if_fail (arch_quark != SRT_ARCHITECTURE_QUARK_NONE,
+                        SRT_LIBRARY_ISSUES_UNKNOWN);
   g_return_val_if_fail (more_details_out == NULL || *more_details_out == NULL,
                         SRT_LIBRARY_ISSUES_UNKNOWN);
   g_return_val_if_fail (_srt_check_not_setuid (), SRT_LIBRARY_ISSUES_UNKNOWN);
@@ -990,6 +993,7 @@ _srt_check_library_presence (SrtSubprocessRunner *runner,
   if (symbols_path == NULL)
     issues |= SRT_LIBRARY_ISSUES_UNKNOWN_EXPECTATIONS;
 
+  multiarch = g_quark_to_string (arch_quark);
   argv = _srt_subprocess_runner_get_helper (runner, multiarch,
                                             "inspect-library", helper_flags,
                                             &error);
@@ -1000,7 +1004,7 @@ _srt_check_library_presence (SrtSubprocessRunner *runner,
       /* Use the error message as though the child had printed it on stderr -
        * either way, it's a useful diagnostic */
       if (more_details_out != NULL)
-        *more_details_out = _srt_library_new (multiarch, NULL, requested_name, issues,
+        *more_details_out = _srt_library_new (arch_quark, NULL, requested_name, issues,
                                               error->message, NULL, NULL, NULL,
                                               NULL, NULL, -1, 0);
       return issues;
@@ -1026,7 +1030,7 @@ _srt_check_library_presence (SrtSubprocessRunner *runner,
   g_ptr_array_add (argv, NULL);
 
   issues = _srt_inspect_library (runner, (gchar **) argv->pdata, requested_name,
-                                 multiarch, issues, NULL, &details);
+                                 arch_quark, issues, NULL, &details);
 
   if ((check_flags & SRT_CHECK_FLAGS_SKIP_SLOW_CHECKS)
       || (issues & SRT_LIBRARY_ISSUES_CANNOT_LOAD)
@@ -1051,7 +1055,7 @@ _srt_check_library_presence (SrtSubprocessRunner *runner,
        * For the rest of the library details, keep the results from the previous
        * successful `inspect-library` execution. */
       if (more_details_out != NULL)
-        *more_details_out = _srt_library_new (multiarch,
+        *more_details_out = _srt_library_new (arch_quark,
                                               library_absolute_path,
                                               requested_name,
                                               issues,
@@ -1074,7 +1078,7 @@ _srt_check_library_presence (SrtSubprocessRunner *runner,
   g_ptr_array_add (argv_libelf, NULL);
 
   issues = _srt_inspect_library (runner, (gchar **) argv_libelf->pdata,
-                                 library_absolute_path, multiarch, issues, details,
+                                 library_absolute_path, arch_quark, issues, details,
                                  &details_libelf);
 
   if (more_details_out != NULL)

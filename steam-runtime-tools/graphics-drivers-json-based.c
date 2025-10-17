@@ -544,11 +544,11 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
  */
 static gchar *
 _get_library_canonical_path (SrtSubprocessRunner *runner,
-                             const char *multiarch,
+                             GQuark arch_quark,
                              const gchar *library_path)
 {
   g_autoptr(SrtLibrary) library = NULL;
-  _srt_check_library_presence (runner, library_path, multiarch, NULL,
+  _srt_check_library_presence (runner, library_path, arch_quark, NULL,
                                NULL, SRT_CHECK_FLAGS_SKIP_SLOW_CHECKS,
                                SRT_LIBRARY_SYMBOLS_FORMAT_PLAIN, &library);
 
@@ -641,7 +641,7 @@ _srt_loadable_flag_duplicates (GType which,
                 {
                   g_autofree gchar *canonical_path = NULL;
                   canonical_path = _get_library_canonical_path (runner,
-                                                                g_quark_to_string (multiarch_tuples[i]),
+                                                                multiarch_tuples[i],
                                                                 resolved_path);
 
                   if (canonical_path == NULL)
@@ -682,7 +682,7 @@ _srt_loadable_flag_duplicates (GType which,
                   g_autofree gchar *canonical_path = NULL;
                   g_autofree gchar *hash_key = NULL;
                   canonical_path = _get_library_canonical_path (runner,
-                                                                g_quark_to_string (multiarch_tuples[i]),
+                                                                multiarch_tuples[i],
                                                                 resolved_path);
 
                   if (canonical_path == NULL)

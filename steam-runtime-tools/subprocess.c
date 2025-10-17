@@ -1211,6 +1211,7 @@ _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
 static gboolean
 _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
                               SrtHelperFlags flags,
+                              GQuark architecture,
                               const char * const *argv,
                               SrtSubprocessOutput stdout_mode,
                               SrtSubprocessOutput stderr_mode,
@@ -1334,6 +1335,9 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
  * _srt_subprocess_runner_run_sync:
  * @self: The subprocess runner
  * @flags: Flags affecting how we run @argv
+ * @architecture: The architecture of @argv, used to select an emulator
+ *  if appropriate, or %SRT_ARCHITECTURE_QUARK_NONE (= 0) to assume that
+ *  it is directly runnable
  * @argv: The executable and arguments to run
  * @stdout_mode: Whether to capture stdout, send it to the stdout of the
  *  current process, or send it to /dev/null
@@ -1353,6 +1357,7 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
 SrtCompletedSubprocess *
 _srt_subprocess_runner_run_sync (SrtSubprocessRunner *self,
                                  SrtHelperFlags flags,
+                                 GQuark architecture,
                                  const char * const *argv,
                                  SrtSubprocessOutput stdout_mode,
                                  SrtSubprocessOutput stderr_mode,
@@ -1363,8 +1368,9 @@ _srt_subprocess_runner_run_sync (SrtSubprocessRunner *self,
   g_return_val_if_fail (argv != NULL, NULL);
   g_return_val_if_fail (argv[0] != NULL, NULL);
 
-  if (!_srt_subprocess_runner_spawn (self,
-                                     flags, argv, stdout_mode, stderr_mode,
+  if (!_srt_subprocess_runner_spawn (self, flags,
+                                     architecture, argv,
+                                     stdout_mode, stderr_mode,
                                      &subprocess, error))
     return NULL;
 

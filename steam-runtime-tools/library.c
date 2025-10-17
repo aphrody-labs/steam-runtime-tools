@@ -755,6 +755,7 @@ _srt_inspect_library (SrtSubprocessRunner *runner,
 
   completed = _srt_subprocess_runner_run_sync (runner,
                                                helper_flags,
+                                               arch_quark,
                                                (const char * const *) argv,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE,

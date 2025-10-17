@@ -199,6 +199,12 @@ tests_check_fd_leaks_enter (void)
 
   g_return_val_if_fail (_srt_tests_init_was_called (), NULL);
 
+  /* The default GMainContext is created and never freed, and it owns
+   * a GWakeup, which owns a file descriptor; so we have to ensure that
+   * it exists before we start tracking whether our own code has leaked
+   * any file descriptors. */
+  (void) g_main_context_default ();
+
   ret = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
 
   glnx_dirfd_iterator_init_at (AT_FDCWD, "/proc/self/fd", TRUE,

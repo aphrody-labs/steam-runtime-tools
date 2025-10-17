@@ -104,6 +104,7 @@ struct _PvRuntime
   GObject parent;
 
   gchar *bubblewrap;
+  SrtSubprocessRunner *run_in_current_context;
   gchar *source;
   gchar *source_files;          /* either source or that + "/files" */
   const gchar *pv_prefix;
@@ -161,6 +162,7 @@ enum {
   PROP_SOURCE,
   PROP_ORIGINAL_ENVIRON,
   PROP_FLAGS,
+  PROP_RUN_IN_CURRENT_CONTEXT,
   PROP_VARIABLE_DIR,
   PROP_WORKAROUNDS,
   N_PROPERTIES
@@ -829,6 +831,10 @@ pv_runtime_get_property (GObject *object,
         g_value_set_string (value, self->source);
         break;
 
+      case PROP_RUN_IN_CURRENT_CONTEXT:
+        g_value_set_object (value, self->run_in_current_context);
+        break;
+
       case PROP_WORKAROUNDS:
         g_value_set_flags (value, self->workarounds);
         break;
@@ -920,6 +926,12 @@ pv_runtime_set_property (GObject *object,
               }
           }
 
+        break;
+
+      case PROP_RUN_IN_CURRENT_CONTEXT:
+        /* Construct-only */
+        g_return_if_fail (self->run_in_current_context == NULL);
+        self->run_in_current_context = g_value_dup_object (value);
         break;
 
       case PROP_WORKAROUNDS:
@@ -1316,6 +1328,9 @@ pv_runtime_initable_init (GInitable *initable,
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
+  /* Should have been set at construct time */
+  g_return_val_if_fail (self->run_in_current_context != NULL, FALSE);
+
   self->pv_prefix = _srt_find_myself (NULL, &self->helpers_path, error);
 
   if (self->pv_prefix == NULL)
@@ -1707,6 +1722,7 @@ pv_runtime_dispose (GObject *object)
   g_clear_object (&self->mutable_sysroot);
   g_clear_object (&self->real_root);
   g_clear_object (&self->host_root);
+  g_clear_object (&self->run_in_current_context);
 
   G_OBJECT_CLASS (pv_runtime_parent_class)->dispose (object);
 }
@@ -1799,6 +1815,12 @@ pv_runtime_class_init (PvRuntimeClass *cls)
                          (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                           G_PARAM_STATIC_STRINGS));
 
+  properties[PROP_RUN_IN_CURRENT_CONTEXT] =
+    g_param_spec_object ("run-in-current-context", NULL, NULL,
+                         SRT_TYPE_SUBPROCESS_RUNNER,
+                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                          G_PARAM_STATIC_STRINGS));
+
   properties[PROP_WORKAROUNDS] =
     g_param_spec_flags ("workarounds", "Workarounds",
                         "Workarounds for external components",
@@ -1816,6 +1838,7 @@ pv_runtime_new (const char *source,
                 GArray *architectures,
                 GPtrArray *providers,
                 const char * const *original_environ,
+                SrtSubprocessRunner *run_in_current_context,
                 PvRuntimeFlags flags,
                 PvWorkaroundFlags workarounds,
                 GError **error)
@@ -1830,6 +1853,7 @@ pv_runtime_new (const char *source,
                          "bubblewrap", bubblewrap,
                          "graphics-providers", providers,
                          "original-environ", original_environ,
+                         "run-in-current-context", run_in_current_context,
                          "variable-dir", variable_dir,
                          "source", source,
                          "flags", flags,

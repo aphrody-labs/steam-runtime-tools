@@ -67,6 +67,7 @@ PvRuntime *pv_runtime_new (const char *source,
                            GArray *architectures,
                            GPtrArray *providers,
                            const char * const *original_environ,
+                           SrtSubprocessRunner *run_in_current_context,
                            PvRuntimeFlags flags,
                            PvWorkaroundFlags workarounds,
                            GError **error);

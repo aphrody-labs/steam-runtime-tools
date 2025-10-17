@@ -260,6 +260,7 @@ fixture_create_runtime (Fixture *f,
                                         archs_arr,
                                         graphics_providers,
                                         _srt_peek_environ_nonnull (),
+                                        runner,
                                         flags,
                                         PV_WORKAROUND_FLAGS_NONE,
                                         &local_error);

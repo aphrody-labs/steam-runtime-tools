@@ -639,6 +639,7 @@ main (int argc,
                                       self->options.architectures,
                                       graphics_providers,
                                       _srt_const_strv (self->original_environ),
+                                      self->run_in_current_context,
                                       flags,
                                       workarounds,
                                       error);

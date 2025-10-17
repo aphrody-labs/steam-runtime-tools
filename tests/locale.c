@@ -52,6 +52,7 @@ static const char *argv0;
 
 typedef struct
 {
+  TestsOpenFdSet old_fds;
   int unused;
   gchar *builddir;
 } Fixture;
@@ -66,6 +67,9 @@ setup (Fixture *f,
        gconstpointer context)
 {
   G_GNUC_UNUSED const Config *config = context;
+
+  f->old_fds = tests_check_fd_leaks_enter ();
+
   f->builddir = g_strdup (g_getenv ("G_TEST_BUILDDIR"));
 
   if (f->builddir == NULL)
@@ -79,6 +83,8 @@ teardown (Fixture *f,
   G_GNUC_UNUSED const Config *config = context;
 
   g_free (f->builddir);
+
+  tests_check_fd_leaks_leave (f->old_fds);
 }
 
 /*

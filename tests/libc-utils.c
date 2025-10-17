@@ -10,7 +10,7 @@
 
 typedef struct
 {
-  int unused;
+  TestsOpenFdSet old_fds;
 } Fixture;
 
 typedef struct
@@ -22,12 +22,14 @@ static void
 setup (Fixture *f,
        gconstpointer context)
 {
+  f->old_fds = tests_check_fd_leaks_enter ();
 }
 
 static void
 teardown (Fixture *f,
           gconstpointer context)
 {
+  tests_check_fd_leaks_leave (f->old_fds);
 }
 
 static void

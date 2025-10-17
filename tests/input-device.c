@@ -65,6 +65,7 @@ static const Config udev_config =
 typedef struct
 {
   const Config *config;
+  TestsOpenFdSet old_fds;
   gchar *srcdir;
   gchar *builddir;
   GMainContext *monitor_context;
@@ -78,6 +79,8 @@ setup (Fixture *f,
 {
   const Config *config = context;
   GStatBuf sb;
+
+  f->old_fds = tests_check_fd_leaks_enter ();
 
   f->srcdir = g_strdup (g_getenv ("G_TEST_SRCDIR"));
   f->builddir = g_strdup (g_getenv ("G_TEST_BUILDDIR"));
@@ -113,6 +116,8 @@ teardown (Fixture *f,
 
   g_clear_pointer (&f->log, g_ptr_array_unref);
   g_clear_pointer (&f->monitor_context, g_main_context_unref);
+
+  tests_check_fd_leaks_leave (f->old_fds);
 }
 
 #define VENDOR_VALVE 0x28de

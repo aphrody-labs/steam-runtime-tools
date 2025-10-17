@@ -18,6 +18,7 @@
 
 typedef struct
 {
+  TestsOpenFdSet old_fds;
   SrtEnvOverlay *container_env;
 } Fixture;
 
@@ -43,6 +44,8 @@ setup (Fixture *f,
 {
   G_GNUC_UNUSED const Config *config = context;
 
+  f->old_fds = tests_check_fd_leaks_enter ();
+
   f->container_env = _srt_env_overlay_new ();
 
   /* In each of these pairs, the first one is filtered by glibc for setuid
@@ -63,6 +66,8 @@ teardown (Fixture *f,
   G_GNUC_UNUSED const Config *config = context;
 
   g_clear_pointer (&f->container_env, _srt_env_overlay_unref);
+
+  tests_check_fd_leaks_leave (f->old_fds);
 }
 
 static void

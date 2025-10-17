@@ -361,6 +361,47 @@ test_exec_failure (Fixture *f,
   g_assert_nonnull (f->error);
 }
 
+static void
+test_fds_open (Fixture *f,
+               gconstpointer context)
+{
+  g_autoptr(SrtSubprocessRunner) runner = _srt_subprocess_runner_new ();
+  g_autoptr(SrtCompletedSubprocess) completed = NULL;
+  g_auto(SrtPipe) pipe_fds = _SRT_PIPE_INIT;
+  g_autofree char *proc_self_fd;
+  const char *argv[] = { "cat", "<placeholder>", NULL };
+
+  _srt_pipe_open (&pipe_fds, &f->error);
+  g_assert_no_error (f->error);
+  /* This assumes the pipe buffer is large enough to write the whole
+   * string without deadlocking, but Linux guarantees at least 1 page (4K)
+   * so that should be fine */
+  g_assert_no_errno (glnx_loop_write (pipe_fds.fds[_SRT_PIPE_END_WRITE],
+                                      "hello", strlen ("hello")));
+  glnx_close_fd (&pipe_fds.fds[_SRT_PIPE_END_WRITE]);
+
+  /* Verify that the read end of the pipe was left open in the child
+   * process, by reading from it and checking for the intended bytes */
+  _srt_fd_unset_close_on_exec (pipe_fds.fds[_SRT_PIPE_END_READ]);
+  proc_self_fd = g_strdup_printf ("/proc/self/fd/%d",
+                                  pipe_fds.fds[_SRT_PIPE_END_READ]);
+  argv[1] = proc_self_fd;
+  completed = _srt_subprocess_runner_run_sync (runner,
+                                               (SRT_HELPER_FLAGS_LEAVE_FDS_OPEN
+                                                | SRT_HELPER_FLAGS_SEARCH_PATH),
+                                               argv,
+                                               SRT_SUBPROCESS_OUTPUT_CAPTURE,
+                                               SRT_SUBPROCESS_OUTPUT_INHERIT,
+                                               &f->error);
+  g_assert_no_error (f->error);
+  g_assert_nonnull (completed);
+  _srt_completed_subprocess_check (completed, &f->error);
+  g_assert_no_error (f->error);
+  g_assert_cmpstr (_srt_completed_subprocess_get_stdout (completed),
+                   ==, "hello");
+  g_clear_object (&completed);
+}
+
 /*
  * Exercises parsing of sh(1)-style exit status (128+n -> killed by signal n)
  */
@@ -552,6 +593,8 @@ main (int argc,
               setup, test_environ, teardown);
   g_test_add ("/subproc/exec_failure", Fixture, NULL,
               setup, test_exec_failure, teardown);
+  g_test_add ("/subproc/fds_open", Fixture, NULL,
+              setup, test_fds_open, teardown);
   g_test_add ("/subproc/shell_exit_status", Fixture, NULL,
               setup, test_shell_exit_status, teardown);
   g_test_add ("/subproc/terminating_signal", Fixture, NULL,

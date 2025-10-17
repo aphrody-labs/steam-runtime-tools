@@ -1226,6 +1226,9 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
   if (flags & SRT_HELPER_FLAGS_SEARCH_PATH)
     spawn_flags |= G_SPAWN_SEARCH_PATH;
 
+  if (flags & SRT_HELPER_FLAGS_LEAVE_FDS_OPEN)
+    spawn_flags |= G_SPAWN_LEAVE_DESCRIPTORS_OPEN;
+
   if ((flags & SRT_HELPER_FLAGS_TIME_OUT) == 0)
     {
       trace ("Unlimited timeout");

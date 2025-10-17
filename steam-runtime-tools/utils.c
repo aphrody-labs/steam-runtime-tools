@@ -2052,3 +2052,57 @@ _srt_find_next_executable (const char *search_path,
                "Failed to locate '%s'", exe_name);
   return NULL;
 }
+
+/*
+ * _srt_fd_read_loop:
+ * @fd: A file descriptor open for reading
+ * @buf: A buffer
+ * @len: Number of bytes available in @buf
+ * @n_read_out: (out) (not optional): Number of valid bytes in @buf
+ * @error: Used to raise an error on failure
+ *
+ * Read exactly @len bytes into @buf, if available from @fd.
+ * Store the number of bytes actually read into @n_read_out.
+ * Retry on `EAGAIN` or a short read.
+ *
+ * If EOF is reached, set @n_read_out to less than @len and return %TRUE.
+ *
+ * If an error is encountered, set @n_read_out to the number of valid
+ * bytes read before the error and return %FALSE.
+ *
+ * Returns: %TRUE on success
+ */
+gboolean
+_srt_fd_read_loop (int fd,
+                   char *buf,
+                   size_t len,
+                   size_t *n_read_out,
+                   GError **error)
+{
+  ssize_t read_result;
+
+  g_return_val_if_fail (n_read_out != NULL, FALSE);
+  *n_read_out = 0;
+  g_return_val_if_fail (fd >= 0, FALSE);
+  g_return_val_if_fail (buf != NULL, FALSE);
+  g_return_val_if_fail (len > 0, FALSE);
+
+  do
+    {
+      size_t bytes_this_time;
+
+      read_result = TEMP_FAILURE_RETRY (read (fd, buf, len));
+
+      if (read_result < 0)
+        return glnx_throw_errno (error);
+
+      bytes_this_time = (size_t) read_result;
+      g_return_val_if_fail (bytes_this_time <= len, FALSE);
+      *n_read_out += bytes_this_time;
+      len -= bytes_this_time;
+      buf += bytes_this_time;
+    }
+  while (read_result != 0 && len != 0);
+
+  return TRUE;
+}

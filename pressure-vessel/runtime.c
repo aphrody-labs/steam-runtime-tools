@@ -62,6 +62,11 @@
 #define PKGLIBEXECDIR "libexec/steam-runtime-tools-" _SRT_API_MAJOR
 
 /*
+ * Location of pv-adverb specifically, relative to the $PRESSURE_VESSEL_PREFIX
+ */
+#define PV_ADVERB_IN_PREFIX PKGLIBEXECDIR "/pv-adverb"
+
+/*
  * Parent of the location where the $PRESSURE_VESSEL_PREFIX gets mounted
  * when using the mutable_sysroot code path
  */
@@ -75,7 +80,7 @@
  * Path to pv-adverb as it is mounted inside the container when using
  * the mutable_sysroot code path
  */
-#define PV_ADVERB_IN_MUTABLE_SYSROOT PV_FROM_HOST_IN_MUTABLE_SYSROOT "/" PKGLIBEXECDIR "/pv-adverb"
+#define PV_ADVERB_IN_MUTABLE_SYSROOT PV_FROM_HOST_IN_MUTABLE_SYSROOT "/" PV_ADVERB_IN_PREFIX
 
 /*
  * Location where the $PRESSURE_VESSEL_PREFIX gets mounted when not
@@ -86,7 +91,7 @@
  * Path to pv-adverb as it is mounted inside the container when not
  * using the mutable_sysroot code path
  */
-#define PV_ADVERB_WITHOUT_MUTABLE_SYSROOT PV_FROM_HOST_WITHOUT_MUTABLE_SYSROOT "/" PKGLIBEXECDIR "/pv-adverb"
+#define PV_ADVERB_WITHOUT_MUTABLE_SYSROOT PV_FROM_HOST_WITHOUT_MUTABLE_SYSROOT "/" PV_ADVERB_IN_PREFIX
 
 /*
  * PvRuntime:
@@ -106,6 +111,8 @@ struct _PvRuntime
   SrtFileLock *runtime_lock;
   GStrv original_environ;
 
+  const SrtKnownArchitecture *adverb_architecture;
+  const SrtKnownArchitecture *ldconfig_architecture;
   gchar *libcapsule_knowledge;  /* relative to runtime_files */
   gchar *runtime_abi_json;
   gchar *variable_dir;
@@ -1295,7 +1302,9 @@ pv_runtime_initable_init (GInitable *initable,
                           GError **error)
 {
   PvRuntime *self = PV_RUNTIME (initable);
+  g_autoptr(GError) local_error = NULL;
   g_autoptr(SrtFileLock) mutable_lock = NULL;
+  g_autofree gchar *adverb = NULL;
   g_autofree gchar *contents = NULL;
   g_autofree gchar *os_release = NULL;
   g_autofree gchar *usr_mtree = NULL;
@@ -1324,6 +1333,39 @@ pv_runtime_initable_init (GInitable *initable,
 
       if (!_srt_architecture_check_plausible_tuple (tuple, error))
         return FALSE;
+    }
+
+  adverb = g_build_filename (self->pv_prefix, PV_ADVERB_IN_PREFIX, NULL);
+  self->adverb_architecture = _srt_architecture_guess_from_elf (AT_FDCWD,
+                                                                adverb,
+                                                                &local_error);
+
+  if (G_LIKELY (self->adverb_architecture != NULL))
+    {
+      g_debug ("pv-adverb is a %s executable",
+               self->adverb_architecture->multiarch_tuple);
+    }
+  else
+    {
+      self->adverb_architecture = _srt_architecture_get_current ();
+
+      if (self->adverb_architecture != NULL)
+        {
+          _srt_log_warning ("Unable to determine architecture of pv-adverb, assuming %s: %s",
+                            self->adverb_architecture->multiarch_tuple,
+                            local_error->message);
+          g_clear_error (&local_error);
+        }
+      else
+        {
+          /* In practice this can't happen in official builds, because
+           * we do define _SRT_MULTIARCH in official builds, and we also
+           * don't do official builds for any architecture that isn't
+           * in the SrtKnownArchitecture table. */
+          g_propagate_prefixed_error (error, g_steal_pointer (&local_error),
+                                      "Unable to determine architecture of pv-adverb: ");
+          return FALSE;
+        }
     }
 
   /* If we are in Flatpak container we don't expect to have a working bwrap */
@@ -1416,8 +1458,6 @@ pv_runtime_initable_init (GInitable *initable,
   if (self->variable_dir_fd >= 0
       && (self->flags & PV_RUNTIME_FLAGS_GC_RUNTIMES))
     {
-      g_autoptr(GError) local_error = NULL;
-
       /* Take out an exclusive lock for GC so that we will not conflict
        * with other concurrent processes that are halfway through
        * deploying or unpacking a runtime. */
@@ -1539,6 +1579,31 @@ pv_runtime_initable_init (GInitable *initable,
   if (fstatat (self->runtime_files_fd, self->libcapsule_knowledge,
                &ignore, AT_SYMLINK_NOFOLLOW) != 0)
     g_clear_pointer (&self->libcapsule_knowledge, g_free);
+
+  /* We assume that in any runtime we might want to ship (unlike the
+   * graphics stack, which is outside our control), ldconfig(8) will
+   * be at its canonical path, /sbin/ldconfig.
+   * Later, we might parachute in the ldconfig(8) from the graphics
+   * provider, to go with a glibc from the graphics provider.
+   * If so, we'll overwrite self->ldconfig_architecture with the
+   * architecture of the replacement ldconfig. */
+  self->ldconfig_architecture = _srt_architecture_guess_from_elf (self->runtime_files_fd,
+                                                                  "sbin/ldconfig",
+                                                                  &local_error);
+
+  if (G_LIKELY (self->ldconfig_architecture != NULL))
+    {
+      g_debug ("runtime's ldconfig(8) is a %s executable",
+               self->ldconfig_architecture->multiarch_tuple);
+    }
+  else
+    {
+      /* Not a g_warning() because during unit testing, our mock sysroot
+       * legitimately doesn't have a real ldconfig */
+      _srt_log_warning ("Unable to determine architecture of runtime's ldconfig: %s",
+                        local_error->message);
+      g_clear_error (&local_error);
+    }
 
   self->runtime_abi_json = g_build_filename (self->runtime_usr, "lib", "steamrt",
                                              "steam-runtime-abi.json", NULL);
@@ -1835,6 +1900,7 @@ pv_runtime_adverb_regenerate_ld_so_cache (PvRuntime *self,
       const char *tuple = g_quark_to_string (tuple_quark);
       g_autofree gchar *ld_path = NULL;
       g_autofree gchar *aliases = NULL;
+      gboolean keep_in_ldlp = FALSE;
 
       ld_path = g_build_filename (self->overrides_in_container, "lib",
                                   tuple, NULL);
@@ -1856,6 +1922,25 @@ pv_runtime_adverb_regenerate_ld_so_cache (PvRuntime *self,
        * the ld.so.cache - this will not work for games that incorrectly
        * reset the LD_LIBRARY_PATH, but is better than nothing! */
       if (self->mutable_sysroot == NULL)
+        keep_in_ldlp = TRUE;
+
+      /* Each ldconfig(8) implementation will write its own libraries,
+       * and zero or more foreign architectures' libraries, into the
+       * ld.so.cache.
+       * For example x86_64 ldconfig(8) handles its own libraries,
+       * plus i386 and x32 libraries.
+       * If it does, we can remove the corresponding directories from the
+       * LD_LIBRARY_PATH to get a search order that more closely resembles
+       * the "real" host machine.
+       * Conversely, if it does not (for example aarch64 libraries when we
+       * are running an x86_64 ldconfig(8)), we will have to keep those
+       * directories in the LD_LIBRARY_PATH, otherwise the foreign
+       * architecture's libraries will not be found. */
+      if (!_srt_architecture_ldconfig_knows_architecture (self->ldconfig_architecture,
+                                                          tuple))
+        keep_in_ldlp = TRUE;
+
+      if (keep_in_ldlp)
         pv_search_path_append (ldlp_after_regen, ld_path);
 
       pv_search_path_append (ldlp_after_regen, aliases);
@@ -1889,32 +1974,22 @@ pv_runtime_get_adverb (PvRuntime *self,
   if (self->workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID)
     {
       g_autofree char *ld_library_path = pv_runtime_get_ld_library_path (self);
-      const char *ld_so;
-      const char *tuple;
+      const char *ld_so = NULL;
+
+      /* This should have been set in pv_runtime_initable_init() */
+      g_return_val_if_fail (self->adverb_architecture != NULL, FALSE);
 
       /* We can't rely on LD_LIBRARY_PATH staying in the environment,
        * which means we can't run anything until we have invoked
        * ldconfig to regenerate ld.so.cache, which is a chicken-and-egg
        * problem because pv-adverb needs to load shared libraries.
-       * Resolve this by using ld.so(8) to invoke pv-adverb, which we
-       * assume is of the same architecture as pv-wrap. */
-#if defined(_SRT_MULTIARCH)
-      tuple = _SRT_MULTIARCH;
-#elif defined(__x86_64__)
-      tuple = SRT_ABI_X86_64;
-#elif defined(__i386__)
-      tuple = SRT_ABI_I386;
-#elif defined(__aarch64__)
-      tuple = SRT_ABI_AARCH64;
-#else
-#error Unsupported architecture
-#endif
-      ld_so = srt_architecture_get_expected_runtime_linker (tuple);
+       * Resolve this by using ld.so(8) to invoke pv-adverb. */
+      ld_so = self->adverb_architecture->interoperable_runtime_linker;
 
       if (ld_so == NULL)
         return glnx_throw (error,
                            "Runtime linker for architecture %s not known",
-                           tuple);
+                           self->adverb_architecture->multiarch_tuple);
 
       g_debug ("Using runtime linker %s to run pv-adverb", ld_so);
       flatpak_bwrap_add_args (bwrap,
@@ -6256,6 +6331,205 @@ pv_runtime_take_misc_data_from_provider (PvRuntime *self,
   return TRUE;
 }
 
+static const SrtKnownArchitecture *
+pv_runtime_get_provider_ldconfig_architecture (PvRuntime *self,
+                                               PvGraphicsProvider *provider,
+                                               const char *ldconfig,
+                                               const char *ldconfig_real,
+                                               GError **error)
+{
+  glnx_autofd int fd = -1;
+  char buf[4] = { 0, 0, 0, 0 };
+  size_t n_read;
+
+  fd = _srt_sysroot_open (provider->in_current_ns, ldconfig,
+                          SRT_RESOLVE_FLAGS_READABLE,
+                          NULL, error);
+
+  if (fd < 0)
+    return NULL;
+
+  if (!_srt_fd_read_loop (fd, buf, sizeof (buf), &n_read, error))
+    return NULL;
+
+  if (n_read < 4 || memcmp (buf, "\177ELF", 4) != 0)
+    {
+      g_debug ("ldconfig(8) \"%s\" in \"%s\" is not an ELF executable",
+               ldconfig, provider->in_current_ns->path);
+
+      if (ldconfig_real != NULL
+          && n_read >= 2
+          && memcmp (buf, "#!", 2) == 0)
+        {
+          g_debug ("ldconfig is a script and ldconfig.real exists, "
+                   "trying to get architecture from ldconfig.real instead");
+          glnx_close_fd (&fd);
+          fd = _srt_sysroot_open (provider->in_current_ns, ldconfig_real,
+                                  SRT_RESOLVE_FLAGS_READABLE,
+                                  NULL, error);
+
+          if (fd < 0)
+            return NULL;
+        }
+    }
+
+  return _srt_architecture_guess_from_elf (fd, NULL, error);
+}
+
+typedef enum
+{
+  OPTIONAL,
+  IMPORTANT,
+  ESSENTIAL
+} ComponentPriority;
+
+typedef struct
+{
+  const char *executable;
+  const char *target_path;
+  ComponentPriority priority;
+} GlibcExecutable;
+
+static gboolean
+pv_runtime_provide_glibc_executable (PvRuntime *self,
+                                     const GlibcExecutable *exe,
+                                     FlatpakBwrap *bwrap,
+                                     GError **error)
+{
+  g_autoptr(GError) local_error = NULL;
+  g_autofree char *provider_impl = NULL;
+  g_autofree char *target_path_alloc = NULL;
+  const char *target_path = exe->target_path;
+  const gchar *search_paths = NULL;
+  PvGraphicsProvider *provider = NULL;
+  TakeFromProviderFlags flags;
+  gsize provider_index;
+
+  for (provider_index = 0;
+       provider_index < self->providers->len;
+       provider_index++)
+    {
+      provider = g_ptr_array_index (self->providers, provider_index);
+
+      if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
+        continue;
+
+      if (_srt_sysroot_is_direct (provider->in_current_ns))
+        search_paths = g_environ_getenv (self->original_environ, "PATH");
+      else
+        search_paths = NULL;
+
+      provider_impl = pv_graphics_provider_search_in_path_and_bin (provider,
+                                                                   search_paths,
+                                                                   exe->executable);
+
+      /* Leaves provider and search_paths set appropriately if a match was
+       * found (we will use this later) */
+      if (provider_impl != NULL)
+        break;
+    }
+
+  if (target_path == NULL)
+    {
+      target_path_alloc = g_build_filename ("/usr/bin", exe->executable, NULL);
+      target_path = target_path_alloc;
+    }
+
+  if (exe->priority >= ESSENTIAL)
+    flags = TAKE_FROM_PROVIDER_FLAGS_NONE;
+  else
+    flags = TAKE_FROM_PROVIDER_FLAGS_IF_CONTAINER_COMPATIBLE;
+
+  if (provider_impl == NULL)
+    {
+      if (exe->priority >= IMPORTANT)
+        g_warning ("Cannot find %s", exe->executable);
+      else
+        g_debug ("Cannot find %s", exe->executable);
+
+      /* TODO: If we can't find the implementation of an ESSENTIAL
+       * executable like ldconfig, should we just fail? */
+      return TRUE;
+    }
+
+  if (!pv_runtime_take_from_provider (self,
+                                      provider, provider_impl,
+                                      bwrap, target_path,
+                                      flags,
+                                      &local_error))
+    {
+      if (exe->priority >= IMPORTANT)
+        {
+          g_propagate_error (error, g_steal_pointer (&local_error));
+          return FALSE;
+        }
+      else
+        {
+          g_debug ("Cannot take %s from provider, ignoring: %s",
+                   provider_impl, local_error->message);
+          g_clear_error (&local_error);
+          return TRUE;
+        }
+    }
+
+  if (g_str_equal (exe->executable, "ldconfig"))
+    {
+      /* In Ubuntu and very old Debian releases (Debian 8 or older),
+       * /sbin/ldconfig is a shell script wrapper around the real binary
+       * /sbin/ldconfig.real, working around lack of dpkg trigger support
+       * in old library packages. This means we might need
+       * /sbin/ldconfig.real as well. */
+      g_autofree char *real_impl = NULL;
+
+      real_impl = pv_graphics_provider_search_in_path_and_bin (provider,
+                                                               search_paths,
+                                                               "ldconfig.real");
+
+      if (real_impl == NULL)
+        {
+          g_debug ("Did not find accompanying ldconfig.real in the same provider");
+        }
+      else if (pv_runtime_take_from_provider (self,
+                                              provider, real_impl,
+                                              bwrap, "/sbin/ldconfig.real",
+                                              flags,
+                                              &local_error))
+        {
+          g_debug ("Using accompanying ldconfig.real from the same provider");
+        }
+      else
+        {
+          g_debug ("Cannot take ldconfig.real from same provider, ignoring: %s",
+                   local_error->message);
+          g_clear_error (&local_error);
+          g_clear_pointer (&real_impl, g_free);
+        }
+
+      self->ldconfig_architecture =
+        pv_runtime_get_provider_ldconfig_architecture (self,
+                                                       provider,
+                                                       provider_impl,
+                                                       real_impl,
+                                                       &local_error);
+
+      if (G_LIKELY (self->ldconfig_architecture != NULL))
+        {
+          g_debug ("provider %s ldconfig(8) is a %s executable",
+                   provider->in_current_ns->path,
+                   self->ldconfig_architecture->multiarch_tuple);
+        }
+      else
+        {
+          _srt_log_warning ("Unable to determine architecture of provider %s ldconfig: %s",
+                            provider->in_current_ns->path,
+                            local_error->message);
+          g_clear_error (&local_error);
+        }
+    }
+
+  return TRUE;
+}
+
 static gboolean
 pv_runtime_finish_libc_family (PvRuntime *self,
                                FlatpakBwrap *bwrap,
@@ -6285,12 +6559,7 @@ pv_runtime_finish_libc_family (PvRuntime *self,
     "/usr/share/i18n",
     NULL
   };
-  static const struct
-  {
-    const char *executable;
-    const char *target_path;
-    enum { OPTIONAL, IMPORTANT, ESSENTIAL } priority;
-  } glibc_executables[] =
+  static const GlibcExecutable glibc_executables[] =
   {
     /* This is basically the libc-bin Debian package, which is
      * marked Essential. At least ldd can fail to work if it is too
@@ -6300,10 +6569,6 @@ pv_runtime_finish_libc_family (PvRuntime *self,
     { "getent" },
     { "iconv" },
     { "ldconfig", .priority = ESSENTIAL, .target_path = "/sbin/ldconfig" },
-    /* In Ubuntu and old Debian releases (Debian 8 or older), /sbin/ldconfig
-     * is a shell script wrapper around the real binary /sbin/ldconfig.real,
-     * working around lack of dpkg trigger support in old library packages. */
-    { "ldconfig.real", .target_path = "/sbin/ldconfig.real" },
     { "ldd", .priority = IMPORTANT },
     { "locale", .priority = IMPORTANT },
     { "localedef", .priority = IMPORTANT },
@@ -6356,74 +6621,11 @@ pv_runtime_finish_libc_family (PvRuntime *self,
 
       for (i = 0; i < G_N_ELEMENTS (glibc_executables); i++)
         {
-          g_autoptr(GError) local_error = NULL;
-          const char *executable = glibc_executables[i].executable;
-          g_autofree char *provider_impl = NULL;
-          g_autofree char *target_path_alloc = NULL;
-          const char *target_path = glibc_executables[i].target_path;
-          PvGraphicsProvider *provider = NULL;
-          TakeFromProviderFlags flags;
-          gsize provider_index;
-
-          for (provider_index = 0;
-               provider_index < self->providers->len;
-               provider_index++)
-            {
-              const gchar *search_paths = NULL;
-
-              provider = g_ptr_array_index (self->providers, provider_index);
-
-              if (provider->flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST)
-                continue;
-
-              if (_srt_sysroot_is_direct (provider->in_current_ns))
-                search_paths = g_environ_getenv (self->original_environ, "PATH");
-
-              provider_impl = pv_graphics_provider_search_in_path_and_bin (provider,
-                                                                           search_paths,
-                                                                           executable);
-
-              /* Leaves provider set to this one */
-              if (provider_impl != NULL)
-                break;
-            }
-
-          if (target_path == NULL)
-            {
-              target_path_alloc = g_build_filename ("/usr/bin", executable, NULL);
-              target_path = target_path_alloc;
-            }
-
-          if (glibc_executables[i].priority >= ESSENTIAL)
-            flags = TAKE_FROM_PROVIDER_FLAGS_NONE;
-          else
-            flags = TAKE_FROM_PROVIDER_FLAGS_IF_CONTAINER_COMPATIBLE;
-
-          if (provider_impl == NULL)
-            {
-              if (glibc_executables[i].priority >= IMPORTANT)
-                g_warning ("Cannot find %s", executable);
-              else
-                g_debug ("Cannot find %s", executable);
-            }
-          else if (!pv_runtime_take_from_provider (self,
-                                                   provider, provider_impl,
-                                                   bwrap, target_path,
-                                                   flags,
-                                                   &local_error))
-            {
-              if (glibc_executables[i].priority >= IMPORTANT)
-                {
-                  g_propagate_error (error, g_steal_pointer (&local_error));
-                  return FALSE;
-                }
-              else
-                {
-                  g_debug ("Cannot take %s from provider, ignoring: %s",
-                           provider_impl, local_error->message);
-                  g_clear_error (&local_error);
-                }
-            }
+          if (!pv_runtime_provide_glibc_executable (self,
+                                                    &glibc_executables[i],
+                                                    bwrap,
+                                                    error))
+            return FALSE;
         }
 
       g_debug ("Making provider gconv modules visible in container");

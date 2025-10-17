@@ -5,6 +5,7 @@
 
 #include <steam-runtime-tools/steam-runtime-tools.h>
 #include "steam-runtime-tools/architecture-internal.h"
+#include "steam-runtime-tools/elf-utils-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 #include <gelf.h>
@@ -59,11 +60,14 @@ dump_strv (const char *title,
 }
 
 static void
-dump_architecture (const SrtKnownArchitecture *arch)
+dump_architecture (const char *label,
+                   const SrtKnownArchitecture *arch)
 {
   const char *description;
 
-  g_test_message ("Known architecture: %s", arch->multiarch_tuple);
+  g_test_message ("%s: %s",
+                  label ?: "Known architecture",
+                  arch->multiarch_tuple);
   g_test_message ("\tld.so(8): %s",
                   arch->interoperable_runtime_linker ?: "(unknown)");
   g_test_message ("\tIn OpenXR vocabulary: %s",
@@ -127,6 +131,34 @@ dump_architecture (const SrtKnownArchitecture *arch)
 }
 
 static void
+test_architecture_get_current (Fixture *f,
+                               gconstpointer context)
+{
+  const SrtKnownArchitecture *arch = _srt_architecture_get_current ();
+
+  dump_architecture ("Current architecture", arch);
+
+#if defined(__x86_64__) && defined(__LP64__)
+  g_assert_cmpstr (arch->multiarch_tuple, ==, SRT_ABI_X86_64);
+  g_assert_cmpstr (arch->interoperable_runtime_linker,
+                   ==, "/lib64/ld-linux-x86-64.so.2");
+#elif defined(__i386__)
+  g_assert_cmpstr (arch->multiarch_tuple, ==, SRT_ABI_I386);
+  g_assert_cmpstr (arch->interoperable_runtime_linker,
+                   ==, "/lib/ld-linux.so.2");
+#elif defined(__aarch64__)
+  g_assert_cmpstr (arch->multiarch_tuple, ==, SRT_ABI_AARCH64);
+  g_assert_cmpstr (arch->interoperable_runtime_linker,
+                   ==, "/lib/ld-linux-aarch64.so.1");
+#endif
+
+#if defined(_SRT_MULTIARCH)
+  g_assert_cmpstr (arch->multiarch_tuple, ==, _SRT_MULTIARCH);
+  g_assert_cmpuint (arch->sizeof_pointer, ==, sizeof (void *));
+#endif
+}
+
+static void
 test_architecture_get_by_tuple (Fixture *f,
                                 gconstpointer context)
 {
@@ -138,7 +170,7 @@ test_architecture_get_by_tuple (Fixture *f,
 
   arch = x86_64_arch = _srt_architecture_get_by_tuple (SRT_ABI_X86_64);
   g_assert_nonnull (x86_64_arch);
-  dump_architecture (arch);
+  dump_architecture ("x86_64 architecture", arch);
   g_assert_cmpstr (x86_64_arch->multiarch_tuple, ==, SRT_ABI_X86_64);
   g_assert_cmpstr (x86_64_arch->interoperable_runtime_linker, ==,
                    "/lib64/ld-linux-x86-64.so.2");
@@ -175,7 +207,7 @@ test_architecture_get_by_tuple (Fixture *f,
 
   arch = i386_arch = _srt_architecture_get_by_tuple (SRT_ABI_I386);
   g_assert_nonnull (i386_arch);
-  dump_architecture (arch);
+  dump_architecture ("i386 architecture", arch);
   g_assert_cmpstr (i386_arch->multiarch_tuple, ==, SRT_ABI_I386);
   g_assert_cmpstr (i386_arch->interoperable_runtime_linker, ==,
                    "/lib/ld-linux.so.2");
@@ -212,7 +244,7 @@ test_architecture_get_by_tuple (Fixture *f,
 
   arch = aarch64_arch = _srt_architecture_get_by_tuple (SRT_ABI_AARCH64);
   g_assert_nonnull (arch);
-  dump_architecture (arch);
+  dump_architecture ("aarch64 architecture", arch);
   g_assert_cmpstr (arch->multiarch_tuple, ==, SRT_ABI_AARCH64);
   g_assert_cmpstr (arch->interoperable_runtime_linker, ==,
                    "/lib/ld-linux-aarch64.so.1");
@@ -246,7 +278,7 @@ test_architecture_get_by_tuple (Fixture *f,
   /* Used in unit tests */
   arch = _srt_architecture_get_by_tuple ("x86_64-mock-abi");
   g_assert_nonnull (arch);
-  dump_architecture (arch);
+  dump_architecture ("Mock architecture for unit tests", arch);
   g_assert_cmpstr (arch->multiarch_tuple, ==, "x86_64-mock-abi");
   g_assert_cmpstr (arch->interoperable_runtime_linker, ==, NULL);
   g_assert_cmpstr (arch->openxr_1_architecture, ==, NULL);
@@ -275,6 +307,109 @@ test_architecture_get_by_tuple (Fixture *f,
   /* An architecture we have no knowledge of isn't found */
   arch = _srt_architecture_get_by_tuple ("potato-glados-eabi");
   g_assert_null (arch);
+}
+
+static void
+dump_guessed_arch (const char *input,
+                   const SrtKnownArchitecture *arch,
+                   const GError *error)
+{
+  if (arch != NULL)
+    g_test_message ("%s -> guessed %s", input, arch->multiarch_tuple);
+  else
+    g_test_message ("%s -> cannot guess: %s", input,
+                    error != NULL ? error->message : "<no error>");
+}
+
+static void
+test_architecture_guess_from_elf (Fixture *f,
+                                  gconstpointer context)
+{
+  const SrtKnownArchitecture *arch;
+
+    {
+      g_autoptr(GError) local_error = NULL;
+
+      arch = _srt_architecture_guess_from_elf (AT_FDCWD, "/nonexistent",
+                                               &local_error);
+      dump_guessed_arch ("/nonexistent", arch, local_error);
+      g_assert_nonnull (local_error);
+      g_assert_null (arch);
+    }
+
+  for (gsize use_fd = 0; use_fd < 2; use_fd++)
+    {
+      const SrtKnownArchitecture *native_architecture;
+      g_autofree gchar *mock_true = NULL;
+      g_autoptr(GError) local_error = NULL;
+      glnx_autofd int already_open_fd = -1;
+
+      mock_true = g_test_build_filename (G_TEST_BUILT, "mock-true", NULL);
+
+      if (use_fd != 0)
+        {
+          gboolean ok;
+
+          ok = glnx_openat_rdonly (AT_FDCWD, mock_true,
+                                   TRUE, /* follow symlinks */
+                                   &already_open_fd,
+                                   &local_error);
+          g_assert_no_error (local_error);
+          g_assert_true (ok);
+
+          arch = _srt_architecture_guess_from_elf (already_open_fd, NULL,
+                                                   &local_error);
+        }
+      else
+        {
+          arch = _srt_architecture_guess_from_elf (AT_FDCWD, mock_true,
+                                                   &local_error);
+        }
+
+      dump_guessed_arch ("mock-true ELF executable", arch, local_error);
+
+      native_architecture = _srt_architecture_get_current ();
+#if defined(_SRT_MULTIARCH) \
+    || (defined(__x86_64__) && defined(__LP64__)) \
+    || defined(__i386__) \
+    || defined(__aarch64__)
+      g_assert_nonnull (native_architecture);
+#endif
+
+      if (native_architecture != NULL)
+        {
+          if (native_architecture->elf_class != ELFCLASSNONE
+              && native_architecture->elf_encoding != ELFDATANONE
+              && native_architecture->machine_type != SRT_MACHINE_TYPE_UNKNOWN)
+            {
+              g_assert_nonnull (arch);
+              g_assert_cmpstr (arch->multiarch_tuple,
+                               ==, native_architecture->multiarch_tuple);
+              g_assert_true (arch == native_architecture);
+            }
+          else
+            {
+#if (defined(__x86_64__) && defined(__LP64__)) \
+    || defined(__i386__) \
+    || defined(__aarch64__)
+              g_error ("This architecture should be identifiable");
+#endif
+            }
+        }
+    }
+
+    {
+      g_autofree gchar *check_sh = NULL;
+      g_autoptr(GError) local_error = NULL;
+
+      /* A shell script's architecture can't be guessed */
+      check_sh = g_test_build_filename (G_TEST_DIST, "check-sh.sh", NULL);
+      arch = _srt_architecture_guess_from_elf (AT_FDCWD, check_sh,
+                                               &local_error);
+      dump_guessed_arch ("check-sh.sh shell script", arch, local_error);
+      g_assert_nonnull (local_error);
+      g_assert_null (arch);
+    }
 }
 
 static void
@@ -348,6 +483,52 @@ test_architecture_guess_from_user_input (Fixture *f,
 }
 
 static void
+test_architecture_ldconfig_knows_arch (Fixture *f,
+                                       gconstpointer context)
+{
+  const struct
+  {
+    const char *ldconfig;
+    const char *libraries;
+    gboolean expected;
+  }
+  tests[] =
+  {
+    { NULL, SRT_ABI_X86_64, FALSE },
+    { SRT_ABI_X86_64, SRT_ABI_X86_64, TRUE },
+    { SRT_ABI_I386, SRT_ABI_I386, TRUE },
+    { SRT_ABI_X86_64, SRT_ABI_I386, TRUE },
+    { SRT_ABI_I386, SRT_ABI_X86_64, TRUE },
+    { SRT_ABI_AARCH64, SRT_ABI_X86_64, FALSE },
+    { SRT_ABI_X86_64, SRT_ABI_AARCH64, FALSE },
+  };
+
+  for (size_t i = 0; i < G_N_ELEMENTS (tests); i++)
+    {
+      const SrtKnownArchitecture *known;
+      gboolean res;
+
+      if (tests[i].ldconfig != NULL)
+        {
+          known = _srt_architecture_get_by_tuple (tests[i].ldconfig);
+          g_assert_nonnull (known);
+          g_assert_cmpstr (known->multiarch_tuple, ==, tests[i].ldconfig);
+        }
+      else
+        {
+          known = NULL;
+        }
+
+      res = _srt_architecture_ldconfig_knows_architecture (known, tests[i].libraries);
+      g_test_message ("%s ldconfig knows architecture %s -> %s",
+                      tests[i].ldconfig ?: "unknown",
+                      tests[i].libraries,
+                      res ? "yes" : "no");
+      g_assert_cmpint (res, ==, tests[i].expected);
+    }
+}
+
+static void
 test_architecture_plausible_tuple (Fixture *f,
                                    gconstpointer context)
 {
@@ -398,6 +579,146 @@ test_architecture_plausible_tuple (Fixture *f,
     }
 }
 
+static void
+dump_elf_or_error (const char *input,
+                   gboolean ok,
+                   int fd,
+                   Elf *elf,
+                   GError *error)
+{
+  GElf_Ehdr eh;
+
+  if (ok)
+    g_test_message ("%s -> success, fd %d, Elf %s: %s",
+                    input, fd,
+                    elf != NULL ? "non-null" : "null",
+                    error != NULL ? error->message : "<no error>");
+  else
+    g_test_message ("%s -> error, fd %d, Elf %s: %s",
+                    input, fd,
+                    elf != NULL ? "non-null" : "null",
+                    error != NULL ? error->message : "<no error>");
+
+  if (elf == NULL)
+    return;
+
+  if (gelf_getehdr (elf, &eh) != NULL)
+    g_test_message ("ELF class 0x%x, data encoding 0x%x, machine type 0x%x",
+                    eh.e_ident[EI_CLASS], eh.e_ident[EI_DATA], eh.e_machine);
+  else
+    g_test_message ("gelf_getehdr() -> %s", elf_errmsg (elf_errno ()));
+}
+
+static void
+test_elf_utils_open (Fixture *f,
+                     gconstpointer context)
+{
+    {
+      g_autoptr(GError) local_error = NULL;
+      g_autoptr(Elf) elf = NULL;
+      glnx_autofd int fd = -1;
+      gboolean ok;
+
+      /* A file we can't open */
+      ok = _srt_open_elf (AT_FDCWD, "/nonexistent", &fd, &elf, &local_error);
+      dump_elf_or_error ("/nonexistent", ok, fd, elf, local_error);
+      g_assert_nonnull (local_error);
+      g_assert_false (ok);
+      g_assert_cmpint (fd, <, 0);
+      g_assert_null (elf);
+    }
+
+  for (gsize use_fd = 0; use_fd < 2; use_fd++)
+    {
+      const SrtKnownArchitecture *native_architecture;
+      g_autofree gchar *mock_true = NULL;
+      g_autoptr(GError) local_error = NULL;
+      g_autoptr(Elf) elf = NULL;
+      GElf_Ehdr eh;
+      glnx_autofd int already_open_fd = -1;
+      glnx_autofd int fd = -1;
+      gboolean ok;
+
+      mock_true = g_test_build_filename (G_TEST_BUILT, "mock-true", NULL);
+
+      if (use_fd != 0)
+        {
+          ok = glnx_openat_rdonly (AT_FDCWD, mock_true,
+                                   TRUE, /* follow symlinks */
+                                   &already_open_fd,
+                                   &local_error);
+          g_assert_no_error (local_error);
+          g_assert_true (ok);
+
+          ok = _srt_open_elf (already_open_fd, NULL, &fd, &elf, &local_error);
+        }
+      else
+        {
+          ok = _srt_open_elf (AT_FDCWD, mock_true, &fd, &elf, &local_error);
+        }
+
+      dump_elf_or_error ("mock-true executable", ok, fd, elf, local_error);
+      g_assert_no_error (local_error);
+      g_assert_true (ok);
+
+      if (use_fd)
+        g_assert_cmpint (fd, ==, -1);
+      else
+        g_assert_cmpint (fd, >=, 0);
+
+      g_assert_nonnull (elf);
+      g_assert_nonnull (gelf_getehdr (elf, &eh));
+
+      native_architecture = _srt_architecture_get_current ();
+#if defined(_SRT_MULTIARCH)
+      g_assert_nonnull (native_architecture);
+#endif
+
+      if (native_architecture != NULL)
+        {
+          if (native_architecture->elf_class != ELFCLASSNONE)
+            g_assert_cmpuint (native_architecture->elf_class,
+                              ==, eh.e_ident[EI_CLASS]);
+
+          if (native_architecture->elf_encoding != ELFDATANONE)
+            g_assert_cmpuint (native_architecture->elf_encoding,
+                              ==, eh.e_ident[EI_DATA]);
+
+          if (native_architecture->machine_type != SRT_MACHINE_TYPE_UNKNOWN)
+            g_assert_cmpuint (native_architecture->machine_type,
+                              ==, eh.e_machine);
+        }
+    }
+
+    {
+      g_autofree gchar *check_sh = NULL;
+      g_autoptr(GError) local_error = NULL;
+      g_autoptr(Elf) elf = NULL;
+      glnx_autofd int fd = -1;
+      gboolean ok;
+
+      check_sh = g_test_build_filename (G_TEST_DIST, "check-sh.sh", NULL);
+      ok = _srt_open_elf (AT_FDCWD, check_sh, &fd, &elf, &local_error);
+      dump_elf_or_error ("check-sh.sh script", ok, fd, elf, local_error);
+
+      /* libelf currently reports success for a non-ELF executable
+       * (shell script) for some reason (?) but even if it does,
+       * it shouldn't be able to parse the ELF header */
+      if (ok)
+        {
+          GElf_Ehdr eh;
+
+          g_assert_nonnull (elf);
+          g_assert_null (gelf_getehdr (elf, &eh));
+        }
+      else
+        {
+          g_assert_nonnull (local_error);
+          g_assert_null (elf);
+        }
+    }
+}
+
 int
 main (int argc,
       char **argv)
@@ -405,10 +726,18 @@ main (int argc,
   _srt_tests_init (&argc, &argv, NULL);
   g_test_add ("/architecture/get_by_tuple", Fixture, NULL,
               setup, test_architecture_get_by_tuple, teardown);
+  g_test_add ("/architecture/get_current", Fixture, NULL,
+              setup, test_architecture_get_current, teardown);
+  g_test_add ("/architecture/guess_from_elf", Fixture, NULL,
+              setup, test_architecture_guess_from_elf, teardown);
   g_test_add ("/architecture/guess_from_user_input", Fixture, NULL,
               setup, test_architecture_guess_from_user_input, teardown);
+  g_test_add ("/architecture/ldconfig_knows_arch", Fixture, NULL,
+              setup, test_architecture_ldconfig_knows_arch, teardown);
   g_test_add ("/architecture/plausible_tuple", Fixture, NULL,
               setup, test_architecture_plausible_tuple, teardown);
+  g_test_add ("/elf-utils/open", Fixture, NULL,
+              setup, test_elf_utils_open, teardown);
 
   return g_test_run ();
 }

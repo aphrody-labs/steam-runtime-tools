@@ -55,6 +55,8 @@ G_DEFINE_QUARK (srt-architecture-error-quark, srt_architecture_error)
 #define EM_AARCH64	183	/* ARM AARCH64 */
 #endif
 
+#define SRT_ABI_X32 "x86_64-linux-gnux32"
+
 G_STATIC_ASSERT (SRT_MACHINE_TYPE_UNKNOWN == EM_NONE);
 G_STATIC_ASSERT (SRT_MACHINE_TYPE_386 == EM_386);
 G_STATIC_ASSERT (SRT_MACHINE_TYPE_X86_64 == EM_X86_64);
@@ -70,6 +72,11 @@ static const SrtKnownArchitecture known_architectures[] =
       .multilib_suffixes = ((const char * const[]){
           "x86_64-pc-linux-gnu/lib",
           "lib64",
+          NULL
+      }),
+      .extra_ld_so_architectures = ((const char * const[]){
+          SRT_ABI_I386,
+          SRT_ABI_X32,
           NULL
       }),
       .extra_ld_so_caches = ((const char * const[]){
@@ -106,6 +113,11 @@ static const SrtKnownArchitecture known_architectures[] =
           "lib32",
           NULL
       }),
+      .extra_ld_so_architectures = ((const char * const[]){
+          SRT_ABI_X86_64,
+          SRT_ABI_X32,
+          NULL
+      }),
       .extra_ld_so_caches = ((const char * const[]){
           "ld-i686-pc-linux-gnu.cache",
           NULL
@@ -134,11 +146,16 @@ static const SrtKnownArchitecture known_architectures[] =
     },
 
     {
-      .multiarch_tuple = "x86_64-linux-gnux32",
+      .multiarch_tuple = SRT_ABI_X32,
       .debian_architecture = "x32",
       .interoperable_runtime_linker = "/libx32/ld-linux-x32.so.2",
       .openxr_1_architecture = "x32",
       .multilib_suffixes = ((const char * const[]){ "libx32", NULL }),
+      .extra_ld_so_architectures = ((const char * const[]){
+          SRT_ABI_X86_64,
+          SRT_ABI_I386,
+          NULL
+      }),
       .extra_ld_so_caches = ((const char * const[]){
           "ld-i686-pc-linux-gnu.cache",
           NULL
@@ -158,6 +175,10 @@ static const SrtKnownArchitecture known_architectures[] =
           "aarch64-unknown-linux-gnueabi/lib",
           NULL
       }),
+      /* Technically an aarch64 ldconfig(8) can also enumerate and cache
+       * 32-bit ARM libraries (arm-linux-gnu OABI, arm-linux-gnueabi
+       * and arm-linux-gnueabihf) but we don't expect this to ever
+       * matter for the Steam Runtime. */
       .extra_ld_so_caches = ((const char * const[]){
           "ld-aarch64-unknown-linux-gnueabi.cache",
           NULL
@@ -361,6 +382,81 @@ srt_architecture_can_run_x86_64 (void)
   return _srt_architecture_can_run (runner, SRT_ABI_X86_64);
 }
 
+/*
+ * _srt_architecture_ldconfig_knows_architecture:
+ * @maybe_known: (nullable): A #SrtKnownArchitecture or %NULL
+ * @tuple: An architecture
+ *
+ * If a ldconfig(8) provided by architecture @maybe_known would write
+ * architectures from @tuple into `/etc/ld.so.cache`, return %TRUE.
+ *
+ * If @maybe_known is %NULL, pessimistically return %FALSE.
+ *
+ * Otherwise return %FALSE.
+ *
+ * Returns: %TRUE if @tuple libraries will appear in `ld.so.cache`
+ */
+gboolean
+_srt_architecture_ldconfig_knows_architecture (const SrtKnownArchitecture *maybe_known,
+                                               const char *tuple)
+{
+  if (maybe_known == NULL)
+    {
+      /* If we couldn't figure out the architecture that ldconfig(8)
+       * in the container is going to have, pessimistically assume
+       * that it won't write this architecture into ld.so.cache,
+       * and therefore we need to keep it in the LD_LIBRARY_PATH
+       * even after regenerating ld.so.cache. */
+      g_debug ("Assuming unknown ldconfig(8) will not put %s libraries "
+               "in ld.so.cache",
+               tuple);
+      return FALSE;
+    }
+
+  if (g_str_equal (maybe_known->multiarch_tuple, tuple))
+    {
+      /* If we're going to run an x86_64 ldconfig(8), then we don't
+       * need to keep /overrides/lib/x86_64-linux-gnu in the
+       * LD_LIBRARY_PATH, because those libraries will be listed
+       * in the ld.so.cache after we have re-run ldconfig(8).
+       * We prefer to do this because it more closely mirrors what would
+       * happen on the "real" host system. */
+      g_debug ("%s ldconfig(8) will put its own libraries in ld.so.cache",
+               tuple);
+      return TRUE;
+    }
+
+  if (maybe_known->extra_ld_so_architectures == NULL)
+    {
+      /* If we're going to run, for example, an aarch64 ldconfig(8),
+       * then we *do* need to keep /overrides/lib/x86_64-linux-gnu in the
+       * LD_LIBRARY_PATH, because the ldconfig(8) does not know about
+       * cross-library architectures, so those libraries will *not* be
+       * listed in the ld.so.cache. */
+      g_debug ("%s ldconfig(8) will not put any foreign libraries in ld.so.cache",
+               maybe_known->multiarch_tuple);
+      return FALSE;
+    }
+
+  for (gsize i = 0; maybe_known->extra_ld_so_architectures[i] != NULL; i++)
+    {
+      /* If we're going to run an x86_64 ldconfig(8), then we don't
+       * need to keep /overrides/lib/i386-linux-gnu in the
+       * LD_LIBRARY_PATH because x86_64 ldconfig(8) *does* know about
+       * i386 libraries, and vice versa. */
+      if (g_str_equal (maybe_known->extra_ld_so_architectures[i], tuple))
+        {
+          g_debug ("%s ldconfig(8) will put %s libraries in ld.so.cache",
+                   maybe_known->multiarch_tuple, tuple);
+          return TRUE;
+        }
+    }
+
+  g_debug ("%s ldconfig(8) will not put %s libraries in ld.so.cache",
+           maybe_known->multiarch_tuple, tuple);
+  return FALSE;
+}
+
 /**
  * srt_architecture_get_expected_runtime_linker:
  * @multiarch_tuple: A multiarch tuple defining an ABI, as printed
@@ -426,8 +522,11 @@ _srt_architecture_get_by_tuple (const char *tuple)
 }
 
 /*
- * @dfd: a directory file descriptor, `AT_FDCWD` or -1
- * @file_path: (type filename):
+ * @dfd: a directory file descriptor, `AT_FDCWD` or -1,
+ *  or an open file descriptor for the library or executable itself
+ *  if @file_path is %NULL
+ * @file_path: (type filename): Filename to open, or %NULL if @dfd
+ *  is an open file descriptor for the executable or library
  * @cls: (not optional) (out): ELF class, normally `ELFCLASS32` or `ELFCLASS64`
  * @data_encoding: (not optional) (out): ELF data encoding, normally
  *  `ELFDATA2LSB` or `ELFDATA2MSB`
@@ -449,7 +548,8 @@ _srt_architecture_read_elf (int dfd,
   g_autoptr(Elf) elf = NULL;
   GElf_Ehdr eh;
 
-  g_return_val_if_fail (file_path != NULL, FALSE);
+  g_return_val_if_fail (file_path == NULL || file_path[0] != '\0', FALSE);
+  g_return_val_if_fail (file_path != NULL || dfd >= 0, FALSE);
   g_return_val_if_fail (cls != NULL, FALSE);
   g_return_val_if_fail (machine != NULL, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
@@ -469,14 +569,17 @@ _srt_architecture_read_elf (int dfd,
 }
 
 /*
- * @dfd: a directory file descriptor, `AT_FDCWD` or -1
- * @file_path: (type filename):
+ * @dfd: a directory file descriptor, `AT_FDCWD` or -1,
+ *  or an open file descriptor for the library or executable itself
+ *  if @file_path is %NULL
+ * @file_path: (type filename): Filename to open, or %NULL if @dfd
+ *  is an open file descriptor for the executable or library
  * @error: On failure set to GIOErrorEnum or SrtArchitectureError, used to
  *  describe the error
  *
- * Returns: (nullable): The multiarch tuple or %NULL on error.
+ * Returns: (nullable): The known architecture object, or %NULL on error
  */
-const gchar *
+const SrtKnownArchitecture *
 _srt_architecture_guess_from_elf (int dfd,
                                   const char *file_path,
                                   GError **error)
@@ -486,7 +589,8 @@ _srt_architecture_guess_from_elf (int dfd,
   guint16 machine = EM_NONE;
   gsize i;
 
-  g_return_val_if_fail (file_path != NULL, NULL);
+  g_return_val_if_fail (file_path == NULL || file_path[0] != '\0', NULL);
+  g_return_val_if_fail (file_path != NULL || dfd >= 0, NULL);
 
   if (!_srt_architecture_read_elf (dfd, file_path, &cls, &data_encoding, &machine, error))
     return NULL;
@@ -497,7 +601,7 @@ _srt_architecture_guess_from_elf (int dfd,
           && machine == known_architectures[i].machine_type
           && cls == known_architectures[i].elf_class
           && data_encoding == known_architectures[i].elf_encoding)
-        return known_architectures[i].multiarch_tuple;
+        return &known_architectures[i];
     }
 
   g_set_error (error, SRT_ARCHITECTURE_ERROR, SRT_ARCHITECTURE_ERROR_NO_INFORMATION,
@@ -614,4 +718,36 @@ _srt_architecture_array_populate_with_defaults (GArray *arch_quarks)
       g_return_if_fail (arch_quark != 0);
       g_array_append_val (arch_quarks, arch_quark);
     }
+}
+
+#if defined(__x86_64__)
+#define CURRENT_TUPLE SRT_ABI_X86_64
+#elif defined(__i386__)
+#define CURRENT_TUPLE SRT_ABI_I386
+#elif defined(__aarch64__)
+#define CURRENT_TUPLE SRT_ABI_AARCH64
+#elif defined(_SRT_MULTIARCH)
+#define CURRENT_TUPLE _SRT_MULTIARCH
+#else
+#warning Unknown architecture, please build with -Dmultiarch_tuple=...
+#endif
+
+/*
+ * Return the architecture for which the current process was compiled.
+ *
+ * If the current architecture's multiarch tuple cannot be determined,
+ * instead return 0.
+ * This can only happen on unusual architectures and only if
+ * steam-runtime-tools was configured without `-Dmultiarch_tuple`.
+ *
+ * Returns: interned string representing a multiarch tuple, or 0 if unknown
+ */
+const SrtKnownArchitecture *
+_srt_architecture_get_current (void)
+{
+#ifdef CURRENT_TUPLE
+  return _srt_architecture_get_by_tuple (CURRENT_TUPLE);
+#else
+  return 0;
+#endif
 }

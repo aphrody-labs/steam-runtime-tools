@@ -709,9 +709,9 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
 
   while (_srt_dir_iter_next_dent (&dfd_iter, &dent, NULL, NULL) && dent != NULL)
     {
+      const SrtKnownArchitecture *arch;
       SrtVaApiVersion libva_version = SRT_VA_API_VERSION_UNKNOWN;
       gchar *this_driver_link = NULL;
-      const gchar *library_multiarch = NULL;
       g_autofree gchar *this_driver_in_provider = NULL;
       gsize i;
 
@@ -728,12 +728,13 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
       this_driver_in_provider = g_build_filename (module_directory_path,
                                                   dent->d_name, NULL);
 
-      library_multiarch = _srt_architecture_guess_from_elf (dfd_iter.real_iter.fd,
-                                                            dent->d_name, &error);
+      arch = _srt_architecture_guess_from_elf (dfd_iter.real_iter.fd,
+                                               dent->d_name, &error);
 
-      if (library_multiarch == NULL)
+      if (arch == NULL)
         {
-          /* We were not able to guess the multiarch, fallback to inspect-library */
+          /* We were not able to guess the architecture,
+           * fall back to inspect-library */
           g_autofree gchar *driver_proc_path = NULL;
           g_debug ("%s", error->message);
           g_clear_error (&error);
@@ -753,10 +754,10 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
           if (issues & SRT_LIBRARY_ISSUES_CANNOT_LOAD)
             continue;
         }
-      else if (g_strcmp0 (library_multiarch, multiarch_tuple) != 0)
+      else if (g_strcmp0 (arch->multiarch_tuple, multiarch_tuple) != 0)
         {
           g_debug ("The library \"%s\" has a multiarch %s, but we were looking for %s. Skipping...",
-                    this_driver_in_provider, library_multiarch, multiarch_tuple);
+                    this_driver_in_provider, arch->multiarch_tuple, multiarch_tuple);
           continue;
         }
 

@@ -651,3 +651,9 @@ gboolean _srt_check_recursive_exec_guard (const char *debug_target,
 gchar *_srt_find_next_executable (const char *search_path,
                                   const char *exe_name,
                                   GError **error);
+
+gboolean _srt_fd_read_loop (int fd,
+                            char *buf,
+                            size_t len,
+                            size_t *n_read_out,
+                            GError **error);

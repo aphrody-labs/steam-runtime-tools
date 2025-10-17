@@ -96,12 +96,17 @@ print_library_details (const gchar *library_path,
                        const gchar separator,
                        FILE *original_stdout)
 {
+  const SrtKnownArchitecture *known;
   const gchar *identifier = NULL;
   g_autoptr(GError) error = NULL;
 
-  identifier = _srt_architecture_guess_from_elf (AT_FDCWD, library_path, &error);
+  known = _srt_architecture_guess_from_elf (AT_FDCWD, library_path, &error);
 
-  if (identifier == NULL)
+  if (known != NULL)
+    {
+      identifier = known->multiarch_tuple;
+    }
+  else
     {
       g_debug ("%s", error->message);
 

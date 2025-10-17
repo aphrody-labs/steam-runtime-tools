@@ -119,6 +119,7 @@ GPtrArray *_srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
                                               GError **error);
 SrtCompletedSubprocess *_srt_subprocess_runner_run_sync (SrtSubprocessRunner *self,
                                                          SrtHelperFlags flags,
+                                                         GQuark architecture,
                                                          const char * const *argv,
                                                          SrtSubprocessOutput stdout_mode,
                                                          SrtSubprocessOutput stderr_mode,

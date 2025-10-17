@@ -237,6 +237,7 @@ _srt_check_locale (SrtSubprocessRunner *runner,
 
   completed = _srt_subprocess_runner_run_sync (runner,
                                                helper_flags,
+                                               arch_quark,
                                                (const char * const *) argv->pdata,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,

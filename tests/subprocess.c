@@ -5,6 +5,7 @@
 
 #include "steam-runtime-tools/subprocess-internal.h"
 
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 #include "test-utils.h"
 
@@ -128,6 +129,7 @@ test_basic (Fixture *f,
    * asking for it not to be logged doesn't crash. */
   completed = _srt_subprocess_runner_run_sync (runner,
                                                SRT_HELPER_FLAGS_QUIET,
+                                               SRT_ARCHITECTURE_QUARK_NONE,
                                                _srt_const_strv (f->argv),
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE,
                                                SRT_SUBPROCESS_OUTPUT_INHERIT,
@@ -214,6 +216,7 @@ test_capture (Fixture *f,
 
   completed = _srt_subprocess_runner_run_sync (runner,
                                                SRT_HELPER_FLAGS_TIME_OUT,
+                                               SRT_ARCHITECTURE_QUARK_NONE,
                                                produce_output,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
@@ -273,6 +276,7 @@ test_chdir (Fixture *f,
 
   completed = _srt_subprocess_runner_run_sync (runner,
                                                SRT_HELPER_FLAGS_SEARCH_PATH,
+                                               SRT_ARCHITECTURE_QUARK_NONE,
                                                argv,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE,
                                                SRT_SUBPROCESS_OUTPUT_INHERIT,
@@ -317,6 +321,7 @@ test_chomp (Fixture *f,
       completed = _srt_subprocess_runner_run_sync (runner,
                                                    (SRT_HELPER_FLAGS_SEARCH_PATH
                                                     | SRT_HELPER_FLAGS_CHOMP),
+                                                   SRT_ARCHITECTURE_QUARK_NONE,
                                                    argv,
                                                    SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
                                                    SRT_SUBPROCESS_OUTPUT_INHERIT,
@@ -367,6 +372,7 @@ test_environ (Fixture *f,
 
       completed = _srt_subprocess_runner_run_sync (runner,
                                                    flags,
+                                                   SRT_ARCHITECTURE_QUARK_NONE,
                                                    echo_vars,
                                                    SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
                                                    SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
@@ -398,6 +404,7 @@ test_exec_failure (Fixture *f,
 
   completed = _srt_subprocess_runner_run_sync (runner,
                                                SRT_HELPER_FLAGS_NONE,
+                                               SRT_ARCHITECTURE_QUARK_NONE,
                                                argv,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
@@ -434,6 +441,7 @@ test_fds_open (Fixture *f,
   completed = _srt_subprocess_runner_run_sync (runner,
                                                (SRT_HELPER_FLAGS_LEAVE_FDS_OPEN
                                                 | SRT_HELPER_FLAGS_SEARCH_PATH),
+                                               SRT_ARCHITECTURE_QUARK_NONE,
                                                argv,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE,
                                                SRT_SUBPROCESS_OUTPUT_INHERIT,
@@ -475,6 +483,7 @@ test_shell_exit_status (Fixture *f,
 
       completed = _srt_subprocess_runner_run_sync (runner,
                                                    flags,
+                                                   SRT_ARCHITECTURE_QUARK_NONE,
                                                    mock_shell_sigkill,
                                                    SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
                                                    SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
@@ -528,6 +537,7 @@ test_terminating_signal (Fixture *f,
 
   completed = _srt_subprocess_runner_run_sync (runner,
                                                SRT_HELPER_FLAGS_SEARCH_PATH,
+                                               SRT_ARCHITECTURE_QUARK_NONE,
                                                die_with_signal,
                                                SRT_SUBPROCESS_OUTPUT_SILENCE,
                                                SRT_SUBPROCESS_OUTPUT_SILENCE,
@@ -590,6 +600,7 @@ test_timeout (Fixture *f,
 
   completed = _srt_subprocess_runner_run_sync (runner,
                                                SRT_HELPER_FLAGS_TIME_OUT,
+                                               SRT_ARCHITECTURE_QUARK_NONE,
                                                who_wants_to_live_forever,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,

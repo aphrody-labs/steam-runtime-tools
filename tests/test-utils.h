@@ -30,6 +30,8 @@
 /* for its backports of g_test_skip(), etc. */
 #include <libglnx.h>
 
+#include <glib/gstdio.h>
+
 /*
  * Other assorted test helpers.
  */
@@ -68,3 +70,16 @@ void _srt_show_diff (const char *expected,
                            "assertion failed (" #a " == " #b ")"); \
     } \
   } G_STMT_END
+
+/*
+ * Create the @path as if via g_creat(), and immediately close it.
+ * Assert that this was successful.
+ */
+static inline void
+create_and_close (const char *path,
+                  int mode)
+{
+  glnx_autofd int fd = -1;
+
+  g_assert_no_errno ((fd = g_creat (path, mode)));
+}

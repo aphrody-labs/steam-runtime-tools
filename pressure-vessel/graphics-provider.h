@@ -29,6 +29,7 @@
 
 #include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
+#include "steam-runtime-tools/subprocess-internal.h"
 
 #include "runtime-flags.h"
 
@@ -41,6 +42,7 @@ struct _PvGraphicsProvider
 
   /* All public members are read-only after initable_init(), which means
    * it's OK to access this object from more than one thread. */
+  SrtSubprocessRunner *run_in_current_context;
   SrtSysroot *in_current_ns;
   gchar *path_in_container_ns;
   gchar *path_in_host_ns;
@@ -76,7 +78,8 @@ SrtSystemInfo *pv_graphics_provider_get_system_info (PvGraphicsProvider *self,
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (PvGraphicsProvider, g_object_unref)
 
-GPtrArray *pv_graphics_provider_build_array (const char *provider_path,
+GPtrArray *pv_graphics_provider_build_array (SrtSubprocessRunner *run_in_current_context,
+                                             const char *provider_path,
                                              GHashTable *quark_to_provider,
                                              const GQuark *tuples,
                                              gsize n_tuples,

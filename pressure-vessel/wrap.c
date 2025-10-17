@@ -599,7 +599,8 @@ main (int argc,
       if (self->options.graphics_provider != NULL
           && self->options.graphics_provider[0] != '\0')
         {
-          graphics_providers = pv_graphics_provider_build_array (self->options.graphics_provider,
+          graphics_providers = pv_graphics_provider_build_array (self->run_in_current_context,
+                                                                 self->options.graphics_provider,
                                                                  self->options.arch_graphics_providers,
                                                                  tuples,
                                                                  n_tuples,

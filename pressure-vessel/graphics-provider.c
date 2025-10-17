@@ -32,6 +32,7 @@ enum {
   PROP_FLAGS,
   PROP_IN_CURRENT_NS,
   PROP_PATH_IN_CONTAINER_NS,
+  PROP_RUN_IN_CURRENT_CONTEXT,
   N_PROPERTIES
 };
 
@@ -346,6 +347,10 @@ pv_graphics_provider_get_property (GObject *object,
         g_value_set_string (value, self->path_in_container_ns);
         break;
 
+      case PROP_RUN_IN_CURRENT_CONTEXT:
+        g_value_set_object (value, self->run_in_current_context);
+        break;
+
       default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
     }
@@ -377,6 +382,12 @@ pv_graphics_provider_set_property (GObject *object,
         self->path_in_container_ns = g_value_dup_string (value);
         break;
 
+      case PROP_RUN_IN_CURRENT_CONTEXT:
+        /* Construct-only */
+        g_return_if_fail (self->run_in_current_context == NULL);
+        self->run_in_current_context = g_value_dup_object (value);
+        break;
+
       default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
     }
@@ -393,6 +404,7 @@ pv_graphics_provider_constructed (GObject *object)
   g_return_if_fail (self->in_current_ns->path != NULL);
   g_return_if_fail (self->in_current_ns->fd >= 0);
   g_return_if_fail (self->path_in_container_ns != NULL);
+  g_return_if_fail (SRT_IS_SUBPROCESS_RUNNER (self->run_in_current_context));
 
   /* Path that, when resolved in the host namespace, points to us */
   self->path_in_host_ns = pv_current_namespace_path_to_host_path (self->in_current_ns->path);
@@ -409,6 +421,7 @@ pv_graphics_provider_dispose (GObject *object)
   g_clear_object (&priv->system_info);
 
   g_clear_object (&self->in_current_ns);
+  g_clear_object (&self->run_in_current_context);
 
   G_OBJECT_CLASS (pv_graphics_provider_parent_class)->dispose (object);
 }
@@ -459,6 +472,12 @@ pv_graphics_provider_class_init (PvGraphicsProviderClass *cls)
                          ("Path to the graphics provider in the container "
                           "namespace, typically /run/host"),
                          NULL,
+                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                          G_PARAM_STATIC_STRINGS));
+
+  properties[PROP_RUN_IN_CURRENT_CONTEXT] =
+    g_param_spec_object ("run-in-current-context", NULL, NULL,
+                         SRT_TYPE_SUBPROCESS_RUNNER,
                          (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                           G_PARAM_STATIC_STRINGS));
 
@@ -523,7 +542,8 @@ pv_graphics_provider_search_in_path_and_bin (PvGraphicsProvider *self,
 }
 
 static PvGraphicsProvider *
-pv_graphics_provider_new (const char *path_in_current_ns,
+pv_graphics_provider_new (SrtSubprocessRunner *run_in_current_context,
+                          const char *path_in_current_ns,
                           const char *path_in_container_ns,
                           PvGraphicsProviderFlags flags,
                           GError **error)
@@ -532,6 +552,7 @@ pv_graphics_provider_new (const char *path_in_current_ns,
 
   g_return_val_if_fail (path_in_current_ns != NULL, NULL);
   g_return_val_if_fail (path_in_container_ns != NULL, NULL);
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (run_in_current_context), NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
   if (g_str_equal (path_in_current_ns, "/"))
@@ -545,6 +566,7 @@ pv_graphics_provider_new (const char *path_in_current_ns,
   return g_object_new (PV_TYPE_GRAPHICS_PROVIDER,
                        "in-current-ns", sysroot,
                        "path-in-container-ns", path_in_container_ns,
+                       "run-in-current-context", run_in_current_context,
                        "flags", flags,
                        NULL);
 }
@@ -584,6 +606,7 @@ pv_graphics_provider_create_system_info (PvGraphicsProvider *self,
     flags |= SRT_CHECK_FLAGS_NO_HELPERS;
 
   system_info = srt_system_info_new (NULL);
+  _srt_system_info_set_subprocess_runner (system_info, self->run_in_current_context);
 
   if (single_arch != SRT_ARCHITECTURE_QUARK_NONE)
     {
@@ -836,7 +859,8 @@ pv_graphics_provider_choose_mount_point (const char *path_in_current_ns,
 }
 
 GPtrArray *
-pv_graphics_provider_build_array (const char *provider_path,
+pv_graphics_provider_build_array (SrtSubprocessRunner *run_in_current_context,
+                                  const char *provider_path,
                                   GHashTable *quark_to_provider,
                                   const GQuark *tuples,
                                   gsize n_tuples,
@@ -860,7 +884,8 @@ pv_graphics_provider_build_array (const char *provider_path,
   if (mount_point == NULL)
     return NULL;
 
-  graphics_provider = pv_graphics_provider_new (provider_path,
+  graphics_provider = pv_graphics_provider_new (run_in_current_context,
+                                                provider_path,
                                                 mount_point,
                                                 PV_GRAPHICS_PROVIDER_FLAGS_NONE,
                                                 error);
@@ -896,7 +921,8 @@ pv_graphics_provider_build_array (const char *provider_path,
           if (arch_mount == NULL)
             return NULL;
 
-          arch_provider = pv_graphics_provider_new (arch_path,
+          arch_provider = pv_graphics_provider_new (run_in_current_context,
+                                                    arch_path,
                                                     arch_mount,
                                                     PV_GRAPHICS_PROVIDER_FLAGS_NONE,
                                                     error);
@@ -948,7 +974,8 @@ pv_graphics_provider_build_array (const char *provider_path,
 
           /* The trailing slash is needed to allow open(2) to work even if
            * it's using the O_NOFOLLOW flag. */
-          graphics_provider = pv_graphics_provider_new ("/proc/self/root/",
+          graphics_provider = pv_graphics_provider_new (run_in_current_context,
+                                                        "/proc/self/root/",
                                                         "/proc/self/root/",
                                                         PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST,
                                                         error);

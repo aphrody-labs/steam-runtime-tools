@@ -92,7 +92,7 @@ _srt_global_teardown_private_xdg_dirs (void)
   gboolean result;
   g_return_val_if_fail (fake_home_parent != NULL, FALSE);
 
-  result = _srt_rm_rf (fake_home_parent);
+  result = glnx_shutil_rm_rf_at (AT_FDCWD, fake_home_parent, NULL, NULL);
   g_free (fake_home_parent);
   fake_home_parent = NULL;
 
@@ -183,7 +183,7 @@ _srt_global_teardown_sysroots (void)
   gboolean result;
   g_return_val_if_fail (sysroots_parent != NULL, FALSE);
 
-  result = _srt_rm_rf (sysroots_parent);
+  result = glnx_shutil_rm_rf_at (AT_FDCWD, sysroots_parent, NULL, NULL);
   g_free (sysroots_parent);
   sysroots_parent = NULL;
 
@@ -198,6 +198,12 @@ tests_check_fd_leaks_enter (void)
   g_autoptr(GError) error = NULL;
 
   g_return_val_if_fail (_srt_tests_init_was_called (), NULL);
+
+  /* The default GMainContext is created and never freed, and it owns
+   * a GWakeup, which owns a file descriptor; so we have to ensure that
+   * it exists before we start tracking whether our own code has leaked
+   * any file descriptors. */
+  (void) g_main_context_default ();
 
   ret = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
 
@@ -397,5 +403,8 @@ _srt_show_diff (const char *expected,
                   expected_path, actual_path);
 
   if (tmpdir != NULL)
-    _srt_rm_rf (tmpdir);
+    {
+      glnx_shutil_rm_rf_at (AT_FDCWD, tmpdir, NULL, &error);
+      g_assert_no_error (error);
+    }
 }

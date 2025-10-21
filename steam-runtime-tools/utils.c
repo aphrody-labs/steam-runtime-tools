@@ -169,48 +169,44 @@ _srt_check_not_setuid (void)
 #define INSTALLED_TESTS_PKGLIBEXECDIR \
   "/libexec/installed-tests/steam-runtime-tools-" _SRT_API_MAJOR
 
-G_GNUC_INTERNAL const char *
-_srt_find_myself (const char **exe_path_out,
-                  const char **helpers_path_out,
-                  GError **error)
+/* Read-only after initialization, for thread-safety */
+static struct
 {
-  static gchar *saved_prefix = NULL;
-  static gchar *saved_exe_path = NULL;
-  static gchar *saved_helpers_path = NULL;
+  GError *error;
+  gchar *saved_prefix;
+  gchar *saved_exe_path;
+  gchar *saved_helpers_path;
+  gsize initialized;
+} _srt_find_myself_result =
+{
+  .initialized = 0,
+};
+
+static void
+_srt_find_myself_impl (void)
+{
   Dl_info ignored;
   struct link_map *map = NULL;
-  gchar *dir = NULL;
+  g_autofree gchar *dir = NULL;
   g_autofree gchar *exe = NULL;
-
-  g_return_val_if_fail (_srt_check_not_setuid (), NULL);
-  g_return_val_if_fail (error == NULL || *error == NULL, NULL);
-  g_return_val_if_fail (exe_path_out == NULL || *exe_path_out == NULL,
-                        NULL);
-  g_return_val_if_fail (helpers_path_out == NULL || *helpers_path_out == NULL,
-                        NULL);
-
-  if (saved_prefix != NULL
-      && saved_exe_path != NULL
-      && saved_helpers_path != NULL)
-    goto out;
 
   if (dladdr1 (_srt_find_myself, &ignored, (void **) &map,
                RTLD_DL_LINKMAP) == 0 ||
       map == NULL)
     {
-      g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+      g_set_error (&_srt_find_myself_result.error, G_IO_ERROR, G_IO_ERROR_FAILED,
                    "Unable to locate shared library containing "
                    "_srt_find_myself()");
-      goto out;
+      return;
     }
 
   exe = realpath ("/proc/self/exe", NULL);
 
   if (exe == NULL)
     {
-      g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+      g_set_error (&_srt_find_myself_result.error, G_IO_ERROR, G_IO_ERROR_FAILED,
                    "Unable to locate main executable");
-      goto out;
+      return;
     }
 
   if (map->l_name == NULL || map->l_name[0] == '\0')
@@ -250,22 +246,50 @@ _srt_find_myself (const char **exe_path_out,
       dir = g_strdup ("/usr");
     }
 
-  saved_exe_path = g_steal_pointer (&exe);
-  saved_prefix = g_steal_pointer (&dir);
+  _srt_find_myself_result.saved_exe_path = g_steal_pointer (&exe);
+  _srt_find_myself_result.saved_prefix = g_steal_pointer (&dir);
   /* deliberate one-per-process leak */
-  saved_helpers_path = g_build_filename (
-      saved_prefix, "libexec", "steam-runtime-tools-" _SRT_API_MAJOR,
+  _srt_find_myself_result.saved_helpers_path = g_build_filename (
+      _srt_find_myself_result.saved_prefix,
+      "libexec", "steam-runtime-tools-" _SRT_API_MAJOR,
       NULL);
+}
 
-out:
+const char *
+_srt_find_myself (const char **exe_path_out,
+                  const char **helpers_path_out,
+                  GError **error)
+{
+  g_return_val_if_fail (_srt_check_not_setuid (), NULL);
+  g_return_val_if_fail (error == NULL || *error == NULL, NULL);
+  g_return_val_if_fail (exe_path_out == NULL || *exe_path_out == NULL,
+                        NULL);
+  g_return_val_if_fail (helpers_path_out == NULL || *helpers_path_out == NULL,
+                        NULL);
+
+  if (g_once_init_enter (&_srt_find_myself_result.initialized))
+    {
+      _srt_find_myself_impl ();
+      g_once_init_leave (&_srt_find_myself_result.initialized, 1);
+    }
+
+  if (G_UNLIKELY (_srt_find_myself_result.saved_prefix == NULL))
+    {
+      g_return_val_if_fail (_srt_find_myself_result.error != NULL, NULL);
+      g_set_error_literal (error,
+                           _srt_find_myself_result.error->domain,
+                           _srt_find_myself_result.error->code,
+                           _srt_find_myself_result.error->message);
+      return NULL;
+    }
+
   if (exe_path_out != NULL)
-    *exe_path_out = saved_exe_path;
+    *exe_path_out = _srt_find_myself_result.saved_exe_path;
 
   if (helpers_path_out != NULL)
-    *helpers_path_out = saved_helpers_path;
+    *helpers_path_out = _srt_find_myself_result.saved_helpers_path;
 
-  g_free (dir);
-  return saved_prefix;
+  return _srt_find_myself_result.saved_prefix;
 }
 
 /**
@@ -2051,6 +2075,17 @@ _srt_find_next_executable (const char *search_path,
   g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND,
                "Failed to locate '%s'", exe_name);
   return NULL;
+}
+
+gboolean
+_srt_pipe_open (SrtPipe *self,
+                GError **error)
+{
+#if GLIB_CHECK_VERSION (2, 78, 0)
+  return g_unix_open_pipe (self->fds, O_CLOEXEC, error);
+#else
+  return g_unix_open_pipe (self->fds, FD_CLOEXEC, error);
+#endif
 }
 
 /*

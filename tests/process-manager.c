@@ -42,7 +42,7 @@
 
 typedef struct
 {
-  int unused;
+  TestsOpenFdSet old_fds;
 } Fixture;
 
 typedef struct
@@ -58,6 +58,8 @@ setup (Fixture *f,
 
   /* Assert we initially have no child processes */
   g_assert_cmpint (waitpid (-1, NULL, WNOHANG) >= 0 ? 0 : errno, ==, ECHILD);
+
+  f->old_fds = tests_check_fd_leaks_enter ();
 }
 
 static void
@@ -68,6 +70,8 @@ teardown (Fixture *f,
 
   /* Assert we end up with no child processes */
   g_assert_cmpint (waitpid (-1, NULL, WNOHANG) >= 0 ? 0 : errno, ==, ECHILD);
+
+  tests_check_fd_leaks_leave (f->old_fds);
 }
 
 #define SPAWN_FLAGS \

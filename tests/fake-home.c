@@ -218,15 +218,11 @@ const gchar *mime_cache =
   if (f->create_steamrt_files)
     {
       run = g_build_filename (f->runtime, "run.sh", NULL);
+      create_and_close (run, 0755);
       setup = g_build_filename (f->runtime, "setup.sh", NULL);
+      create_and_close (setup, 0755);
       version = g_build_filename (f->runtime, "version.txt", NULL);
-
-      if (g_creat (run, 0755) < 0)
-        goto out;
-      if (g_creat (setup, 0755) < 0)
-        goto out;
-      if (g_creat (version, 0755) < 0)
-        goto out;
+      create_and_close (version, 0755);
 
       g_file_set_contents (version, "steam-runtime_0.20190711.3", -1, &error);
       g_assert_no_error (error);

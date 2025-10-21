@@ -2431,7 +2431,7 @@ pinned_libraries (Fixture *f,
   g_assert_no_error (error);
 
   target2 = g_build_filename (fake_home->i386_usr_lib_i386, "libcurl.so.4.2.0", NULL);
-  g_assert_cmpint (g_creat (target2, 0755), >, -1);
+  create_and_close (target2, 0755);
   symlink_gfile = g_file_new_for_path (target1);
 
   g_file_make_symbolic_link (symlink_gfile, target2, NULL, &error);
@@ -2439,7 +2439,7 @@ pinned_libraries (Fixture *f,
   g_assert_no_error (error);
 
   has_pins = g_build_filename (fake_home->pinned_32, "has_pins", NULL);
-  g_assert_cmpint (g_creat (has_pins, 0755), >, -1);
+  create_and_close (has_pins, 0755);
 
   values = srt_system_info_list_pinned_libs_32 (info, &messages);
   g_assert_nonnull (values);
@@ -2492,7 +2492,7 @@ pinned_libraries (Fixture *f,
   g_assert_no_error (error);
 
   target2 = g_build_filename (fake_home->amd64_usr_lib_64, "libcurl.so.4.2.0", NULL);
-  g_assert_cmpint (g_creat (target2, 0755), >, -1);
+  create_and_close (target2, 0755);
   symlink_gfile = g_file_new_for_path (target1);
 
   g_file_make_symbolic_link (symlink_gfile, target2, NULL, &error);
@@ -2500,7 +2500,7 @@ pinned_libraries (Fixture *f,
   g_assert_no_error (error);
 
   has_pins = g_build_filename (fake_home->pinned_64, "has_pins", NULL);
-  g_assert_cmpint (g_creat (has_pins, 0755), >, -1);
+  create_and_close (has_pins, 0755);
 
   values = srt_system_info_list_pinned_libs_64 (info, &messages);
   g_assert_nonnull (values);

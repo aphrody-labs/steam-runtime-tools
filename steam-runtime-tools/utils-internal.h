@@ -653,3 +653,10 @@ gboolean _srt_fd_read_loop (int fd,
                             size_t len,
                             size_t *n_read_out,
                             GError **error);
+
+gboolean _srt_fd_offset_read_loop (int fd,
+                                   goffset offset,
+                                   char *buf,
+                                   size_t len,
+                                   size_t *n_read_out,
+                                   GError **error);

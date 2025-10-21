@@ -15,3 +15,16 @@ foreach program : [
     install_dir : tests_dir,
   )
 endforeach
+
+foreach program : [
+  'elf-info',
+]
+  executable(
+    program,
+    program + '.c',
+    dependencies : [glib, gio_unix, libglnx_dep, libsteamrt_static_dep],
+    include_directories : project_include_dirs,
+    install : get_option('installed_tests'),
+    install_dir : tests_dir,
+  )
+endforeach

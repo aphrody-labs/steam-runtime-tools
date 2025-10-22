@@ -106,6 +106,77 @@ do the build locally instead of using ssh.
     given process, the multiarch tuple is often represented by a `GQuark`,
     GLib's mechanism for storing interned strings (analogous to X atoms).
 
+* When dealing with emulation, we need to keep track of several architectures:
+
+    - The *machine architecture* is the device we are running on,
+        in practice `x86_64-linux-gnu` or `aarch64-linux-gnu`.
+
+    - The runtime we are running (soldier or sniper or similar)
+        supports one or more architectures.
+        The *primary architecture* is used to implement `/bin/sh`,
+        `/sbin/ldconfig` and other key executables.
+        Zero or more *foreign architectures* are provided for compatibility
+        with legacy binaries.
+        If we are running an x86 game,
+        in practice the primary architecture is `x86_64-linux-gnu`
+        and we have an `i386-linux-gnu` foreign architecture.
+        If we are running a natively aarch64 game,
+        the primary architecture is `aarch64-linux-gnu` and there is no
+        foreign architecture.
+
+    - When we combine the runtime with the user's graphics drivers to enter
+        a container,
+        the container also has a primary architecture and zero or more
+        foreign architectures.
+
+    - In the absence of emulation,
+        we expect that the machine architecture is the same as the runtime's
+        primary architecture.
+        The resulting container will have the same primary and foreign
+        architectures as the runtime.
+
+    - pressure-vessel's own architecture is normally the machine architecture,
+        but when running under an emulator, it might not be.
+        For example, FEX-Emu runs on `aarch64-linux-gnu` systems
+        and emulates an x86 CPU,
+        making it possible to use an `x86_64-linux-gnu` copy of
+        pressure-vessel with a soldier or sniper runtime that has
+        primary architecture `x86_64-linux-gnu` and foreign architecture
+        `i386-linux-gnu`.
+        In this case,
+        the root directory of the container has `aarch64-linux-gnu`
+        libraries to run FEX-Emu,
+        and we set up soldier or sniper as a FEX-Emu "rootfs" that has
+        the same architectures as the runtime:
+        primary `x86_64-linux-gnu` and foreign `i386-linux-gnu`.
+
+    - Or if we are using pressure-vessel in conjunction with an emulator,
+        we might have both pressure-vessel and the emulator as binaries
+        from the machine architecture,
+        for example an `aarch64-linux-gnu` pressure-vessel binary and
+        an `aarch64-linux-gnu` FEX-Emu binary cooperating to launch
+        a runtime with primary architecture `x86_64-linux-gnu` and
+        foreign architecture `i386-linux-gnu`.
+        The container's primary architecture is the same as the runtime's.
+        The container's foreign architectures are the union of
+        the runtime's foreign architectures,
+        the architecture of pressure-vessel,
+        and the architecture of the emulator if different.
+        In the example above,
+        the container has `x86_64-linux-gnu` as its primary architecture,
+        and needs both `i386-linux-gnu` and `aarch64-linux-gnu` as foreign
+        architectures.
+
+    - pressure-vessel needs to include helper executables for its own
+        architecture,
+        plus every primary or foreign architecture that it can support
+        at runtime.
+
+    - Among the foreign architectures,
+        we also need to distinguish between foreign architectures that are
+        known to the primary architecture's `ldconfig`,
+        and foreign architectures that are not.
+
 * Be careful when adding dependencies, especially in library code.
 
     - glibc must be assumed to be very old:
@@ -143,8 +214,9 @@ do the build locally instead of using ssh.
     means that if they crash, they don't bring down the entire Steam
     client with them.
 
-* Any checks that need to look at more than one ABI (32- and 64-bit) must
-    be in a subprocess, so that the same process can run both.
+* Any checks that need to look at more than one ABI
+    (32- and 64-bit, x86 and ARM, or similar)
+    must be in a subprocess, so that the same process can run both.
 
 * The `inspect-library` helper should not have non-libc dependencies -
     not even GLib. Other helpers may have library dependencies if it is

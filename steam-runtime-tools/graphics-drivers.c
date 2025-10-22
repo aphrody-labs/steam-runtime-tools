@@ -615,7 +615,7 @@ _srt_list_links_from_directory (SrtSubprocessRunner *runner,
  * _srt_get_modules_from_path:
  * @sysroot: The root directory, usually '/'
  * @runner: The execution environment
- * @arch_quark: A nonzero quark representing a Debian-style multiarch tuple
+ * @want_arch_quark: A nonzero quark representing a Debian-style multiarch tuple
  *  such as %SRT_ABI_X86_64
  * @check_flags: Flags affecting how we do the search
  * @module_directory_path: (not nullable) (type filename): Path, in @sysroot namespace,
@@ -627,7 +627,7 @@ _srt_list_links_from_directory (SrtSubprocessRunner *runner,
  *  Otherwise if @module is #SRT_GRAPHICS_VAAPI_MODULE, the element-type will be #SrtVaApiDriver.
  *
  * @drivers_out will be prepended only with modules that are of the same ELF class that
- * corresponds to @arch_quark.
+ * corresponds to @want_arch_quark.
  *
  * Drivers are added to `drivers_out` in reverse lexicographic order
  * (`r600_dri.so` is before `r200_dri.so`, which is before `i965_dri.so`).
@@ -635,7 +635,7 @@ _srt_list_links_from_directory (SrtSubprocessRunner *runner,
 static void
 _srt_get_modules_from_path (SrtSysroot *sysroot,
                             SrtSubprocessRunner *runner,
-                            GQuark arch_quark,
+                            GQuark want_arch_quark,
                             SrtCheckFlags check_flags,
                             const char *module_directory_path,
                             gboolean is_extra,
@@ -709,7 +709,7 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
 
   while (_srt_dir_iter_next_dent (&dfd_iter, &dent, NULL, NULL) && dent != NULL)
     {
-      const SrtKnownArchitecture *arch;
+      const SrtKnownArchitecture *found_arch;
       SrtVaApiVersion libva_version = SRT_VA_API_VERSION_UNKNOWN;
       gchar *this_driver_link = NULL;
       g_autofree gchar *this_driver_in_provider = NULL;
@@ -728,10 +728,10 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
       this_driver_in_provider = g_build_filename (module_directory_path,
                                                   dent->d_name, NULL);
 
-      arch = _srt_architecture_guess_from_elf (dfd_iter.real_iter.fd,
-                                               dent->d_name, &error);
+      found_arch = _srt_architecture_guess_from_elf (dfd_iter.real_iter.fd,
+                                                     dent->d_name, &error);
 
-      if (arch == NULL)
+      if (found_arch == NULL)
         {
           /* We were not able to guess the architecture,
            * fall back to inspect-library */
@@ -745,7 +745,7 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
                                               dfd_iter.real_iter.fd,
                                               dent->d_name);
           issues = _srt_check_library_presence (runner, driver_proc_path,
-                                                arch_quark, NULL, NULL,
+                                                want_arch_quark, NULL, NULL,
                                                 SRT_CHECK_FLAGS_SKIP_SLOW_CHECKS,
                                                 SRT_LIBRARY_SYMBOLS_FORMAT_PLAIN, NULL);
 
@@ -754,11 +754,11 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
           if (issues & SRT_LIBRARY_ISSUES_CANNOT_LOAD)
             continue;
         }
-      else if (arch_quark != g_quark_from_static_string (arch->multiarch_tuple))
+      else if (want_arch_quark != g_quark_from_static_string (found_arch->multiarch_tuple))
         {
           g_debug ("The library \"%s\" has a multiarch %s, but we were looking for %s. Skipping...",
-                    this_driver_in_provider, arch->multiarch_tuple,
-                    g_quark_to_string (arch_quark));
+                    this_driver_in_provider, found_arch->multiarch_tuple,
+                    g_quark_to_string (want_arch_quark));
           continue;
         }
 

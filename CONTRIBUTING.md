@@ -106,10 +106,10 @@ do the build locally instead of using ssh.
     given process, the multiarch tuple is often represented by a `GQuark`,
     GLib's mechanism for storing interned strings (analogous to X atoms).
 
-* Be careful when adding dependencies to the main library. GLib 2.32
-    (Ubuntu 12.04 'precise', SteamRT 1 'scout') can be relied on.
-    JSON-GLib is OK (we have a backport in SteamRT 1 'scout'). Anything
-    else is probably bad news.
+* Be careful when adding dependencies, especially in library code.
+    GLib 2.58.3 is OK (we have a backport in SteamRT 1 'scout'),
+    and so is JSON-GLib 1.0.2.
+    Anything else is probably bad news.
 
     - In particular, try not to pull in C++ ABIs, because incompatible C++
         ABIs are one of the things that steam-runtime-tools should be

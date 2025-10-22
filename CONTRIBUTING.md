@@ -107,14 +107,37 @@ do the build locally instead of using ssh.
     GLib's mechanism for storing interned strings (analogous to X atoms).
 
 * Be careful when adding dependencies, especially in library code.
-    GLib 2.58.3 is OK (we have a backport in SteamRT 1 'scout'),
-    and so is JSON-GLib 1.0.2.
-    Anything else is probably bad news.
+
+    - glibc must be assumed to be very old:
+        currently we require the ability to compile and run on glibc 2.15
+        (Ubuntu 12.04, Steam Runtime 1 'scout')
+        on x86,
+        or glibc 2.31
+        (Ubuntu 22.04, Debian 11, Steam Runtime 3 'sniper')
+        on other architectures.
+        The requirement on x86 will be raised to either 2.28 or 2.31
+        in future.
+
+    - Depending on libelf (from elfutils) is OK,
+        but it must be assumed to be very old:
+        currently 0.152 (Ubuntu 12.04),
+        increasing to 0.176 (Debian 10) or 0.183 (Debian 11) in future.
+
+    - GLib 2.58.3 (from Debian 10) is OK to assume,
+        because we have a backport in scout.
+        This might rise to 2.66.8 (Debian 11) in future.
+
+    - Similarly JSON-GLib 1.0.2 is OK to assume,
+        increasing to 1.4.4 (Debian 10) or 1.6.2 (Debian 11) in future.
+
+    - Anything else is probably bad news.
 
     - In particular, try not to pull in C++ ABIs, because incompatible C++
         ABIs are one of the things that steam-runtime-tools should be
         able to detect and diagnose. We use C ABIs because they are the
         lowest common denominator for compatibility between distros.
+
+    - See ["Can I use?"](docs/can-i-use.md) for more details.
 
 * Any checks that can reasonably crash should be in a subprocess. This
     means that if they crash, they don't bring down the entire Steam

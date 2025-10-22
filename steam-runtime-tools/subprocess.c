@@ -944,7 +944,7 @@ const char * const *
 _srt_subprocess_runner_get_environ (SrtSubprocessRunner *self)
 {
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
-  return (const char * const *) self->envp;
+  return _srt_const_strv (self->envp);
 }
 
 /*

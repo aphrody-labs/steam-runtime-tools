@@ -71,6 +71,13 @@ _srt_subprocess_runner_new_full (const char * const *envp,
                        NULL);
 }
 
+SrtSubprocessRunner *_srt_subprocess_runner_new_swap_envp (SrtSubprocessRunner *self,
+                                                           const char * const *envp);
+SrtSubprocessRunner *_srt_subprocess_runner_new_swap_helpers_path (SrtSubprocessRunner *self,
+                                                                   const char *path);
+SrtSubprocessRunner *_srt_subprocess_runner_new_swap_test_flags (SrtSubprocessRunner *self,
+                                                                 SrtTestFlags flags);
+
 const char * const *_srt_subprocess_runner_get_environ (SrtSubprocessRunner *self);
 const char *_srt_subprocess_runner_getenv (SrtSubprocessRunner *self, const char *var);
 const char *_srt_subprocess_runner_get_bin_path (SrtSubprocessRunner *self);

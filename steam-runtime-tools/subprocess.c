@@ -937,6 +937,39 @@ _srt_subprocess_runner_class_init (SrtSubprocessRunnerClass *cls)
   g_object_class_install_properties (object_class, N_PROPERTIES, properties);
 }
 
+SrtSubprocessRunner *
+_srt_subprocess_runner_new_swap_envp (SrtSubprocessRunner *self,
+                                      const char * const *envp)
+{
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
+  return _srt_subprocess_runner_new_full (envp,
+                                          self->bin_path,
+                                          self->helpers_path,
+                                          self->test_flags);
+}
+
+SrtSubprocessRunner *
+_srt_subprocess_runner_new_swap_helpers_path (SrtSubprocessRunner *self,
+                                              const char *path)
+{
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
+  return _srt_subprocess_runner_new_full (_srt_const_strv (self->envp),
+                                          self->bin_path,
+                                          path,
+                                          self->test_flags);
+}
+
+SrtSubprocessRunner *
+_srt_subprocess_runner_new_swap_test_flags (SrtSubprocessRunner *self,
+                                            SrtTestFlags flags)
+{
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
+  return _srt_subprocess_runner_new_full (_srt_const_strv (self->envp),
+                                          self->bin_path,
+                                          self->helpers_path,
+                                          flags);
+}
+
 /*
  * Returns: The environment. Never %NULL unless a programming error occurs.
  */

@@ -25,13 +25,14 @@
 
 #include "steam-runtime-tools/libdl-internal.h"
 
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/utils.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 static gchar *
 _srt_libdl_run_helper (SrtSubprocessRunner *runner,
-                       const char *multiarch_tuple,
+                       GQuark arch_quark,
                        const char *helper_name,
                        GError **error)
 {
@@ -42,16 +43,12 @@ _srt_libdl_run_helper (SrtSubprocessRunner *runner,
   gsize len;
 
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (runner), NULL);
+  g_return_val_if_fail (arch_quark != SRT_ARCHITECTURE_QUARK_NONE, NULL);
   g_return_val_if_fail (helper_name != NULL, NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
   g_return_val_if_fail (_srt_check_not_setuid (), NULL);
 
-#if defined(_SRT_MULTIARCH)
-  if (multiarch_tuple == NULL)
-    multiarch_tuple = _SRT_MULTIARCH;
-#endif
-
-  argv = _srt_subprocess_runner_get_helper (runner, multiarch_tuple,
+  argv = _srt_subprocess_runner_get_helper (runner, g_quark_to_string (arch_quark),
                                             helper_name, helper_flags,
                                             error);
 
@@ -89,22 +86,22 @@ _srt_libdl_run_helper (SrtSubprocessRunner *runner,
 
 gchar *
 _srt_libdl_detect_platform (SrtSubprocessRunner *runner,
-                            const char *multiarch_tuple,
+                            GQuark arch_quark,
                             GError **error)
 {
   return _srt_libdl_run_helper (runner,
-                                multiarch_tuple,
+                                arch_quark,
                                 "detect-platform",
                                 error);
 }
 
 gchar *
 _srt_libdl_detect_lib (SrtSubprocessRunner *runner,
-                       const char *multiarch_tuple,
+                       GQuark arch_quark,
                        GError **error)
 {
   return _srt_libdl_run_helper (runner,
-                                multiarch_tuple,
+                                arch_quark,
                                 "detect-lib",
                                 error);
 }

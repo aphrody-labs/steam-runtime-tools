@@ -79,7 +79,7 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
 
   which = &pv_preload_variables[module->index_in_preload_variables];
 
-  if (architecture == 0
+  if (architecture == SRT_ARCHITECTURE_QUARK_NONE
       && module->index_in_preload_variables == PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD
       && strcmp (base, "gameoverlayrenderer.so") == 0)
     {
@@ -103,7 +103,7 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
             }
         }
 
-      if (architecture == 0)
+      if (architecture == SRT_ARCHITECTURE_QUARK_NONE)
         {
           g_debug ("Preloading %s from an unexpected path \"%s\", "
                    "just leave it as is without adjusting",
@@ -111,7 +111,7 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
         }
     }
 
-  if (architecture != 0)
+  if (architecture != SRT_ARCHITECTURE_QUARK_NONE)
     {
       const char *abi_path;
       g_autofree gchar *link = NULL;
@@ -241,10 +241,10 @@ pv_adverb_preload_module_parse_adverb_cli (PvAdverbPreloadModule *self,
 {
   g_auto(GStrv) parts = NULL;
   const char *architecture = NULL;
-  GQuark arch_quark = 0;
+  GQuark arch_quark = SRT_ARCHITECTURE_QUARK_NONE;
 
   g_return_val_if_fail (self->name == NULL, FALSE);
-  g_return_val_if_fail (self->architecture == 0, FALSE);
+  g_return_val_if_fail (self->architecture == SRT_ARCHITECTURE_QUARK_NONE, FALSE);
 
   parts = g_strsplit (value, ":", 0);
 
@@ -264,7 +264,7 @@ pv_adverb_preload_module_parse_adverb_cli (PvAdverbPreloadModule *self,
                                                                     NULL,
                                                                     &local_error);
 
-              if (arch_quark == 0)
+              if (arch_quark == SRT_ARCHITECTURE_QUARK_NONE)
                 {
                   g_set_error_literal (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE,
                                        local_error->message);
@@ -305,7 +305,7 @@ pv_adverb_preload_module_to_adverb_cli (PvAdverbPreloadModule *self)
   g_string_append_c (buf, '=');
   g_string_append (buf, self->name);
 
-  if (self->architecture != 0)
+  if (self->architecture != SRT_ARCHITECTURE_QUARK_NONE)
     {
       const char *tuple = g_quark_to_string (self->architecture);
 

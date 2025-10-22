@@ -79,6 +79,6 @@ typedef enum
 } SrtDisplayExitStatus;
 
 SrtDisplayInfo *_srt_check_display (SrtSubprocessRunner *runner,
-                                    const char *multiarch_tuple);
+                                    GQuark arch_quark);
 
 SrtDisplayInfo *_srt_display_info_get_from_report (JsonObject *json_obj);

@@ -27,6 +27,8 @@
 #pragma once
 
 #include "steam-runtime-tools/steam-runtime-tools.h"
+
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/subprocess-internal.h"
 #include "steam-runtime-tools/system-info-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
@@ -51,7 +53,7 @@
  *
  * Returns: (transfer full): A new #SrtGraphics
  */
-static inline SrtGraphics *_srt_graphics_new (const char *multiarch_tuple,
+static inline SrtGraphics *_srt_graphics_new (GQuark arch_quark,
                                               SrtWindowSystem window_system,
                                               SrtRenderingInterface rendering_interface,
                                               SrtGraphicsLibraryVendor library_vendor,
@@ -108,13 +110,13 @@ static inline int _srt_graphics_hash_key(SrtWindowSystem winsys, SrtRenderingInt
 #ifndef __GTK_DOC_IGNORE__
 
 G_GNUC_INTERNAL SrtGraphicsIssues _srt_check_graphics (SrtSubprocessRunner *runner,
-                                                       const char *multiarch_tuple,
+                                                       GQuark arch_quark,
                                                        SrtWindowSystem window_system,
                                                        SrtRenderingInterface rendering_interface,
                                                        SrtGraphics **details_out);
 
 static inline SrtGraphics *
-_srt_graphics_new (const char *multiarch_tuple,
+_srt_graphics_new (GQuark arch_quark,
                    SrtWindowSystem window_system,
                    SrtRenderingInterface rendering_interface,
                    SrtGraphicsLibraryVendor library_vendor,
@@ -126,9 +128,9 @@ _srt_graphics_new (const char *multiarch_tuple,
                    int exit_status,
                    int terminating_signal)
 {
-  g_return_val_if_fail (multiarch_tuple != NULL, NULL);
+  g_return_val_if_fail (arch_quark != SRT_ARCHITECTURE_QUARK_NONE, NULL);
   return g_object_new (SRT_TYPE_GRAPHICS,
-                       "multiarch-tuple", multiarch_tuple,
+                       "multiarch-tuple", g_quark_to_string (arch_quark),
                        "issues", issues,
                        "library-vendor", library_vendor,
                        "window-system", window_system,
@@ -309,7 +311,7 @@ void _srt_load_openxr_1_runtimes (SrtSysroot *sysroot,
 G_GNUC_INTERNAL
 GList *_srt_list_graphics_modules (SrtSysroot *sysroot,
                                    SrtSubprocessRunner *runner,
-                                   const char *multiarch_tuple,
+                                   GQuark arch_quark,
                                    SrtCheckFlags check_flags,
                                    SrtGraphicsModule which);
 
@@ -322,7 +324,7 @@ GList *_srt_load_vulkan_layers_extended (SrtSysroot *sysroot,
                                          SrtCheckFlags check_flags);
 
 void _srt_graphics_get_from_report (JsonObject *json_obj,
-                                    const gchar *multiarch_tuple,
+                                    GQuark arch_quark,
                                     GHashTable **cached_graphics);
 
 GList *_srt_get_egl_from_json_report (GType type, JsonObject *json_obj);

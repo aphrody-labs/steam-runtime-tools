@@ -26,6 +26,7 @@
 #include "steam-runtime-tools/display-internal.h"
 #include "steam-runtime-tools/display.h"
 
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/enums.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/json-glib-backports-internal.h"
@@ -228,13 +229,13 @@ srt_display_info_class_init (SrtDisplayInfoClass *cls)
 /**
  * _srt_check_display:
  * @runner: The execution environment
- * @multiarch_tuple: (not nullable): Multiarch tuple of helper executable to use
+ * @arch_quark: Nonzero quark representing architecture of helper executable
  *
  * Returns: A SrtDisplayInfo object containing the details of the check
  */
 SrtDisplayInfo *
 _srt_check_display (SrtSubprocessRunner *runner,
-                    const char *multiarch_tuple)
+                    GQuark arch_quark)
 {
   GPtrArray *builder;
   g_auto(GStrv) display_environ = NULL;
@@ -270,7 +271,7 @@ _srt_check_display (SrtSubprocessRunner *runner,
                         _srt_display_info_new (NULL, FALSE,
                                                SRT_DISPLAY_WAYLAND_ISSUES_UNKNOWN,
                                                SRT_DISPLAY_X11_TYPE_UNKNOWN, NULL));
-  g_return_val_if_fail (multiarch_tuple != NULL,
+  g_return_val_if_fail (arch_quark != SRT_ARCHITECTURE_QUARK_NONE,
                         _srt_display_info_new (NULL, FALSE,
                                                SRT_DISPLAY_WAYLAND_ISSUES_UNKNOWN,
                                                SRT_DISPLAY_X11_TYPE_UNKNOWN, NULL));
@@ -328,7 +329,8 @@ _srt_check_display (SrtSubprocessRunner *runner,
         }
     }
 
-  argv = _srt_subprocess_runner_get_helper (runner, multiarch_tuple,
+  argv = _srt_subprocess_runner_get_helper (runner,
+                                            g_quark_to_string (arch_quark),
                                             "is-x-server-xwayland",
                                             helper_flags, &local_error);
 

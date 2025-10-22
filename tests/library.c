@@ -96,7 +96,7 @@ test_object (Fixture *f,
   const char *one_missing_version[] = { "LIBJPEGTURBO_6.9000", NULL };
   const char *two_deps[] = { "linux-vdso.so.1", "/usr/lib/libdl.so.2", NULL };
 
-  library = _srt_library_new ("arm-linux-gnueabihf",
+  library = _srt_library_new (g_quark_from_static_string ("arm-linux-gnueabihf"),
                               "/usr/lib/libz.so.1",
                               "libz.so.1",
                               SRT_LIBRARY_ISSUES_NONE,
@@ -175,7 +175,7 @@ test_object (Fixture *f,
   g_strfreev (dependencies_mutable);
   g_object_unref (library);
 
-  library = _srt_library_new ("s390x-linux-gnu",
+  library = _srt_library_new (g_quark_from_static_string ("s390x-linux-gnu"),
                               "/usr/lib/libjpeg.so.62",
                               "libjpeg.so.62",
                               SRT_LIBRARY_ISSUES_MISSING_SYMBOLS |
@@ -437,6 +437,7 @@ test_libraries (Fixture *f,
 {
   g_autoptr(SrtSubprocessRunner) runner = _srt_subprocess_runner_new ();
   const char *multiarch_tuple = NULL;
+  GQuark arch_quark;
   g_autofree gchar *tmp_file = NULL;
   int fd;
   gsize i;
@@ -449,6 +450,7 @@ test_libraries (Fixture *f,
 #else
   multiarch_tuple = _SRT_MULTIARCH;
 #endif
+  arch_quark = g_quark_from_static_string (multiarch_tuple);
 
   fd = g_file_open_tmp ("library-XXXXXX", &tmp_file, &error);
   g_assert_no_error (error);
@@ -477,7 +479,7 @@ test_libraries (Fixture *f,
           g_assert_true (result);
         }
 
-      issues = _srt_check_library_presence (runner, library_name, multiarch_tuple,
+      issues = _srt_check_library_presence (runner, library_name, arch_quark,
                                             test->expected_symbols == NULL ? NULL : tmp_file,
                                             NULL, SRT_CHECK_FLAGS_SKIP_SLOW_CHECKS,
                                             test->format,

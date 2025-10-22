@@ -105,7 +105,7 @@ _srt_xdg_portal_new (const char *messages,
 G_GNUC_INTERNAL
 SrtXdgPortalIssues _srt_check_xdg_portals (SrtSubprocessRunner *runner,
                                            SrtContainerType container_type,
-                                           const char *multiarch_tuple,
+                                           GQuark arch_quark,
                                            SrtXdgPortal **details_out);
 #endif
 

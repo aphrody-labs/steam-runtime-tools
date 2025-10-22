@@ -28,16 +28,17 @@
 
 #include "steam-runtime-tools/library.h"
 
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/subprocess-internal.h"
 #include "steam-runtime-tools/system-info-internal.h"
 
 /*
  * _srt_library_new:
- * @multiarch_tuple: A multiarch tuple like %SRT_ABI_I386,
- *  representing an ABI
+ * @arch_quark: Quark representing a multiarch tuple like %SRT_ABI_I386,
+ *  denoting the library's ABI
  * @absolute_path: (nullable) Absolute path of @requested_name
  * @requested_name: A SONAME like libz.so.1
- * @issues: Problems found when loading a @multiarch_tuple copy
+ * @issues: Problems found when loading a @arch_quark copy
  *  of @requested_name
  * @missing_symbols: (nullable) (array zero-terminated=1) (element-type utf8):
  *  Symbols we expected to find in @requested_name but did not
@@ -56,7 +57,7 @@
  *
  * Returns: (transfer full): A new #SrtLibrary
  */
-static inline SrtLibrary *_srt_library_new (const char *multiarch_tuple,
+static inline SrtLibrary *_srt_library_new (GQuark arch_quark,
                                             const char *absolute_path,
                                             const char *requested_name,
                                             SrtLibraryIssues issues,
@@ -71,7 +72,7 @@ static inline SrtLibrary *_srt_library_new (const char *multiarch_tuple,
 
 #ifndef __GTK_DOC_IGNORE__
 static inline SrtLibrary *
-_srt_library_new (const char *multiarch_tuple,
+_srt_library_new (GQuark arch_quark,
                   const char *absolute_path,
                   const char *requested_name,
                   SrtLibraryIssues issues,
@@ -84,7 +85,7 @@ _srt_library_new (const char *multiarch_tuple,
                   int exit_status,
                   int terminating_signal)
 {
-  g_return_val_if_fail (multiarch_tuple != NULL, NULL);
+  g_return_val_if_fail (arch_quark != SRT_ARCHITECTURE_QUARK_NONE, NULL);
   g_return_val_if_fail (requested_name != NULL, NULL);
   return g_object_new (SRT_TYPE_LIBRARY,
                        "absolute-path", absolute_path,
@@ -92,7 +93,7 @@ _srt_library_new (const char *multiarch_tuple,
                        "issues", issues,
                        "messages", messages,
                        "missing-symbols", missing_symbols,
-                       "multiarch-tuple", multiarch_tuple,
+                       "multiarch-tuple", g_quark_to_string (arch_quark),
                        "misversioned-symbols", misversioned_symbols,
                        "missing-versions", missing_versions,
                        "exit-status", exit_status,
@@ -106,7 +107,7 @@ _srt_library_new (const char *multiarch_tuple,
 G_GNUC_INTERNAL
 SrtLibraryIssues _srt_check_library_presence (SrtSubprocessRunner *runner,
                                               const char *requested_name,
-                                              const char *multiarch,
+                                              GQuark arch_quark,
                                               const char *symbols_path,
                                               const char * const *hidden_deps,
                                               SrtCheckFlags check_flags,

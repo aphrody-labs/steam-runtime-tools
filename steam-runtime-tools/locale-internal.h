@@ -57,7 +57,7 @@ _srt_locale_new (const char *requested_name,
 
 G_GNUC_INTERNAL
 SrtLocale *_srt_check_locale (SrtSubprocessRunner *runner,
-                              const char *multiarch_tuple,
+                              GQuark arch_quark,
                               const char *requested_name,
                               GError **error);
 #endif

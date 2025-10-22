@@ -302,7 +302,7 @@ test_object (Fixture *f,
 
   g_test_message ("Entering %s", G_STRFUNC);
 
-  graphics = _srt_graphics_new("mock-good",
+  graphics = _srt_graphics_new (g_quark_from_static_string ("mock-good"),
                                SRT_WINDOW_SYSTEM_GLX,
                                SRT_RENDERING_INTERFACE_GL,
                                SRT_GRAPHICS_LIBRARY_VENDOR_GLVND,

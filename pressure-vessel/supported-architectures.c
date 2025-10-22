@@ -121,7 +121,7 @@ pv_architecture_array_populate_from_environ (GArray *arch_quarks)
                                                                 &known,
                                                                 &local_error);
 
-          if (arch_quark == 0)
+          if (arch_quark == SRT_ARCHITECTURE_QUARK_NONE)
             {
               g_warning ("%s", local_error->message);
               continue;

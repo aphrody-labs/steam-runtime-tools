@@ -102,6 +102,10 @@ do the build locally instead of using ssh.
     in the same style used for cross-compilers and cross-tools
     (`x86_64-linux-gnu-inspect-library`, `i386-linux-gnu-wflinfo`).
 
+    Because only a small number of multiarch tuples are relevant to any
+    given process, the multiarch tuple is often represented by a `GQuark`,
+    GLib's mechanism for storing interned strings (analogous to X atoms).
+
 * Be careful when adding dependencies to the main library. GLib 2.32
     (Ubuntu 12.04 'precise', SteamRT 1 'scout') can be relied on.
     JSON-GLib is OK (we have a backport in SteamRT 1 'scout'). Anything

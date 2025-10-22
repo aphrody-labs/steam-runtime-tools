@@ -1038,7 +1038,7 @@ srt_system_info_new_from_json (const char *path,
           get_runtime_linker_from_report (info, abi, json_arch_obj);
 
           _srt_graphics_get_from_report (json_arch_obj,
-                                         l->data,
+                                         g_quark_from_string (l->data),
                                          &abi->cached_graphics_results);
 
           abi->graphics_modules[SRT_GRAPHICS_DRI_MODULE].modules = _srt_dri_driver_get_from_report (json_arch_obj);
@@ -1184,11 +1184,13 @@ gboolean
 srt_system_info_can_run (SrtSystemInfo *self,
                          const char *multiarch_tuple)
 {
+  GQuark arch_quark;
   Abi *abi = NULL;
 
   g_return_val_if_fail (SRT_IS_SYSTEM_INFO (self), FALSE);
   g_return_val_if_fail (multiarch_tuple != NULL, FALSE);
 
+  arch_quark = g_quark_from_string (multiarch_tuple);
   abi = ensure_abi_unless_immutable (self, multiarch_tuple);
 
   if (abi == NULL)
@@ -1196,7 +1198,7 @@ srt_system_info_can_run (SrtSystemInfo *self,
 
   if (abi->can_run == TRI_MAYBE)
     {
-      if (_srt_architecture_can_run (self->runner, multiarch_tuple))
+      if (_srt_architecture_can_run (self->runner, arch_quark))
         abi->can_run = TRI_YES;
       else
         abi->can_run = TRI_NO;
@@ -1685,6 +1687,7 @@ srt_system_info_check_libraries (SrtSystemInfo *self,
                                  const gchar *multiarch_tuple,
                                  GList **libraries_out)
 {
+  GQuark arch_quark;
   Abi *abi = NULL;
   gchar *dir_path = NULL;
   const gchar *filename = NULL;
@@ -1701,6 +1704,7 @@ srt_system_info_check_libraries (SrtSystemInfo *self,
   g_return_val_if_fail (libraries_out == NULL || *libraries_out == NULL,
                         SRT_LIBRARY_ISSUES_UNKNOWN);
 
+  arch_quark = g_quark_from_string (multiarch_tuple);
   abi = ensure_abi_unless_immutable (self, multiarch_tuple);
 
   if (abi == NULL)
@@ -1776,7 +1780,7 @@ srt_system_info_check_libraries (SrtSystemInfo *self,
               gchar **hidden_deps = g_hash_table_lookup (self->cached_hidden_deps, soname);
               abi->cached_combined_issues |= _srt_check_library_presence (self->runner,
                                                                           soname,
-                                                                          multiarch_tuple,
+                                                                          arch_quark,
                                                                           symbols_file,
                                                                           (const gchar * const *)hidden_deps,
                                                                           self->check_flags,
@@ -1836,6 +1840,7 @@ srt_system_info_check_library (SrtSystemInfo *self,
                                const gchar *requested_name,
                                SrtLibrary **more_details_out)
 {
+  GQuark arch_quark;
   Abi *abi = NULL;
   SrtLibrary *library = NULL;
   const gchar *filename = NULL;
@@ -1856,6 +1861,7 @@ srt_system_info_check_library (SrtSystemInfo *self,
   g_return_val_if_fail (more_details_out == NULL || *more_details_out == NULL,
                         SRT_LIBRARY_ISSUES_UNKNOWN);
 
+  arch_quark = g_quark_from_string (multiarch_tuple);
   abi = ensure_abi_unless_immutable (self, multiarch_tuple);
 
   if (abi == NULL)
@@ -1921,7 +1927,7 @@ srt_system_info_check_library (SrtSystemInfo *self,
                   gchar **hidden_deps = g_hash_table_lookup (self->cached_hidden_deps, requested_name);
                   issues = _srt_check_library_presence (self->runner,
                                                         soname_found,
-                                                        multiarch_tuple,
+                                                        arch_quark,
                                                         symbols_file,
                                                         (const gchar * const *)hidden_deps,
                                                         self->check_flags,
@@ -1947,7 +1953,7 @@ srt_system_info_check_library (SrtSystemInfo *self,
    * We do instead a simple absence/presence check. */
   issues = _srt_check_library_presence (self->runner,
                                         requested_name,
-                                        multiarch_tuple,
+                                        arch_quark,
                                         NULL,
                                         NULL,
                                         self->check_flags,
@@ -2050,6 +2056,7 @@ srt_system_info_check_graphics (SrtSystemInfo *self,
                                 SrtRenderingInterface rendering_interface,
                                 SrtGraphics **details_out)
 {
+  GQuark arch_quark;
   Abi *abi = NULL;
   SrtGraphicsIssues issues;
 
@@ -2060,6 +2067,7 @@ srt_system_info_check_graphics (SrtSystemInfo *self,
   g_return_val_if_fail (((unsigned) window_system) < SRT_N_WINDOW_SYSTEMS, SRT_GRAPHICS_ISSUES_UNKNOWN);
   g_return_val_if_fail (((unsigned) rendering_interface) < SRT_N_RENDERING_INTERFACES, SRT_GRAPHICS_ISSUES_UNKNOWN);
 
+  arch_quark = g_quark_from_string (multiarch_tuple);
   abi = ensure_abi_unless_immutable (self, multiarch_tuple);
 
   if (abi == NULL)
@@ -2080,7 +2088,7 @@ srt_system_info_check_graphics (SrtSystemInfo *self,
 
   graphics = NULL;
   issues = _srt_check_graphics (self->runner,
-                                multiarch_tuple,
+                                arch_quark,
                                 window_system,
                                 rendering_interface,
                                 &graphics);
@@ -2957,6 +2965,12 @@ srt_system_info_set_helpers_path (SrtSystemInfo *self,
   _srt_system_info_set_subprocess_runner (self, runner);
 }
 
+static inline GQuark
+_srt_system_info_get_primary_multiarch_quark (SrtSystemInfo *self)
+{
+  return g_array_index (self->multiarch_tuples, GQuark, 0);
+}
+
 /**
  * srt_system_info_get_primary_multiarch_tuple:
  * @self: The #SrtSystemInfo
@@ -2974,7 +2988,7 @@ srt_system_info_get_primary_multiarch_tuple (SrtSystemInfo *self)
 {
   g_return_val_if_fail (SRT_IS_SYSTEM_INFO (self), NULL);
 
-  return g_quark_to_string (g_array_index (self->multiarch_tuples, GQuark, 0));
+  return g_quark_to_string (_srt_system_info_get_primary_multiarch_quark (self));
 }
 
 /**
@@ -3311,7 +3325,7 @@ srt_system_info_check_locale (SrtSystemInfo *self,
       SrtLocale *locale = NULL;
 
       locale = _srt_check_locale (self->runner,
-                                  srt_system_info_get_primary_multiarch_tuple (self),
+                                  _srt_system_info_get_primary_multiarch_quark (self),
                                   g_quark_to_string (quark),
                                   &local_error);
 
@@ -3772,6 +3786,7 @@ _srt_system_info_list_graphics_modules (SrtSystemInfo *self,
                                         SrtDriverFlags flags,
                                         SrtGraphicsModule which)
 {
+  GQuark arch_quark;
   Abi *abi = NULL;
   GList *ret = NULL;
   const GList *iter;
@@ -3781,6 +3796,7 @@ _srt_system_info_list_graphics_modules (SrtSystemInfo *self,
   g_return_val_if_fail ((int) which >= 0, NULL);
   g_return_val_if_fail ((int) which < NUM_SRT_GRAPHICS_MODULES, NULL);
 
+  arch_quark = g_quark_from_string (multiarch_tuple);
   abi = ensure_abi_unless_immutable (self, multiarch_tuple);
 
   if (abi == NULL)
@@ -3790,7 +3806,7 @@ _srt_system_info_list_graphics_modules (SrtSystemInfo *self,
     {
       abi->graphics_modules[which].modules = _srt_list_graphics_modules (self->sysroot,
                                                                          self->runner,
-                                                                         multiarch_tuple,
+                                                                         arch_quark,
                                                                          self->check_flags,
                                                                          which);
       abi->graphics_modules[which].available = TRUE;
@@ -4446,7 +4462,7 @@ ensure_display_info (SrtSystemInfo *self)
 
   if (self->display_info == NULL && self->from_report == NULL)
     self->display_info = _srt_check_display (self->runner,
-                                             srt_system_info_get_primary_multiarch_tuple (self));
+                                             _srt_system_info_get_primary_multiarch_quark (self));
 }
 
 /**
@@ -4578,7 +4594,7 @@ ensure_xdg_portals_cached (SrtSystemInfo *self)
       ensure_container_info (self);
       _srt_check_xdg_portals (self->runner,
                               srt_container_info_get_container_type (self->container_info),
-                              srt_system_info_get_primary_multiarch_tuple (self),
+                              _srt_system_info_get_primary_multiarch_quark (self),
                               &self->xdg_portal_data);
     }
 }
@@ -4834,12 +4850,14 @@ srt_system_info_dup_libdl_lib (SrtSystemInfo *self,
                                const char *multiarch_tuple,
                                GError **error)
 {
+  GQuark arch_quark;
   Abi *abi = NULL;
 
   g_return_val_if_fail (SRT_IS_SYSTEM_INFO (self), NULL);
   g_return_val_if_fail (multiarch_tuple != NULL, NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
+  arch_quark = g_quark_from_string (multiarch_tuple);
   abi = ensure_abi_unless_immutable (self, multiarch_tuple);
 
   if (abi == NULL)
@@ -4863,7 +4881,7 @@ srt_system_info_dup_libdl_lib (SrtSystemInfo *self,
                             multiarch_tuple);
 
   abi->libdl_lib = _srt_libdl_detect_lib (self->runner,
-                                          multiarch_tuple,
+                                          arch_quark,
                                           &abi->libdl_lib_error);
 
   if (abi->libdl_lib_error != NULL && error != NULL)
@@ -4905,12 +4923,14 @@ srt_system_info_dup_libdl_platform (SrtSystemInfo *self,
                                     const char *multiarch_tuple,
                                     GError **error)
 {
+  GQuark arch_quark;
   Abi *abi = NULL;
 
   g_return_val_if_fail (SRT_IS_SYSTEM_INFO (self), NULL);
   g_return_val_if_fail (multiarch_tuple != NULL, NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
+  arch_quark = g_quark_from_string (multiarch_tuple);
   abi = ensure_abi_unless_immutable (self, multiarch_tuple);
 
   if (abi == NULL)
@@ -4934,7 +4954,7 @@ srt_system_info_dup_libdl_platform (SrtSystemInfo *self,
                             multiarch_tuple);
 
   abi->libdl_platform = _srt_libdl_detect_platform (self->runner,
-                                                    multiarch_tuple,
+                                                    arch_quark,
                                                     &abi->libdl_platform_error);
 
   if (abi->libdl_platform_error != NULL && error != NULL)

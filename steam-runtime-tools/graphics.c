@@ -1136,7 +1136,7 @@ _argv_for_check_gl (SrtSubprocessRunner *runner,
 /**
  * _srt_check_library_vendor:
  * @runner: The execution environment
- * @multiarch_tuple: A multiarch tuple to check e.g. i386-linux-gnu
+ * @arch_quark: A multiarch tuple to check e.g. i386-linux-gnu
  * @window_system: The window system to check.
  * @rendering_interface: The graphics renderer to check.
  *
@@ -1161,7 +1161,7 @@ _argv_for_check_gl (SrtSubprocessRunner *runner,
  */
 static SrtGraphicsLibraryVendor
 _srt_check_library_vendor (SrtSubprocessRunner *runner,
-                           const char *multiarch_tuple,
+                           GQuark arch_quark,
                            SrtWindowSystem window_system,
                            SrtRenderingInterface rendering_interface)
 {
@@ -1199,7 +1199,7 @@ _srt_check_library_vendor (SrtSubprocessRunner *runner,
 
   /* We assume libGL and libEGL have no hidden dependencies: if they did,
    * games that dlopen them would have a problem. */
-  issues = _srt_check_library_presence (runner, soname, multiarch_tuple,
+  issues = _srt_check_library_presence (runner, soname, arch_quark,
                                         NULL,   /* no symbols file */
                                         NULL,   /* no hidden dependencies */
                                         SRT_CHECK_FLAGS_NONE,
@@ -1346,7 +1346,7 @@ _srt_run_helper (SrtSubprocessRunner *runner,
 /**
  * _srt_check_graphics:
  * @runner: Execution environment
- * @multiarch_tuple: A multiarch tuple to check e.g. i386-linux-gnu
+ * @arch_quark: A multiarch tuple to check e.g. i386-linux-gnu
  * @winsys: The window system to check.
  * @renderer: The graphics renderer to check.
  * @details_out: The SrtGraphics object containing the details of the check.
@@ -1358,7 +1358,7 @@ _srt_run_helper (SrtSubprocessRunner *runner,
  */
 G_GNUC_INTERNAL SrtGraphicsIssues
 _srt_check_graphics (SrtSubprocessRunner *runner,
-                     const char *multiarch_tuple,
+                     GQuark arch_quark,
                      SrtWindowSystem window_system,
                      SrtRenderingInterface rendering_interface,
                      SrtGraphics **details_out)
@@ -1381,6 +1381,7 @@ _srt_check_graphics (SrtSubprocessRunner *runner,
   g_auto(GStrv) json_output = NULL;
   g_autoptr(GPtrArray) graphics_device = g_ptr_array_new_with_free_func (g_object_unref);
   gsize i;
+  const char *multiarch_tuple;
 
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (runner), SRT_GRAPHICS_ISSUES_UNKNOWN);
   g_return_val_if_fail (details_out == NULL || *details_out == NULL, SRT_GRAPHICS_ISSUES_UNKNOWN);
@@ -1388,6 +1389,7 @@ _srt_check_graphics (SrtSubprocessRunner *runner,
   g_return_val_if_fail (((unsigned) rendering_interface) < SRT_N_RENDERING_INTERFACES, SRT_GRAPHICS_ISSUES_UNKNOWN);
   g_return_val_if_fail (_srt_check_not_setuid (), SRT_GRAPHICS_ISSUES_UNKNOWN);
 
+  multiarch_tuple = g_quark_to_string (arch_quark);
   GPtrArray *argv = _argv_for_graphics_test (runner,
                                              helper_flags,
                                              multiarch_tuple,
@@ -1403,7 +1405,7 @@ _srt_check_graphics (SrtSubprocessRunner *runner,
       goto out;
     }
 
-  library_vendor = _srt_check_library_vendor (runner, multiarch_tuple,
+  library_vendor = _srt_check_library_vendor (runner, arch_quark,
                                               window_system,
                                               rendering_interface);
 
@@ -1681,7 +1683,7 @@ out:
     }
 
   if (details_out != NULL)
-    *details_out = _srt_graphics_new (multiarch_tuple,
+    *details_out = _srt_graphics_new (arch_quark,
                                       window_system,
                                       rendering_interface,
                                       library_vendor,
@@ -1953,7 +1955,7 @@ _srt_get_graphics_issues_from_json_object (JsonObject *json_obj)
  * _srt_graphics_get_from_report:
  * @json_obj: (not nullable): A JSON Object representing an ABI,
  *  which is checked for a "graphics-details" member
- * @multiarch_tuple: (not nullable) (type filename): A Debian-style multiarch tuple
+ * @arch_quark: A nonzero Debian-style multiarch tuple
  *  such as %SRT_ABI_X86_64
  * @cached_graphics: (inout): An hash table with the #SrtGraphics
  *  objects that have been found. The hash key is an int generated combining
@@ -1961,7 +1963,7 @@ _srt_get_graphics_issues_from_json_object (JsonObject *json_obj)
  */
 void
 _srt_graphics_get_from_report (JsonObject *json_obj,
-                               const gchar *multiarch_tuple,
+                               GQuark arch_quark,
                                GHashTable **cached_graphics)
 {
   JsonObject *json_graphics_obj;
@@ -1969,7 +1971,7 @@ _srt_graphics_get_from_report (JsonObject *json_obj,
   JsonArray *array;
 
   g_return_if_fail (json_obj != NULL);
-  g_return_if_fail (multiarch_tuple != NULL);
+  g_return_if_fail (arch_quark != SRT_ARCHITECTURE_QUARK_NONE);
   g_return_if_fail (cached_graphics != NULL && *cached_graphics != NULL);
 
   if (json_object_has_member (json_obj, "graphics-details"))
@@ -2135,7 +2137,7 @@ _srt_graphics_get_from_report (JsonObject *json_obj,
                 }
             }
 
-          graphics = _srt_graphics_new (multiarch_tuple,
+          graphics = _srt_graphics_new (arch_quark,
                                         window_system,
                                         rendering_interface,
                                         library_vendor,

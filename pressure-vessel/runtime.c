@@ -339,7 +339,7 @@ path_visible_in_container_namespace (PvRuntimeFlags flags,
  * and Flatpak's --filesystem=host-os and --filesystem=host-etc special
  * keywords.
  */
-static gboolean
+gboolean
 path_visible_in_provider_namespace (PvRuntimeFlags flags,
                                     const char *path)
 {

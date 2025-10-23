@@ -1203,6 +1203,46 @@ test_export_root_dirs (Fixture *f,
   assert_bwrap_does_not_contain (f->bwrap, "/srv");
 }
 
+static void
+test_path_visible_in_provider_namespace (Fixture *f,
+                                         gconstpointer context)
+{
+  static const char * const yes[] =
+    {
+      "/usr/bin/env",
+      "/usr/lib64/libc.so.6",
+      "/usr/bin/env",
+      "/lib32/libstdc++.so.5",
+      "/bin/sh",
+      "/sbin/ldconfig",
+    };
+  static const char * const no[] =
+    {
+      "/home/smcv",
+      "/media/ssd",
+      "/opt/mangohud/MangoHud.so",
+    };
+
+  for (size_t i = 0; i < G_N_ELEMENTS (yes); i++)
+    {
+      g_test_message ("%s is like /usr", yes[i]);
+      g_assert_true (path_visible_in_provider_namespace (PV_RUNTIME_FLAGS_NONE, yes[i]));
+      g_assert_true (path_visible_in_provider_namespace (PV_RUNTIME_FLAGS_MASK, yes[i]));
+    }
+
+  for (size_t i = 0; i < G_N_ELEMENTS (no); i++)
+    {
+      g_test_message ("%s is not like /usr", no[i]);
+      g_assert_false (path_visible_in_provider_namespace (PV_RUNTIME_FLAGS_NONE, no[i]));
+      g_assert_false (path_visible_in_provider_namespace (PV_RUNTIME_FLAGS_MASK, no[i]));
+    }
+
+  g_test_message ("/app/bin is only like /usr under Flatpak");
+  g_assert_false (path_visible_in_provider_namespace (PV_RUNTIME_FLAGS_NONE, "/app/bin"));
+  g_assert_true (path_visible_in_provider_namespace (PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX,
+                                                     "/app/bin"));
+}
+
 /*
  * Check that pv-wrap defaults are as expected
  */
@@ -2750,6 +2790,8 @@ main (int argc,
   g_test_add ("/options/true", Fixture, NULL,
               setup, test_options_true, teardown);
   g_test_add ("/passwd", Fixture, NULL, setup, test_passwd, teardown);
+  g_test_add ("/path-visible-in-provider-namespace", Fixture, NULL,
+              setup, test_path_visible_in_provider_namespace, teardown);
   g_test_add ("/remap-ld-preload", Fixture, &default_config,
               setup_ld_preload, test_remap_ld_preload, teardown);
   g_test_add ("/remap-ld-preload-flatpak", Fixture, &default_config,

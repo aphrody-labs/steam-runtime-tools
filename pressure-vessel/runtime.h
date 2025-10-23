@@ -136,3 +136,5 @@ typedef struct
 } PvAppFrameworkPath;
 
 const PvAppFrameworkPath *pv_runtime_get_other_app_framework_paths (void);
+gboolean path_visible_in_provider_namespace (PvRuntimeFlags flags,
+                                             const char *path);

@@ -2205,6 +2205,7 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
                                      RuntimeArchitecture *arch,
                                      GError **error)
 {
+  SrtEmulator *emulator = NULL;
   const gchar *ld_library_path;
   g_autofree gchar *remap_app = NULL;
   g_autofree gchar *remap_usr = NULL;
@@ -2247,6 +2248,22 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
                                          "files \"%s\"",
                                          self->runtime_files_fd,
                                          self->runtime_files);
+
+  /* self->container_access_adverb might involve a srt-bwrap or system bwrap
+   * invocation, assumed to be of our own architecture rather than @arch,
+   * so we can't just ask the SrtSubprocessRunner to prepend the emulator
+   * to the argv. Instead we need to insert the emulator into the middle
+   * of the argv, after srt-bwrap or system bwrap, but before the
+   * ${arch}-capsule-capture-libs command. */
+  emulator = _srt_subprocess_runner_get_emulator_for_arch (self->run_in_current_context,
+                                                           arch->tuple_quark);
+
+  if (emulator != NULL)
+    {
+      const char * const *emulator_argv = _srt_emulator_get_argv (emulator);
+
+      flatpak_bwrap_append_argsv (ret, (char **) emulator_argv, -1);
+    }
 
   for (size_t i = 0; i < arch->capsule_capture_libs->len; i++)
     flatpak_bwrap_add_arg (ret, g_ptr_array_index (arch->capsule_capture_libs, i));

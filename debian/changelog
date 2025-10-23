@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20251021.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251023.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
     - Fix a small memory leak in pv-adverb while setting up VDPAU drivers
@@ -36,7 +36,7 @@ steam-runtime-tools (0.20251021.0) UNRELEASED; urgency=medium
     - Use automatic memory management in more places
   * Library code:
     - Further refactoring of architecture handling
-      (steamrt/tasks#786, steamrt/tasks#821)
+      (steamrt/tasks#786, steamrt/tasks#821, steamrt/tasks#787)
     - Better compatibility with GLib >= 2.78 (steamrt/tasks#787)
     - Improve thread-safety (steamrt/tasks#787)
   * Tests:
@@ -46,7 +46,7 @@ steam-runtime-tools (0.20251021.0) UNRELEASED; urgency=medium
     - Improve coverage (steamrt/tasks#786, steamrt/tasks#821)
     - Check for fd leaks more thoroughly (steamrt/tasks#787)
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 21 Oct 2025 14:36:24 +0100
+ -- Simon McVittie <smcv@collabora.com>  Thu, 23 Oct 2025 20:16:42 +0100
 
 steam-runtime-tools (0.20250926.0) steamrt; urgency=medium
 

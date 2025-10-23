@@ -1164,6 +1164,20 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
   if (self->architectures->len == 0)
     _srt_architecture_array_populate_with_defaults (self->architectures);
 
+#ifdef _SRT_MULTIARCH
+  /* We expect we will need our own architecture to be able to run
+   * pv-adverb, or s-r-supervisor if we switch to using that as the
+   * subreaper. */
+  if (_srt_architecture_array_add (self->architectures,
+                                   g_quark_from_static_string (_SRT_MULTIARCH)))
+    g_info ("Added architecture %s, required by pressure-vessel itself",
+            _SRT_MULTIARCH);
+#endif
+
+  /* All edits to self->architectures need to be done before this point,
+   * otherwise it'll be too late to look up their graphics providers
+   * in the environment. */
+
   for (i = 0; i < self->architectures->len; i++)
     {
       GQuark tuple = g_array_index (self->architectures, GQuark, i);

@@ -2107,6 +2107,9 @@ pv_runtime_get_adverb (PvRuntime *self,
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
   /* This will be true if pv_runtime_bind() was successfully called. */
   g_return_val_if_fail (self->adverb_in_container != NULL, FALSE);
+  /* This will be true if pv_runtime_bind() was successfully called. */
+  g_return_val_if_fail ((self->emulator != NULL) == (self->emulator_in_container != NULL),
+                        FALSE);
   g_return_val_if_fail (bwrap != NULL, FALSE);
   g_return_val_if_fail (flatpak_bwrap_is_empty (bwrap), FALSE);
   g_return_val_if_fail (!pv_bwrap_was_finished (bwrap), FALSE);
@@ -2142,6 +2145,22 @@ pv_runtime_get_adverb (PvRuntime *self,
   flatpak_bwrap_add_arg (bwrap, self->adverb_in_container);
   flatpak_bwrap_add_arg_printf (bwrap, "--prefix=%s",
                                 self->pv_prefix_in_container);
+
+  /* We need to tell the adverb how it can run the emulator for its
+   * subprocesses, notably ldconfig. */
+  if (self->emulator_in_container != NULL)
+    {
+      g_autofree char *dest = NULL;
+
+      dest = g_strdup_printf ("%s/emulator.json", self->overrides);
+
+      if (!_srt_emulator_write_manifest (self->emulator_in_container, dest, error))
+        return FALSE;
+
+      flatpak_bwrap_add_arg_printf (bwrap,
+                                    "--emulator=%s/emulator.json",
+                                    self->overrides_in_container);
+    }
 
   if (self->flags & PV_RUNTIME_FLAGS_GENERATE_LOCALES)
     flatpak_bwrap_add_args (bwrap, "--generate-locales", NULL);

@@ -1,0 +1,8 @@
+{
+  "emulator_v0": {
+    "argv": ["./mock-emulator.sh", "--"],
+    "emulated_architectures": ["mock-emulated"],
+    "required_architectures": ["x86_64-linux-gnu", "i386-linux-gnu"],
+    "required_libraries": ["libc.so.6", "libstdc++.so.6", "libm.so.6", "libgcc_s.so.1"]
+  }
+}

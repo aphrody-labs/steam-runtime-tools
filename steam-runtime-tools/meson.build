@@ -104,6 +104,8 @@ libsteamrt_internals = [
     'display-internal.h',
     'elf-utils.c',
     'elf-utils-internal.h',
+    'emulator.c',
+    'emulator-internal.h',
     'glib-backports.c',
     'glib-backports-internal.h',
     'graphics-internal.h',

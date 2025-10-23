@@ -1994,6 +1994,7 @@ pv_runtime_adverb_regenerate_ld_so_cache (PvRuntime *self,
 {
   g_autoptr(GString) ldlp_after_regen = g_string_new ("");
   g_autofree gchar *regen_dir = NULL;
+  SrtEmulator *emulator;
   gsize i;
 
   /* This directory was set up in bind_runtime_ld_so() */
@@ -2020,6 +2021,14 @@ pv_runtime_adverb_regenerate_ld_so_cache (PvRuntime *self,
   flatpak_bwrap_add_args (adverb_argv,
                           "--regenerate-ld.so-cache", regen_dir,
                           NULL);
+
+  emulator = _srt_subprocess_runner_get_emulator (self->run_in_current_context);
+
+  if (emulator != NULL && self->ldconfig_architecture != NULL)
+    flatpak_bwrap_add_args (adverb_argv,
+                            "--ldconfig-architecture",
+                            self->ldconfig_architecture->multiarch_tuple,
+                            NULL);
 
   /* This logic to build the search path matches
    * pv_runtime_set_search_paths(), except that here, we split them up:

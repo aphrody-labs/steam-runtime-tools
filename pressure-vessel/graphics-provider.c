@@ -613,17 +613,8 @@ pv_graphics_provider_has_architecture (PvGraphicsProvider *self,
                                        GQuark tuple)
 {
   PvGraphicsProviderPrivate *priv = pv_graphics_provider_get_instance_private (self);
-  gsize i;
 
-  for (i = 0; i < priv->tuples->len; i++)
-    {
-      GQuark other = g_array_index (priv->tuples, GQuark, i);
-
-      if (tuple == other)
-        return TRUE;
-    }
-
-  return FALSE;
+  return _srt_architecture_array_has (priv->tuples, tuple);
 }
 
 /*
@@ -640,10 +631,7 @@ pv_graphics_provider_get_architectures (PvGraphicsProvider *self,
 {
   PvGraphicsProviderPrivate *priv = pv_graphics_provider_get_instance_private (self);
 
-  if (n != NULL)
-    *n = priv->tuples->len;
-
-  return (const GQuark *) priv->tuples->data;
+  return _srt_architecture_array_peek_data (priv->tuples, n);
 }
 
 /*
@@ -658,20 +646,10 @@ pv_graphics_provider_add_architecture (PvGraphicsProvider *self,
                                        GQuark tuple)
 {
   PvGraphicsProviderPrivate *priv = pv_graphics_provider_get_instance_private (self);
-  gsize i;
 
   g_return_if_fail (PV_IS_GRAPHICS_PROVIDER (self));
   g_return_if_fail (tuple != SRT_ARCHITECTURE_QUARK_NONE);
-
-  for (i = 0; i < priv->tuples->len; i++)
-    {
-      GQuark other = g_array_index (priv->tuples, GQuark, i);
-
-      if (tuple == other)
-        return;
-    }
-
-  g_array_append_val (priv->tuples, tuple);
+  _srt_architecture_array_add (priv->tuples, tuple);
 }
 
 /*

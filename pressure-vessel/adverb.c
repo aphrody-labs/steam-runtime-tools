@@ -60,8 +60,10 @@ static SrtProcessManagerOptions *global_options = NULL;
 static gboolean opt_batch = FALSE;
 static gboolean opt_clear_env = FALSE;
 static gboolean opt_create = FALSE;
+static SrtEmulator *opt_emulator = NULL;
 static gboolean opt_exit_with_parent = FALSE;
 static gboolean opt_generate_locales = FALSE;
+static GQuark opt_ldconfig_architecture = SRT_ARCHITECTURE_QUARK_NONE;
 static gchar *opt_overrides = NULL;
 static gchar *opt_prefix = NULL;
 static gchar *opt_regenerate_ld_so_cache = NULL;
@@ -78,6 +80,30 @@ static gboolean opt_write = FALSE;
 
 /* (element-type PvAdverbPreloadModule) */
 static GArray *opt_preload_modules = NULL;
+
+static gboolean
+opt_emulator_cb (const char *name,
+                 const char *value,
+                 void *user_data,
+                 GError **error)
+{
+  g_autoptr(SrtEmulator) emulator = NULL;
+
+  if (opt_emulator != NULL)
+    {
+      g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,
+                   "%s option can only be used once", name);
+      return FALSE;
+    }
+
+  emulator = _srt_emulator_new_from_manifest (value, error);
+
+  if (emulator == NULL)
+    return FALSE;
+
+  opt_emulator = g_steal_pointer (&emulator);
+  return TRUE;
+}
 
 static gboolean
 opt_fd_cb (const char *name,
@@ -147,6 +173,25 @@ opt_ld_preload_cb (const gchar *option_name,
 {
   return opt_ld_something (option_name, PV_PRELOAD_VARIABLE_INDEX_LD_PRELOAD,
                            value, data, error);
+}
+
+static gboolean
+opt_ldconfig_architecture_cb (const char *name,
+                              const char *value,
+                              void *user_data,
+                              GError **error)
+{
+  if (opt_ldconfig_architecture != SRT_ARCHITECTURE_QUARK_NONE)
+    {
+      g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,
+                   "%s option can only be used once", name);
+      return FALSE;
+    }
+
+  opt_ldconfig_architecture = _srt_architecture_guess_from_user_input (value,
+                                                                       NULL,
+                                                                       error);
+  return (opt_ldconfig_architecture != SRT_ARCHITECTURE_QUARK_NONE);
 }
 
 static gboolean
@@ -622,6 +667,11 @@ static GOptionEntry options[] =
     "Don't create subsequent nonexistent lock files [default].",
     NULL },
 
+  { "emulator", '\0',
+    G_OPTION_FLAG_FILENAME, G_OPTION_ARG_CALLBACK, opt_emulator_cb,
+    "Use an emulator to run helper processes",
+    "JSONFILE" },
+
   { "exit-with-parent", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_exit_with_parent,
     "Terminate child process and self with SIGTERM when parent process "
@@ -684,6 +734,11 @@ static GOptionEntry options[] =
     "may be performed, e.g. joining together multiple gameoverlayrenderer.so "
     "preloads into a single path by leveraging the dynamic linker token expansion",
     "MODULE" },
+
+  { "ldconfig-architecture", '\0',
+    G_OPTION_FLAG_FILENAME, G_OPTION_ARG_CALLBACK, &opt_ldconfig_architecture_cb,
+    "Assume that the multiarch tuple for /sbin/ldconfig is TUPLE",
+    "TUPLE" },
 
   { "lock-file", '\0',
     G_OPTION_FLAG_FILENAME, G_OPTION_ARG_CALLBACK, opt_lock_file_cb,
@@ -917,7 +972,7 @@ main (int argc,
                                         NULL);
     }
 
-  runner = _srt_subprocess_runner_new_full (NULL,   /* TODO: have an emulator */
+  runner = _srt_subprocess_runner_new_full (opt_emulator,
                                             global_envp,
                                             bindir,
                                             pkglibexecdir,
@@ -998,13 +1053,8 @@ main (int argc,
   if (opt_regenerate_ld_so_cache != NULL
       && opt_regenerate_ld_so_cache[0] != '\0')
     {
-      GQuark ldconfig_architecture;
-
-      /* TODO */
-      ldconfig_architecture = SRT_ARCHITECTURE_QUARK_NONE;
-
       if (regenerate_ld_so_cache (runner,
-                                  ldconfig_architecture,
+                                  opt_ldconfig_architecture,
                                   global_ld_so_conf_entries,
                                   opt_regenerate_ld_so_cache,
                                   error))
@@ -1092,10 +1142,10 @@ main (int argc,
        * assume) is probably of the same architecture as pv-adverb, and it
        * also runs localedef, which is most likely to be of the container's
        * primary architecture.
-       * We need to figure this out before steamrt/tasks#787 is complete,
-       * but a first approximation is to just run it and hope - on a properly
-       * configured system, we shouldn't need this anyway. */
-      architecture = SRT_ARCHITECTURE_QUARK_NONE;
+       *
+       * As a starting point that will usually be correct, guess that
+       * /bin/sh and localedef will be of the same architecture as ldconfig. */
+      architecture = opt_ldconfig_architecture;
 
       /* If this fails, it is not fatal - carry on anyway */
       if (!generate_locales (runner, architecture, &locales_temp_dir, error))
@@ -1124,6 +1174,7 @@ main (int argc,
 out:
   global_ld_so_conf_entries = NULL;
   global_options = NULL;
+  g_clear_object (&opt_emulator);
   g_clear_pointer (&opt_overrides, g_free);
   g_clear_pointer (&opt_regenerate_ld_so_cache, g_free);
   g_clear_pointer (&opt_preload_modules, g_array_unref);

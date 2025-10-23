@@ -112,6 +112,7 @@ struct _PvRuntime
   GStrv original_environ;
 
   const SrtKnownArchitecture *adverb_architecture;
+  SrtEmulator *emulator;
   const SrtKnownArchitecture *ldconfig_architecture;
   gchar *libcapsule_knowledge;  /* relative to runtime_files */
   gchar *runtime_abi_json;
@@ -1331,6 +1332,7 @@ pv_runtime_initable_init (GInitable *initable,
   g_autofree gchar *contents = NULL;
   g_autofree gchar *os_release = NULL;
   g_autofree gchar *usr_mtree = NULL;
+  SrtEmulator *emulator;
   gsize len;
   PvMtreeApplyFlags mtree_flags = PV_MTREE_APPLY_FLAGS_NONE;
   struct stat ignore;
@@ -1341,6 +1343,11 @@ pv_runtime_initable_init (GInitable *initable,
 
   /* Should have been set at construct time */
   g_return_val_if_fail (self->run_in_current_context != NULL, FALSE);
+
+  emulator = _srt_subprocess_runner_get_emulator (self->run_in_current_context);
+
+  if (emulator != NULL)
+    self->emulator = g_object_ref (emulator);
 
   self->pv_prefix = _srt_find_myself (NULL, NULL, error);
 
@@ -1730,6 +1737,7 @@ pv_runtime_dispose (GObject *object)
   if (self->providers != NULL)
     g_ptr_array_set_size (self->providers, 0);
 
+  g_clear_object (&self->emulator);
   g_clear_object (&self->mutable_sysroot);
   g_clear_object (&self->real_root);
   g_clear_object (&self->host_root);
@@ -1870,6 +1878,58 @@ pv_runtime_new (const char *source,
                          "flags", flags,
                          "workarounds", workarounds,
                          NULL);
+}
+
+static gboolean
+pv_runtime_bind_emulator (PvRuntime *self,
+                          FlatpakExports *exports,
+                          FlatpakBwrap *bwrap,
+                          GError **error)
+{
+  const char * const *argv;
+  const char *paths[2];
+
+  g_return_val_if_fail (SRT_IS_EMULATOR (self->emulator), FALSE);
+
+  argv = _srt_emulator_get_argv (self->emulator);
+  g_return_val_if_fail (argv != NULL, FALSE);
+  g_return_val_if_fail (argv[0] != NULL, FALSE);
+
+  /* We document that we only export the path of the manifest (paths[0]),
+   * but to be nice to developers, also try to export the path to the
+   * main executable if different. */
+  paths[0] = _srt_emulator_get_manifest (self->emulator);
+  paths[1] = argv[0];
+
+  for (size_t i = 0; i < G_N_ELEMENTS (paths); i++)
+    {
+      const char *path = paths[i];
+      g_autofree gchar *parent = NULL;
+
+      if (path == NULL)
+        continue;
+
+      parent = g_path_get_dirname (path);
+
+      if (path_visible_in_provider_namespace (self->flags, parent))
+        {
+          g_info ("Emulator path %s is /usr-like, not exporting", parent);
+        }
+      else if (exports != NULL)
+        {
+          g_info ("Trying to export %s because it contains an emulator",
+                  parent);
+
+          if (!flatpak_exports_add_path_expose (exports,
+                                                FLATPAK_FILESYSTEM_MODE_READ_ONLY,
+                                                parent,
+                                                error))
+            return glnx_prefix_error (error, "Unable to export emulator \"%s\"",
+                                      parent);
+        }
+    }
+
+  return TRUE;
 }
 
 /*
@@ -7879,6 +7939,10 @@ pv_runtime_bind (PvRuntime *self,
                                                    error))
         return FALSE;
     }
+
+  if (self->emulator != NULL
+      && !pv_runtime_bind_emulator (self, exports, bwrap, error))
+    return FALSE;
 
   if (bwrap != NULL
       && !bind_runtime_finish (self, exports, bwrap, error))

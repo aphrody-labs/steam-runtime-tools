@@ -767,6 +767,8 @@ struct _SrtSubprocessRunner
   /* Path to find helper executables, or %NULL to use $SRT_HELPERS_PATH
    * or the installed helpers */
   gchar *helpers_path;
+  /* Working directory, or %NULL to use current */
+  gchar *working_directory;
   SrtTestFlags test_flags;
   unsigned can_use_waitid : 1;
 };
@@ -785,6 +787,7 @@ enum
   PROP_ENVIRON,
   PROP_HELPERS_PATH,
   PROP_TEST_FLAGS,
+  PROP_WORKING_DIRECTORY,
   N_PROPERTIES
 };
 
@@ -845,6 +848,10 @@ _srt_subprocess_runner_get_property (GObject *object,
         g_value_set_flags (value, self->test_flags);
         break;
 
+      case PROP_WORKING_DIRECTORY:
+        g_value_set_string (value, self->working_directory);
+        break;
+
       default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
     }
@@ -889,6 +896,12 @@ _srt_subprocess_runner_set_property (GObject *object,
         self->test_flags = g_value_get_flags (value);
         break;
 
+      case PROP_WORKING_DIRECTORY:
+        /* Construct-only */
+        g_return_if_fail (self->working_directory == NULL);
+        self->working_directory = g_value_dup_string (value);
+        break;
+
       default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
     }
@@ -902,6 +915,7 @@ _srt_subprocess_runner_finalize (GObject *object)
   g_strfreev (self->envp);
   g_free (self->bin_path);
   g_free (self->helpers_path);
+  g_free (self->working_directory);
 
   G_OBJECT_CLASS (_srt_subprocess_runner_parent_class)->finalize (object);
 }
@@ -933,6 +947,10 @@ _srt_subprocess_runner_class_init (SrtSubprocessRunnerClass *cls)
                         SRT_TYPE_TEST_FLAGS, SRT_TEST_FLAGS_NONE,
                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                         G_PARAM_STATIC_STRINGS);
+  properties[PROP_WORKING_DIRECTORY] =
+    g_param_spec_string ("working-directory", NULL, NULL, NULL,
+                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS);
 
   g_object_class_install_properties (object_class, N_PROPERTIES, properties);
 }
@@ -945,7 +963,8 @@ _srt_subprocess_runner_new_swap_envp (SrtSubprocessRunner *self,
   return _srt_subprocess_runner_new_full (envp,
                                           self->bin_path,
                                           self->helpers_path,
-                                          self->test_flags);
+                                          self->test_flags,
+                                          self->working_directory);
 }
 
 SrtSubprocessRunner *
@@ -956,7 +975,8 @@ _srt_subprocess_runner_new_swap_helpers_path (SrtSubprocessRunner *self,
   return _srt_subprocess_runner_new_full (_srt_const_strv (self->envp),
                                           self->bin_path,
                                           path,
-                                          self->test_flags);
+                                          self->test_flags,
+                                          self->working_directory);
 }
 
 SrtSubprocessRunner *
@@ -967,7 +987,20 @@ _srt_subprocess_runner_new_swap_test_flags (SrtSubprocessRunner *self,
   return _srt_subprocess_runner_new_full (_srt_const_strv (self->envp),
                                           self->bin_path,
                                           self->helpers_path,
-                                          flags);
+                                          flags,
+                                          self->working_directory);
+}
+
+SrtSubprocessRunner *
+_srt_subprocess_runner_new_swap_working_directory (SrtSubprocessRunner *self,
+                                                   const char *working_directory)
+{
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
+  return _srt_subprocess_runner_new_full (_srt_const_strv (self->envp),
+                                          self->bin_path,
+                                          self->helpers_path,
+                                          self->test_flags,
+                                          working_directory);
 }
 
 /*
@@ -1049,6 +1082,16 @@ _srt_subprocess_runner_get_test_flags (SrtSubprocessRunner *self)
 {
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), SRT_TEST_FLAGS_NONE);
   return self->test_flags;
+}
+
+/*
+ * Returns: The working directory for subprocesses, or %NULL to inherit
+ */
+const char *
+_srt_subprocess_runner_get_working_directory (SrtSubprocessRunner *self)
+{
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
+  return self->working_directory;
 }
 
 /*
@@ -1248,7 +1291,7 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
         g_return_val_if_reached (FALSE);
     }
 
-  return g_spawn_async_with_pipes (NULL,        /* working directory */
+  return g_spawn_async_with_pipes (self->working_directory,
                                    (gchar **) argv,
                                    my_environ != NULL ? my_environ : self->envp,
                                    spawn_flags,

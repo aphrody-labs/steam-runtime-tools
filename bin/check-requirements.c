@@ -301,7 +301,8 @@ main (int argc,
   runner = _srt_subprocess_runner_new_full (_srt_const_strv (subproc_environ),
                                             NULL,
                                             NULL,
-                                            SRT_TEST_FLAGS_NONE);
+                                            SRT_TEST_FLAGS_NONE,
+                                            NULL);    /* cwd */
   sysroot = _srt_sysroot_new_direct (&error);
 
   if (sysroot == NULL)

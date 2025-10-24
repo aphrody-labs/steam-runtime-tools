@@ -96,7 +96,8 @@ test_basic (Fixture *f,
   runner = _srt_subprocess_runner_new_full (NULL,    /* envp */
                                             "/path/to/bin",
                                             "/path/to/libexec/steam-runtime-tools-0",
-                                            SRT_TEST_FLAGS_NONE);
+                                            SRT_TEST_FLAGS_NONE,
+                                            NULL);   /* cwd */
   g_assert_nonnull (_srt_subprocess_runner_get_environ (runner));
   g_assert_cmpstr (_srt_subprocess_runner_getenv (runner, "PATH"),
                    ==, g_getenv ("PATH"));
@@ -254,6 +255,35 @@ test_capture (Fixture *f,
   g_assert_null (_srt_completed_subprocess_steal_stderr (completed));
 }
 
+static void
+test_chdir (Fixture *f,
+            gconstpointer context)
+{
+  g_autoptr(SrtSubprocessRunner) runner = NULL;
+  g_autoptr(SrtCompletedSubprocess) completed = NULL;
+  const char * const argv[] = { "pwd", NULL };
+
+  runner = _srt_subprocess_runner_new_full (NULL,     /* envp */
+                                            NULL,     /* ./bin */
+                                            NULL,     /* ./libexec/s-r-t-0 */
+                                            SRT_TEST_FLAGS_NONE,
+                                            "/");
+
+  completed = _srt_subprocess_runner_run_sync (runner,
+                                               SRT_HELPER_FLAGS_SEARCH_PATH,
+                                               argv,
+                                               SRT_SUBPROCESS_OUTPUT_CAPTURE,
+                                               SRT_SUBPROCESS_OUTPUT_INHERIT,
+                                               &f->error);
+  g_assert_no_error (f->error);
+  g_assert_nonnull (completed);
+  _srt_completed_subprocess_check (completed, &f->error);
+  g_assert_no_error (f->error);
+  g_assert_cmpstr (_srt_completed_subprocess_get_stdout (completed),
+                   ==, "/\n");
+  g_clear_object (&completed);
+}
+
 /*
  * Exercises environment variable manipulation
  */
@@ -272,7 +302,8 @@ test_environ (Fixture *f,
   runner = _srt_subprocess_runner_new_full (_srt_const_strv (envp),
                                             NULL,    /* ./bin */
                                             NULL,    /* ./libexec/s-r-t-0 */
-                                            SRT_TEST_FLAGS_NONE);
+                                            SRT_TEST_FLAGS_NONE,
+                                            NULL);   /* cwd */
 
   for (unsigned libgl_verbose = 0; libgl_verbose <= 1; libgl_verbose++)
     {
@@ -460,7 +491,8 @@ test_timeout (Fixture *f,
   runner = _srt_subprocess_runner_new_full (NULL,    /* envp */
                                             NULL,    /* ./bin */
                                             NULL,    /* ./libexec/s-r-t-0 */
-                                            SRT_TEST_FLAGS_TIME_OUT_SOONER);
+                                            SRT_TEST_FLAGS_TIME_OUT_SOONER,
+                                            NULL);   /* cwd */
   g_assert_cmpint (_srt_subprocess_runner_get_test_flags (runner),
                    ==, SRT_TEST_FLAGS_TIME_OUT_SOONER);
   g_object_get (runner,
@@ -512,6 +544,8 @@ main (int argc,
               setup, test_basic, teardown);
   g_test_add ("/subproc/capture", Fixture, NULL,
               setup, test_capture, teardown);
+  g_test_add ("/subproc/chdir", Fixture, NULL,
+              setup, test_chdir, teardown);
   g_test_add ("/subproc/environ", Fixture, NULL,
               setup, test_environ, teardown);
   g_test_add ("/subproc/exec_failure", Fixture, NULL,

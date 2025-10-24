@@ -309,9 +309,6 @@ _srt_architecture_can_run (SrtSubprocessRunner *runner,
 
   g_ptr_array_add (argv, NULL);
 
-  g_debug ("Testing architecture %s with %s",
-           multiarch, (const char *) g_ptr_array_index (argv, 0));
-
   completed = _srt_subprocess_runner_run_sync (runner,
                                                helper_flags,
                                                (const char * const *) argv->pdata,

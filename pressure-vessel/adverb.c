@@ -315,7 +315,6 @@ static gboolean
 run_helper_sync (SrtSubprocessRunner *runner,
                  GQuark architecture,
                  const char * const *argv,
-                 gchar **child_stdout,
                  gchar **child_stderr,
                  int *wait_status,
                  GError **error)
@@ -345,17 +344,15 @@ run_helper_sync (SrtSubprocessRunner *runner,
                                                flags,
                                                architecture,
                                                argv,
-                                               SRT_SUBPROCESS_OUTPUT_CAPTURE,
-                                               SRT_SUBPROCESS_OUTPUT_CAPTURE,
+                                               SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
+                                               SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
                                                error);
 
   if (completed == NULL)
     return FALSE;
 
+  /* This has the side-effect of debug-logging stdout, stderr and wait status */
   _srt_completed_subprocess_report (completed, wait_status, NULL, NULL, NULL);
-
-  if (child_stdout != NULL)
-    *child_stdout = _srt_completed_subprocess_steal_stdout (completed);
 
   if (child_stderr != NULL)
     *child_stderr = _srt_completed_subprocess_steal_stderr (completed);
@@ -374,7 +371,6 @@ regenerate_ld_so_cache (SrtSubprocessRunner *runner,
   g_autoptr(GPtrArray) argv = g_ptr_array_new ();
   g_autoptr(GString) conf = g_string_new ("");
   g_autoptr(SrtSubprocessRunner) chdir_runner = NULL;
-  g_autofree gchar *child_stdout = NULL;
   g_autofree gchar *child_stderr = NULL;
   g_autofree gchar *conf_path = g_build_filename (dir, "ld.so.conf", NULL);
   g_autofree gchar *rt_conf_path = g_build_filename (dir, "runtime-ld.so.conf", NULL);
@@ -453,7 +449,6 @@ regenerate_ld_so_cache (SrtSubprocessRunner *runner,
   if (!run_helper_sync (chdir_runner,
                         ldconfig_architecture,
                         (const char * const *) argv->pdata,
-                        &child_stdout,
                         &child_stderr,
                         &wait_status,
                         error))
@@ -481,12 +476,6 @@ regenerate_ld_so_cache (SrtSubprocessRunner *runner,
       return FALSE;
     }
 
-  if (child_stdout != NULL && child_stdout[0] != '\0')
-    g_debug ("Output:\n%s", child_stdout);
-
-  if (child_stderr != NULL && child_stderr[0] != '\0')
-    g_debug ("Diagnostic output:\n%s", child_stderr);
-
   /* Atomically replace ld.so.cache with new-ld.so.cache. */
   if (!glnx_renameat (AT_FDCWD, new_path, AT_FDCWD, replace_path, error))
     return glnx_prefix_error (error, "Cannot move %s to %s",
@@ -501,26 +490,13 @@ regenerate_ld_so_cache (SrtSubprocessRunner *runner,
         NULL
       };
 
-      g_clear_pointer (&child_stdout, g_free);
-      g_clear_pointer (&child_stderr, g_free);
-
       if (!run_helper_sync (runner,
                             ldconfig_architecture,
                             read_back_argv,
-                            &child_stdout,
-                            &child_stderr,
-                            &wait_status,
+                            NULL,
+                            NULL,
                             error))
         return glnx_prefix_error (error, "Cannot run /sbin/ldconfig -p");
-
-      if (child_stdout != NULL && child_stdout[0] != '\0')
-        g_debug ("ldconfig -p output:\n%s", child_stdout);
-
-      if (child_stderr != NULL && child_stderr[0] != '\0')
-        g_debug ("ldconfig -p diagnostic output:\n%s", child_stderr);
-
-      if (wait_status != 0)
-        g_debug ("ldconfig -p wait status:\n%d", wait_status);
     }
 
   return TRUE;
@@ -535,7 +511,6 @@ generate_locales (SrtSubprocessRunner *runner,
   g_autofree gchar *temp_dir = NULL;
   g_autoptr(GDir) dir = NULL;
   int wait_status;
-  g_autofree gchar *child_stdout = NULL;
   g_autofree gchar *child_stderr = NULL;
   g_autofree gchar *pvlg = NULL;
   g_autofree gchar *this_dir = NULL;
@@ -573,7 +548,6 @@ generate_locales (SrtSubprocessRunner *runner,
   if (!run_helper_sync (runner,
                         architecture,
                         locale_gen_argv,
-                        &child_stdout,
                         &child_stderr,
                         &wait_status,
                         error))
@@ -582,12 +556,6 @@ generate_locales (SrtSubprocessRunner *runner,
         glnx_prefix_error (error, "Cannot run pv-locale-gen");
       goto out;
     }
-
-  if (child_stdout != NULL && child_stdout[0] != '\0')
-    g_debug ("Output:\n%s", child_stdout);
-
-  if (child_stderr != NULL && child_stderr[0] != '\0')
-    g_debug ("Diagnostic output:\n%s", child_stderr);
 
   if (WIFEXITED (wait_status) && WEXITSTATUS (wait_status) == EX_OSFILE)
     {

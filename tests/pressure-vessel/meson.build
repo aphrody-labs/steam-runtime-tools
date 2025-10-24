@@ -21,6 +21,8 @@
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+pv_tests_dir = tests_dir / 'pressure-vessel'
+
 test_env = environment(common_test_env_vars + uninstalled_env_vars)
 test_env.set('G_TEST_SRCDIR', meson.current_source_dir())
 test_env.set('G_TEST_BUILDDIR', meson.current_build_dir())
@@ -29,6 +31,10 @@ test_env.set(
   get_option('test_containers_dir'),
 )
 test_env.prepend('PYTHONPATH', meson.current_source_dir() / '..')
+
+if get_option('installed_tests')
+  install_subdir('mock-drivers', install_dir: pv_tests_dir)
+endif
 
 # Helper programs and manual tests
 helpers = [

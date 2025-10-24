@@ -298,7 +298,8 @@ main (int argc,
   subproc_environ = g_environ_unsetenv (subproc_environ, "LD_AUDIT");
   subproc_environ = g_environ_unsetenv (subproc_environ, "LD_PRELOAD");
 
-  runner = _srt_subprocess_runner_new_full (_srt_const_strv (subproc_environ),
+  runner = _srt_subprocess_runner_new_full (NULL,   /* no emulator */
+                                            _srt_const_strv (subproc_environ),
                                             NULL,
                                             NULL,
                                             SRT_TEST_FLAGS_NONE,

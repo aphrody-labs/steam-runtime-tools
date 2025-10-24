@@ -9,6 +9,7 @@
 #include <steam-runtime-tools/macros.h>
 #include <steam-runtime-tools/glib-backports-internal.h>
 
+#include "steam-runtime-tools/emulator-internal.h"
 #include "steam-runtime-tools/system-info.h"
 
 typedef struct _SrtCompletedSubprocess SrtCompletedSubprocess;
@@ -58,13 +59,15 @@ _srt_subprocess_runner_new (void)
 }
 
 static inline SrtSubprocessRunner *
-_srt_subprocess_runner_new_full (const char * const *envp,
+_srt_subprocess_runner_new_full (SrtEmulator *emulator,
+                                 const char * const *envp,
                                  const char *bin_path,
                                  const char *helpers_path,
                                  SrtTestFlags flags,
                                  const char *working_directory)
 {
   return g_object_new (SRT_TYPE_SUBPROCESS_RUNNER,
+                       "emulator", emulator,
                        "environ", envp,
                        "bin-path", bin_path,
                        "helpers-path", helpers_path,
@@ -82,6 +85,9 @@ SrtSubprocessRunner *_srt_subprocess_runner_new_swap_test_flags (SrtSubprocessRu
 SrtSubprocessRunner *_srt_subprocess_runner_new_swap_working_directory (SrtSubprocessRunner *self,
                                                                         const char *working_directory);
 
+SrtEmulator *_srt_subprocess_runner_get_emulator (SrtSubprocessRunner *self);
+SrtEmulator *_srt_subprocess_runner_get_emulator_for_arch (SrtSubprocessRunner *self,
+                                                           GQuark architecture);
 const char * const *_srt_subprocess_runner_get_environ (SrtSubprocessRunner *self);
 const char *_srt_subprocess_runner_getenv (SrtSubprocessRunner *self, const char *var);
 const char *_srt_subprocess_runner_get_bin_path (SrtSubprocessRunner *self);

@@ -319,7 +319,8 @@ test_run_sync (Fixture *f,
 
   envp = g_environ_setenv (envp, "FOO", "bar", TRUE);
   g_clear_object (&runner);
-  runner = _srt_subprocess_runner_new_full (_srt_const_strv (envp),
+  runner = _srt_subprocess_runner_new_full (NULL,   /* no emulator */
+                                            _srt_const_strv (envp),
                                             NULL,   /* ./bin */
                                             NULL,   /* ./libexec/s-r-t-0 */
                                             SRT_TEST_FLAGS_NONE,
@@ -335,7 +336,8 @@ test_run_sync (Fixture *f,
 
   envp = g_environ_unsetenv (envp, "FOO");
   g_clear_object (&runner);
-  runner = _srt_subprocess_runner_new_full (_srt_const_strv (envp),
+  runner = _srt_subprocess_runner_new_full (NULL,   /* no emulator */
+                                            _srt_const_strv (envp),
                                             NULL,   /* ./bin */
                                             NULL,   /* ./libexec/s-r-t-0 */
                                             SRT_TEST_FLAGS_NONE,

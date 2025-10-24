@@ -904,7 +904,8 @@ main (int argc,
   if (process_manager == NULL)
     goto out;
 
-  runner = _srt_subprocess_runner_new_full (global_envp,
+  runner = _srt_subprocess_runner_new_full (NULL,   /* TODO: have an emulator */
+                                            global_envp,
                                             NULL,   /* path to bin */
                                             NULL,   /* path to libexec/s-r-t-0 */
                                             SRT_TEST_FLAGS_NONE,

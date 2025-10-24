@@ -1248,6 +1248,7 @@ gboolean
 pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
                                          GError **error)
 {
+  g_autoptr(SrtEmulator) emulator = NULL;
   g_autofree char *bindir = NULL;
   const char *prefix;
   const char *pkglibexecdir = NULL;
@@ -1264,7 +1265,10 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
   if (prefix == NULL)
     return FALSE;
 
-  self->run_in_current_context = _srt_subprocess_runner_new_full (NULL,   /* envp */
+  /* TODO: populate emulator from configured JSON file */
+
+  self->run_in_current_context = _srt_subprocess_runner_new_full (emulator,
+                                                                  NULL,   /* envp */
                                                                   bindir,
                                                                   pkglibexecdir,
                                                                   SRT_TEST_FLAGS_NONE,

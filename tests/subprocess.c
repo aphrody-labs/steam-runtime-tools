@@ -124,8 +124,10 @@ test_basic (Fixture *f,
   g_assert_cmpstr (helpers_path_copy, ==, "/path/to/libexec/steam-runtime-tools-0");
   g_assert_cmpint (flags_copy, ==, SRT_TEST_FLAGS_NONE);
 
+  /* We don't actually assert that the command is not logged, only that
+   * asking for it not to be logged doesn't crash. */
   completed = _srt_subprocess_runner_run_sync (runner,
-                                               SRT_HELPER_FLAGS_NONE,
+                                               SRT_HELPER_FLAGS_QUIET,
                                                _srt_const_strv (f->argv),
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE,
                                                SRT_SUBPROCESS_OUTPUT_INHERIT,

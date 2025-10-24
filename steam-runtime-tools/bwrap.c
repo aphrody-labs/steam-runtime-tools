@@ -128,7 +128,7 @@ test_bwrap_executable (SrtSubprocessRunner *runner,
     }
   else
     {
-      g_debug ("Successfully ran: %s --bind / / true", bwrap_executable);
+      g_debug ("... success");
 
       if (features_out != NULL)
         *features_out |= test_features;

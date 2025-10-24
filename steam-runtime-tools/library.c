@@ -1021,9 +1021,6 @@ _srt_check_library_presence (SrtSubprocessRunner *runner,
       g_string_append (log_args, g_ptr_array_index (argv, i));
     }
 
-  g_debug ("Checking library %s integrity with %s ", requested_name,
-           log_args->str);
-
   _srt_add_inspect_library_arguments (argv, requested_name, symbols_path, NULL,
                                       hidden_deps, symbols_format);
   /* NULL terminate the array */

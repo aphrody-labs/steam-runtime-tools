@@ -1291,6 +1291,20 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
         g_return_val_if_reached (FALSE);
     }
 
+  if (!(flags & SRT_HELPER_FLAGS_QUIET))
+    {
+      g_autoptr(GString) command = g_string_new ("");
+
+      for (size_t i = 0; argv[i] != NULL; i++)
+        {
+          g_autofree gchar *quoted = g_shell_quote (argv[i]);
+
+          g_string_append_printf (command, " %s", quoted);
+        }
+
+      g_debug ("run:%s", command->str);
+    }
+
   return g_spawn_async_with_pipes (self->working_directory,
                                    (gchar **) argv,
                                    my_environ != NULL ? my_environ : self->envp,

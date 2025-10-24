@@ -287,6 +287,51 @@ test_chdir (Fixture *f,
 }
 
 /*
+ * Exercise SRT_HELPER_FLAGS_CHOMP, and incidentally also
+ * SRT_HELPER_FLAGS_SEARCH_PATH.
+ */
+static void
+test_chomp (Fixture *f,
+            gconstpointer context)
+{
+  static struct
+    {
+      const char *input;
+      const char *output;
+    }
+  tests[] =
+    {
+        { "hello\\n", "hello" },
+        { "hello\\n\\n", "hello\n" },
+        { "hello", "hello" },
+        { "hello\\nworld", "hello\nworld" },
+        { "", "" },
+    };
+  g_autoptr(SrtSubprocessRunner) runner = _srt_subprocess_runner_new ();
+
+  for (size_t i = 0; i < G_N_ELEMENTS (tests); i++)
+    {
+      g_autoptr(SrtCompletedSubprocess) completed = NULL;
+      const char *argv[] = { "printf", tests[i].input, NULL };
+
+      completed = _srt_subprocess_runner_run_sync (runner,
+                                                   (SRT_HELPER_FLAGS_SEARCH_PATH
+                                                    | SRT_HELPER_FLAGS_CHOMP),
+                                                   argv,
+                                                   SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
+                                                   SRT_SUBPROCESS_OUTPUT_INHERIT,
+                                                   &f->error);
+      g_assert_no_error (f->error);
+      g_assert_nonnull (completed);
+      _srt_completed_subprocess_check (completed, &f->error);
+      g_assert_no_error (f->error);
+      /* It removes exactly one newline */
+      g_assert_cmpstr (_srt_completed_subprocess_get_stdout (completed),
+                       ==, tests[i].output);
+    }
+}
+
+/*
  * Exercises environment variable manipulation
  */
 static void
@@ -589,6 +634,8 @@ main (int argc,
               setup, test_capture, teardown);
   g_test_add ("/subproc/chdir", Fixture, NULL,
               setup, test_chdir, teardown);
+  g_test_add ("/subproc/chomp", Fixture, NULL,
+              setup, test_chomp, teardown);
   g_test_add ("/subproc/environ", Fixture, NULL,
               setup, test_environ, teardown);
   g_test_add ("/subproc/exec_failure", Fixture, NULL,

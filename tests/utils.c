@@ -1617,6 +1617,33 @@ test_str_is_integer (Fixture *f,
   g_assert_false (_srt_str_is_integer ("23a"));
 }
 
+static void
+test_string_chomp_newline (Fixture *f,
+                           gconstpointer context)
+{
+  static const struct
+    {
+      const char *input;
+      const char *expected;
+    }
+  tests[] =
+    {
+      { "", "" },
+      { "foo", "foo" },
+      { "foo\n", "foo" },
+      { "foo\r\n", "foo\r" },
+      { "bar\n\n\n", "bar\n\n" },
+    };
+
+  for (size_t i = 0; i < G_N_ELEMENTS (tests); i++)
+    {
+      g_autoptr(GString) str = g_string_new (tests[i].input);
+
+      _srt_string_chomp_newline (str);
+      g_assert_cmpstr (str->str, ==, tests[i].expected);
+    }
+}
+
 static const struct
 {
   const char *str;
@@ -1884,6 +1911,8 @@ main (int argc,
               setup, test_same_file, teardown);
   g_test_add ("/utils/str_is_integer", Fixture, NULL,
               setup, test_str_is_integer, teardown);
+  g_test_add ("/utils/string_chomp_newline", Fixture, NULL,
+              setup, test_string_chomp_newline, teardown);
   g_test_add ("/utils/string_ends_with", Fixture, NULL,
               setup, test_string_ends_with, teardown);
   g_test_add ("/utils/string_read_fd_until_eof", Fixture, NULL,

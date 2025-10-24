@@ -740,6 +740,15 @@ _srt_completed_subprocess_new_from_subprocess (SrtSubprocess *self)
   completed->wait_status = self->wait_status;
   completed->timed_out = self->timed_out;
 
+  if (self->flags & SRT_HELPER_FLAGS_CHOMP)
+    {
+      if (self->out != NULL)
+        _srt_string_chomp_newline (self->out);
+
+      if (self->err != NULL)
+        _srt_string_chomp_newline (self->err);
+    }
+
   if (self->out != NULL)
     completed->out = g_string_free (g_steal_pointer (&self->out), FALSE);
 

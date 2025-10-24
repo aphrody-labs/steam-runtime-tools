@@ -607,6 +607,21 @@ gboolean _srt_string_read_fd_until_eof (GString *buf,
                                         GError **error);
 
 /*
+ * _srt_string_chomp_newline:
+ * @str: A #GString
+ *
+ * If @str ends with one or more newlines, delete the last one in-place,
+ * like Perl chomp().
+ * If @str does not end with a newline, do nothing.
+ */
+static inline void
+_srt_string_chomp_newline (GString *str)
+{
+  if (str->len != 0 && str->str[str->len - 1] == '\n')
+    g_string_truncate (str, str->len - 1);
+}
+
+/*
  * _srt_string_ends_with_len:
  * @str: A #GString
  * @suffix: A suffix

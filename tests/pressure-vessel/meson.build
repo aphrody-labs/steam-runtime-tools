@@ -34,6 +34,7 @@ test_env.prepend('PYTHONPATH', meson.current_source_dir() / '..')
 
 if get_option('installed_tests')
   install_subdir('mock-drivers', install_dir: pv_tests_dir)
+  install_subdir('mock-emulators', install_dir: pv_tests_dir)
 endif
 
 # Helper programs and manual tests

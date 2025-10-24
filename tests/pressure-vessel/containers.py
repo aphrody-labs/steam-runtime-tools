@@ -562,6 +562,7 @@ class TestContainers(BaseTest):
         fake_home: bool = False,
         gc: bool = True,
         locales: bool = False,
+        mock_emulator: str = '',
         only_prepare: bool = False,
         workarounds: typing.Iterable[str] = ()
     ) -> None:
@@ -572,6 +573,7 @@ class TestContainers(BaseTest):
             gc=gc,
             is_soldier=True,
             locales=locales,
+            mock_emulator=mock_emulator,
             only_prepare=only_prepare,
             workarounds=workarounds,
         )
@@ -587,6 +589,7 @@ class TestContainers(BaseTest):
         is_scout: bool = False,
         is_soldier: bool = False,
         locales: bool = False,
+        mock_emulator: str = '',
         only_prepare: bool = False,
         workarounds: typing.Iterable[str] = ()
     ) -> None:
@@ -617,6 +620,13 @@ class TestContainers(BaseTest):
             os.path.join(self.G_TEST_SRCDIR, 'mock-drivers', 'share'),
             data_dirs,
         ])
+
+        if mock_emulator:
+            env['PRESSURE_VESSEL_EMULATOR'] = os.path.join(
+                self.G_TEST_SRCDIR,
+                'mock-emulators',
+                mock_emulator,
+            )
 
         if workarounds:
             if 'PRESSURE_VESSEL_WORKAROUNDS' in env:

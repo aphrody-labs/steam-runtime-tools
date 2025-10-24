@@ -5757,7 +5757,9 @@ collect_graphics_libraries_patterns (GPtrArray *patterns)
 }
 
 static void
-collect_core_libraries_patterns (GPtrArray *patterns)
+collect_core_libraries_patterns (PvRuntime *self,
+                                 RuntimeArchitecture *arch,
+                                 GPtrArray *patterns)
 {
   /* libudev.so.0 and libudev.so.1 have an ABI that is so close that people
    * sometimes create a symlink libudev.so.0 -> libudev.so.1, even though
@@ -5777,11 +5779,64 @@ collect_core_libraries_patterns (GPtrArray *patterns)
      * genuinely used libudev.so.0. */
     "libudev.so.0",
   };
-  gsize i;
+  SrtEmulator *emulator;
 
   g_return_if_fail (patterns != NULL);
 
-  for (i = 0; i < G_N_ELEMENTS (exact_sonames); i++)
+  emulator = _srt_subprocess_runner_get_emulator (self->run_in_current_context);
+
+  if (emulator != NULL)
+    {
+      const GQuark *required_archs;
+      size_t n;
+
+      required_archs = _srt_emulator_get_required_architectures (emulator, &n);
+
+      for (size_t i = 0; i < n; i++)
+        {
+          if (required_archs[i] == arch->tuple_quark)
+            {
+              /* If we can't find the library, we err on the side of
+               * just failing to capture it and trying to continue anyway.
+               * The worst that can happen is that the emulator doesn't work,
+               * and that's no worse than pressure-vessel failing to work. */
+              static const char mode[] = "if-exists:if-same-abi";
+              const char * const *libraries;
+
+              libraries = _srt_emulator_get_required_libraries (emulator);
+
+              /* Assume we will always need glibc for emulators,
+               * if only for its ELF interpreter,
+               * even if not explicitly declared.
+               * This automatically pulls in the rest of its family:
+               * libm.so.6, libdl.so.1 and so on. */
+              if (libraries == NULL
+                  || !g_strv_contains (libraries, "libc.so.6"))
+                g_ptr_array_add (patterns,
+                                 g_strdup_printf ("%s:libc.so.6", mode));
+
+              if (libraries != NULL && libraries[0] != NULL)
+                {
+                  for (size_t j = 0; libraries[j] != NULL; j++)
+                    {
+                      g_debug ("Emulator requires %s", libraries[j]);
+                      g_ptr_array_add (patterns,
+                                       g_strdup_printf ("%s:%s",
+                                                        mode, libraries[j]));
+                    }
+                }
+              else
+                {
+                  g_debug ("Emulator requires no libraries except maybe libc");
+                }
+
+              break;
+            }
+        }
+    }
+
+
+  for (size_t i = 0; i < G_N_ELEMENTS (exact_sonames); i++)
     g_ptr_array_add (patterns,
                      g_strdup_printf ("if-exists:if-same-abi:exact-soname:%s",
                                       exact_sonames[i]));
@@ -7530,7 +7585,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
           g_debug ("Collecting graphics drivers from provider system...");
 
-          collect_core_libraries_patterns (patterns);
+          collect_core_libraries_patterns (self, arch, patterns);
           collect_graphics_libraries_patterns (patterns);
 
           if (!collect_json_based_drivers (self,

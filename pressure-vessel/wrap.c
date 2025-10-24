@@ -1328,7 +1328,7 @@ main (int argc,
 
   if (!self->is_flatpak_env)
     {
-      if (!pv_wrap_maybe_load_nvidia_modules (error))
+      if (!pv_wrap_maybe_load_nvidia_modules (self->run_in_current_context, error))
         {
           g_debug ("Cannot load nvidia modules: %s", local_error->message);
           g_clear_error (&local_error);

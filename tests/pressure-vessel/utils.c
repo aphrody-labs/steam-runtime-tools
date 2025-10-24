@@ -253,27 +253,30 @@ test_run_sync (Fixture *f,
   };
   g_autofree gchar *output = NULL;
   g_autoptr(GError) error = NULL;
+  g_autoptr(SrtSubprocessRunner) runner = NULL;
   g_auto(GStrv) envp = g_get_environ ();
   int exit_status = -1;
 
-  pv_run_sync (SRT_ARCHITECTURE_QUARK_NONE, argv, NULL, NULL, &output, &error);
+  runner = _srt_subprocess_runner_new ();
+
+  pv_run_sync (runner, SRT_ARCHITECTURE_QUARK_NONE, argv, NULL, &output, &error);
   g_assert_cmpstr (output, ==, "hello");
   g_assert_no_error (error);
   g_clear_pointer (&output, g_free);
 
-  pv_run_sync (SRT_ARCHITECTURE_QUARK_NONE, argv, NULL, &exit_status, NULL, &error);
+  pv_run_sync (runner, SRT_ARCHITECTURE_QUARK_NONE, argv, &exit_status, NULL, &error);
   g_assert_cmpint (exit_status, ==, 0);
   g_assert_no_error (error);
 
   argv[1] = "hello\\nworld";    /* deliberately no trailing newline */
-  pv_run_sync (SRT_ARCHITECTURE_QUARK_NONE, argv, NULL, &exit_status, &output, &error);
+  pv_run_sync (runner, SRT_ARCHITECTURE_QUARK_NONE, argv, &exit_status, &output, &error);
   g_assert_cmpint (exit_status, ==, 0);
   g_assert_no_error (error);
   g_assert_cmpstr (output, ==, "hello\nworld");
   g_clear_pointer (&output, g_free);
 
   argv[0] = "/nonexistent/doesnotexist";
-  pv_run_sync (SRT_ARCHITECTURE_QUARK_NONE, argv, NULL, &exit_status, &output, &error);
+  pv_run_sync (runner, SRT_ARCHITECTURE_QUARK_NONE, argv, &exit_status, &output, &error);
   g_assert_cmpint (exit_status, ==, -1);
   g_assert_nonnull (error);
 
@@ -299,7 +302,7 @@ test_run_sync (Fixture *f,
 
   argv[0] = "false";
   argv[1] = NULL;
-  pv_run_sync (SRT_ARCHITECTURE_QUARK_NONE, argv, NULL, &exit_status, &output, &error);
+  pv_run_sync (runner, SRT_ARCHITECTURE_QUARK_NONE, argv, &exit_status, &output, &error);
   g_assert_cmpint (exit_status, ==, 1);
   g_assert_error (error, G_SPAWN_EXIT_ERROR, 1);
   g_assert_cmpstr (output, ==, NULL);
@@ -308,27 +311,39 @@ test_run_sync (Fixture *f,
   argv[0] = "sh";
   argv[1] = "-euc";
   argv[2] = "echo \"$PATH\"";
-  pv_run_sync (SRT_ARCHITECTURE_QUARK_NONE, argv, NULL, &exit_status, &output, &error);
+  pv_run_sync (runner, SRT_ARCHITECTURE_QUARK_NONE, argv, &exit_status, &output, &error);
   g_assert_cmpint (exit_status, ==, 0);
   g_assert_no_error (error);
   g_assert_cmpstr (output, ==, g_getenv ("PATH"));
   g_clear_pointer (&output, g_free);
 
   envp = g_environ_setenv (envp, "FOO", "bar", TRUE);
+  g_clear_object (&runner);
+  runner = _srt_subprocess_runner_new_full (_srt_const_strv (envp),
+                                            NULL,   /* ./bin */
+                                            NULL,   /* ./libexec/s-r-t-0 */
+                                            SRT_TEST_FLAGS_NONE,
+                                            NULL);  /* cwd */
   argv[0] = "sh";
   argv[1] = "-euc";
   argv[2] = "echo \"${FOO-unset}\"";
-  pv_run_sync (SRT_ARCHITECTURE_QUARK_NONE, argv, (const char * const *) envp, &exit_status, &output, &error);
+  pv_run_sync (runner, SRT_ARCHITECTURE_QUARK_NONE, argv, &exit_status, &output, &error);
   g_assert_cmpint (exit_status, ==, 0);
   g_assert_no_error (error);
   g_assert_cmpstr (output, ==, "bar");
   g_clear_pointer (&output, g_free);
 
   envp = g_environ_unsetenv (envp, "FOO");
+  g_clear_object (&runner);
+  runner = _srt_subprocess_runner_new_full (_srt_const_strv (envp),
+                                            NULL,   /* ./bin */
+                                            NULL,   /* ./libexec/s-r-t-0 */
+                                            SRT_TEST_FLAGS_NONE,
+                                            NULL);  /* cwd */
   argv[0] = "sh";
   argv[1] = "-euc";
   argv[2] = "echo \"${FOO-unset}\"";
-  pv_run_sync (SRT_ARCHITECTURE_QUARK_NONE, argv, (const char * const *) envp, &exit_status, &output, &error);
+  pv_run_sync (runner, SRT_ARCHITECTURE_QUARK_NONE, argv, &exit_status, &output, &error);
   g_assert_cmpint (exit_status, ==, 0);
   g_assert_no_error (error);
   g_assert_cmpstr (output, ==, "unset");

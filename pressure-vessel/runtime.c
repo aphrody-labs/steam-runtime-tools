@@ -737,7 +737,8 @@ runtime_architecture_init (RuntimeArchitecture *self,
    * for this architecture on the current environment. We
    * assume that this is the same as whether we can run them
    * on the host, if different. */
-  pv_run_sync (tuple, (const char * const *) argv->pdata, NULL, NULL, &self->ld_so, NULL);
+  pv_run_sync (runtime->run_in_current_context, tuple,
+               (const char * const *) argv->pdata, NULL, &self->ld_so, NULL);
 
   if (self->ld_so == NULL)
     {
@@ -2390,7 +2391,7 @@ pv_runtime_capture_libraries (PvRuntime *self,
 
   flatpak_bwrap_finish (temp_bwrap);
 
-  if (!pv_bwrap_run_sync (temp_bwrap, NULL, error))
+  if (!pv_bwrap_run_sync (temp_bwrap, self->run_in_current_context, NULL, error))
     return FALSE;
 
   return TRUE;
@@ -5271,6 +5272,7 @@ pv_runtime_get_ld_so (PvRuntime *self,
     }
   else
     {
+      g_autoptr(SrtSubprocessRunner) runner = NULL;
       g_autoptr(FlatpakBwrap) temp_bwrap = NULL;
       g_autofree gchar *etc = NULL;
 
@@ -5338,12 +5340,18 @@ pv_runtime_get_ld_so (PvRuntime *self,
                               NULL);
       flatpak_bwrap_finish (temp_bwrap);
 
+      /* We can't use self->run_in_current_context directly, because we
+       * altered the PATH above */
+      runner = _srt_subprocess_runner_new_swap_envp (self->run_in_current_context,
+                                                     _srt_const_strv (temp_bwrap->envp));
       /* Assume bwrap can be run without a special emulator (native
        * executable or transparent emulation) */
-      pv_run_sync (SRT_ARCHITECTURE_QUARK_NONE,
+      pv_run_sync (runner,
+                   SRT_ARCHITECTURE_QUARK_NONE,
                    (const char * const *) temp_bwrap->argv->pdata,
-                   (const char * const *) temp_bwrap->envp, NULL,
-                   ld_so_in_runtime, NULL);
+                   NULL,    /* wait status */
+                   ld_so_in_runtime,
+                   NULL);
     }
 
   return TRUE;

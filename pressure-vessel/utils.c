@@ -231,14 +231,13 @@ pv_search_path_append (GString *search_path,
 }
 
 gboolean
-pv_run_sync (GQuark architecture,
+pv_run_sync (SrtSubprocessRunner *runner,
+             GQuark architecture,
              const char * const * argv,
-             const char * const * envp,
              int *exit_status_out,
              char **output_out,
              GError **error)
 {
-  g_autoptr(SrtSubprocessRunner) runner = NULL;
   g_autoptr(SrtCompletedSubprocess) completed = NULL;
   SrtHelperFlags flags;
 
@@ -249,12 +248,6 @@ pv_run_sync (GQuark architecture,
 
   if (exit_status_out != NULL)
     *exit_status_out = -1;
-
-  runner = _srt_subprocess_runner_new_full (envp,
-                                            NULL,   /* ./bin */
-                                            NULL,   /* ./libexec/s-r-t-0 */
-                                            SRT_TEST_FLAGS_NONE,
-                                            NULL);  /* cwd */
 
   flags = SRT_HELPER_FLAGS_SEARCH_PATH | SRT_HELPER_FLAGS_CHOMP;
 

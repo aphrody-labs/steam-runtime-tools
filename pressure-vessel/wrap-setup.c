@@ -87,7 +87,7 @@ pv_wrap_check_bwrap (SrtSubprocessRunner *runner,
    * debug log, so it's OK that the exit status and stdout are ignored.
    * bwrap is assumed to be directly executable without emulation. */
   argv[0] = bwrap;
-  pv_run_sync (SRT_ARCHITECTURE_QUARK_NONE, argv, NULL, NULL, NULL, NULL);
+  pv_run_sync (runner, SRT_ARCHITECTURE_QUARK_NONE, argv, NULL, NULL, NULL);
 
   return g_steal_pointer (&bwrap);
 }
@@ -564,7 +564,8 @@ pv_wrap_move_into_scope (const char *steam_app_id)
  * execution environment, without non-transparent emulation.
  */
 gboolean
-pv_wrap_maybe_load_nvidia_modules (GError **error)
+pv_wrap_maybe_load_nvidia_modules (SrtSubprocessRunner *runner,
+                                   GError **error)
 {
   const char *nvidia_modprobe_argv[] =
   {
@@ -578,8 +579,9 @@ pv_wrap_maybe_load_nvidia_modules (GError **error)
 
   if (g_file_test ("/sys/module/nvidia/version", G_FILE_TEST_IS_REGULAR)
       && !g_file_test ("/sys/module/nvidia_uvm", G_FILE_TEST_IS_DIR))
-    return pv_run_sync (SRT_ARCHITECTURE_QUARK_NONE,
-                        nvidia_modprobe_argv, NULL, NULL, NULL, error);
+    return pv_run_sync (runner,
+                        SRT_ARCHITECTURE_QUARK_NONE,
+                        nvidia_modprobe_argv, NULL, NULL, error);
 
   return TRUE;
 }

@@ -34,6 +34,7 @@
 #include "utils.h"
 
 gboolean pv_bwrap_run_sync (FlatpakBwrap *bwrap,
+                            SrtSubprocessRunner *runner,
                             int *exit_status_out,
                             GError **error);
 gboolean pv_bwrap_execve (FlatpakBwrap *bwrap,

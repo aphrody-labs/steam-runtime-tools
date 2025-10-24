@@ -65,7 +65,8 @@ gboolean pv_export_root_dirs_like_filesystem_host (int root_fd,
 
 void pv_wrap_move_into_scope (const char *steam_app_id);
 
-gboolean pv_wrap_maybe_load_nvidia_modules (GError **error);
+gboolean pv_wrap_maybe_load_nvidia_modules (SrtSubprocessRunner *runner,
+                                            GError **error);
 
 void pv_wrap_detect_virtualization (SrtSysroot **interpreter_root_out,
                                     const SrtKnownArchitecture **host_machine_out);

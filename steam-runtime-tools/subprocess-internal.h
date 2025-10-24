@@ -61,13 +61,15 @@ static inline SrtSubprocessRunner *
 _srt_subprocess_runner_new_full (const char * const *envp,
                                  const char *bin_path,
                                  const char *helpers_path,
-                                 SrtTestFlags flags)
+                                 SrtTestFlags flags,
+                                 const char *working_directory)
 {
   return g_object_new (SRT_TYPE_SUBPROCESS_RUNNER,
                        "environ", envp,
                        "bin-path", bin_path,
                        "helpers-path", helpers_path,
                        "test-flags", flags,
+                       "working-directory", working_directory,
                        NULL);
 }
 
@@ -77,12 +79,15 @@ SrtSubprocessRunner *_srt_subprocess_runner_new_swap_helpers_path (SrtSubprocess
                                                                    const char *path);
 SrtSubprocessRunner *_srt_subprocess_runner_new_swap_test_flags (SrtSubprocessRunner *self,
                                                                  SrtTestFlags flags);
+SrtSubprocessRunner *_srt_subprocess_runner_new_swap_working_directory (SrtSubprocessRunner *self,
+                                                                        const char *working_directory);
 
 const char * const *_srt_subprocess_runner_get_environ (SrtSubprocessRunner *self);
 const char *_srt_subprocess_runner_getenv (SrtSubprocessRunner *self, const char *var);
 const char *_srt_subprocess_runner_get_bin_path (SrtSubprocessRunner *self);
 const char *_srt_subprocess_runner_get_helpers_path (SrtSubprocessRunner *self);
 SrtTestFlags _srt_subprocess_runner_get_test_flags (SrtSubprocessRunner *self);
+const char *_srt_subprocess_runner_get_working_directory (SrtSubprocessRunner *self);
 
 typedef enum
 {

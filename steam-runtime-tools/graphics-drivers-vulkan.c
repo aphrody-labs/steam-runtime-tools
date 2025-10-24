@@ -1571,7 +1571,8 @@ _srt_load_vulkan_layers (const char *sysroot,
   runner = _srt_subprocess_runner_new_full (_srt_const_strv (envp),
                                             NULL,
                                             NULL,
-                                            SRT_TEST_FLAGS_NONE);
+                                            SRT_TEST_FLAGS_NONE,
+                                            NULL);    /* cwd */
   return _srt_load_vulkan_layers_extended (sysroot_object, runner, NULL, 0,
                                            explicit, SRT_CHECK_FLAGS_NONE);
 }

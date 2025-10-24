@@ -401,18 +401,11 @@ class TestContainers(BaseTest):
 
         if host_srsi is None:
             rt = os.path.join(cls.containers_dir, 'steam-runtime')
-            cpu = os.uname().machine
-
-            if cpu == 'x86_64':
-                arch = 'amd64'
-            elif cpu.startswith('i') and len(cpu) == 4 and cpu.endswith('86'):
-                arch = 'i386'
-            else:
-                arch = cpu
 
             host_srsi = shutil.which(
                 os.path.join(
-                    rt, arch, 'usr', 'bin', 'steam-runtime-system-info',
+                    rt, cls.deb_arch,
+                    'usr', 'bin', 'steam-runtime-system-info',
                 )
             )
 

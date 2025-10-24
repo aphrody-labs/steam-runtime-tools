@@ -98,6 +98,7 @@ typedef enum
   SRT_HELPER_FLAGS_IN_BIN_DIR = (1 << 4),
   SRT_HELPER_FLAGS_QUIET = (1 << 5),
   SRT_HELPER_FLAGS_LEAVE_FDS_OPEN = (1 << 6),
+  SRT_HELPER_FLAGS_CHOMP = (1 << 7),
   SRT_HELPER_FLAGS_NONE = 0
 } SrtHelperFlags;
 

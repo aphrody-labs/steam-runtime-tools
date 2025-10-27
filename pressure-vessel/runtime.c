@@ -2104,6 +2104,9 @@ pv_runtime_get_adverb (PvRuntime *self,
                        FlatpakBwrap *bwrap,
                        GError **error)
 {
+  SrtEmulator *emulator_for_adverb;
+  GQuark adverb_arch_quark;
+
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
   /* This will be true if pv_runtime_bind() was successfully called. */
   g_return_val_if_fail (self->adverb_in_container != NULL, FALSE);
@@ -2114,13 +2117,30 @@ pv_runtime_get_adverb (PvRuntime *self,
   g_return_val_if_fail (flatpak_bwrap_is_empty (bwrap), FALSE);
   g_return_val_if_fail (!pv_bwrap_was_finished (bwrap), FALSE);
 
+  /* This should have been set in pv_runtime_initable_init() */
+  g_return_val_if_fail (self->adverb_architecture != NULL, FALSE);
+  adverb_arch_quark = g_quark_from_static_string (self->adverb_architecture->multiarch_tuple);
+
+  emulator_for_adverb = _srt_subprocess_runner_get_emulator_for_arch (self->run_in_current_context,
+                                                                      adverb_arch_quark);
+  if (emulator_for_adverb != NULL)
+    {
+      const char * const *argv;
+
+      /* If emulator_for_adverb is non-null, then we can assume that it is
+       * the same emulator as the one we would have previously used to derive
+       * emulator_in_container, because we only support one emulator
+       * at a time. */
+      g_return_val_if_fail (self->emulator_in_container != NULL, FALSE);
+      argv = _srt_emulator_get_argv (self->emulator_in_container);
+      g_return_val_if_fail (argv != NULL, FALSE);
+      flatpak_bwrap_append_argsv (bwrap, (char **) argv, -1);
+    }
+
   if (self->workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID)
     {
       g_autofree char *ld_library_path = pv_runtime_get_ld_library_path (self);
       const char *ld_so = NULL;
-
-      /* This should have been set in pv_runtime_initable_init() */
-      g_return_val_if_fail (self->adverb_architecture != NULL, FALSE);
 
       /* We can't rely on LD_LIBRARY_PATH staying in the environment,
        * which means we can't run anything until we have invoked

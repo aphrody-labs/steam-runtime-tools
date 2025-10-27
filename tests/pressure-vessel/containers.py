@@ -170,6 +170,17 @@ class TestContainers(BaseTest):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
+        cls.G_TEST_SRCDIR = os.getenv(
+            'G_TEST_SRCDIR',
+            os.path.abspath(os.path.dirname(__file__)),
+        )
+        cls.G_TEST_BUILDDIR = os.getenv(
+            'G_TEST_BUILDDIR',
+            os.path.abspath(
+                os.path.join(os.path.dirname(__file__)),
+            ),
+        )
+
         if not os.environ.get('PRESSURE_VESSEL_TEST_CONTAINERS', ''):
             raise unittest.SkipTest('Containers not available')
 

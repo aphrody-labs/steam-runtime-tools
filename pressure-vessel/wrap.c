@@ -1319,8 +1319,14 @@ main (int argc,
       else
         {
           for (i = 0; i < final_argv->argv->len; i++)
-            fprintf (file, "%s%c",
-                     (gchar *) g_ptr_array_index (final_argv->argv, i), '\0');
+            {
+              const char *arg = g_ptr_array_index (final_argv->argv, i);
+
+              if (i == final_argv->argv->len - 1)
+                g_assert (arg == NULL);
+              else
+                fprintf (file, "%s%c", arg, '\0');
+            }
 
           fclose (file);
         }

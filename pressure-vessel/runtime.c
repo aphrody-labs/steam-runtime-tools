@@ -32,6 +32,7 @@
 #include <steam-runtime-tools/steam-runtime-tools.h>
 
 #include "steam-runtime-tools/architecture-internal.h"
+#include "steam-runtime-tools/elf-utils-internal.h"
 #include "steam-runtime-tools/file-lock-internal.h"
 #include "steam-runtime-tools/graphics-internal.h"
 #include "steam-runtime-tools/graphics-drivers-json-based-internal.h"
@@ -2104,6 +2105,7 @@ pv_runtime_get_adverb (PvRuntime *self,
                        FlatpakBwrap *bwrap,
                        GError **error)
 {
+  g_autofree char *ld_library_path = NULL;
   SrtEmulator *emulator_for_adverb;
   GQuark adverb_arch_quark;
 
@@ -2123,8 +2125,13 @@ pv_runtime_get_adverb (PvRuntime *self,
 
   emulator_for_adverb = _srt_subprocess_runner_get_emulator_for_arch (self->run_in_current_context,
                                                                       adverb_arch_quark);
+
+  if (self->workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID)
+    ld_library_path = pv_runtime_get_ld_library_path (self);
+
   if (emulator_for_adverb != NULL)
     {
+      const char * const *original_argv;
       const char * const *argv;
 
       /* If emulator_for_adverb is non-null, then we can assume that it is
@@ -2132,14 +2139,50 @@ pv_runtime_get_adverb (PvRuntime *self,
        * emulator_in_container, because we only support one emulator
        * at a time. */
       g_return_val_if_fail (self->emulator_in_container != NULL, FALSE);
+
+      if (ld_library_path != NULL)
+        {
+          /* See below - same idea, but for the emulator itself */
+          g_autoptr(GError) local_error = NULL;
+          g_autofree gchar *ld_so = NULL;
+
+          original_argv = _srt_emulator_get_argv (emulator_for_adverb);
+          g_return_val_if_fail (original_argv != NULL, FALSE);
+          ld_so = _srt_elf_path_get_pt_interp (AT_FDCWD,
+                                               original_argv[0],
+                                               &local_error);
+
+          if (ld_so != NULL)
+            {
+              g_info ("Running emulator %s via ELF interpreter %s",
+                      original_argv[0], ld_so);
+              flatpak_bwrap_add_args (bwrap,
+                                      ld_so,
+                                      "--library-path",
+                                      ld_library_path,
+                                      NULL);
+            }
+          else if (g_error_matches (local_error, SRT_LIBRARY_ERROR,
+                                    SRT_LIBRARY_ERROR_NO_INTERPRETER))
+            {
+              g_info ("Assuming emulator %s is statically linked",
+                      original_argv[0]);
+              g_clear_error (&local_error);
+            }
+          else
+            {
+              g_propagate_error (error, g_steal_pointer (&local_error));
+              return FALSE;
+            }
+        }
+
       argv = _srt_emulator_get_argv (self->emulator_in_container);
       g_return_val_if_fail (argv != NULL, FALSE);
       flatpak_bwrap_append_argsv (bwrap, (char **) argv, -1);
     }
 
-  if (self->workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID)
+  if (ld_library_path != NULL)
     {
-      g_autofree char *ld_library_path = pv_runtime_get_ld_library_path (self);
       const char *ld_so = NULL;
 
       /* We can't rely on LD_LIBRARY_PATH staying in the environment,

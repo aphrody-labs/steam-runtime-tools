@@ -5567,7 +5567,9 @@ pv_runtime_get_ld_so (PvRuntime *self,
  * @patterns: (inout) (not nullable):
  */
 static void
-collect_graphics_libraries_patterns (GPtrArray *patterns)
+collect_graphics_libraries_patterns (PvRuntime *self,
+                                     RuntimeArchitecture *arch,
+                                     GPtrArray *patterns)
 {
   static const char * const sonames[] =
   {
@@ -7586,7 +7588,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           g_debug ("Collecting graphics drivers from provider system...");
 
           collect_core_libraries_patterns (self, arch, patterns);
-          collect_graphics_libraries_patterns (patterns);
+          collect_graphics_libraries_patterns (self, arch, patterns);
 
           if (!collect_json_based_drivers (self,
                                            arch,

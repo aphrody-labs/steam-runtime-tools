@@ -768,6 +768,21 @@ class TestContainers(BaseTest):
                             final_argv,
                         )
 
+                if mock_emulator:
+                    path = os.path.realpath(
+                        os.path.join(
+                            self.G_TEST_SRCDIR,
+                            'mock-emulators'
+                        )
+                    )
+
+                    # In practice we usually expect this to be in $HOME
+                    if not path.startswith(('/usr', '/lib', '/var', '/run')):
+                        self.assertIn(
+                            "\0--ro-bind\0{}\0{}".format(path, path),
+                            final_argv,
+                        )
+
             if fake_home:
                 members = set(os.listdir(fake_home_temp))
 

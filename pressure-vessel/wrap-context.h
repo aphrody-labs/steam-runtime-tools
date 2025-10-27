@@ -53,6 +53,8 @@ G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (WrapPreloadModule, wrap_preload_module_clear)
 typedef struct
 {
   GArray *architectures;
+  SrtEmulator *emulator;
+  gchar *emulator_manifest;
   GStrv env_if_host;
   GStrv filesystems;
   gchar *freedesktop_app_id;

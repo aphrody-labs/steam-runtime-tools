@@ -90,6 +90,8 @@ pv_wrap_options_clear (PvWrapOptions *self)
 {
   g_clear_pointer (&self->architectures, g_array_unref);
   g_clear_pointer (&self->arch_graphics_providers, g_hash_table_unref);
+  g_clear_object (&self->emulator);
+  g_clear_pointer (&self->emulator_manifest, g_free);
   g_clear_pointer (&self->env_if_host, g_strfreev);
   g_clear_pointer (&self->filesystems, g_strfreev);
   g_clear_pointer (&self->freedesktop_app_id, g_free);
@@ -214,6 +216,10 @@ static void
 pv_wrap_context_dispose (GObject *object)
 {
   PvWrapContext *self = PV_WRAP_CONTEXT (object);
+
+  /* We need to clear this early, because it now contains objects and
+   * therefore could participate in a reference cycle */
+  pv_wrap_options_clear (&self->options);
 
   g_clear_object (&self->current_root);
   g_clear_object (&self->run_in_current_context);
@@ -713,6 +719,14 @@ pv_wrap_options_parse_environment (PvWrapOptions *self,
   self->devel = _srt_boolean_environment ("PRESSURE_VESSEL_DEVEL",
                                           self->devel);
 
+  value = g_getenv ("PRESSURE_VESSEL_EMULATOR");
+
+  if (value != NULL)
+    {
+      g_free (self->emulator_manifest);
+      self->emulator_manifest = g_strdup (value);
+    }
+
   value = g_getenv ("PRESSURE_VESSEL_VARIABLE_DIR");
 
   if (value != NULL)
@@ -1161,6 +1175,17 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
       return FALSE;
     }
 
+  if (self->emulator_manifest != NULL
+      && self->emulator_manifest[0] != '\0')
+    {
+      g_info ("Using emulator from %s", self->emulator_manifest);
+      self->emulator = _srt_emulator_new_from_manifest (self->emulator_manifest,
+                                                        error);
+
+      if (self->emulator == NULL)
+        return FALSE;
+    }
+
   /* If no architectures have been configured, the default is whatever
    * architectures are hard-coded to be supported */
   if (self->architectures->len == 0)
@@ -1248,7 +1273,6 @@ gboolean
 pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
                                          GError **error)
 {
-  g_autoptr(SrtEmulator) emulator = NULL;
   g_autofree char *bindir = NULL;
   const char *prefix;
   const char *pkglibexecdir = NULL;
@@ -1265,9 +1289,7 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
   if (prefix == NULL)
     return FALSE;
 
-  /* TODO: populate emulator from configured JSON file */
-
-  self->run_in_current_context = _srt_subprocess_runner_new_full (emulator,
+  self->run_in_current_context = _srt_subprocess_runner_new_full (self->options.emulator,
                                                                   NULL,   /* envp */
                                                                   bindir,
                                                                   pkglibexecdir,

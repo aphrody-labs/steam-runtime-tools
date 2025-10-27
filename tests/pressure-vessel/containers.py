@@ -783,6 +783,19 @@ class TestContainers(BaseTest):
                             final_argv,
                         )
 
+                if mock_emulator == 'env.json':
+                    self.assertTrue(
+                        final_argv.endswith(
+                            '\0/run/host/usr/bin/env\0'
+                        )
+                    )
+                elif mock_emulator == 'sh.json':
+                    self.assertTrue(
+                        final_argv.endswith(
+                            'tests/pressure-vessel/mock-emulators/wrapper.sh\0'
+                        )
+                    )
+
             if fake_home:
                 members = set(os.listdir(fake_home_temp))
 

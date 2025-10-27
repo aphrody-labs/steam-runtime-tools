@@ -783,6 +783,9 @@ class TestContainers(BaseTest):
                             final_argv,
                         )
 
+                    self.assertIn('\0--emulator=', final_argv)
+                    self.assertIn('overrides/emulator.json\0', final_argv)
+
                 if mock_emulator == 'env.json':
                     self.assertTrue(
                         final_argv.endswith(

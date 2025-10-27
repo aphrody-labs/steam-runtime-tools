@@ -709,6 +709,82 @@ If set to `0`, no effect.
 </dd>
 <dt>
 
+`PRESSURE_VESSEL_EMULATOR` (path to a JSON file)
+
+</dt><dd>
+
+Experimental option to configure non-transparent CPU emulation,
+without needing `binfmt_misc`.
+`pressure-vessel-wrap` itself must be directly runnable,
+or runnable via transparent emulation.
+
+If non-empty,
+each item in this list must be the path to a manifest file using
+`.desktop`-compatible syntax,
+with contents similar to this:
+
+    {
+      "emulator_v0": {
+        "argv": ["./bin/emulator", "--verbose", "--"],
+        "emulated_architectures": ["x86_64-linux-gnu", "i386-linux-gnu"],
+        "required_architectures": ["aarch64-linux-gnu"],
+        "required_libraries": ["libc.so.6", "libstdc++.so.6"]
+      }
+    }
+
+This emulator is assumed to be appropriate for the *COMMAND*.
+
+The emulator will be used to run programs of the `emulated_architectures`,
+which will be appended to the `argv` command-line.
+Programs of any architecture not listed will be run directly.
+
+The `argv` command-line may be either an array or a string.
+If it is a string, it is parsed with a subset of shell syntax,
+the same as `Exec` in the the Desktop Entry Specification.
+See documentation for `g_shell_parse_argv()` for details.
+
+The first word of the command-line must either be an absolute path
+such as `/usr/bin/qemu-arm`,
+or a relative path containing `/`,
+taken to be relative to the manifest file.
+The emulator itself must be an ELF executable:
+it cannot be a shell script or another script starting with `#!`.
+
+The remaining words of the command-line must be valid both outside and
+inside the pressure-vessel container;
+in particular,
+they cannot usefully be filenames in `/usr` or in `/run/host`.
+If necessary, the emulator executable can be a wrapper program that
+locates itself with logic similar to `_srt_find_myself()`,
+and then uses paths relative to its own location to find resources and
+`execve()` the actual emulator.
+
+If the emulator is not in `/usr`,
+then the parent directory of the manifest must contain all of its dependencies,
+other than what is provided by the runtime or the graphics stack.
+That parent directory will automatically be shared with the container.
+
+For example,
+if the environment variable is
+`PRESSURE_VESSEL_EMULATOR=/.../steamapps/common/MyEmulator/emulator.json`,
+then that directory might look like this,
+with `bin/emulator` linked using `-Wl,-rpath,${ORIGIN}/../lib`:
+
+    .../steamapps/common/MyEmulator/
+        emulator.ini
+        bin/
+            emulator
+        lib/
+            libdependency.so.0
+
+In this example,
+**pv-wrap** will automatically share `.../steamapps/common/MyEmulator`
+with the container,
+but the rest of `.../steamapps/common` is not guaranteed to be available.
+
+</dd>
+<dt>
+
 `PRESSURE_VESSEL_FILESYSTEMS_RO` (`:`-separated list of paths)
 
 </dt><dd>

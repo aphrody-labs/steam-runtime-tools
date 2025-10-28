@@ -24,15 +24,20 @@
 srt_helpers = []
 uninstalled_env_vars += {'SRT_HELPERS_PATH': meson.current_build_dir()}
 
-srt_helpers += executable(
-  multiarch + '-true',
-  'true.c',
-  include_directories : project_include_dirs,
-  install : true,
-  install_dir : pkglibexecdir,
-  # Deliberately no RPATH/RUNPATH here: it's unnecessary because this
-  # executable has no dependencies.
-)
+foreach helper: [
+  'exec',
+  'true',
+]
+  srt_helpers += executable(
+    multiarch + '-' + helper,
+    helper + '.c',
+    include_directories : project_include_dirs,
+    install : true,
+    install_dir : pkglibexecdir,
+    # Deliberately no RPATH/RUNPATH here: it's unnecessary because this
+    # executable has no dependencies.
+  )
+endforeach
 
 srt_helpers += executable(
   multiarch + '-check-locale',

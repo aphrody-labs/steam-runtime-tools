@@ -214,6 +214,7 @@ pv_wrap_context_dispose (GObject *object)
   PvWrapContext *self = PV_WRAP_CONTEXT (object);
 
   g_clear_object (&self->current_root);
+  g_clear_object (&self->run_in_current_context);
   g_clear_object (&self->runtime);
 
   G_OBJECT_CLASS (pv_wrap_context_parent_class)->dispose (object);
@@ -1224,6 +1225,34 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
         }
     }
 
+  return TRUE;
+}
+
+gboolean
+pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
+                                         GError **error)
+{
+  g_autofree char *bindir = NULL;
+  const char *prefix;
+  const char *pkglibexecdir = NULL;
+
+  bindir = _srt_find_executable_dir (error);
+
+  if (bindir == NULL)
+    return FALSE;
+
+  g_debug ("Found executable directory: %s", bindir);
+
+  prefix = _srt_find_myself (NULL, &pkglibexecdir, error);
+
+  if (prefix == NULL)
+    return FALSE;
+
+  self->run_in_current_context = _srt_subprocess_runner_new_full (NULL,   /* envp */
+                                                                  bindir,
+                                                                  pkglibexecdir,
+                                                                  SRT_TEST_FLAGS_NONE,
+                                                                  NULL);  /* cwd */
   return TRUE;
 }
 

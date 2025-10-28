@@ -44,6 +44,7 @@ setup (Fixture *f,
 {
   G_GNUC_UNUSED const Config *config = context;
   g_autoptr(GError) local_error = NULL;
+  g_autoptr(SrtSystemInfo) info = NULL;
   gsize i;
 
   f->archs = _srt_architecture_array_new ();
@@ -53,7 +54,10 @@ setup (Fixture *f,
 
   f->old_fds = tests_check_fd_leaks_enter ();
   f->bwrap = flatpak_bwrap_new (flatpak_bwrap_empty_env);
-  f->lib_temp_dirs = pv_per_arch_dirs_new ((const GQuark *) f->archs->data,
+
+  info = srt_system_info_new (NULL);
+  f->lib_temp_dirs = pv_per_arch_dirs_new (info,
+                                           (const GQuark *) f->archs->data,
                                            f->archs->len,
                                            &f->lib_temp_dirs_error);
 #ifdef _SRT_TESTS_STRICT

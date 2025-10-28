@@ -33,6 +33,7 @@
 /**
  * pv_bwrap_run_sync:
  * @bwrap: A #FlatpakBwrap on which flatpak_bwrap_finish() has been called
+ * @runner: Execution environment to be modified by `bwrap->envp`
  * @exit_status_out: (out) (optional): Used to return the exit status,
  *  or -1 if it could not be launched or was killed by a signal
  * @error: Used to raise an error on failure
@@ -40,20 +41,33 @@
  * Try to run a command. It inherits pressure-vessel's own file
  * descriptors.
  *
+ * The environment variables from the @runner are ignored, and
+ * `bwrap->envp` is used instead.
+ * Other aspects of the execution environment are taken from @runner.
+ *
+ * The command is assumed to be directly executable without emulation.
+ *
  * Returns: %TRUE if the subprocess runs to completion
  */
 gboolean
 pv_bwrap_run_sync (FlatpakBwrap *bwrap,
+                   SrtSubprocessRunner *runner,
                    int *exit_status_out,
                    GError **error)
 {
+  g_autoptr(SrtSubprocessRunner) modified_runner = NULL;
+
   g_return_val_if_fail (bwrap != NULL, FALSE);
   g_return_val_if_fail (bwrap->argv->len >= 2, FALSE);
   g_return_val_if_fail (pv_bwrap_was_finished (bwrap), FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
-  return pv_run_sync ((const char * const *) bwrap->argv->pdata,
-                      (const char * const *) bwrap->envp,
+  /* We need a new SrtSubprocessRunner because we're overriding
+   * the environment. */
+  modified_runner = _srt_subprocess_runner_new_swap_envp (runner,
+                                                          _srt_const_strv (bwrap->envp));
+  return pv_run_sync (modified_runner, SRT_ARCHITECTURE_QUARK_NONE,
+                      (const char * const *) bwrap->argv->pdata,
                       exit_status_out, NULL, error);
 }
 
@@ -67,6 +81,9 @@ pv_bwrap_run_sync (FlatpakBwrap *bwrap,
  *
  * Attempt to replace the current process with the given bwrap command.
  * If unable to do so, raise an error.
+ *
+ * The bwrap command is assumed to be directly executable without emulation
+ * (in practice, it is either `srt-bwrap` or `steam-runtime-launch-client`).
  *
  * Returns: %FALSE
  */

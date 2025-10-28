@@ -22,6 +22,7 @@
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "libglnx.h"
 
+#include "steam-runtime-tools/system-info.h"
 #include "flatpak-bwrap-private.h"
 
 /*
@@ -39,7 +40,8 @@ typedef struct
   GHashTable *abi_paths;
 } PvPerArchDirs;
 
-PvPerArchDirs *pv_per_arch_dirs_new (const GQuark *architectures,
+PvPerArchDirs *pv_per_arch_dirs_new (SrtSystemInfo *info,
+                                     const GQuark *architectures,
                                      gsize n_architectures,
                                      GError **error);
 void pv_per_arch_dirs_free (PvPerArchDirs *self);

@@ -38,6 +38,7 @@
 #include <glib-object.h>
 
 #include "steam-runtime-tools/glib-backports-internal.h"
+#include "steam-runtime-tools/elf-utils-internal.h"
 #include "steam-runtime-tools/input-device-internal.h"
 #include "steam-runtime-tools/logger-internal.h"
 #include "steam-runtime-tools/runtime-internal.h"
@@ -495,6 +496,23 @@ test_dir_iter (Fixture *f,
       g_test_message ("ino#%lld %s",
                       (long long) dent->d_ino, dent->d_name);
     }
+}
+
+static void
+test_elf_get_pt_interp (Fixture *f,
+                        gconstpointer context)
+{
+  g_autoptr(GError) local_error = NULL;
+  g_autofree gchar *pt_interp = NULL;
+
+  pt_interp = _srt_elf_path_get_pt_interp (AT_FDCWD,
+                                           f->logging_helper,
+                                           &local_error);
+  g_assert_no_error (local_error);
+  g_assert_nonnull (pt_interp);
+  g_test_message ("PT_INTERP of %s: %s", f->logging_helper, pt_interp);
+  g_assert_true (g_path_is_absolute (pt_interp));
+  g_assert_true (g_file_test (pt_interp, G_FILE_TEST_EXISTS));
 }
 
 static void
@@ -1599,6 +1617,33 @@ test_str_is_integer (Fixture *f,
   g_assert_false (_srt_str_is_integer ("23a"));
 }
 
+static void
+test_string_chomp_newline (Fixture *f,
+                           gconstpointer context)
+{
+  static const struct
+    {
+      const char *input;
+      const char *expected;
+    }
+  tests[] =
+    {
+      { "", "" },
+      { "foo", "foo" },
+      { "foo\n", "foo" },
+      { "foo\r\n", "foo\r" },
+      { "bar\n\n\n", "bar\n\n" },
+    };
+
+  for (size_t i = 0; i < G_N_ELEMENTS (tests); i++)
+    {
+      g_autoptr(GString) str = g_string_new (tests[i].input);
+
+      _srt_string_chomp_newline (str);
+      g_assert_cmpstr (str->str, ==, tests[i].expected);
+    }
+}
+
 static const struct
 {
   const char *str;
@@ -1836,6 +1881,8 @@ main (int argc,
               setup, test_describe_fd, teardown);
   g_test_add ("/utils/dir-iter", Fixture, NULL,
               setup, test_dir_iter, teardown);
+  g_test_add ("/utils/elf_get_pt_interp", Fixture, NULL,
+              setup, test_elf_get_pt_interp, teardown);
   g_test_add ("/utils/escape_steam_runtime", Fixture, NULL,
               setup, test_escape_steam_runtime, teardown);
   g_test_add ("/utils/environ_get_boolean", Fixture, NULL,
@@ -1864,6 +1911,8 @@ main (int argc,
               setup, test_same_file, teardown);
   g_test_add ("/utils/str_is_integer", Fixture, NULL,
               setup, test_str_is_integer, teardown);
+  g_test_add ("/utils/string_chomp_newline", Fixture, NULL,
+              setup, test_string_chomp_newline, teardown);
   g_test_add ("/utils/string_ends_with", Fixture, NULL,
               setup, test_string_ends_with, teardown);
   g_test_add ("/utils/string_read_fd_until_eof", Fixture, NULL,

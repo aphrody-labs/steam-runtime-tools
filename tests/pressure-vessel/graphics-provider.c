@@ -178,6 +178,7 @@ test_graphics_provider_search (Fixture *f,
                                gconstpointer context)
 {
   g_autoptr(GPtrArray) graphics_providers = NULL;
+  g_autoptr(SrtSubprocessRunner) runner = _srt_subprocess_runner_new ();
   PvGraphicsProvider *graphics_provider = NULL;
   g_autoptr(GError) error = NULL;
   GQuark tuples[2];
@@ -192,7 +193,8 @@ test_graphics_provider_search (Fixture *f,
    * a controlled environment that we can edit for our tests.
    * To keep things simple in this unit test, don't start multi-threaded
    * graphics driver enumeration immediately. */
-  graphics_providers = pv_graphics_provider_build_array (f->tmpdir,
+  graphics_providers = pv_graphics_provider_build_array (runner,
+                                                         f->tmpdir,
                                                          NULL,
                                                          tuples,
                                                          G_N_ELEMENTS (tuples),

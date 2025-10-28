@@ -94,11 +94,11 @@ main (int argc,
   g_autofree gchar *cwd_l = NULL;
   g_autofree gchar *cwd_p_host = NULL;
   g_autofree gchar *private_home = NULL;
-  g_autofree gchar *tools_dir = NULL;
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
-  const char *pkglibexecdir = NULL;
+  const char *pkglibexecdir;
   const char *steam_app_id;
+  const char *tools_dir;
   g_autoptr(GPtrArray) adverb_preload_argv = NULL;
   int result;
   PvAppendPreloadFlags append_preload_flags = PV_APPEND_PRELOAD_FLAGS_NONE;
@@ -107,7 +107,6 @@ main (int argc,
   PvWrapLogFlags pv_log_flags = PV_WRAP_LOG_FLAGS_NONE;
   SrtSteamCompatFlags compat_flags;
   PvWorkaroundFlags workarounds;
-  const char *prefix = NULL;
   const GQuark *tuples;
   gsize n_tuples = 0;
 
@@ -350,6 +349,9 @@ main (int argc,
    * us exit 1. */
   ret = 1;
 
+  if (!pv_wrap_context_after_parsing_arguments (self, error))
+    goto out;
+
   if ((result = _srt_set_compatible_resource_limits (0)) < 0)
     g_warning ("Unable to set normal resource limits: %s",
                g_strerror (-result));
@@ -413,17 +415,11 @@ main (int argc,
         }
     }
 
-  tools_dir = _srt_find_executable_dir (error);
-
-  if (tools_dir == NULL)
-    goto out;
-
-  g_debug ("Found executable directory: %s", tools_dir);
-
-  prefix = _srt_find_myself (NULL, &pkglibexecdir, error);
-
-  if (prefix == NULL)
-    goto out;
+  g_return_val_if_fail (self->run_in_current_context != NULL, FALSE);
+  tools_dir = _srt_subprocess_runner_get_bin_path (self->run_in_current_context);
+  g_return_val_if_fail (tools_dir != NULL, FALSE);
+  pkglibexecdir = _srt_subprocess_runner_get_helpers_path (self->run_in_current_context);
+  g_return_val_if_fail (pkglibexecdir != NULL, FALSE);
 
   /* If we are in a Flatpak environment we can't use bwrap directly */
   if (self->is_flatpak_env)
@@ -435,7 +431,8 @@ main (int argc,
     {
       g_debug ("Checking for bwrap...");
 
-      bwrap_executable = pv_wrap_check_bwrap (self->options.only_prepare,
+      bwrap_executable = pv_wrap_check_bwrap (self->run_in_current_context,
+                                              self->options.only_prepare,
                                               &bwrap_flags,
                                               error);
 
@@ -602,7 +599,8 @@ main (int argc,
       if (self->options.graphics_provider != NULL
           && self->options.graphics_provider[0] != '\0')
         {
-          graphics_providers = pv_graphics_provider_build_array (self->options.graphics_provider,
+          graphics_providers = pv_graphics_provider_build_array (self->run_in_current_context,
+                                                                 self->options.graphics_provider,
                                                                  self->options.arch_graphics_providers,
                                                                  tuples,
                                                                  n_tuples,
@@ -641,6 +639,7 @@ main (int argc,
                                       self->options.architectures,
                                       graphics_providers,
                                       _srt_const_strv (self->original_environ),
+                                      self->run_in_current_context,
                                       flags,
                                       workarounds,
                                       error);
@@ -1329,7 +1328,7 @@ main (int argc,
 
   if (!self->is_flatpak_env)
     {
-      if (!pv_wrap_maybe_load_nvidia_modules (error))
+      if (!pv_wrap_maybe_load_nvidia_modules (self->run_in_current_context, error))
         {
           g_debug ("Cannot load nvidia modules: %s", local_error->message);
           g_clear_error (&local_error);

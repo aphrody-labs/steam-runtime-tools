@@ -42,6 +42,7 @@
 #include "steam-runtime-tools/process-manager-internal.h"
 #include "steam-runtime-tools/profiling-internal.h"
 #include "steam-runtime-tools/steam-runtime-tools.h"
+#include "steam-runtime-tools/system-info-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 #include "libglnx.h"
 
@@ -76,26 +77,6 @@ static gboolean opt_write = FALSE;
 
 /* (element-type PvAdverbPreloadModule) */
 static GArray *opt_preload_modules = NULL;
-
-static void
-helper_child_setup_cb (gpointer nil)
-{
-  /* The adverb should wait for its child before it exits, but if it
-   * gets terminated prematurely, we want the child to terminate too.
-   * The child could reset this, but we assume it usually won't.
-   * This makes it exit even if we are killed by SIGKILL, unless it
-   * takes steps not to be.
-   * Note that we can't use the GError here, because a GSpawnChildSetupFunc
-   * needs to follow signal-safety(7) rules. */
-  if (opt_exit_with_parent
-      && !_srt_raise_on_parent_death (SIGTERM, NULL))
-    _srt_async_signal_safe_error ("pv-adverb",
-                                  "Failed to set up parent-death signal",
-                                  LAUNCH_EX_FAILED);
-
-  /* Unblock all signals and reset signal disposition to SIG_DFL */
-  _srt_child_setup_unblock_signals (NULL);
-}
 
 static gboolean
 opt_fd_cb (const char *name,
@@ -331,63 +312,65 @@ opt_lock_file_cb (const char *name,
 }
 
 static gboolean
-run_helper_sync (const char *cwd,
+run_helper_sync (SrtSubprocessRunner *runner,
+                 GQuark architecture,
                  const char * const *argv,
-                 const char * const *envp,
-                 gchar **child_stdout,
                  gchar **child_stderr,
                  int *wait_status,
                  GError **error)
 {
-  sigset_t mask;
-  sigset_t old_mask;
-  gboolean ret;
+  g_autoptr(SrtCompletedSubprocess) completed = NULL;
+  SrtHelperFlags flags;
 
   g_return_val_if_fail (argv != NULL, FALSE);
   g_return_val_if_fail (argv[0] != NULL, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
-  if (envp == NULL)
-    envp = global_envp;
-
-  sigemptyset (&mask);
-  sigemptyset (&old_mask);
-  sigaddset (&mask, SIGCHLD);
-
-  /* Unblock SIGCHLD in case g_spawn_sync() needs it in some version */
-  if ((errno = pthread_sigmask (SIG_UNBLOCK, &mask, &old_mask)) != 0)
-    return glnx_throw_errno_prefix (error, "pthread_sigmask");
-
-  /* We use LEAVE_DESCRIPTORS_OPEN to work around a deadlock in older GLib,
+  /* We use LEAVE_FDS_OPEN to work around a deadlock in older GLib,
    * and to avoid wasting a lot of time closing fds if the rlimit for
    * maximum open file descriptors is high. Because we're waiting for the
    * subprocess to finish anyway, it doesn't really matter that any fds
    * that are not close-on-execute will get leaked into the child. */
-  ret = g_spawn_sync (cwd,
-                      (gchar **) argv,
-                      (gchar **) envp,
-                      G_SPAWN_LEAVE_DESCRIPTORS_OPEN,
-                      helper_child_setup_cb, NULL,
-                      child_stdout,
-                      child_stderr,
-                      wait_status,
-                      error);
+  flags = SRT_HELPER_FLAGS_SEARCH_PATH | SRT_HELPER_FLAGS_LEAVE_FDS_OPEN;
 
-  if ((errno = pthread_sigmask (SIG_SETMASK, &old_mask, NULL)) != 0 && ret)
-    return glnx_throw_errno_prefix (error, "pthread_sigmask");
+  /* The adverb should wait for its child before it exits, but if it
+   * gets terminated prematurely, we want the child to terminate too.
+   * The child could reset this, but we assume it usually won't.
+   * This makes it exit even if we are killed by SIGKILL, unless it
+   * takes steps not to be. */
+  flags |= SRT_HELPER_FLAGS_TERMINATE_WITH_PARENT;
 
-  return ret;
+  completed = _srt_subprocess_runner_run_sync (runner,
+                                               flags,
+                                               architecture,
+                                               argv,
+                                               SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
+                                               SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
+                                               error);
+
+  if (completed == NULL)
+    return FALSE;
+
+  /* This has the side-effect of debug-logging stdout, stderr and wait status */
+  _srt_completed_subprocess_report (completed, wait_status, NULL, NULL, NULL);
+
+  if (child_stderr != NULL)
+    *child_stderr = _srt_completed_subprocess_steal_stderr (completed);
+
+  return TRUE;
 }
 
 static gboolean
-regenerate_ld_so_cache (const GPtrArray *ld_so_cache_paths,
+regenerate_ld_so_cache (SrtSubprocessRunner *runner,
+                        GQuark ldconfig_architecture,
+                        const GPtrArray *ld_so_cache_paths,
                         const char *dir,
                         GError **error)
 {
   g_autoptr(GError) local_error = NULL;
   g_autoptr(GPtrArray) argv = g_ptr_array_new ();
   g_autoptr(GString) conf = g_string_new ("");
-  g_autofree gchar *child_stdout = NULL;
+  g_autoptr(SrtSubprocessRunner) chdir_runner = NULL;
   g_autofree gchar *child_stderr = NULL;
   g_autofree gchar *conf_path = g_build_filename (dir, "ld.so.conf", NULL);
   g_autofree gchar *rt_conf_path = g_build_filename (dir, "runtime-ld.so.conf", NULL);
@@ -440,6 +423,8 @@ regenerate_ld_so_cache (const GPtrArray *ld_so_cache_paths,
         break;
     }
 
+  chdir_runner = _srt_subprocess_runner_new_swap_working_directory (runner, dir);
+
   /* Items in this GPtrArray are borrowed, not copied.
    *
    * /sbin/ldconfig might be a symlink into /run/host, or it might
@@ -461,10 +446,9 @@ regenerate_ld_so_cache (const GPtrArray *ld_so_cache_paths,
 
   g_ptr_array_add (argv, NULL);
 
-  if (!run_helper_sync (dir,
+  if (!run_helper_sync (chdir_runner,
+                        ldconfig_architecture,
                         (const char * const *) argv->pdata,
-                        global_envp,
-                        &child_stdout,
                         &child_stderr,
                         &wait_status,
                         error))
@@ -492,12 +476,6 @@ regenerate_ld_so_cache (const GPtrArray *ld_so_cache_paths,
       return FALSE;
     }
 
-  if (child_stdout != NULL && child_stdout[0] != '\0')
-    g_debug ("Output:\n%s", child_stdout);
-
-  if (child_stderr != NULL && child_stderr[0] != '\0')
-    g_debug ("Diagnostic output:\n%s", child_stderr);
-
   /* Atomically replace ld.so.cache with new-ld.so.cache. */
   if (!glnx_renameat (AT_FDCWD, new_path, AT_FDCWD, replace_path, error))
     return glnx_prefix_error (error, "Cannot move %s to %s",
@@ -512,39 +490,27 @@ regenerate_ld_so_cache (const GPtrArray *ld_so_cache_paths,
         NULL
       };
 
-      g_clear_pointer (&child_stdout, g_free);
-      g_clear_pointer (&child_stderr, g_free);
-
-      if (!run_helper_sync (NULL,
+      if (!run_helper_sync (runner,
+                            ldconfig_architecture,
                             read_back_argv,
-                            global_envp,
-                            &child_stdout,
-                            &child_stderr,
-                            &wait_status,
+                            NULL,
+                            NULL,
                             error))
         return glnx_prefix_error (error, "Cannot run /sbin/ldconfig -p");
-
-      if (child_stdout != NULL && child_stdout[0] != '\0')
-        g_debug ("ldconfig -p output:\n%s", child_stdout);
-
-      if (child_stderr != NULL && child_stderr[0] != '\0')
-        g_debug ("ldconfig -p diagnostic output:\n%s", child_stderr);
-
-      if (wait_status != 0)
-        g_debug ("ldconfig -p wait status:\n%d", wait_status);
     }
 
   return TRUE;
 }
 
 static gboolean
-generate_locales (gchar **locpath_out,
+generate_locales (SrtSubprocessRunner *runner,
+                  GQuark architecture,
+                  gchar **locpath_out,
                   GError **error)
 {
   g_autofree gchar *temp_dir = NULL;
   g_autoptr(GDir) dir = NULL;
   int wait_status;
-  g_autofree gchar *child_stdout = NULL;
   g_autofree gchar *child_stderr = NULL;
   g_autofree gchar *pvlg = NULL;
   g_autofree gchar *this_dir = NULL;
@@ -579,10 +545,9 @@ generate_locales (gchar **locpath_out,
       goto out;
     }
 
-  if (!run_helper_sync (NULL,
+  if (!run_helper_sync (runner,
+                        architecture,
                         locale_gen_argv,
-                        NULL,
-                        &child_stdout,
                         &child_stderr,
                         &wait_status,
                         error))
@@ -591,12 +556,6 @@ generate_locales (gchar **locpath_out,
         glnx_prefix_error (error, "Cannot run pv-locale-gen");
       goto out;
     }
-
-  if (child_stdout != NULL && child_stdout[0] != '\0')
-    g_debug ("Output:\n%s", child_stdout);
-
-  if (child_stderr != NULL && child_stderr[0] != '\0')
-    g_debug ("Diagnostic output:\n%s", child_stderr);
 
   if (WIFEXITED (wait_status) && WEXITSTATUS (wait_status) == EX_OSFILE)
     {
@@ -812,6 +771,8 @@ main (int argc,
   g_autoptr(PvPerArchDirs) lib_temp_dirs = NULL;
   SrtSteamCompatFlags compat_flags;
   g_autoptr(GArray) tuples = NULL;
+  g_autoptr(SrtSubprocessRunner) runner = NULL;
+  g_autoptr(SrtSystemInfo) info = NULL;
 
   setlocale (LC_ALL, "");
 
@@ -941,6 +902,12 @@ main (int argc,
   if (process_manager == NULL)
     goto out;
 
+  runner = _srt_subprocess_runner_new_full (global_envp,
+                                            NULL,   /* path to bin */
+                                            NULL,   /* path to libexec/s-r-t-0 */
+                                            SRT_TEST_FLAGS_NONE,
+                                            NULL);  /* cwd */
+
   envp = _srt_env_overlay_apply (env_overlay, envp);
 
   if (opt_clear_env)
@@ -1015,7 +982,15 @@ main (int argc,
   if (opt_regenerate_ld_so_cache != NULL
       && opt_regenerate_ld_so_cache[0] != '\0')
     {
-      if (regenerate_ld_so_cache (global_ld_so_conf_entries, opt_regenerate_ld_so_cache,
+      GQuark ldconfig_architecture;
+
+      /* TODO */
+      ldconfig_architecture = SRT_ARCHITECTURE_QUARK_NONE;
+
+      if (regenerate_ld_so_cache (runner,
+                                  ldconfig_architecture,
+                                  global_ld_so_conf_entries,
+                                  opt_regenerate_ld_so_cache,
                                   error))
         {
           g_debug ("Generated ld.so.cache in %s", opt_regenerate_ld_so_cache);
@@ -1051,7 +1026,9 @@ main (int argc,
                              opt_set_ld_library_path, TRUE);
     }
 
-  lib_temp_dirs = pv_per_arch_dirs_new ((const GQuark *) tuples->data,
+  info = srt_system_info_new (NULL);
+  _srt_system_info_set_subprocess_runner (info, runner);
+  lib_temp_dirs = pv_per_arch_dirs_new (info, (const GQuark *) tuples->data,
                                         tuples->len, error);
 
   if (lib_temp_dirs == NULL)
@@ -1090,11 +1067,22 @@ main (int argc,
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) profiling =
         _srt_profiling_start ("Making sure locales are available");
+      GQuark architecture;
 
       g_debug ("Making sure locales are available");
 
+      /* TODO: pv-locale-gen is a shell script, so we need to run it using the
+       * architecture of /bin/sh; but it runs pv-try-setlocale, which (we can
+       * assume) is probably of the same architecture as pv-adverb, and it
+       * also runs localedef, which is most likely to be of the container's
+       * primary architecture.
+       * We need to figure this out before steamrt/tasks#787 is complete,
+       * but a first approximation is to just run it and hope - on a properly
+       * configured system, we shouldn't need this anyway. */
+      architecture = SRT_ARCHITECTURE_QUARK_NONE;
+
       /* If this fails, it is not fatal - carry on anyway */
-      if (!generate_locales (&locales_temp_dir, error))
+      if (!generate_locales (runner, architecture, &locales_temp_dir, error))
         {
           g_warning ("%s", local_error->message);
           g_clear_error (error);

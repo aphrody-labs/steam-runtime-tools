@@ -104,10 +104,10 @@ struct _PvRuntime
   GObject parent;
 
   gchar *bubblewrap;
+  SrtSubprocessRunner *run_in_current_context;
   gchar *source;
   gchar *source_files;          /* either source or that + "/files" */
   const gchar *pv_prefix;
-  const gchar *helpers_path;
   SrtFileLock *runtime_lock;
   GStrv original_environ;
 
@@ -161,6 +161,7 @@ enum {
   PROP_SOURCE,
   PROP_ORIGINAL_ENVIRON,
   PROP_FLAGS,
+  PROP_RUN_IN_CURRENT_CONTEXT,
   PROP_VARIABLE_DIR,
   PROP_WORKAROUNDS,
   N_PROPERTIES
@@ -642,11 +643,9 @@ typedef struct
    * /overrides/${aliases_relative_to_overrides}/libbz2.so.1 might exist
    * inside the final container */
   gchar *aliases_relative_to_overrides;
-  /* TUPLE-capsule-capture-libs */
-  gchar *capsule_capture_libs_basename;
   /* Absolute path to TUPLE-capsule-capture-libs in p-v's execution
-   * environment */
-  gchar *capsule_capture_libs;
+   * environment, with possible wrappers */
+  GPtrArray *capsule_capture_libs;
   /* "lib/TUPLE", so that for example
    * /overrides/${libdir_relative_to_overrides}/libc.so.6 might exist inside
    * the final container */
@@ -688,7 +687,8 @@ runtime_architecture_init (RuntimeArchitecture *self,
                            PvRuntime *runtime,
                            GQuark tuple)
 {
-  const gchar *argv[] = { NULL, "--print-ld.so", NULL };
+  g_autoptr(GError) local_error = NULL;
+  g_autoptr(GPtrArray) argv = NULL;
   PvGraphicsProvider *provider;
 
   g_return_val_if_fail (tuple != SRT_ARCHITECTURE_QUARK_NONE, FALSE);
@@ -705,11 +705,18 @@ runtime_architecture_init (RuntimeArchitecture *self,
   /* Could be %NULL, so be careful when dereferencing */
   self->known_arch = _srt_architecture_get_by_tuple (self->tuple);
 
-  self->capsule_capture_libs_basename = g_strdup_printf ("%s-capsule-capture-libs",
-                                                         self->tuple);
-  self->capsule_capture_libs = g_build_filename (runtime->helpers_path,
-                                                 self->capsule_capture_libs_basename,
-                                                 NULL);
+  self->capsule_capture_libs = _srt_subprocess_runner_get_helper (runtime->run_in_current_context,
+                                                                  self->tuple,
+                                                                  "capsule-capture-libs",
+                                                                  SRT_HELPER_FLAGS_NONE,
+                                                                  &local_error);
+
+  if (self->capsule_capture_libs == NULL)
+    {
+      g_warning ("%s", local_error->message);
+      return FALSE;
+    }
+
   self->libdir_relative_to_overrides = g_strdup_printf ("lib/%s",
                                                         self->tuple);
   self->libdir_in_container = g_build_filename (runtime->overrides_in_container,
@@ -718,12 +725,20 @@ runtime_architecture_init (RuntimeArchitecture *self,
   self->aliases_relative_to_overrides = g_strdup_printf ("lib/%s/aliases",
                                                          self->tuple);
 
+  argv = g_ptr_array_sized_new (self->capsule_capture_libs->len + 2);
+
+  for (size_t i = 0; i < self->capsule_capture_libs->len; i++)
+    g_ptr_array_add (argv, g_ptr_array_index (self->capsule_capture_libs, i));
+
+  g_ptr_array_add (argv, (char *) "--print-ld.so");
+  g_ptr_array_add (argv, NULL);
+
   /* This has the side-effect of testing whether we can run binaries
    * for this architecture on the current environment. We
    * assume that this is the same as whether we can run them
    * on the host, if different. */
-  argv[0] = self->capsule_capture_libs;
-  pv_run_sync (argv, NULL, NULL, &self->ld_so, NULL);
+  pv_run_sync (runtime->run_in_current_context, tuple,
+               (const char * const *) argv->pdata, NULL, &self->ld_so, NULL);
 
   if (self->ld_so == NULL)
     {
@@ -740,7 +755,6 @@ runtime_architecture_check_valid (RuntimeArchitecture *self)
   g_return_val_if_fail (self->tuple != NULL, FALSE);
   g_return_val_if_fail (self->tuple_quark != SRT_ARCHITECTURE_QUARK_NONE, FALSE);
   g_return_val_if_fail (self->provider != NULL, FALSE);
-  g_return_val_if_fail (self->capsule_capture_libs_basename != NULL, FALSE);
   g_return_val_if_fail (self->capsule_capture_libs != NULL, FALSE);
   g_return_val_if_fail (self->libdir_relative_to_overrides != NULL, FALSE);
   g_return_val_if_fail (self->libdir_in_container != NULL, FALSE);
@@ -755,8 +769,7 @@ runtime_architecture_clear (RuntimeArchitecture *self)
   self->tuple = NULL;
   self->tuple_quark = SRT_ARCHITECTURE_QUARK_NONE;
   g_clear_object (&self->provider);
-  g_clear_pointer (&self->capsule_capture_libs_basename, g_free);
-  g_clear_pointer (&self->capsule_capture_libs, g_free);
+  g_clear_pointer (&self->capsule_capture_libs, g_ptr_array_unref);
   g_clear_pointer (&self->libdir_relative_to_overrides, g_free);
   g_clear_pointer (&self->libdir_in_container, g_free);
   g_clear_pointer (&self->aliases_relative_to_overrides, g_free);
@@ -827,6 +840,10 @@ pv_runtime_get_property (GObject *object,
 
       case PROP_SOURCE:
         g_value_set_string (value, self->source);
+        break;
+
+      case PROP_RUN_IN_CURRENT_CONTEXT:
+        g_value_set_object (value, self->run_in_current_context);
         break;
 
       case PROP_WORKAROUNDS:
@@ -920,6 +937,12 @@ pv_runtime_set_property (GObject *object,
               }
           }
 
+        break;
+
+      case PROP_RUN_IN_CURRENT_CONTEXT:
+        /* Construct-only */
+        g_return_if_fail (self->run_in_current_context == NULL);
+        self->run_in_current_context = g_value_dup_object (value);
         break;
 
       case PROP_WORKAROUNDS:
@@ -1316,7 +1339,10 @@ pv_runtime_initable_init (GInitable *initable,
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
-  self->pv_prefix = _srt_find_myself (NULL, &self->helpers_path, error);
+  /* Should have been set at construct time */
+  g_return_val_if_fail (self->run_in_current_context != NULL, FALSE);
+
+  self->pv_prefix = _srt_find_myself (NULL, NULL, error);
 
   if (self->pv_prefix == NULL)
     return FALSE;
@@ -1707,6 +1733,7 @@ pv_runtime_dispose (GObject *object)
   g_clear_object (&self->mutable_sysroot);
   g_clear_object (&self->real_root);
   g_clear_object (&self->host_root);
+  g_clear_object (&self->run_in_current_context);
 
   G_OBJECT_CLASS (pv_runtime_parent_class)->dispose (object);
 }
@@ -1799,6 +1826,12 @@ pv_runtime_class_init (PvRuntimeClass *cls)
                          (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                           G_PARAM_STATIC_STRINGS));
 
+  properties[PROP_RUN_IN_CURRENT_CONTEXT] =
+    g_param_spec_object ("run-in-current-context", NULL, NULL,
+                         SRT_TYPE_SUBPROCESS_RUNNER,
+                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                          G_PARAM_STATIC_STRINGS));
+
   properties[PROP_WORKAROUNDS] =
     g_param_spec_flags ("workarounds", "Workarounds",
                         "Workarounds for external components",
@@ -1816,6 +1849,7 @@ pv_runtime_new (const char *source,
                 GArray *architectures,
                 GPtrArray *providers,
                 const char * const *original_environ,
+                SrtSubprocessRunner *run_in_current_context,
                 PvRuntimeFlags flags,
                 PvWorkaroundFlags workarounds,
                 GError **error)
@@ -1830,6 +1864,7 @@ pv_runtime_new (const char *source,
                          "bubblewrap", bubblewrap,
                          "graphics-providers", providers,
                          "original-environ", original_environ,
+                         "run-in-current-context", run_in_current_context,
                          "variable-dir", variable_dir,
                          "source", source,
                          "flags", flags,
@@ -2213,7 +2248,8 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
                                          self->runtime_files_fd,
                                          self->runtime_files);
 
-  flatpak_bwrap_add_arg (ret, arch->capsule_capture_libs);
+  for (size_t i = 0; i < arch->capsule_capture_libs->len; i++)
+    flatpak_bwrap_add_arg (ret, g_ptr_array_index (arch->capsule_capture_libs, i));
 
   if (_srt_util_get_log_flags () & SRT_LOG_FLAGS_LEVEL)
     flatpak_bwrap_add_arg (ret, "--level-prefix");
@@ -2355,7 +2391,7 @@ pv_runtime_capture_libraries (PvRuntime *self,
 
   flatpak_bwrap_finish (temp_bwrap);
 
-  if (!pv_bwrap_run_sync (temp_bwrap, NULL, error))
+  if (!pv_bwrap_run_sync (temp_bwrap, self->run_in_current_context, NULL, error))
     return FALSE;
 
   return TRUE;
@@ -5236,6 +5272,7 @@ pv_runtime_get_ld_so (PvRuntime *self,
     }
   else
     {
+      g_autoptr(SrtSubprocessRunner) runner = NULL;
       g_autoptr(FlatpakBwrap) temp_bwrap = NULL;
       g_autofree gchar *etc = NULL;
 
@@ -5303,9 +5340,18 @@ pv_runtime_get_ld_so (PvRuntime *self,
                               NULL);
       flatpak_bwrap_finish (temp_bwrap);
 
-      pv_run_sync ((const char * const *) temp_bwrap->argv->pdata,
-                   (const char * const *) temp_bwrap->envp, NULL,
-                   ld_so_in_runtime, NULL);
+      /* We can't use self->run_in_current_context directly, because we
+       * altered the PATH above */
+      runner = _srt_subprocess_runner_new_swap_envp (self->run_in_current_context,
+                                                     _srt_const_strv (temp_bwrap->envp));
+      /* Assume bwrap can be run without a special emulator (native
+       * executable or transparent emulation) */
+      pv_run_sync (runner,
+                   SRT_ARCHITECTURE_QUARK_NONE,
+                   (const char * const *) temp_bwrap->argv->pdata,
+                   NULL,    /* wait status */
+                   ld_so_in_runtime,
+                   NULL);
     }
 
   return TRUE;

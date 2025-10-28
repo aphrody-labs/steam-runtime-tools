@@ -23,6 +23,20 @@ gstring_free0 (GString *str)
     g_string_free (str, TRUE);
 }
 
+/*
+ * SrtCompletedSubprocess:
+ *
+ * Object representing a subprocess that has finished running,
+ * similar to Python `subprocess.CompletedProcess`.
+ * It has standard output (if captured),
+ * standard error (if captured),
+ * and a wait status which encodes whether it exited normally or was
+ * killed by a signal.
+ *
+ * Unlike the equivalent Python object, this object also has an
+ * indication of whether it timed out.
+ */
+
 struct _SrtCompletedSubprocess
 {
   GObject parent;
@@ -202,30 +216,62 @@ _srt_completed_subprocess_timed_out (SrtCompletedSubprocess *self)
   return ret;
 }
 
+/*
+ * Return what the subprocess wrote to stdout.
+ * If _srt_completed_subprocess_steal_stdout() was previously called,
+ * or if the output mode was INHERIT or SILENCE, then this will be %NULL.
+ * Otherwise it will be non-%NULL (but possibly empty).
+ *
+ * Returns: (transfer none):
+ */
 const char *
 _srt_completed_subprocess_get_stdout (SrtCompletedSubprocess *self)
 {
   return self->out;
 }
 
+/*
+ * Same as _srt_completed_subprocess_get_stdout(), but for stderr.
+ *
+ * Returns: (transfer none):
+ */
 const char *
 _srt_completed_subprocess_get_stderr (SrtCompletedSubprocess *self)
 {
   return self->err;
 }
 
+/*
+ * Return what the subprocess wrote to stdout, the same as
+ * _srt_completed_subprocess_get_stdout(), but without copying.
+ * The caller is given ownership of the result, and subsequent calls to
+ * _srt_completed_subprocess_steal_stdout() will return %NULL.
+ *
+ * Returns: (transfer full):
+ */
 gchar *
 _srt_completed_subprocess_steal_stdout (SrtCompletedSubprocess *self)
 {
   return g_steal_pointer (&self->out);
 }
 
+/*
+ * Same as _srt_completed_subprocess_steal_stdout(), but for stderr.
+ *
+ * Returns: (transfer full):
+ */
 gchar *
 _srt_completed_subprocess_steal_stderr (SrtCompletedSubprocess *self)
 {
   return g_steal_pointer (&self->err);
 }
 
+/*
+ * SrtSubprocess:
+ *
+ * Internal data structure representing a subprocess that has been launched
+ * and might not yet have completed.
+ */
 typedef struct
 {
   /* Thread safety: Not thread safe.
@@ -694,6 +740,15 @@ _srt_completed_subprocess_new_from_subprocess (SrtSubprocess *self)
   completed->wait_status = self->wait_status;
   completed->timed_out = self->timed_out;
 
+  if (self->flags & SRT_HELPER_FLAGS_CHOMP)
+    {
+      if (self->out != NULL)
+        _srt_string_chomp_newline (self->out);
+
+      if (self->err != NULL)
+        _srt_string_chomp_newline (self->err);
+    }
+
   if (self->out != NULL)
     completed->out = g_string_free (g_steal_pointer (&self->out), FALSE);
 
@@ -703,6 +758,14 @@ _srt_completed_subprocess_new_from_subprocess (SrtSubprocess *self)
   return g_steal_pointer (&completed);
 }
 
+/*
+ * SrtSubprocessRunner:
+ *
+ * Object representing a context in which subprocesses can be run.
+ *
+ * Because all members are read-only (immutable) after construction,
+ * this object may be used concurrently in more than one thread.
+ */
 struct _SrtSubprocessRunner
 {
   GObject parent;
@@ -713,6 +776,8 @@ struct _SrtSubprocessRunner
   /* Path to find helper executables, or %NULL to use $SRT_HELPERS_PATH
    * or the installed helpers */
   gchar *helpers_path;
+  /* Working directory, or %NULL to use current */
+  gchar *working_directory;
   SrtTestFlags test_flags;
   unsigned can_use_waitid : 1;
 };
@@ -731,6 +796,7 @@ enum
   PROP_ENVIRON,
   PROP_HELPERS_PATH,
   PROP_TEST_FLAGS,
+  PROP_WORKING_DIRECTORY,
   N_PROPERTIES
 };
 
@@ -791,6 +857,10 @@ _srt_subprocess_runner_get_property (GObject *object,
         g_value_set_flags (value, self->test_flags);
         break;
 
+      case PROP_WORKING_DIRECTORY:
+        g_value_set_string (value, self->working_directory);
+        break;
+
       default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
     }
@@ -835,6 +905,12 @@ _srt_subprocess_runner_set_property (GObject *object,
         self->test_flags = g_value_get_flags (value);
         break;
 
+      case PROP_WORKING_DIRECTORY:
+        /* Construct-only */
+        g_return_if_fail (self->working_directory == NULL);
+        self->working_directory = g_value_dup_string (value);
+        break;
+
       default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
     }
@@ -848,6 +924,7 @@ _srt_subprocess_runner_finalize (GObject *object)
   g_strfreev (self->envp);
   g_free (self->bin_path);
   g_free (self->helpers_path);
+  g_free (self->working_directory);
 
   G_OBJECT_CLASS (_srt_subprocess_runner_parent_class)->finalize (object);
 }
@@ -879,8 +956,60 @@ _srt_subprocess_runner_class_init (SrtSubprocessRunnerClass *cls)
                         SRT_TYPE_TEST_FLAGS, SRT_TEST_FLAGS_NONE,
                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                         G_PARAM_STATIC_STRINGS);
+  properties[PROP_WORKING_DIRECTORY] =
+    g_param_spec_string ("working-directory", NULL, NULL, NULL,
+                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS);
 
   g_object_class_install_properties (object_class, N_PROPERTIES, properties);
+}
+
+SrtSubprocessRunner *
+_srt_subprocess_runner_new_swap_envp (SrtSubprocessRunner *self,
+                                      const char * const *envp)
+{
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
+  return _srt_subprocess_runner_new_full (envp,
+                                          self->bin_path,
+                                          self->helpers_path,
+                                          self->test_flags,
+                                          self->working_directory);
+}
+
+SrtSubprocessRunner *
+_srt_subprocess_runner_new_swap_helpers_path (SrtSubprocessRunner *self,
+                                              const char *path)
+{
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
+  return _srt_subprocess_runner_new_full (_srt_const_strv (self->envp),
+                                          self->bin_path,
+                                          path,
+                                          self->test_flags,
+                                          self->working_directory);
+}
+
+SrtSubprocessRunner *
+_srt_subprocess_runner_new_swap_test_flags (SrtSubprocessRunner *self,
+                                            SrtTestFlags flags)
+{
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
+  return _srt_subprocess_runner_new_full (_srt_const_strv (self->envp),
+                                          self->bin_path,
+                                          self->helpers_path,
+                                          flags,
+                                          self->working_directory);
+}
+
+SrtSubprocessRunner *
+_srt_subprocess_runner_new_swap_working_directory (SrtSubprocessRunner *self,
+                                                   const char *working_directory)
+{
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
+  return _srt_subprocess_runner_new_full (_srt_const_strv (self->envp),
+                                          self->bin_path,
+                                          self->helpers_path,
+                                          self->test_flags,
+                                          working_directory);
 }
 
 /*
@@ -890,7 +1019,7 @@ const char * const *
 _srt_subprocess_runner_get_environ (SrtSubprocessRunner *self)
 {
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
-  return (const char * const *) self->envp;
+  return _srt_const_strv (self->envp);
 }
 
 /*
@@ -962,6 +1091,16 @@ _srt_subprocess_runner_get_test_flags (SrtSubprocessRunner *self)
 {
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), SRT_TEST_FLAGS_NONE);
   return self->test_flags;
+}
+
+/*
+ * Returns: The working directory for subprocesses, or %NULL to inherit
+ */
+const char *
+_srt_subprocess_runner_get_working_directory (SrtSubprocessRunner *self)
+{
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
+  return self->working_directory;
 }
 
 /*
@@ -1069,9 +1208,35 @@ _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
   return argv;
 }
 
+typedef struct
+{
+  SrtHelperFlags flags;
+} ChildSetupData;
+
+static void
+_srt_subprocess_runner_child_setup_cb (gpointer user_data)
+{
+  const ChildSetupData *data = user_data;
+
+  /* Note that we can't use the GError here, because a GSpawnChildSetupFunc
+   * needs to follow signal-safety(7) rules.
+   *
+   * Reporting this internal error as though terminated by SIGABRT is somewhat
+   * arbitrary. */
+  if ((data->flags & SRT_HELPER_FLAGS_TERMINATE_WITH_PARENT)
+      && !_srt_raise_on_parent_death (SIGTERM, NULL))
+    _srt_async_signal_safe_error ("srt-subprocess-runner",
+                                  "Failed to set up parent-death signal",
+                                  128 + SIGABRT);
+
+  /* Unblock all signals and reset signal disposition to SIG_DFL */
+  _srt_child_setup_unblock_signals (NULL);
+}
+
 static gboolean
 _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
                               SrtHelperFlags flags,
+                              GQuark architecture,
                               const char * const *argv,
                               SrtSubprocessOutput stdout_mode,
                               SrtSubprocessOutput stderr_mode,
@@ -1079,6 +1244,7 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
                               GError **error)
 {
   g_auto(GStrv) my_environ = NULL;
+  ChildSetupData child_setup_data = { .flags = flags };
   GSpawnFlags spawn_flags = G_SPAWN_DO_NOT_REAP_CHILD;
   int *stdout_fdp = NULL;
   int *stderr_fdp = NULL;
@@ -1095,6 +1261,9 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
 
   if (flags & SRT_HELPER_FLAGS_SEARCH_PATH)
     spawn_flags |= G_SPAWN_SEARCH_PATH;
+
+  if (flags & SRT_HELPER_FLAGS_LEAVE_FDS_OPEN)
+    spawn_flags |= G_SPAWN_LEAVE_DESCRIPTORS_OPEN;
 
   if ((flags & SRT_HELPER_FLAGS_TIME_OUT) == 0)
     {
@@ -1161,12 +1330,26 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
         g_return_val_if_reached (FALSE);
     }
 
-  return g_spawn_async_with_pipes (NULL,        /* working directory */
+  if (!(flags & SRT_HELPER_FLAGS_QUIET))
+    {
+      g_autoptr(GString) command = g_string_new ("");
+
+      for (size_t i = 0; argv[i] != NULL; i++)
+        {
+          g_autofree gchar *quoted = g_shell_quote (argv[i]);
+
+          g_string_append_printf (command, " %s", quoted);
+        }
+
+      g_debug ("run:%s", command->str);
+    }
+
+  return g_spawn_async_with_pipes (self->working_directory,
                                    (gchar **) argv,
                                    my_environ != NULL ? my_environ : self->envp,
                                    spawn_flags,
-                                   _srt_child_setup_unblock_signals,
-                                   NULL,        /* user data */
+                                   _srt_subprocess_runner_child_setup_cb,
+                                   &child_setup_data,
                                    &subprocess->pid,
                                    NULL,
                                    stdout_fdp,
@@ -1174,9 +1357,33 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
                                    error);
 }
 
+/*
+ * _srt_subprocess_runner_run_sync:
+ * @self: The subprocess runner
+ * @flags: Flags affecting how we run @argv
+ * @architecture: The architecture of @argv, used to select an emulator
+ *  if appropriate, or %SRT_ARCHITECTURE_QUARK_NONE (= 0) to assume that
+ *  it is directly runnable
+ * @argv: The executable and arguments to run
+ * @stdout_mode: Whether to capture stdout, send it to the stdout of the
+ *  current process, or send it to /dev/null
+ * @stderr_mode: Same as @stdout_mode, but for stderr
+ * @error: Used to raise an error on failure
+ *
+ * Run a subprocess and wait for it to finish.
+ * If a subprocess was run (even if it timed out, crashed, or exited with a
+ * nonzero status), return a non-%NULL #SrtCompletedSubprocess object.
+ * If no subprocess could be run, return %NULL with @error set.
+ *
+ * This is functionally similar to Python `subprocess.run(check=False)`.
+ *
+ * Returns: (transfer full): an object representing the completed subprocess,
+ *  or %NULL on failure to start it
+ */
 SrtCompletedSubprocess *
 _srt_subprocess_runner_run_sync (SrtSubprocessRunner *self,
                                  SrtHelperFlags flags,
+                                 GQuark architecture,
                                  const char * const *argv,
                                  SrtSubprocessOutput stdout_mode,
                                  SrtSubprocessOutput stderr_mode,
@@ -1184,8 +1391,12 @@ _srt_subprocess_runner_run_sync (SrtSubprocessRunner *self,
 {
   g_auto(SrtSubprocess) subprocess = SRT_SUBPROCESS_INIT;
 
-  if (!_srt_subprocess_runner_spawn (self,
-                                     flags, argv, stdout_mode, stderr_mode,
+  g_return_val_if_fail (argv != NULL, NULL);
+  g_return_val_if_fail (argv[0] != NULL, NULL);
+
+  if (!_srt_subprocess_runner_spawn (self, flags,
+                                     architecture, argv,
+                                     stdout_mode, stderr_mode,
                                      &subprocess, error))
     return NULL;
 

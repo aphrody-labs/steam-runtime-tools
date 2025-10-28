@@ -205,6 +205,7 @@ static void
 fixture_create_runtime (Fixture *f,
                         PvRuntimeFlags flags)
 {
+  g_autoptr(SrtSubprocessRunner) runner = _srt_subprocess_runner_new ();
   g_autoptr(GArray) archs_arr = NULL;
   g_autoptr(GError) local_error = NULL;
   g_autoptr(GPtrArray) graphics_providers = NULL;
@@ -230,7 +231,8 @@ fixture_create_runtime (Fixture *f,
   else
     expected_gfx_in_container = "/run/host";
 
-  graphics_providers = pv_graphics_provider_build_array ("/",
+  graphics_providers = pv_graphics_provider_build_array (runner,
+                                                         "/",
                                                          NULL,
                                                          tuples,
                                                          G_N_ELEMENTS (tuples),
@@ -258,6 +260,7 @@ fixture_create_runtime (Fixture *f,
                                         archs_arr,
                                         graphics_providers,
                                         _srt_peek_environ_nonnull (),
+                                        runner,
                                         flags,
                                         PV_WORKAROUND_FLAGS_NONE,
                                         &local_error);

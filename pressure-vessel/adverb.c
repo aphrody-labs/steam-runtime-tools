@@ -63,6 +63,7 @@ static gboolean opt_create = FALSE;
 static gboolean opt_exit_with_parent = FALSE;
 static gboolean opt_generate_locales = FALSE;
 static gchar *opt_overrides = NULL;
+static gchar *opt_prefix = NULL;
 static gchar *opt_regenerate_ld_so_cache = NULL;
 static gchar *opt_set_ld_library_path = NULL;
 static PvShell opt_shell = PV_SHELL_NONE;
@@ -700,6 +701,11 @@ static GOptionEntry options[] =
     "Let the launched process inherit the given fd.",
     "FD" },
 
+  { "prefix", '\0',
+    G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME, &opt_prefix,
+    "pressure-vessel can be found in PATH/bin and PATH/libexec.",
+    "PATH" },
+
   { "shell", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, opt_shell_cb,
     "Run an interactive shell: never, after COMMAND, "
@@ -763,6 +769,8 @@ main (int argc,
   g_autoptr(SrtProcessManager) process_manager = NULL;
   GError **error = &local_error;
   int ret = EX_USAGE;
+  g_autofree gchar *bindir = NULL;
+  g_autofree gchar *pkglibexecdir = NULL;
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
   g_autoptr(FlatpakBwrap) wrapped_command = NULL;
@@ -900,10 +908,19 @@ main (int argc,
   if (process_manager == NULL)
     goto out;
 
+  if (opt_prefix != NULL)
+    {
+      bindir = g_build_filename (opt_prefix, "bin", NULL);
+      pkglibexecdir = g_build_filename (opt_prefix,
+                                        "libexec",
+                                        "steam-runtime-tools-" _SRT_API_MAJOR,
+                                        NULL);
+    }
+
   runner = _srt_subprocess_runner_new_full (NULL,   /* TODO: have an emulator */
                                             global_envp,
-                                            NULL,   /* path to bin */
-                                            NULL,   /* path to libexec/s-r-t-0 */
+                                            bindir,
+                                            pkglibexecdir,
                                             SRT_TEST_FLAGS_NONE,
                                             NULL);  /* cwd */
 

@@ -2131,6 +2131,8 @@ pv_runtime_get_adverb (PvRuntime *self,
     }
 
   flatpak_bwrap_add_arg (bwrap, self->adverb_in_container);
+  flatpak_bwrap_add_arg_printf (bwrap, "--prefix=%s",
+                                self->pv_prefix_in_container);
 
   if (self->flags & PV_RUNTIME_FLAGS_GENERATE_LOCALES)
     flatpak_bwrap_add_args (bwrap, "--generate-locales", NULL);

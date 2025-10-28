@@ -529,39 +529,35 @@ generate_locales (SrtSubprocessRunner *runner,
                   GError **error)
 {
   g_autoptr(GDir) dir = NULL;
+  g_autoptr(GPtrArray) pvlg = NULL;
   int wait_status;
   g_autofree gchar *child_stderr = NULL;
-  g_autofree gchar *pvlg = NULL;
-  g_autofree gchar *this_dir = NULL;
-  const char *locale_gen_argv[] =
-  {
-    NULL,   /* placeholder for /path/to/pv-locale-gen */
-    "--output-dir", NULL,
-    "--verbose",
-    NULL
-  };
 
   g_return_val_if_fail (temp_dir != NULL, FALSE);
   g_return_val_if_fail (!temp_dir->initialized, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
-  this_dir = _srt_find_executable_dir (error);
-
-  if (this_dir == NULL)
-    return FALSE;
-
-  pvlg = g_build_filename (this_dir, "pv-locale-gen", NULL);
-  locale_gen_argv[0] = pvlg;
-
   if (!glnx_mkdtemp ("pressure-vessel-locales-XXXXXX", 0755, temp_dir, error))
     return glnx_prefix_error (error,
                               "Cannot create temporary directory for locales");
 
-  locale_gen_argv[2] = temp_dir->path;
+  pvlg = _srt_subprocess_runner_get_helper (runner,
+                                            NULL,   /* no tuple - it's a script */
+                                            "pv-locale-gen",
+                                            SRT_HELPER_FLAGS_NONE,
+                                            error);
+
+  if (pvlg == NULL)
+    return FALSE;
+
+  g_ptr_array_add (pvlg, g_strdup ("--output-dir"));
+  g_ptr_array_add (pvlg, g_strdup (temp_dir->path));
+  g_ptr_array_add (pvlg, g_strdup ("--verbose"));
+  g_ptr_array_add (pvlg, NULL);
 
   if (!run_helper_sync (runner,
                         architecture,
-                        locale_gen_argv,
+                        (const char * const *) pvlg->pdata,
                         &child_stderr,
                         &wait_status,
                         error))

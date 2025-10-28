@@ -35,7 +35,7 @@
  */
 typedef struct
 {
-  gchar *root_path;
+  GLnxTmpDir root;
   gchar *libdl_token_path;
   GHashTable *abi_paths;
 } PvPerArchDirs;

@@ -128,12 +128,20 @@ open_or_die (const char *path,
     g_error ("open(%s, 0x%x): %s", path, flags, g_strerror (errno));
 }
 
-static inline gboolean
+static gboolean
 fixture_has_arch (Fixture *f,
                   const char *tuple)
 {
-  return pv_wrap_options_has_architecture (&f->context->options,
-                                           g_quark_from_string (tuple));
+  GQuark q = g_quark_from_string (tuple);
+  gsize i;
+
+  for (i = 0; i < f->context->options.architectures->len; i++)
+    {
+      if (g_array_index (f->context->options.architectures, GQuark, i) == q)
+        return TRUE;
+    }
+
+  return FALSE;
 }
 
 /*

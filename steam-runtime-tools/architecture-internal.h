@@ -118,31 +118,4 @@ _srt_architecture_array_new (void)
                       sizeof (GQuark));
 }
 
-/*
- * _srt_architecture_array_peek_data:
- * @self: An array of architectures
- * @n_out: (optional) (out): Number of architectures
- *
- * Returns: (array length=n_out zero-terminated=1): Architectures in @self,
- *  do not modify
- */
-static inline const GQuark *
-_srt_architecture_array_peek_data (const GArray *self,
-                                   size_t *n_out)
-{
-  if (n_out != NULL)
-    *n_out = self->len;
-
-  return (const GQuark *) self->data;
-}
-
 void _srt_architecture_array_populate_with_defaults (GArray *arch_quarks);
-
-GArray *_srt_architecture_array_new_from_quarks (const GQuark *arch_quarks,
-                                                 size_t n);
-GQuark *_srt_architecture_array_copy_data (const GArray *self,
-                                           size_t *n_out);
-gboolean _srt_architecture_array_has (const GArray *self,
-                                      GQuark arch_quark);
-gboolean _srt_architecture_array_add (GArray *self,
-                                      GQuark arch_quark);

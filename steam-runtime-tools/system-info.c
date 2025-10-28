@@ -650,8 +650,17 @@ static void
 _srt_system_info_add_multiarch_tuple (SrtSystemInfo *self,
                                       const char *tuple)
 {
-  _srt_architecture_array_add (self->multiarch_tuples,
-                               g_quark_from_string (tuple));
+  GQuark new_tuple = g_quark_from_string (tuple);
+
+  for (gsize i = 0; i < self->multiarch_tuples->len; i++)
+    {
+      GQuark stored_tuple = g_array_index (self->multiarch_tuples, GQuark, i);
+
+      if (stored_tuple == new_tuple)
+        return;
+    }
+
+  g_array_append_val (self->multiarch_tuples, new_tuple);
 }
 
 /**

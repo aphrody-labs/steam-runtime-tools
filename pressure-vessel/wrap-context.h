@@ -164,23 +164,12 @@ static inline const GQuark *
 pv_wrap_options_get_architectures (PvWrapOptions *self,
                                    gsize *n)
 {
-  if (n != NULL)
-    *n = self->architectures->len;
-
-  return (const GQuark *) self->architectures->data;
+  return _srt_architecture_array_peek_data (self->architectures, n);
 }
 
 static inline gboolean
 pv_wrap_options_has_architecture (PvWrapOptions *self,
                                   GQuark q)
 {
-  gsize i;
-
-  for (i = 0; i < self->architectures->len; i++)
-    {
-      if (g_array_index (self->architectures, GQuark, i) == q)
-        return TRUE;
-    }
-
-  return FALSE;
+  return _srt_architecture_array_has (self->architectures, q);
 }

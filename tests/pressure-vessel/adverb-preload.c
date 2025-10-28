@@ -129,20 +129,11 @@ teardown (Fixture *f,
   tests_check_fd_leaks_leave (f->old_fds);
 }
 
-static gboolean
+static inline gboolean
 fixture_has_arch (Fixture *f,
                   const char *tuple)
 {
-  GQuark q = g_quark_from_string (tuple);
-  gsize i;
-
-  for (i = 0; i < f->archs->len; i++)
-    {
-      if (g_array_index (f->archs, GQuark, i) == q)
-        return TRUE;
-    }
-
-  return FALSE;
+  return _srt_architecture_array_has (f->archs, g_quark_from_string (tuple));
 }
 
 typedef struct

@@ -2088,49 +2088,6 @@ _srt_pipe_open (SrtPipe *self,
 #endif
 }
 
-static gboolean
-fd_read_loop_internal (int fd,
-                       off_t *offset,
-                       char *buf,
-                       size_t len,
-                       size_t *n_read_out,
-                       GError **error)
-{
-  ssize_t read_result;
-
-  g_return_val_if_fail (n_read_out != NULL, FALSE);
-  *n_read_out = 0;
-  g_return_val_if_fail (fd >= 0, FALSE);
-  g_return_val_if_fail (buf != NULL, FALSE);
-  g_return_val_if_fail (len > 0, FALSE);
-
-  do
-    {
-      size_t bytes_this_time;
-
-      if (offset != NULL)
-        read_result = TEMP_FAILURE_RETRY (pread (fd, buf, len, *offset));
-      else
-        read_result = TEMP_FAILURE_RETRY (read (fd, buf, len));
-
-      if (read_result < 0)
-        return glnx_throw_errno (error);
-
-      bytes_this_time = (size_t) read_result;
-      g_return_val_if_fail (bytes_this_time <= len, FALSE);
-      *n_read_out += bytes_this_time;
-
-      if (offset != NULL)
-        *offset += bytes_this_time;
-
-      len -= bytes_this_time;
-      buf += bytes_this_time;
-    }
-  while (read_result != 0 && len != 0);
-
-  return TRUE;
-}
-
 /*
  * _srt_fd_read_loop:
  * @fd: A file descriptor open for reading
@@ -2157,37 +2114,30 @@ _srt_fd_read_loop (int fd,
                    size_t *n_read_out,
                    GError **error)
 {
-  return fd_read_loop_internal (fd, NULL, buf, len, n_read_out, error);
-}
+  ssize_t read_result;
 
-/*
- * _srt_fd_offset_read_loop:
- * @fd: A file descriptor open for reading
- * @offset: Offset from the beginning of the file at which to read
- * @buf: A buffer
- * @len: Number of bytes available in @buf
- * @n_read_out: (out) (not optional): Number of valid bytes in @buf
- * @error: Used to raise an error on failure
- *
- * Read from @fd just like _srt_fd_read_loop(), but using `pread(2)`
- * instead of `read(2)`: @fd must be seekable, and reading starts @offset
- * bytes from the beginning of the file instead of advancing the
- * file descriptor's associated offset.
- *
- * Returns: %TRUE on success
- */
-gboolean
-_srt_fd_offset_read_loop (int fd,
-                          goffset offset,
-                          char *buf,
-                          size_t len,
-                          size_t *n_read_out,
-                          GError **error)
-{
-  off_t offt = (off_t) offset;
+  g_return_val_if_fail (n_read_out != NULL, FALSE);
+  *n_read_out = 0;
+  g_return_val_if_fail (fd >= 0, FALSE);
+  g_return_val_if_fail (buf != NULL, FALSE);
+  g_return_val_if_fail (len > 0, FALSE);
 
-  if (offset != (goffset) offt)
-    return glnx_throw (error, "Offset too large to represent in off_t");
+  do
+    {
+      size_t bytes_this_time;
 
-  return fd_read_loop_internal (fd, &offt, buf, len, n_read_out, error);
+      read_result = TEMP_FAILURE_RETRY (read (fd, buf, len));
+
+      if (read_result < 0)
+        return glnx_throw_errno (error);
+
+      bytes_this_time = (size_t) read_result;
+      g_return_val_if_fail (bytes_this_time <= len, FALSE);
+      *n_read_out += bytes_this_time;
+      len -= bytes_this_time;
+      buf += bytes_this_time;
+    }
+  while (read_result != 0 && len != 0);
+
+  return TRUE;
 }

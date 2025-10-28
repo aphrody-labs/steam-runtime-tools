@@ -57,9 +57,10 @@ _srt_libdl_run_helper (SrtSubprocessRunner *runner,
 
   g_ptr_array_add (argv, NULL);
 
+  g_debug ("Running %s", (const char *) g_ptr_array_index (argv, 0));
+
   completed = _srt_subprocess_runner_run_sync (runner,
                                                helper_flags,
-                                               arch_quark,
                                                (const char * const *) argv->pdata,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,

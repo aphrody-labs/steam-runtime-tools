@@ -9,8 +9,6 @@
  */
 
 #include "steam-runtime-tools/bwrap-internal.h"
-
-#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
@@ -109,11 +107,8 @@ test_bwrap_executable (SrtSubprocessRunner *runner,
   g_ptr_array_add (argv, (char *) "true");
   g_ptr_array_add (argv, NULL);
 
-  /* @bwrap_executable is assumed to be a native binary
-   * (no emulation required). */
   completed = _srt_subprocess_runner_run_sync (runner,
                                                SRT_HELPER_FLAGS_TIME_OUT,
-                                               SRT_ARCHITECTURE_QUARK_NONE,
                                                (const char * const *) argv->pdata,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
@@ -133,7 +128,7 @@ test_bwrap_executable (SrtSubprocessRunner *runner,
     }
   else
     {
-      g_debug ("... success");
+      g_debug ("Successfully ran: %s --bind / / true", bwrap_executable);
 
       if (features_out != NULL)
         *features_out |= test_features;

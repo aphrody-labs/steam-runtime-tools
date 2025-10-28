@@ -1,5 +1,5 @@
 /*
- * Copyright © 2019-2025 Collabora Ltd.
+ * Copyright © 2019-2023 Collabora Ltd.
  * SPDX-License-Identifier: MIT
  */
 
@@ -8,15 +8,7 @@
 #include <elf.h>
 
 #include "steam-runtime-tools/glib-backports-internal.h"
-#include "steam-runtime-tools/utils-internal.h"
-
-/*
- * SRT_LIBRARY_ERROR:
- *
- * The error domain for library-related errors.
- */
-
-G_DEFINE_QUARK (srt-library-error-quark, srt_library_error)
+#include "steam-runtime-tools/utils.h"
 
 /**
  * _srt_open_elf:
@@ -77,101 +69,4 @@ _srt_open_elf (int dfd,
   *elf = g_steal_pointer (&local_elf);
 
   return TRUE;
-}
-
-/*
- * _srt_elf_get_pt_interp:
- * @elf: An ELF program or library
- * @fd: A readable file descriptor opened on @elf
- *
- * Get the `PT_INTERP` section of @elf.
- *
- * Raise %SRT_LIBRARY_ERROR_NO_INTERPRETER if @elf does not have an ELF
- * intepreter, for example if it is a statically-linked executable.
- *
- * Raise an unspecified other error code, most likely from the
- * %SRT_LIBRARY_ERROR or %G_IO_ERROR domains, if something else went wrong.
- *
- * Returns: (type filename): The PT_INTERP section of @elf
- */
-gchar *
-_srt_elf_get_pt_interp (Elf *elf,
-                        int fd,
-                        GError **error)
-{
-  size_t phnum = 0;
-
-  if (elf_getphdrnum (elf, &phnum) < 0)
-    {
-      g_set_error (error, SRT_LIBRARY_ERROR,
-                   SRT_LIBRARY_ERROR_FAILED,
-                   "Unable to determine number of program headers: %s",
-                   elf_errmsg (elf_errno ()));
-      return NULL;
-    }
-
-  for (size_t i = 0; i < phnum; i++)
-    {
-      GElf_Phdr phdr_mem;
-      GElf_Phdr *phdr = gelf_getphdr (elf, i, &phdr_mem);
-
-      /* The ELF interpreter is a program header of type PT_INTERP */
-      if (phdr != NULL && phdr->p_type == PT_INTERP)
-        {
-          g_autofree gchar *buf = NULL;
-          guint64 len;
-          size_t n = 0;
-
-          if (!(phdr->p_flags & PF_R))
-            {
-              g_set_error (error, SRT_LIBRARY_ERROR,
-                           SRT_LIBRARY_ERROR_FAILED,
-                           "ELF interpreter section not readable");
-              return NULL;
-            }
-
-          len = phdr->p_filesz;
-
-          /* The size needs to be plausible: the Linux kernel checks
-           * for the range [2, PATH_MAX] so let's use that.
-           * This avoids memcpying some ridiculously large range if the
-           * size is somehow corrupt or we can't understand it. */
-          if (len < 2 || len >= PATH_MAX)
-            {
-              g_set_error (error, SRT_LIBRARY_ERROR,
-                           SRT_LIBRARY_ERROR_FAILED,
-                           "ELF interpreter size %" G_GUINT64_FORMAT " out of range",
-                           len);
-              return NULL;
-            }
-
-          buf = g_new0 (char, len);
-
-          if (!_srt_fd_offset_read_loop (fd, phdr->p_offset, buf, len, &n, error))
-            return NULL;
-
-          if (n != len)
-            {
-              g_set_error (error, SRT_LIBRARY_ERROR, SRT_LIBRARY_ERROR_FAILED,
-                           "End-of-file in PT_INTERP section");
-              return NULL;
-            }
-
-          /* Must start with a slash, end with \0 and contain no embedded \0 */
-          if (buf[0] != '/'
-              || buf[n - 1] != '\0'
-              || strlen (buf) != n - 1)
-            {
-              g_set_error (error, SRT_LIBRARY_ERROR, SRT_LIBRARY_ERROR_FAILED,
-                           "PT_INTERP section does not contain a valid path");
-              return NULL;
-            }
-
-          return g_steal_pointer (&buf);
-        }
-    }
-
-  g_set_error (error, SRT_LIBRARY_ERROR, SRT_LIBRARY_ERROR_NO_INTERPRETER,
-               "No PT_INTERP section (not a dynamic executable?)");
-  return NULL;
 }

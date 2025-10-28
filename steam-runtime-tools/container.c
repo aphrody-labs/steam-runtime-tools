@@ -35,6 +35,7 @@
 #include <glib.h>
 #include <gio/gio.h>
 
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/bwrap-internal.h"
 #include "steam-runtime-tools/container-internal.h"
 #include "steam-runtime-tools/enums.h"
@@ -778,9 +779,12 @@ _srt_check_flatpak_subsandbox (SrtSubprocessRunner *runner)
    * If this is OK then we're good. */
   set_subsandbox_check_args (argv, initial_argc,
                              SRT_FLATPAK_ISSUES_ANY_SUBSANDBOX);
+  /* s-r-launch-client is assumed to be a native binary
+   * (no emulation required). */
   completed = _srt_subprocess_runner_run_sync (runner,
                                                (SRT_HELPER_FLAGS_TIME_OUT
                                                 | SRT_HELPER_FLAGS_SHELL_EXIT_STATUS),
+                                               SRT_ARCHITECTURE_QUARK_NONE,
                                                (const char * const *) argv->pdata,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
@@ -823,6 +827,7 @@ _srt_check_flatpak_subsandbox (SrtSubprocessRunner *runner)
   completed = _srt_subprocess_runner_run_sync (runner,
                                                (SRT_HELPER_FLAGS_TIME_OUT
                                                 | SRT_HELPER_FLAGS_SHELL_EXIT_STATUS),
+                                               SRT_ARCHITECTURE_QUARK_NONE,
                                                (const char * const *) argv->pdata,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
@@ -859,6 +864,7 @@ _srt_check_flatpak_subsandbox (SrtSubprocessRunner *runner)
       completed = _srt_subprocess_runner_run_sync (runner,
                                                    (SRT_HELPER_FLAGS_TIME_OUT
                                                     | SRT_HELPER_FLAGS_SHELL_EXIT_STATUS),
+                                                   SRT_ARCHITECTURE_QUARK_NONE,
                                                    (const char * const *) argv->pdata,
                                                    SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
                                                    SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,

@@ -380,6 +380,7 @@ _argv_for_list_glx_icds_in_path (SrtSysroot *sysroot,
 /*
  * _srt_list_modules_from_directory:
  * @runner: The execution environment
+ * @architecture: The architecture of @argv
  * @argv: (array zero-terminated=1) (not nullable): The `argv` of the helper to use
  * @tmp_directory: (not nullable) (type filename): Full path to the destination
  *  directory used by the "capsule-capture-libs" helper
@@ -399,6 +400,7 @@ _argv_for_list_glx_icds_in_path (SrtSysroot *sysroot,
  */
 static void
 _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
+                                  GQuark architecture,
                                   GPtrArray *argv,
                                   const gchar *tmp_directory,
                                   GHashTable *known_table,
@@ -418,6 +420,7 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
   gchar *soname_path = NULL;
 
   g_return_if_fail (SRT_IS_SUBPROCESS_RUNNER (runner));
+  g_return_if_fail (architecture != SRT_ARCHITECTURE_QUARK_NONE);
   g_return_if_fail (argv != NULL);
   g_return_if_fail (tmp_directory != NULL);
   g_return_if_fail (known_table != NULL);
@@ -425,6 +428,7 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
 
   completed = _srt_subprocess_runner_run_sync (runner,
                                                helper_flags,
+                                               architecture,
                                                (const char * const *) argv->pdata,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
@@ -538,6 +542,7 @@ out:
  */
 static char **
 _srt_list_links_from_directory (SrtSubprocessRunner *runner,
+                                GQuark architecture,
                                 GPtrArray *argv,
                                 const gchar *tmp_directory)
 {
@@ -550,11 +555,13 @@ _srt_list_links_from_directory (SrtSubprocessRunner *runner,
   g_autoptr(GPtrArray) lib_links = g_ptr_array_new_with_free_func (g_free);
 
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (runner), NULL);
+  g_return_val_if_fail (architecture != SRT_ARCHITECTURE_QUARK_NONE, NULL);
   g_return_val_if_fail (argv != NULL, NULL);
   g_return_val_if_fail (tmp_directory != NULL, NULL);
 
   completed = _srt_subprocess_runner_run_sync (runner,
                                                helper_flags,
+                                               architecture,
                                                (const char * const *) argv->pdata,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
@@ -1076,7 +1083,9 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
       goto out;
     }
 
-  _srt_list_modules_from_directory (runner, by_soname_argv, by_soname_tmp_dir, known_libs,
+  _srt_list_modules_from_directory (runner,
+                                    arch_quark, by_soname_argv,
+                                    by_soname_tmp_dir, known_libs,
                                     SRT_GRAPHICS_GLX_MODULE, FALSE, drivers_out);
 
   /* When in a container we might miss valid GLX drivers because the `ld.so.cache` in
@@ -1102,7 +1111,9 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
           goto out;
         }
 
-      _srt_list_modules_from_directory (runner, overrides_argv, overrides_tmp_dir, known_libs,
+      _srt_list_modules_from_directory (runner,
+                                        arch_quark, overrides_argv,
+                                        overrides_tmp_dir, known_libs,
                                         SRT_GRAPHICS_GLX_MODULE, FALSE, drivers_out);
     }
 
@@ -1401,7 +1412,8 @@ _srt_get_modules_full (SrtSysroot *sysroot,
           goto out;
         }
 
-      loader_lib_link = _srt_list_links_from_directory (runner, gfx_argv,
+      loader_lib_link = _srt_list_links_from_directory (runner,
+                                                        arch_quark, gfx_argv,
                                                         capture_libs_output_dir);
       for (i = 0; loader_lib_link != NULL && loader_lib_link[i] != NULL; i++)
         {
@@ -1531,7 +1543,9 @@ _srt_get_modules_full (SrtSysroot *sysroot,
           g_debug ("An error occurred trying to capture VDPAU drivers: %s", error->message);
           goto out;
         }
-      _srt_list_modules_from_directory (runner, vdpau_argv, tmp_dir, drivers_set,
+      _srt_list_modules_from_directory (runner,
+                                        arch_quark, vdpau_argv,
+                                        tmp_dir, drivers_set,
                                         SRT_GRAPHICS_VDPAU_MODULE, is_extra, drivers_out);
 
       if (!(check_flags & SRT_CHECK_FLAGS_SKIP_EXTRAS))

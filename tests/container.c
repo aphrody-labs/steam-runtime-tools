@@ -404,7 +404,8 @@ test_flatpak_issues (Fixture *f,
       runner = _srt_subprocess_runner_new_full (_srt_const_strv (environ),
                                                 path,
                                                 NULL,
-                                                test_flags);
+                                                test_flags,
+                                                NULL);    /* cwd */
       g_assert_nonnull (runner);
       _srt_container_info_check_issues (container, sysroot, runner);
       g_assert_cmpuint (srt_container_info_get_flatpak_issues (container),
@@ -497,7 +498,8 @@ test_bwrap_issues (Fixture *f,
       runner = _srt_subprocess_runner_new_full (_srt_const_strv (envp),
                                                 NULL,
                                                 pkglibexecdir,
-                                                SRT_TEST_FLAGS_NONE);
+                                                SRT_TEST_FLAGS_NONE,
+                                                NULL);    /* cwd */
       actual = _srt_check_bwrap_issues (sysroot, runner, &bwrap, &message);
 
       if (actual & SRT_BWRAP_ISSUES_CANNOT_RUN)

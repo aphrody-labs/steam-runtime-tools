@@ -1225,7 +1225,7 @@ assert_vulkan_icd (const char *sysroot,
 
   if (error_property == NULL)
     {
-      g_autofree gchar *tmp_dir = NULL;
+      g_auto(GLnxTmpDir) tmp_dir = { .initialized = FALSE };
       g_autofree gchar *output_file = NULL;
       g_autofree gchar *content = NULL;
       g_autofree gchar *saved = NULL;
@@ -1252,10 +1252,10 @@ assert_vulkan_icd (const char *sysroot,
           g_assert_true (g_path_is_absolute (resolved));
         }
 
-      tmp_dir = g_dir_make_tmp ("vulkan-test-XXXXXX", &error);
+      glnx_mkdtemp ("vulkan-test-XXXXXX", 0700, &tmp_dir, &error);
       g_assert_no_error (error);
 
-      output_file = g_build_filename (tmp_dir, "driver.json", NULL);
+      output_file = g_build_filename (tmp_dir.path, "driver.json", NULL);
       srt_vulkan_icd_write_to_file (icd, output_file, &error);
       g_assert_no_error (error);
 
@@ -1275,9 +1275,6 @@ assert_vulkan_icd (const char *sysroot,
       g_assert_cmpuint (saved_len, ==, strlen (saved));
 
       g_assert_cmpstr (content, ==, saved);
-
-      if (!_srt_rm_rf (tmp_dir))
-        g_debug ("Unable to remove temp directory: %s", tmp_dir);
     }
   else
     {
@@ -1898,7 +1895,7 @@ compare_openxr_content (Fixture *f,
                         const char *expected_json_relative)
 {
   g_autoptr(GError) error = NULL;
-  g_autofree char *tmp_dir = NULL;
+  g_auto(GLnxTmpDir) tmp_dir = { .initialized = FALSE };
   g_autofree char *tmp_json_path = NULL;
   g_autofree char *tmp_json_contents = NULL;
   g_autofree char *tmp_json_contents_unformatted = NULL;
@@ -1906,9 +1903,9 @@ compare_openxr_content (Fixture *f,
   g_autofree char *expected_json_contents = NULL;
   gsize tmp_json_len;
 
-  tmp_dir = g_dir_make_tmp ("openxr-json-test-XXXXXX", &error);
+  glnx_mkdtemp ("openxr-json-test-XXXXXX", 0700, &tmp_dir, &error);
   g_assert_no_error (error);
-  tmp_json_path = g_build_filename (tmp_dir, "output.json", NULL);
+  tmp_json_path = g_build_filename (tmp_dir.path, "output.json", NULL);
 
   expected_json_path = g_build_filename (f->sysroot,
                                          expected_json_relative,
@@ -1927,9 +1924,6 @@ compare_openxr_content (Fixture *f,
   tmp_json_contents = _srt_json_pretty (tmp_json_contents_unformatted);
   expected_json_contents = _srt_json_pretty_from_file (expected_json_path);
   _srt_assert_streq_diff (expected_json_contents, tmp_json_contents);
-
-  if (!_srt_rm_rf (tmp_dir))
-    g_debug ("Unable to remove temp directory: %s", tmp_dir);
 }
 
 static void
@@ -2672,14 +2666,14 @@ test_layer_vulkan (Fixture *f,
                    gconstpointer context)
 {
   g_auto(GStrv) vulkan_layer_envp = g_get_environ ();
-  g_autofree gchar *tmp_dir = NULL;
+  g_auto(GLnxTmpDir) tmp_dir = { .initialized = FALSE };
   g_autoptr(GError) error = NULL;
   gsize i;
   const char * const multiarchs[] = { "x86_64-mock-abi", "i386-mock-abi", NULL };
 
   g_test_message ("Entering %s", G_STRFUNC);
 
-  tmp_dir = g_dir_make_tmp ("layers-test-XXXXXX", &error);
+  glnx_mkdtemp ("layers-test-XXXXXX", 0700, &tmp_dir, &error);
   g_assert_no_error (error);
 
   for (i = 0; i < G_N_ELEMENTS (vulkan_layers_test); i++)
@@ -2692,7 +2686,7 @@ test_layer_vulkan (Fixture *f,
       g_autofree gchar *sysroot = NULL;
       /* Create a new empty temp sub directory for every test */
       g_autofree gchar *test_num = g_strdup_printf ("%" G_GSIZE_FORMAT, i);
-      g_autofree gchar *this_test_dir = g_build_filename (tmp_dir, test_num, NULL);
+      g_autofree gchar *this_test_dir = g_build_filename (tmp_dir.path, test_num, NULL);
       const GList *iter;
       gsize j;
 
@@ -2775,9 +2769,6 @@ test_layer_vulkan (Fixture *f,
       if (!_srt_rm_rf (this_test_dir))
         g_debug ("Unable to remove the temp layers directory: %s", this_test_dir);
     }
-
-  if (!_srt_rm_rf (tmp_dir))
-    g_debug ("Unable to remove the temp layers directory: %s", tmp_dir);
 }
 
 static void

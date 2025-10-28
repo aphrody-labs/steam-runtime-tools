@@ -40,8 +40,7 @@
 typedef struct
 {
   TestsOpenFdSet old_fds;
-  gchar *tmpdir;
-  int tmpdir_fd;
+  GLnxTmpDir tmpdir;
 } Fixture;
 
 typedef struct
@@ -65,43 +64,43 @@ setup (Fixture *f,
   const gchar *executable = "ldconfig";
 
   f->old_fds = tests_check_fd_leaks_enter ();
-  f->tmpdir = g_dir_make_tmp ("pressure-vessel-tests.XXXXXX", &local_error);
-  g_assert_no_error (local_error);
-  glnx_opendirat (AT_FDCWD, f->tmpdir, TRUE, &f->tmpdir_fd, &local_error);
+  glnx_mkdtemp ("pressure-vessel-tests.XXXXXX", 0700, &f->tmpdir, &local_error);
   g_assert_no_error (local_error);
 
-  linuxbrew = g_build_filename (f->tmpdir, ".linuxbrew", "bin", NULL);
+  linuxbrew = g_build_filename (f->tmpdir.path, ".linuxbrew", "bin", NULL);
   g_assert_no_errno (g_mkdir_with_parents (linuxbrew, 0755));
   linuxbrew_exe = g_build_filename (".linuxbrew", "bin", executable, NULL);
-  glnx_file_replace_contents_with_perms_at (f->tmpdir_fd, linuxbrew_exe,
+  glnx_file_replace_contents_with_perms_at (f->tmpdir.fd, linuxbrew_exe,
                                             (const guint8 *) "", 0,
                                             (mode_t) 755, (uid_t) -1, (gid_t) -1,
                                             0, NULL, &local_error);
   g_assert_no_error (local_error);
 
-  linuxbrew_home = g_build_filename (f->tmpdir, "home", "linuxbrew", ".local", "bin", NULL);
+  linuxbrew_home = g_build_filename (f->tmpdir.path, "home", "linuxbrew",
+                                     ".local", "bin", NULL);
   g_assert_no_errno (g_mkdir_with_parents (linuxbrew_home, 0755));
   linuxbrew_home_exe = g_build_filename ("home", "linuxbrew", ".local", "bin", executable, NULL);
-  glnx_file_replace_contents_with_perms_at (f->tmpdir_fd, linuxbrew_home_exe,
+  glnx_file_replace_contents_with_perms_at (f->tmpdir.fd, linuxbrew_home_exe,
                                             (const guint8 *) "", 0,
                                             (mode_t) 755, (uid_t) -1, (gid_t) -1,
                                             0, NULL, &local_error);
   g_assert_no_error (local_error);
 
-  bin = g_build_filename (f->tmpdir, "bin", NULL);
+  bin = g_build_filename (f->tmpdir.path, "bin", NULL);
   g_assert_no_errno (g_mkdir_with_parents (bin, 0755));
   bin_exe = g_build_filename ("bin", executable, NULL);
-  glnx_file_replace_contents_with_perms_at (f->tmpdir_fd, bin_exe,
+  glnx_file_replace_contents_with_perms_at (f->tmpdir.fd, bin_exe,
                                             (const guint8 *) "", 0,
                                             (mode_t) 755, (uid_t) -1, (gid_t) -1,
                                             0, NULL, &local_error);
   g_assert_no_error (local_error);
 
-  local_bin = g_build_filename (f->tmpdir, "home", "user", ".local", "bin", NULL);
+  local_bin = g_build_filename (f->tmpdir.path, "home", "user",
+                                ".local", "bin", NULL);
   g_assert_no_errno (g_mkdir_with_parents (local_bin, 0755));
   local_bin_not_exe = g_build_filename ("home", "user", ".local", "bin", executable, NULL);
   /* Create an ldconfig that is unexpectedly not an executable */
-  glnx_file_replace_contents_with_perms_at (f->tmpdir_fd, local_bin_not_exe,
+  glnx_file_replace_contents_with_perms_at (f->tmpdir.fd, local_bin_not_exe,
                                             (const guint8 *) "", 0,
                                             (mode_t) 644, (uid_t) -1, (gid_t) -1,
                                             0, NULL, &local_error);
@@ -114,15 +113,8 @@ teardown (Fixture *f,
 {
   g_autoptr(GError) local_error = NULL;
 
-  glnx_close_fd (&f->tmpdir_fd);
-
-  if (f->tmpdir != NULL)
-    {
-      glnx_shutil_rm_rf_at (-1, f->tmpdir, NULL, &local_error);
-      g_assert_no_error (local_error);
-    }
-
-  g_clear_pointer (&f->tmpdir, g_free);
+  glnx_tmpdir_delete (&f->tmpdir, NULL, &local_error);
+  g_assert_no_error (local_error);
 
   tests_check_fd_leaks_leave (f->old_fds);
 }
@@ -194,7 +186,7 @@ test_graphics_provider_search (Fixture *f,
    * To keep things simple in this unit test, don't start multi-threaded
    * graphics driver enumeration immediately. */
   graphics_providers = pv_graphics_provider_build_array (runner,
-                                                         f->tmpdir,
+                                                         f->tmpdir.path,
                                                          NULL,
                                                          tuples,
                                                          G_N_ELEMENTS (tuples),

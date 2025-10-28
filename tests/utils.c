@@ -1562,8 +1562,8 @@ static void
 test_same_file (Fixture *f,
                 gconstpointer context)
 {
+  g_auto(GLnxTmpDir) temp = { .initialized = FALSE };
   g_autoptr(GError) error = NULL;
-  g_autofree gchar *temp = NULL;
   g_autofree gchar *hard_link_from = NULL;
   g_autofree gchar *hard_link_to = NULL;
   g_autofree gchar *symlink_to_dev_null = NULL;
@@ -1575,13 +1575,13 @@ test_same_file (Fixture *f,
   g_assert_false (_srt_is_same_file ("/nonexistent", "/dev/null"));
   g_assert_false (_srt_is_same_file ("/nonexistent", "/nonexistent/also"));
 
-  temp = g_dir_make_tmp (NULL, &error);
+  glnx_mkdtemp ("test-XXXXXX", 0700, &temp, &error);
   g_assert_no_error (error);
-  g_assert_nonnull (temp);
+  g_assert_nonnull (temp.path);
 
-  hard_link_from = g_build_filename (temp, "hard-link-from", NULL);
-  hard_link_to = g_build_filename (temp, "hard-link-to", NULL);
-  symlink_to_dev_null = g_build_filename (temp, "symlink", NULL);
+  hard_link_from = g_build_filename (temp.path, "hard-link-from", NULL);
+  hard_link_to = g_build_filename (temp.path, "hard-link-to", NULL);
+  symlink_to_dev_null = g_build_filename (temp.path, "symlink", NULL);
 
   g_file_set_contents (hard_link_from, "hello", -1, &error);
   g_assert_no_error (error);
@@ -1600,7 +1600,7 @@ test_same_file (Fixture *f,
   g_assert_true (_srt_is_same_file (symlink_to_dev_null, "/dev/null"));
   g_assert_false (_srt_is_same_file (symlink_to_dev_null, "/dev/zero"));
 
-  glnx_shutil_rm_rf_at (-1, temp, NULL, &error);
+  glnx_tmpdir_delete (&temp, NULL, &error);
   g_assert_no_error (error);
 }
 

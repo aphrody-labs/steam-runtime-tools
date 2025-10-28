@@ -1063,8 +1063,7 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
   GPtrArray *by_soname_argv = NULL;
   GPtrArray *overrides_argv = NULL;
   GError *error = NULL;
-  gchar *by_soname_tmp_dir = NULL;
-  gchar *overrides_tmp_dir = NULL;
+  g_auto(GLnxTmpDir) by_soname_tmp_dir = { .initialized = FALSE };
   gchar *overrides_path = NULL;
   GHashTable *known_libs = NULL;
   const char *multiarch_tuple;
@@ -1076,15 +1075,15 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
 
   multiarch_tuple = g_quark_to_string (arch_quark);
   known_libs = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
-  by_soname_tmp_dir = g_dir_make_tmp ("glx-icds-XXXXXX", &error);
-  if (by_soname_tmp_dir == NULL)
+
+  if (!glnx_mkdtemp ("glx-icds-XXXXXX", 0700, &by_soname_tmp_dir, &error))
     {
       g_debug ("An error occurred trying to create a temporary folder: %s", error->message);
       goto out;
     }
 
   by_soname_argv = _argv_for_list_glx_icds (sysroot, runner, multiarch_tuple,
-                                            by_soname_tmp_dir, &error);
+                                            by_soname_tmp_dir.path, &error);
 
   if (by_soname_argv == NULL)
     {
@@ -1094,7 +1093,7 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
 
   _srt_list_modules_from_directory (runner,
                                     arch_quark, by_soname_argv,
-                                    by_soname_tmp_dir, known_libs,
+                                    by_soname_tmp_dir.path, known_libs,
                                     SRT_GRAPHICS_GLX_MODULE, FALSE, drivers_out);
 
   /* When in a container we might miss valid GLX drivers because the `ld.so.cache` in
@@ -1104,15 +1103,17 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
   overrides_path = g_build_filename (sysroot->path, "/overrides", NULL);
   if (g_file_test (overrides_path, G_FILE_TEST_IS_DIR))
     {
-      overrides_tmp_dir = g_dir_make_tmp ("glx-icds-XXXXXX", &error);
-      if (overrides_tmp_dir == NULL)
+      g_auto(GLnxTmpDir) overrides_tmp_dir = { .initialized = FALSE };
+
+      if (!glnx_mkdtemp ("glx-icds-XXXXXX", 0700, &overrides_tmp_dir, &error))
         {
           g_debug ("An error occurred trying to create a temporary folder: %s", error->message);
           goto out;
         }
 
       overrides_argv = _argv_for_list_glx_icds_in_path (sysroot, runner, multiarch_tuple,
-                                                        overrides_tmp_dir, overrides_path, &error);
+                                                        overrides_tmp_dir.path,
+                                                        overrides_path, &error);
 
       if (overrides_argv == NULL)
         {
@@ -1122,25 +1123,13 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
 
       _srt_list_modules_from_directory (runner,
                                         arch_quark, overrides_argv,
-                                        overrides_tmp_dir, known_libs,
+                                        overrides_tmp_dir.path, known_libs,
                                         SRT_GRAPHICS_GLX_MODULE, FALSE, drivers_out);
     }
 
 out:
   g_clear_pointer (&by_soname_argv, g_ptr_array_unref);
   g_clear_pointer (&overrides_argv, g_ptr_array_unref);
-  if (by_soname_tmp_dir)
-    {
-      if (!_srt_rm_rf (by_soname_tmp_dir))
-        g_debug ("Unable to remove the temporary directory: %s", by_soname_tmp_dir);
-    }
-  if (overrides_tmp_dir)
-    {
-      if (!_srt_rm_rf (overrides_tmp_dir))
-        g_debug ("Unable to remove the temporary directory: %s", overrides_tmp_dir);
-    }
-  g_free (by_soname_tmp_dir);
-  g_free (overrides_tmp_dir);
   g_free (overrides_path);
   g_hash_table_unref (known_libs);
   g_clear_error (&error);
@@ -1182,8 +1171,6 @@ _srt_get_modules_full (SrtSysroot *sysroot,
   const gchar *drivers_path;
   const gchar *ld_library_path = NULL;
   const char *multiarch_tuple;
-  g_autofree gchar *tmp_dir = NULL;
-  g_autofree gchar *capture_libs_output_dir = NULL;
   g_autoptr(GHashTable) drivers_set = NULL;
   gboolean is_extra = FALSE;
   g_autoptr(GPtrArray) vdpau_argv = NULL;
@@ -1269,7 +1256,7 @@ _srt_get_modules_full (SrtSysroot *sysroot,
       /* We continue to search for libraries but we mark them all as "extra" because the
        * loader wouldn't have picked them up. */
       if (check_flags & SRT_CHECK_FLAGS_SKIP_EXTRAS)
-        goto out;
+        return;
       else
         is_extra = TRUE;
     }
@@ -1338,7 +1325,7 @@ _srt_get_modules_full (SrtSysroot *sysroot,
       if (module != SRT_GRAPHICS_VDPAU_MODULE)
         {
           if (check_flags & SRT_CHECK_FLAGS_SKIP_EXTRAS)
-            goto out;
+            return;
           else
             is_extra = TRUE;
         }
@@ -1390,7 +1377,7 @@ _srt_get_modules_full (SrtSysroot *sysroot,
 
       /* It's not possible to discover the extras without relying on the
        * architecture-specific helpers. For this reason we just return. */
-      goto out;
+      return;
     }
 
   if (!_srt_sysroot_is_direct (sysroot))
@@ -1401,29 +1388,31 @@ _srt_get_modules_full (SrtSysroot *sysroot,
        * system that has unmet dependencies may fail.
        * Instead we use capsule-capture-libs, and check the symlinks that it
        * creates. */
+      g_auto(GLnxTmpDir) capture_libs_output_dir = { .initialized = FALSE };
       g_autoptr(GPtrArray) gfx_argv = NULL;
       g_auto(GStrv) loader_lib_link = NULL;
-      capture_libs_output_dir = g_dir_make_tmp ("graphics-drivers-XXXXXX", &error);
-      if (capture_libs_output_dir == NULL)
+
+      if (!glnx_mkdtemp ("graphics-drivers-XXXXXX", 0700, &capture_libs_output_dir, &error))
         {
           g_debug ("An error occurred trying to create a temporary folder: %s",
                    error->message);
-          goto out;
+          return;
         }
 
       gfx_argv = _argv_for_list_loader_libraries (sysroot, runner,
-                                                  multiarch_tuple, capture_libs_output_dir,
+                                                  multiarch_tuple,
+                                                  capture_libs_output_dir.path,
                                                   loader_libraries, &error);
       if (gfx_argv == NULL)
         {
           g_debug ("An error occurred trying to locate graphics drivers: %s",
                    error->message);
-          goto out;
+          return;
         }
 
       loader_lib_link = _srt_list_links_from_directory (runner,
                                                         arch_quark, gfx_argv,
-                                                        capture_libs_output_dir);
+                                                        capture_libs_output_dir.path);
       for (i = 0; loader_lib_link != NULL && loader_lib_link[i] != NULL; i++)
         {
           g_debug ("Searching modules using the loader path \"%s\"", loader_lib_link[i]);
@@ -1492,6 +1481,8 @@ _srt_get_modules_full (SrtSysroot *sysroot,
 
   if (module == SRT_GRAPHICS_VDPAU_MODULE)
     {
+      g_auto(GLnxTmpDir) tmp_dir = { .initialized = FALSE };
+
       /* VDPAU modules are also loaded by just dlopening the bare filename
        * libvdpau_${VDPAU_DRIVER}.so
        * To cover that we search in all directories listed in LD_LIBRARY_PATH.
@@ -1539,22 +1530,22 @@ _srt_get_modules_full (SrtSysroot *sysroot,
 
       /* Also use "capsule-capture-libs" to search for VDPAU drivers that we might have
        * missed */
-      tmp_dir = g_dir_make_tmp ("vdpau-drivers-XXXXXX", &error);
-      if (tmp_dir == NULL)
+      if (!glnx_mkdtemp ("vdpau-drivers-XXXXXX", 0700, &tmp_dir, &error))
         {
           g_debug ("An error occurred trying to create a temporary folder: %s", error->message);
-          goto out;
+          return;
         }
+
       vdpau_argv = _argv_for_list_vdpau_drivers (sysroot, runner,
-                                                 multiarch_tuple, tmp_dir, &error);
+                                                 multiarch_tuple, tmp_dir.path, &error);
       if (vdpau_argv == NULL)
         {
           g_debug ("An error occurred trying to capture VDPAU drivers: %s", error->message);
-          goto out;
+          return;
         }
       _srt_list_modules_from_directory (runner,
                                         arch_quark, vdpau_argv,
-                                        tmp_dir, drivers_set,
+                                        tmp_dir.path, drivers_set,
                                         SRT_GRAPHICS_VDPAU_MODULE, is_extra, drivers_out);
 
       if (!(check_flags & SRT_CHECK_FLAGS_SKIP_EXTRAS))
@@ -1574,19 +1565,6 @@ _srt_get_modules_full (SrtSysroot *sysroot,
             }
         }
     }
-
-out:
-  if (tmp_dir)
-    {
-      if (!_srt_rm_rf (tmp_dir))
-        g_debug ("Unable to remove the temporary directory: %s", tmp_dir);
-    }
-  if (capture_libs_output_dir != NULL)
-    {
-      if (!_srt_rm_rf (capture_libs_output_dir))
-        g_debug ("Unable to remove the temporary directory: %s", capture_libs_output_dir);
-    }
-
 }
 
 /*

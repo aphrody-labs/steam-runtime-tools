@@ -8,8 +8,10 @@
 
 #include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
+#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
+#include "pressure-vessel/bwrap.h"
 #include "pressure-vessel/exports.h"
 #include "pressure-vessel/supported-architectures.h"
 #include "pressure-vessel/utils.h"
@@ -1430,6 +1432,88 @@ pv_wrap_context_export_if_allowed (PvWrapContext *self,
   /* This generally shouldn't fail in practice, because we already checked
    * against reserved_paths[] above */
   pv_exports_expose_or_log (self->exports, export_mode, path);
+
+  return TRUE;
+}
+
+/*
+ * pv_wrap_context_append_payload_command:
+ * @self: The context
+ * @argv: (array length=argc): Arbitrary arguments
+ * @argc: Number of arguments
+ * @argv_in_container: Argument vector to be used inside the container
+ * @error: Used to report error on failure
+ *
+ * Append arguments to @argv_in_container that will run the "payload"
+ * command for the container.
+ *
+ * If `self->options.launcher` is set, then the arguments that are appended
+ * are an invocation of `steam-runtime-launcher-service` with arbitrary
+ * arguments.
+ *
+ * Otherwise, the arguments that are appended are the COMMAND that was
+ * passed to `pressure-vessel-wrap(1)`.
+ * Typically this is a Steam game, or a compatibility tool like Proton
+ * that wraps a game, but during debugging and development it might be
+ * something else such as an interactive shell.
+ *
+ * On entry, @argv_in_container must either be empty, or contain an
+ * "adverb" command that wraps an arbitrary command inside the container.
+ *
+ * Returns: %TRUE if successful
+ */
+gboolean
+pv_wrap_context_append_payload_command (PvWrapContext *self,
+                                        const char * const *argv,
+                                        int argc,
+                                        FlatpakBwrap *argv_in_container,
+                                        GError **error)
+{
+  const char *tools_dir;
+
+  g_return_val_if_fail (PV_IS_WRAP_CONTEXT (self), FALSE);
+  g_return_val_if_fail (argc >= 0, FALSE);
+  g_return_val_if_fail (argv != NULL, FALSE);
+  g_return_val_if_fail (argv_in_container != NULL, FALSE);
+  g_return_val_if_fail (!pv_bwrap_was_finished (argv_in_container), FALSE);
+  g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+
+  if (!(self->options.launcher || self->options.only_prepare))
+    {
+      g_return_val_if_fail (argc >= 1, FALSE);
+      g_return_val_if_fail (argv[0] != NULL, FALSE);
+    }
+
+  tools_dir = _srt_subprocess_runner_get_bin_path (self->run_in_current_context);
+
+  if (self->options.launcher)
+    {
+      g_autoptr(FlatpakBwrap) launcher_argv =
+        flatpak_bwrap_new (flatpak_bwrap_empty_env);
+      g_autofree gchar *launcher_service = g_build_filename (tools_dir,
+                                                             "steam-runtime-launcher-service",
+                                                             NULL);
+      g_debug ("Adding steam-runtime-launcher-service '%s'...", launcher_service);
+      flatpak_bwrap_add_arg (launcher_argv, launcher_service);
+
+      if (_srt_util_is_debugging ())
+        flatpak_bwrap_add_arg (launcher_argv, "--verbose");
+
+      /* In --launcher mode, arguments after the "--" separator are
+       * passed to the launcher */
+      flatpak_bwrap_append_argsv (launcher_argv, (char **) argv, argc);
+
+      g_warn_if_fail (g_strv_length (launcher_argv->envp) == 0);
+      flatpak_bwrap_append_bwrap (argv_in_container, launcher_argv);
+    }
+  else
+    {
+      /* In non-"--launcher" mode, arguments after the "--" separator
+       * are the command to execute, passed to the adverb after "--".
+       * Because we always use the adverb, we don't need to worry about
+       * whether argv[1] starts with "-". */
+      flatpak_bwrap_append_argsv (argv_in_container, (char **) argv, argc);
+    }
 
   return TRUE;
 }

@@ -2122,6 +2122,124 @@ test_passwd (Fixture *f,
 }
 
 static void
+test_payload_command_basic (Fixture *f,
+                            gconstpointer context)
+{
+  static const char * const argv[] =
+    {
+      "bash",
+      "-i",
+      "<don't append this argument>"
+    };
+  g_autoptr(GError) local_error = NULL;
+  g_autoptr(FlatpakBwrap) argv_in_container = NULL;
+  size_t i;
+  gboolean ok;
+
+  g_assert_false (f->context->options.launcher);
+
+  /* Pretend we had finished parsing arguments, because we need this
+   * in order to have f->context->run_in_current_context */
+  ok = pv_wrap_context_after_parsing_arguments (f->context, &local_error);
+  g_assert_no_error (local_error);
+  g_assert_true (ok);
+
+  argv_in_container = flatpak_bwrap_new (flatpak_bwrap_empty_env);
+
+  ok = pv_wrap_context_append_payload_command (f->context,
+                                               argv,
+                                               (int) G_N_ELEMENTS (argv) - 1,
+                                               argv_in_container,
+                                               &local_error);
+  dump_bwrap (argv_in_container);
+  g_assert_no_error (local_error);
+  g_assert_true (ok);
+  g_assert_false (pv_bwrap_was_finished (argv_in_container));
+
+  for (i = 0; i < G_N_ELEMENTS (argv) - 1; i++)
+    {
+      const char *arg;
+
+      g_assert_cmpuint (i, <, argv_in_container->argv->len);
+      arg = g_ptr_array_index (argv_in_container->argv, i);
+      g_assert_cmpstr (arg, ==, argv[i]);
+    }
+
+  g_assert_cmpuint (argv_in_container->argv->len, ==, i);
+
+  /* pv_wrap_context_append_payload_command() only appends arguments,
+   * not environment variables or fds */
+  g_assert_cmpstrv (argv_in_container->envp, (const char * const[]) { NULL });
+  g_assert_cmpuint (argv_in_container->fds->len, ==, 0);
+  g_assert_cmpuint (argv_in_container->noinherit_fds->len, ==, 0);
+}
+
+static void
+test_payload_command_launcher (Fixture *f,
+                               gconstpointer context)
+{
+  static const char * const argv[] =
+    {
+      "--exec-fallback",
+      "--inside-app",
+      "--",
+      "mygame",
+      "<don't append this argument>"
+    };
+  g_autoptr(GError) local_error = NULL;
+  g_autoptr(FlatpakBwrap) argv_in_container = NULL;
+  const char *arg;
+  size_t offset = 0;
+  size_t i;
+  gboolean ok;
+
+  f->context->options.launcher = TRUE;
+
+  /* Pretend we had finished parsing arguments, because we need this
+   * in order to have f->context->run_in_current_context */
+  ok = pv_wrap_context_after_parsing_arguments (f->context, &local_error);
+  g_assert_no_error (local_error);
+  g_assert_true (ok);
+
+  argv_in_container = flatpak_bwrap_new (flatpak_bwrap_empty_env);
+
+  ok = pv_wrap_context_append_payload_command (f->context,
+                                               argv,
+                                               (int) G_N_ELEMENTS (argv) - 1,
+                                               argv_in_container,
+                                               &local_error);
+  dump_bwrap (argv_in_container);
+  g_assert_no_error (local_error);
+  g_assert_true (ok);
+  g_assert_false (pv_bwrap_was_finished (argv_in_container));
+
+  g_assert_cmpuint (argv_in_container->argv->len, >=, 2);
+  arg = g_ptr_array_index (argv_in_container->argv, 0);
+  g_assert_true (g_str_has_suffix (arg, "/steam-runtime-launcher-service"));
+  offset++;
+
+  arg = g_ptr_array_index (argv_in_container->argv, 1);
+
+  if (g_str_equal (arg, "--verbose"))
+    offset++;
+
+  for (i = 0; i < G_N_ELEMENTS (argv) - 1; i++)
+    {
+      g_assert_cmpuint (offset + i, <, argv_in_container->argv->len);
+      arg = g_ptr_array_index (argv_in_container->argv, offset + i);
+      g_assert_cmpstr (arg, ==, argv[i]);
+    }
+
+  g_assert_cmpuint (argv_in_container->argv->len, ==, offset + i);
+
+  /* pv_wrap_context_append_payload_command() only appends arguments,
+   * not environment variables or fds */
+  g_assert_cmpstrv (argv_in_container->envp, (const char * const[]) { NULL });
+  g_assert_cmpuint (argv_in_container->fds->len, ==, 0);
+  g_assert_cmpuint (argv_in_container->noinherit_fds->len, ==, 0);
+}
+
+static void
 populate_ld_preload (Fixture *f,
                      GPtrArray *argv,
                      PvAppendPreloadFlags flags)
@@ -2792,6 +2910,10 @@ main (int argc,
   g_test_add ("/passwd", Fixture, NULL, setup, test_passwd, teardown);
   g_test_add ("/path-visible-in-provider-namespace", Fixture, NULL,
               setup, test_path_visible_in_provider_namespace, teardown);
+  g_test_add ("/payload-command/basic", Fixture, NULL,
+              setup, test_payload_command_basic, teardown);
+  g_test_add ("/payload-command/launcher", Fixture, NULL,
+              setup, test_payload_command_launcher, teardown);
   g_test_add ("/remap-ld-preload", Fixture, &default_config,
               setup_ld_preload, test_remap_ld_preload, teardown);
   g_test_add ("/remap-ld-preload-flatpak", Fixture, &default_config,

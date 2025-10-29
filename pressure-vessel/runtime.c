@@ -113,6 +113,7 @@ struct _PvRuntime
 
   const SrtKnownArchitecture *adverb_architecture;
   SrtEmulator *emulator;
+  SrtEmulator *emulator_in_container;
   const SrtKnownArchitecture *ldconfig_architecture;
   gchar *libcapsule_knowledge;  /* relative to runtime_files */
   gchar *runtime_abi_json;
@@ -130,7 +131,9 @@ struct _PvRuntime
   gchar *runtime_app;           /* runtime_files + "/app" */
   gchar *runtime_files_on_host;
   GArray *tuples;
+  const gchar *pv_prefix_in_container;
   const gchar *adverb_in_container;
+  gchar *helpers_dir_in_container;
   GPtrArray *providers;
   SrtDirentCompareFunc arbitrary_dirent_order;
   GCompareFunc arbitrary_str_order;
@@ -1738,6 +1741,7 @@ pv_runtime_dispose (GObject *object)
     g_ptr_array_set_size (self->providers, 0);
 
   g_clear_object (&self->emulator);
+  g_clear_object (&self->emulator_in_container);
   g_clear_object (&self->mutable_sysroot);
   g_clear_object (&self->real_root);
   g_clear_object (&self->host_root);
@@ -1753,6 +1757,7 @@ pv_runtime_finalize (GObject *object)
 
   pv_runtime_cleanup (self);
   g_free (self->bubblewrap);
+  g_free (self->helpers_dir_in_container);
   g_free (self->libcapsule_knowledge);
   g_strfreev (self->original_environ);
   glnx_close_fd (&self->overrides_fd);
@@ -1886,6 +1891,8 @@ pv_runtime_bind_emulator (PvRuntime *self,
                           FlatpakBwrap *bwrap,
                           GError **error)
 {
+  g_autofree gchar *exe_now = NULL;
+  g_autofree gchar *exe_in_container = NULL;
   const char * const *argv;
   const char *paths[2];
 
@@ -1929,6 +1936,35 @@ pv_runtime_bind_emulator (PvRuntime *self,
         }
     }
 
+  exe_now = g_canonicalize_filename (argv[0], NULL);
+
+  if (path_visible_in_provider_namespace (self->flags, exe_now))
+    {
+      if (self->flags & PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX)
+        exe_in_container = g_strdup_printf ("/run/parent%s", exe_now);
+      else
+        exe_in_container = g_strdup_printf ("/run/host%s", exe_now);
+    }
+  else if ((self->flags & PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX)
+           || (exports != NULL && flatpak_exports_path_is_visible (exports, exe_now)))
+    {
+      /* It's in $HOME or some similar path, we can use it as-is.
+       * For the Flatpak case, we assume that everything visible
+       * to the Steam app is equally visible to our sub-sandbox.
+       * Otherwise, we can assume that pv_runtime_bind() already exported
+       * the emulator if necessary (and possible). */
+      exe_in_container = g_strdup (exe_now);
+    }
+  else
+    {
+      return glnx_throw (error,
+                         "Unable to work out how to run %s in container",
+                         exe_now);
+    }
+
+  self->emulator_in_container = _srt_emulator_new_modified (self->emulator,
+                                                            exe_in_container);
+  g_return_val_if_fail (SRT_IS_EMULATOR (self->emulator_in_container), FALSE);
   return TRUE;
 }
 
@@ -7955,6 +7991,7 @@ pv_runtime_bind (PvRuntime *self,
       glnx_autofd int parent_dirfd = -1;
       const char *symlink_target = PV_FROM_HOST_IN_MUTABLE_SYSROOT;
 
+      self->pv_prefix_in_container = PV_FROM_HOST_IN_MUTABLE_SYSROOT;
       parent_dirfd = _srt_resolve_in_sysroot (self->mutable_sysroot->fd,
                                               PV_FROM_HOST_IN_MUTABLE_SYSROOT_PARENT,
                                               SRT_RESOLVE_FLAGS_MKDIR_P,
@@ -8012,6 +8049,7 @@ pv_runtime_bind (PvRuntime *self,
                               pressure_vessel_prefix_in_host_namespace,
                               PV_FROM_HOST_WITHOUT_MUTABLE_SYSROOT,
                               NULL);
+      self->pv_prefix_in_container = PV_FROM_HOST_WITHOUT_MUTABLE_SYSROOT;
       self->adverb_in_container = PV_ADVERB_WITHOUT_MUTABLE_SYSROOT;
     }
 
@@ -8421,4 +8459,40 @@ SrtSysroot *
 pv_runtime_get_mutable_sysroot (PvRuntime *self)
 {
   return self->mutable_sysroot;
+}
+
+/*
+ * Return the directory in which we can find helpers inside the container.
+ * Can only be called after a successful call to pv_runtime_bind().
+ *
+ * Returns: (transfer none): An absolute path, never %NULL unless a
+ *  programming error has occurred
+ */
+const char *
+pv_runtime_get_helpers_dir_in_container (PvRuntime *self)
+{
+  /* This will be true if pv_runtime_bind() was successfully called. */
+  g_return_val_if_fail (self->pv_prefix_in_container != NULL, NULL);
+
+  if (self->helpers_dir_in_container == NULL)
+    self->helpers_dir_in_container = g_build_filename (self->pv_prefix_in_container,
+                                                       PKGLIBEXECDIR,
+                                                       NULL);
+
+  return self->helpers_dir_in_container;
+}
+
+/*
+ * Return the emulator to be used for processes inside the container.
+ * Can only be called after a successful call to pv_runtime_bind().
+ *
+ * Returns: (transfer none): An emulator, or %NULL if none is in use
+ */
+SrtEmulator *
+pv_runtime_get_emulator_in_container (PvRuntime *self)
+{
+  /* This will be true if pv_runtime_bind() was successfully called. */
+  g_return_val_if_fail ((self->emulator != NULL) == (self->emulator_in_container != NULL),
+                        NULL);
+  return self->emulator_in_container;
 }

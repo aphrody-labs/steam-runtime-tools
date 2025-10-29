@@ -75,6 +75,8 @@ PvRuntime *pv_runtime_new (const char *source,
 gboolean pv_runtime_get_adverb (PvRuntime *self,
                                 FlatpakBwrap *adverb_args,
                                 GError **error);
+SrtEmulator *pv_runtime_get_emulator_in_container (PvRuntime *self);
+const char *pv_runtime_get_helpers_dir_in_container (PvRuntime *self);
 gboolean pv_runtime_bind (PvRuntime *self,
                           FlatpakExports *exports,
                           FlatpakBwrap *bwrap,

@@ -1553,6 +1553,53 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
     }
   else
     {
+      const char *helpers_dir;
+      SrtEmulator *emulator;
+
+      if (self->runtime != NULL)
+        {
+          emulator = pv_runtime_get_emulator_in_container (self->runtime);
+          helpers_dir = pv_runtime_get_helpers_dir_in_container (self->runtime);
+        }
+      else
+        {
+          emulator = _srt_subprocess_runner_get_emulator (self->run_in_current_context);
+          helpers_dir = _srt_subprocess_runner_get_helpers_path (self->run_in_current_context);
+        }
+
+      /* We don't actually know the architecture of the game we're launching
+       * (which could be a chain of scripts and helper executables that
+       * eventually ends up at the target executable), but we can assume that
+       * Steam wouldn't have told us to use an emulator if not needed. */
+      if (emulator != NULL)
+        {
+          const char * const *emulator_argv = _srt_emulator_get_argv (emulator);
+
+          flatpak_bwrap_append_argsv (argv_in_container,
+                                      (char **) emulator_argv, -1);
+
+          if (argc > 0 && strchr (argv[0], '/') == NULL)
+            {
+              /* The emulator most likely won't search the PATH for the
+               * executable, so we need to give it an executable that is
+               * of an architecture that it emulates, but which *will* search
+               * the PATH. */
+              const GQuark *emulated_architectures;
+
+              emulated_architectures =
+                _srt_emulator_get_emulated_architectures (emulator, NULL);
+
+              /* As above, we don't know the architecture, so we arbitrarily
+               * choose the first one supported by the emulator. */
+              g_return_val_if_fail (emulated_architectures[0] != SRT_ARCHITECTURE_QUARK_NONE,
+                                    FALSE);
+              flatpak_bwrap_add_arg_printf (argv_in_container, "%s/%s-exec",
+                                            helpers_dir,
+                                            g_quark_to_string (emulated_architectures[0]));
+              flatpak_bwrap_add_arg_printf (argv_in_container, "--");
+            }
+        }
+
       /* In non-"--launcher" mode, arguments after the "--" separator
        * are the command to execute, passed to the adverb after "--".
        * Because we always use the adverb, we don't need to worry about

@@ -170,6 +170,17 @@ class TestContainers(BaseTest):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
+        cls.G_TEST_SRCDIR = os.getenv(
+            'G_TEST_SRCDIR',
+            os.path.abspath(os.path.dirname(__file__)),
+        )
+        cls.G_TEST_BUILDDIR = os.getenv(
+            'G_TEST_BUILDDIR',
+            os.path.abspath(
+                os.path.join(os.path.dirname(__file__)),
+            ),
+        )
+
         if not os.environ.get('PRESSURE_VESSEL_TEST_CONTAINERS', ''):
             raise unittest.SkipTest('Containers not available')
 
@@ -391,18 +402,11 @@ class TestContainers(BaseTest):
 
         if host_srsi is None:
             rt = os.path.join(cls.containers_dir, 'steam-runtime')
-            cpu = os.uname().machine
-
-            if cpu == 'x86_64':
-                arch = 'amd64'
-            elif cpu.startswith('i') and len(cpu) == 4 and cpu.endswith('86'):
-                arch = 'i386'
-            else:
-                arch = cpu
 
             host_srsi = shutil.which(
                 os.path.join(
-                    rt, arch, 'usr', 'bin', 'steam-runtime-system-info',
+                    rt, cls.deb_arch,
+                    'usr', 'bin', 'steam-runtime-system-info',
                 )
             )
 
@@ -601,7 +605,7 @@ class TestContainers(BaseTest):
         )
         os.makedirs(artifacts, exist_ok=True)
 
-        final_argv_temp = tempfile.NamedTemporaryFile()
+        final_argv_path = os.path.join(artifacts, 'final-argv')
 
         env = os.environ.copy()
 
@@ -625,7 +629,7 @@ class TestContainers(BaseTest):
         argv = [
             self.pv_wrap,
             '--verbose',
-            '--write-final-argv', final_argv_temp.name,
+            '--write-final-argv', final_argv_path,
             '--filesystem', self.artifacts,
             '--runtime', runtime,
         ]
@@ -728,7 +732,9 @@ class TestContainers(BaseTest):
                     )
                     self.assertEqual(completed.returncode, 0)
 
-            final_argv = final_argv_temp.read().decode()
+            with open(final_argv_path, 'r') as reader:
+                final_argv = reader.read()
+
             if locales:
                 self.assertIn("\0--generate-locales\0", final_argv)
             else:
@@ -751,8 +757,6 @@ class TestContainers(BaseTest):
                             "\0--{}\0{}\0{}".format(bind_mode, path, path),
                             final_argv,
                         )
-
-            final_argv_temp.close()
 
             if fake_home:
                 members = set(os.listdir(fake_home_temp))

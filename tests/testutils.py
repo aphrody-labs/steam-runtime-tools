@@ -88,6 +88,11 @@ class BaseTest(unittest.TestCase):
     tmpdir = None       # type: tempfile.TemporaryDirectory
     top_builddir = ''
     top_srcdir = ''
+    deb_arch = ''
+    is_aarch64 = False
+    is_i386 = False
+    is_x86 = False
+    is_x86_64 = False
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -118,6 +123,21 @@ class BaseTest(unittest.TestCase):
             cls.artifacts = os.path.abspath(artifacts)
         else:
             cls.artifacts = cls.tmpdir.name
+
+        cpu = os.uname().machine
+
+        if cpu == 'x86_64':
+            cls.is_x86_64 = cls.is_x86 = True
+            cls.deb_arch = 'amd64'
+        elif cpu.startswith('i') and len(cpu) == 4 and cpu.endswith('86'):
+            cls.is_i386 = cls.is_x86 = True
+            cls.deb_arch = 'i386'
+        elif cpu == 'aarch64':
+            cls.is_aarch64 = True
+            cls.deb_arch = 'arm64'
+        else:
+            # close enough
+            cls.deb_arch = cpu
 
     def setUp(self) -> None:
         cls = self.__class__

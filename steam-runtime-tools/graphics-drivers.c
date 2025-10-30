@@ -231,7 +231,7 @@ _initial_capsule_capture_libs_argv (SrtSysroot *sysroot,
                                     const char *temp_dir,
                                     GError **error)
 {
-  GPtrArray *argv = NULL;
+  g_autoptr(GPtrArray) argv = NULL;
 
   argv = _srt_subprocess_runner_get_helper (runner, multiarch_tuple,
                                             "capsule-capture-libs",
@@ -246,7 +246,7 @@ _initial_capsule_capture_libs_argv (SrtSysroot *sysroot,
   g_ptr_array_add (argv, g_strdup ("--provider"));
   g_ptr_array_add (argv, g_strdup (sysroot->path));
 
-  return argv;
+  return g_steal_pointer (&argv);
 }
 
 static GPtrArray *
@@ -257,7 +257,7 @@ _argv_for_list_vdpau_drivers (SrtSysroot *sysroot,
                               GError **error)
 {
   const gchar *vdpau_driver = NULL;
-  GPtrArray *argv;
+  g_autoptr(GPtrArray) argv = NULL;
 
   vdpau_driver = _srt_subprocess_runner_getenv (runner, "VDPAU_DRIVER");
   argv = _initial_capsule_capture_libs_argv (sysroot, runner, multiarch_tuple,
@@ -283,7 +283,7 @@ _argv_for_list_vdpau_drivers (SrtSysroot *sysroot,
   g_ptr_array_add (argv, g_strdup ("no-dependencies:if-exists:even-if-older:soname:libvdpau_radeonsi.so"));
   g_ptr_array_add (argv, g_strdup ("no-dependencies:if-exists:even-if-older:soname:libvdpau_va_gl.so"));
   g_ptr_array_add (argv, NULL);
-  return argv;
+  return g_steal_pointer (&argv);
 }
 
 static GPtrArray *
@@ -328,7 +328,7 @@ _argv_for_list_glx_icds (SrtSysroot *sysroot,
                          const char *temp_dir,
                          GError **error)
 {
-  GPtrArray *argv;
+  g_autoptr(GPtrArray) argv = NULL;
 
   argv = _initial_capsule_capture_libs_argv (sysroot, runner, multiarch_tuple,
                                              temp_dir, error);
@@ -348,7 +348,7 @@ _argv_for_list_glx_icds (SrtSysroot *sysroot,
   g_ptr_array_add (argv, g_strdup ("no-dependencies:if-exists:even-if-older:soname:libGLX_mesa.so.0"));
   g_ptr_array_add (argv, g_strdup ("no-dependencies:if-exists:even-if-older:soname:libGLX_nvidia.so.0"));
   g_ptr_array_add (argv, NULL);
-  return argv;
+  return g_steal_pointer (&argv);
 }
 
 static GPtrArray *

@@ -1264,7 +1264,7 @@ ensure_expectations (SrtSystemInfo *self)
   if (self->expectations == NULL)
     {
       const char *runtime;
-      gchar *def = NULL;
+      g_autofree gchar *def = NULL;
 
       runtime = _srt_subprocess_runner_getenv (self->runner, "STEAM_RUNTIME");
 
@@ -1289,8 +1289,6 @@ ensure_expectations (SrtSystemInfo *self)
         self->expectations = g_steal_pointer (&def);
       else
         self->expectations = g_strdup ("");
-
-      g_free (def);
     }
 
   return self->expectations[0] != '\0';

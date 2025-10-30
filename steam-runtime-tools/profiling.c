@@ -70,7 +70,7 @@ SrtProfilingTimer *
 _srt_profiling_start (const char *format,
                       ...)
 {
-  SrtProfilingTimer *ret;
+  g_autoptr(SrtProfilingTimer) ret = NULL;
   va_list args;
 
   if (profiling_ticks_per_sec <= 0)
@@ -83,7 +83,7 @@ _srt_profiling_start (const char *format,
 
   g_log (G_LOG_DOMAIN, profiling_level, "Profiling: start: %s", ret->message);
   ret->wallclock = times (&ret->cpu);
-  return ret;
+  return g_steal_pointer (&ret);
 }
 
 /*

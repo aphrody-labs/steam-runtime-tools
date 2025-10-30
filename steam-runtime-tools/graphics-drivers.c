@@ -409,9 +409,9 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
                                   GList **modules_out)
 {
   g_autoptr(SrtCompletedSubprocess) completed = NULL;
-  GError *error = NULL;
-  GDir *dir_iter = NULL;
-  GPtrArray *members = NULL;
+  g_autoptr(GError) error = NULL;
+  g_autoptr(GDir) dir_iter = NULL;
+  g_autoptr(GPtrArray) members = NULL;
   const gchar *member;
   gchar *full_path = NULL;
   gchar *driver_path = NULL;
@@ -437,13 +437,13 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
   if (completed == NULL)
     {
       g_debug ("An error occurred calling the helper: %s", error->message);
-      goto out;
+      return;
     }
 
   if (!_srt_completed_subprocess_check (completed, &error))
     {
       g_debug ("Subprocess failed: %s", error->message);
-      goto out;
+      return;
     }
 
   dir_iter = g_dir_open (tmp_directory, 0, &error);
@@ -451,7 +451,7 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
   if (dir_iter == NULL)
     {
       g_debug ("Failed to open \"%s\": %s", tmp_directory, error->message);
-      goto out;
+      return;
     }
 
   members = g_ptr_array_new_with_free_func (g_free);
@@ -471,14 +471,14 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
         {
           g_debug ("An error occurred trying to read the symlink: %s", error->message);
           g_free (full_path);
-          goto out;
+          return;
         }
       if (!g_path_is_absolute (driver_path))
         {
           g_debug ("We were expecting an absolute path, instead we have: %s", driver_path);
           g_free (full_path);
           g_free (driver_path);
-          goto out;
+          return;
         }
 
       switch (module)
@@ -527,12 +527,6 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
       g_free (full_path);
       g_free (driver_path);
     }
-
-out:
-  if (dir_iter != NULL)
-    g_dir_close (dir_iter);
-  g_clear_pointer (&members, g_ptr_array_unref);
-  g_clear_error (&error);
 }
 
 /*

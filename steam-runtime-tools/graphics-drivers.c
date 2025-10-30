@@ -1042,12 +1042,11 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
                     GQuark arch_quark,
                     GList **drivers_out)
 {
-  GPtrArray *by_soname_argv = NULL;
-  GPtrArray *overrides_argv = NULL;
-  GError *error = NULL;
+  g_autoptr(GPtrArray) by_soname_argv = NULL;
+  g_autoptr(GError) error = NULL;
   g_auto(GLnxTmpDir) by_soname_tmp_dir = { .initialized = FALSE };
-  gchar *overrides_path = NULL;
-  GHashTable *known_libs = NULL;
+  g_autofree gchar *overrides_path = NULL;
+  g_autoptr(GHashTable) known_libs = NULL;
   const char *multiarch_tuple;
 
   g_return_if_fail (SRT_IS_SYSROOT (sysroot));
@@ -1061,7 +1060,7 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
   if (!glnx_mkdtemp ("glx-icds-XXXXXX", 0700, &by_soname_tmp_dir, &error))
     {
       g_debug ("An error occurred trying to create a temporary folder: %s", error->message);
-      goto out;
+      return;
     }
 
   by_soname_argv = _argv_for_list_glx_icds (sysroot, runner, multiarch_tuple,
@@ -1070,7 +1069,7 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
   if (by_soname_argv == NULL)
     {
       g_debug ("An error occurred trying to capture glx ICDs: %s", error->message);
-      goto out;
+      return;
     }
 
   _srt_list_modules_from_directory (runner,
@@ -1086,11 +1085,12 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
   if (g_file_test (overrides_path, G_FILE_TEST_IS_DIR))
     {
       g_auto(GLnxTmpDir) overrides_tmp_dir = { .initialized = FALSE };
+      g_autoptr(GPtrArray) overrides_argv = NULL;
 
       if (!glnx_mkdtemp ("glx-icds-XXXXXX", 0700, &overrides_tmp_dir, &error))
         {
           g_debug ("An error occurred trying to create a temporary folder: %s", error->message);
-          goto out;
+          return;
         }
 
       overrides_argv = _argv_for_list_glx_icds_in_path (sysroot, runner, multiarch_tuple,
@@ -1100,7 +1100,7 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
       if (overrides_argv == NULL)
         {
           g_debug ("An error occurred trying to capture glx ICDs: %s", error->message);
-          goto out;
+          return;
         }
 
       _srt_list_modules_from_directory (runner,
@@ -1108,13 +1108,6 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
                                         overrides_tmp_dir.path, known_libs,
                                         SRT_GRAPHICS_GLX_MODULE, FALSE, drivers_out);
     }
-
-out:
-  g_clear_pointer (&by_soname_argv, g_ptr_array_unref);
-  g_clear_pointer (&overrides_argv, g_ptr_array_unref);
-  g_free (overrides_path);
-  g_hash_table_unref (known_libs);
-  g_clear_error (&error);
 }
 
 /*

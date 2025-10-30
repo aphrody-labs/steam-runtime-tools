@@ -1430,6 +1430,47 @@ test_logging (Fixture *f,
 }
 
 static void
+test_ptr_array_clear_to_array (Fixture *f,
+                               gconstpointer context)
+{
+  g_autoptr(GPtrArray) null = NULL;
+  g_autoptr(GPtrArray) empty = g_ptr_array_new ();
+  g_autoptr(GPtrArray) populated = g_ptr_array_new_full (0, g_free);
+  char **null_copy;
+  char **empty_copy;
+  char **populated_copy;
+  size_t n = G_MAXSIZE;
+
+  g_ptr_array_add (populated, g_strdup ("one"));
+  g_ptr_array_add (populated, g_strdup ("two"));
+  g_ptr_array_add (populated, g_strdup ("three"));
+
+  null_copy = _srt_ptr_array_clear_to_array (&null, NULL);
+  g_assert_null (null_copy);
+
+  null_copy = _srt_ptr_array_clear_to_array (&null, &n);
+  g_assert_cmpuint (n, ==, 0);
+  g_assert_null (null_copy);
+
+  n = G_MAXSIZE;
+  empty_copy = _srt_ptr_array_clear_to_array (&empty, &n);
+  g_assert_cmpuint (n, ==, 0);
+  g_assert_null (empty_copy);
+
+  n = G_MAXSIZE;
+  populated_copy = _srt_ptr_array_clear_to_array (&populated, &n);
+  g_assert_cmpuint (n, ==, 3);
+  g_assert_cmpstr (populated_copy[0], ==, "one");
+  g_assert_cmpstr (populated_copy[1], ==, "two");
+  g_assert_cmpstr (populated_copy[2], ==, "three");
+
+  for (size_t i = 0; i < n; i++)
+    g_free (populated_copy[i]);
+
+  g_free (populated_copy);
+}
+
+static void
 test_recursive_list (Fixture *f,
                      gconstpointer context)
 {
@@ -1903,6 +1944,8 @@ main (int argc,
               setup, test_is_identifier, teardown);
   g_test_add ("/utils/logging", Fixture, NULL,
               setup, test_logging, teardown);
+  g_test_add ("/utils/ptr_array_clear_to_array", Fixture, NULL,
+              setup, test_ptr_array_clear_to_array, teardown);
   g_test_add ("/utils/recursive_list", Fixture, NULL,
               setup, test_recursive_list, teardown);
   g_test_add ("/utils/rlimit", Fixture, NULL,

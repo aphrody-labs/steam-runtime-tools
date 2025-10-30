@@ -413,11 +413,6 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
   g_autoptr(GDir) dir_iter = NULL;
   g_autoptr(GPtrArray) members = NULL;
   const gchar *member;
-  gchar *full_path = NULL;
-  gchar *driver_path = NULL;
-  gchar *driver_directory = NULL;
-  gchar *driver_link = NULL;
-  gchar *soname_path = NULL;
 
   g_return_if_fail (SRT_IS_SUBPROCESS_RUNNER (runner));
   g_return_if_fail (architecture != SRT_ARCHITECTURE_QUARK_NONE);
@@ -463,6 +458,11 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
 
   for (gsize i = 0; i < members->len; i++)
     {
+      g_autofree char *driver_directory = NULL;
+      g_autofree char *driver_path = NULL;
+      g_autofree char *full_path = NULL;
+      g_autofree char *soname_path = NULL;
+
       member = g_ptr_array_index (members, i);
 
       full_path = g_build_filename (tmp_directory, member, NULL);
@@ -470,14 +470,11 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
       if (driver_path == NULL)
         {
           g_debug ("An error occurred trying to read the symlink: %s", error->message);
-          g_free (full_path);
           return;
         }
       if (!g_path_is_absolute (driver_path))
         {
           g_debug ("We were expecting an absolute path, instead we have: %s", driver_path);
-          g_free (full_path);
-          g_free (driver_path);
           return;
         }
 
@@ -494,16 +491,17 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
             soname_path = g_strjoin ("/", member, driver_path, NULL);
             if (!g_hash_table_contains (known_table, soname_path))
               {
-                g_hash_table_add (known_table, g_strdup (soname_path));
+                g_hash_table_add (known_table, g_steal_pointer (&soname_path));
                 *modules_out = g_list_prepend (*modules_out, srt_glx_icd_new (member, driver_path));
               }
-            g_free (soname_path);
             break;
 
           case SRT_GRAPHICS_VDPAU_MODULE:
             driver_directory = g_path_get_dirname (driver_path);
             if (!g_hash_table_contains (known_table, driver_directory))
               {
+                g_autofree char *driver_link = NULL;
+
                 /* We do not add `driver_directory` to the hash table because it contains
                  * a list of directories where we already looked into. In this case we are
                  * just adding a single driver instead of searching for all the `libvdpau_*`
@@ -512,9 +510,7 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
                 *modules_out = g_list_prepend (*modules_out, srt_vdpau_driver_new (driver_path,
                                                                                   driver_link,
                                                                                   is_extra));
-                g_free (driver_link);
               }
-            g_free (driver_directory);
             break;
 
           case SRT_GRAPHICS_DRI_MODULE:
@@ -523,9 +519,6 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
           default:
             g_return_if_reached ();
         }
-
-      g_free (full_path);
-      g_free (driver_path);
     }
 }
 

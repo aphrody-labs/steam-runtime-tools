@@ -208,7 +208,7 @@ _srt_check_locale (SrtSubprocessRunner *runner,
                    const char *requested_name,
                    GError **error)
 {
-  GPtrArray *argv = NULL;
+  g_autoptr(GPtrArray) argv = NULL;
   const char *output = NULL;
   g_autoptr(GError) local_error = NULL;
   g_autoptr(JsonNode) node = NULL;
@@ -325,7 +325,6 @@ out:
       (*error)->code = SRT_LOCALE_ERROR_INTERNAL_ERROR;
     }
 
-  g_clear_pointer (&argv, g_ptr_array_unref);
   return ret;
 }
 

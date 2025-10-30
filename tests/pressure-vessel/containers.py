@@ -316,6 +316,7 @@ class TestContainers(BaseTest):
                     'capsule-capture-libs',
                     'detect-lib',
                     'detect-platform',
+                    'exec',
                     'inspect-library',
                 ):
                     exe = multiarch + '-' + tool

@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20251028.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251030.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
     - Fix a small memory leak in pv-adverb while setting up VDPAU drivers
@@ -48,7 +48,7 @@ steam-runtime-tools (0.20251028.0) UNRELEASED; urgency=medium
       (steamrt/tasks#786, steamrt/tasks#821, steamrt/tasks#787)
     - Check for fd leaks more thoroughly (steamrt/tasks#787)
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 28 Oct 2025 16:04:41 +0000
+ -- Simon McVittie <smcv@collabora.com>  Thu, 30 Oct 2025 14:06:48 +0000
 
 steam-runtime-tools (0.20250926.0) steamrt; urgency=medium
 

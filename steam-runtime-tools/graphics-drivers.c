@@ -359,7 +359,8 @@ _argv_for_list_glx_icds_in_path (SrtSysroot *sysroot,
                                  const char *base_path,
                                  GError **error)
 {
-  GPtrArray *argv;
+  g_autofree gchar *lib_full_path = NULL;
+  g_autoptr(GPtrArray) argv = NULL;
 
   argv = _initial_capsule_capture_libs_argv (sysroot, runner, multiarch_tuple,
                                              temp_dir, error);
@@ -367,14 +368,13 @@ _argv_for_list_glx_icds_in_path (SrtSysroot *sysroot,
   if (argv == NULL)
     return NULL;
 
-  gchar *lib_full_path = g_build_filename (base_path, "lib", multiarch_tuple, "libGLX_*.so.*", NULL);
+  lib_full_path = g_build_filename (base_path, "lib", multiarch_tuple, "libGLX_*.so.*", NULL);
 
   g_ptr_array_add (argv, g_strjoin (NULL,
                                     "no-dependencies:if-exists:even-if-older:path-match:", lib_full_path,
                                     NULL));
   g_ptr_array_add (argv, NULL);
-  g_free (lib_full_path);
-  return argv;
+  return g_steal_pointer (&argv);
 }
 
 /*

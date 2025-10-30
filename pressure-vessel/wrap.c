@@ -1207,35 +1207,12 @@ main (int argc,
       flatpak_bwrap_append_bwrap (argv_in_container, adverb_argv);
     }
 
-  if (self->options.launcher)
-    {
-      g_autoptr(FlatpakBwrap) launcher_argv =
-        flatpak_bwrap_new (flatpak_bwrap_empty_env);
-      g_autofree gchar *launcher_service = g_build_filename (tools_dir,
-                                                             "steam-runtime-launcher-service",
-                                                             NULL);
-      g_debug ("Adding steam-runtime-launcher-service '%s'...", launcher_service);
-      flatpak_bwrap_add_arg (launcher_argv, launcher_service);
-
-      if (_srt_util_is_debugging ())
-        flatpak_bwrap_add_arg (launcher_argv, "--verbose");
-
-      /* In --launcher mode, arguments after the "--" separator are
-       * passed to the launcher */
-      flatpak_bwrap_append_argsv (launcher_argv, &argv[1], argc - 1);
-
-      g_warn_if_fail (g_strv_length (launcher_argv->envp) == 0);
-      flatpak_bwrap_append_bwrap (argv_in_container, launcher_argv);
-    }
-  else
-    {
-      /* In non-"--launcher" mode, arguments after the "--" separator
-       * are the command to execute, passed to the adverb after "--".
-       * Because we always use the adverb, we don't need to worry about
-       * whether argv[1] starts with "-". */
-      g_debug ("Setting arguments for wrapped command");
-      flatpak_bwrap_append_argsv (argv_in_container, &argv[1], argc - 1);
-    }
+  if (!pv_wrap_context_append_payload_command (self,
+                                               (const char * const *) &argv[1],
+                                               argc - 1,
+                                               argv_in_container,
+                                               error))
+    goto out;
 
   if (flatpak_subsandbox != NULL)
     {

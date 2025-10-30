@@ -177,3 +177,9 @@ pv_wrap_options_has_architecture (PvWrapOptions *self,
 {
   return _srt_architecture_array_has (self->architectures, q);
 }
+
+gboolean pv_wrap_context_append_payload_command (PvWrapContext *self,
+                                                 const char * const *argv,
+                                                 int argc,
+                                                 FlatpakBwrap *argv_in_container,
+                                                 GError **error);

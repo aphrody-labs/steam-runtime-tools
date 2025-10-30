@@ -1301,13 +1301,13 @@ ensure_hidden_deps (SrtSystemInfo *self)
 
   if (self->cached_hidden_deps == NULL)
     {
-      JsonParser *parser = NULL;
+      g_autoptr(JsonParser) parser = NULL;
       JsonNode *node = NULL;
       JsonArray *libraries_array = NULL;
       JsonArray *hidden_libraries_array = NULL;
       JsonObject *object;
-      gchar *path = NULL;
-      GError *error = NULL;
+      g_autofree gchar *path = NULL;
+      g_autoptr(GError) error = NULL;
 
       self->cached_hidden_deps = g_hash_table_new_full (g_str_hash,
                                                         g_str_equal,
@@ -1317,7 +1317,7 @@ ensure_hidden_deps (SrtSystemInfo *self)
       if (!ensure_expectations (self))
         {
           g_debug ("Hidden dependencies parsing skipped because of unknown expectations");
-          goto out;
+          return;
         }
 
       path = g_build_filename (self->expectations, "steam-runtime-abi.json", NULL);
@@ -1326,7 +1326,7 @@ ensure_hidden_deps (SrtSystemInfo *self)
       * from the expectations folder */
       if (!g_file_test (path, G_FILE_TEST_EXISTS))
         {
-          g_free (path);
+          g_clear_pointer (&path, g_free);
           path = g_build_filename (self->expectations, "..", "steam-runtime-abi.json", NULL);
         }
 
@@ -1334,7 +1334,7 @@ ensure_hidden_deps (SrtSystemInfo *self)
       if (!json_parser_load_from_file (parser, path, &error))
         {
           g_debug ("Error parsing the expected JSON object in \"%s\": %s", path, error->message);
-          goto out;
+          return;
         }
 
       node = json_parser_get_root (parser);
@@ -1343,13 +1343,13 @@ ensure_hidden_deps (SrtSystemInfo *self)
       if (!json_object_has_member (object, "shared_libraries"))
         {
           g_debug ("No \"shared_libraries\" in the JSON object \"%s\"", path);
-          goto out;
+          return;
         }
 
       libraries_array = json_object_get_array_member (object, "shared_libraries");
       /* If there are no libraries in the parsed JSON file we simply return */
       if (libraries_array == NULL || json_array_get_length (libraries_array) == 0)
-        goto out;
+        return;
 
       for (guint i = 0; i < json_array_get_length (libraries_array); i++)
         {
@@ -1390,12 +1390,6 @@ ensure_hidden_deps (SrtSystemInfo *self)
                                g_steal_pointer (&soname),
                                _srt_ptr_array_clear_to_array (&arr, NULL));
         }
-
-      out:
-        g_free (path);
-        g_clear_error (&error);
-        if (parser)
-          g_clear_object (&parser);
     }
 }
 

@@ -477,43 +477,21 @@ _srt_steam_check (const char * const *envp,
       bin32 = realpath (dot_steam_bin32, NULL);
 
       if (bin32 == NULL)
-        {
-          g_debug ("realpath(%s): %s", dot_steam_bin32, g_strerror (errno));
-        }
+        g_debug ("realpath(%s): %s", dot_steam_bin32, g_strerror (errno));
       else if (!g_str_has_suffix (bin32, "/ubuntu12_32"))
-        {
-          g_debug ("Unexpected bin32 path: %s -> %s", dot_steam_bin32,
-                   bin32);
-        }
+        g_debug ("Unexpected bin32 path: %s -> %s", dot_steam_bin32,
+                 bin32);
       else
-        {
-          install_path = strndup (bin32, strlen (bin32) - strlen ("/ubuntu12_32"));
-
-          /* We don't try to survive out-of-memory */
-          if (install_path == NULL)
-            g_error ("strndup: %s", g_strerror (errno));
-        }
+        install_path = g_strndup (bin32, strlen (bin32) - strlen ("/ubuntu12_32"));
     }
 
   /* If we have an installation path but no data path, or vice versa,
    * assume they match. */
   if (install_path == NULL && data_path != NULL)
-    {
-      install_path = strdup (data_path);
-
-      /* We don't try to survive out-of-memory */
-      if (install_path == NULL)
-        g_error ("strdup: %s", g_strerror (errno));
-    }
+    install_path = g_strdup (data_path);
 
   if (data_path == NULL && install_path != NULL)
-    {
-      data_path = strdup (install_path);
-
-      /* We don't try to survive out-of-memory */
-      if (data_path == NULL)
-        g_error ("strdup: %s", g_strerror (errno));
-    }
+    data_path = g_strdup (install_path);
 
   /* If *that* doesn't work, try the default installation location. */
   if (install_path == NULL)
@@ -544,11 +522,7 @@ _srt_steam_check (const char * const *envp,
       /* If we haven't found ubuntu12_32 yet, it's a subdirectory of the
        * Steam installation */
       if (bin32 == NULL)
-        {
-          /* We don't try to survive out-of-memory */
-          if (asprintf (&bin32, "%s/ubuntu12_32", install_path) < 0)
-            g_error ("asprintf: %s", g_strerror (errno));
-        }
+        bin32 = g_build_filename (install_path, "ubuntu12_32", NULL);
 
       if (bin32 != NULL)
         {

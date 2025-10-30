@@ -305,11 +305,12 @@ srt_desktop_entry_is_steam_handler (SrtDesktopEntry *self)
 GList *
 _srt_list_steam_desktop_entries (void)
 {
-  GList *ret = NULL;
-  GList *app_list = NULL;
-  GHashTable *found_handlers = NULL;
-  GHashTable *known_ids = NULL;
-  GAppInfo *default_handler = NULL;
+  g_autoptr(SrtObjectList) ret = NULL;
+  g_autoptr(SrtObjectList) app_list = NULL;
+  g_autoptr(SrtObjectList) handlers = NULL;
+  g_autoptr(GHashTable) found_handlers = NULL;
+  g_autoptr(GHashTable) known_ids = NULL;
+  g_autoptr(GAppInfo) default_handler = NULL;
   const char *default_handler_id = NULL;
   const GList *this_app;
 
@@ -320,7 +321,7 @@ _srt_list_steam_desktop_entries (void)
       g_debug ("Found the default `steam:` handler: %s", default_handler_id);
     }
 
-  app_list = g_app_info_get_all_for_type ("x-scheme-handler/steam");
+  handlers = g_app_info_get_all_for_type ("x-scheme-handler/steam");
 
   found_handlers = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
   known_ids = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
@@ -331,7 +332,7 @@ _srt_list_steam_desktop_entries (void)
   /* Arch Linux Steam native */
   g_hash_table_add (known_ids, g_strdup ("steam-native.desktop"));
 
-  for (this_app = app_list; this_app != NULL; this_app = this_app->next)
+  for (this_app = handlers; this_app != NULL; this_app = this_app->next)
     {
       const char *id = NULL;
       const char *commandline = NULL;
@@ -354,8 +355,6 @@ _srt_list_steam_desktop_entries (void)
       entry = _srt_desktop_entry_new (id, commandline, filename, is_default_handler, is_steam_handler);
       ret = g_list_prepend (ret, entry);
     }
-
-  g_list_free_full (app_list, g_object_unref);
 
   /* Get a list of all the desktop apps and filter them if they have a well known ID */
   app_list = g_app_info_get_all ();
@@ -381,12 +380,6 @@ _srt_list_steam_desktop_entries (void)
       entry = _srt_desktop_entry_new (id, commandline, filename, is_default_handler, is_steam_handler);
       ret = g_list_prepend (ret, entry);
     }
-  
-  g_hash_table_unref (found_handlers);
-  g_hash_table_unref (known_ids);
-  g_list_free_full (app_list, g_object_unref);
-  if (default_handler != NULL)
-    g_object_unref (default_handler);
 
-  return g_list_reverse (ret);
+  return g_list_reverse (g_steal_pointer (&ret));
 }

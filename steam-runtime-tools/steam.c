@@ -377,14 +377,14 @@ _srt_steam_check (const char * const *envp,
                   SrtSteam **more_details_out)
 {
   SrtSteamIssues issues = SRT_STEAM_ISSUES_NONE;
-  gchar *dot_steam_bin32 = NULL;
-  gchar *dot_steam_steam = NULL;
-  gchar *dot_steam_root = NULL;
-  gchar *default_steam_path = NULL;
-  GAppInfo *default_app = NULL;
-  char *install_path = NULL;
-  char *data_path = NULL;
-  char *bin32 = NULL;
+  g_autofree gchar *dot_steam_bin32 = NULL;
+  g_autofree gchar *dot_steam_steam = NULL;
+  g_autofree gchar *dot_steam_root = NULL;
+  g_autofree gchar *default_steam_path = NULL;
+  g_autoptr(GAppInfo) default_app = NULL;
+  g_autofree char *install_path = NULL;
+  g_autofree char *data_path = NULL;
+  g_autofree char *bin32 = NULL;
   const char *home = NULL;
   const char *user_data = NULL;
   const char *steam_script = NULL;
@@ -394,7 +394,7 @@ _srt_steam_check (const char * const *envp,
   const char *app_id = NULL;
   const char *steam_compat_client_install_path = NULL;
   gboolean in_flatpak = FALSE;
-  GError *error = NULL;
+  g_autoptr(GError) error = NULL;
 
   g_return_val_if_fail (envp != NULL, SRT_STEAM_ISSUES_UNKNOWN);
   g_return_val_if_fail (_srt_check_not_setuid (), SRT_STEAM_ISSUES_UNKNOWN);
@@ -593,7 +593,8 @@ _srt_steam_check (const char * const *envp,
 
           if (commandline != NULL)
             {
-              gchar **argvp;
+              g_auto(GStrv) argvp = NULL;
+
               if (g_shell_parse_argv (commandline, NULL, &argvp, &error))
                 {
                   const char *const expectations[] = { executable, "%U", NULL };
@@ -606,8 +607,6 @@ _srt_steam_check (const char * const *envp,
 
                   if (argvp[i] == NULL && expectations[i] == NULL)
                     found_expected_steam_uri_handler = TRUE;
-
-                  g_strfreev (argvp);
                 }
               else
                 {
@@ -702,14 +701,6 @@ _srt_steam_check (const char * const *envp,
                                         steam_script,
                                         steam_script_version);
 
-  free (install_path);
-  free (data_path);
-  free (bin32);
-  g_free (dot_steam_bin32);
-  g_free (dot_steam_steam);
-  g_free (dot_steam_root);
-  g_free (default_steam_path);
-  g_clear_object (&default_app);
   return issues;
 }
 

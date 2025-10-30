@@ -714,7 +714,7 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
     {
       const SrtKnownArchitecture *found_arch;
       SrtVaApiVersion libva_version = SRT_VA_API_VERSION_UNKNOWN;
-      gchar *this_driver_link = NULL;
+      g_autofree gchar *this_driver_link = NULL;
       g_autofree gchar *this_driver_in_provider = NULL;
       gsize i;
 
@@ -791,7 +791,6 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
                                             srt_vdpau_driver_new (this_driver_in_provider,
                                                                   this_driver_link,
                                                                   is_extra));
-            g_free (this_driver_link);
             break;
 
           case SRT_GRAPHICS_GLX_MODULE:

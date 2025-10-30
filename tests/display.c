@@ -159,7 +159,7 @@ test_display_wayland_issues (Fixture *f,
   g_autoptr(SrtSystemInfo) info = NULL;
   g_autoptr(SrtDisplayInfo) display = NULL;
   g_auto(GStrv) env = NULL;
-  g_autofree gchar *temp = NULL;
+  g_auto(GLnxTmpDir) temp = { .initialized = FALSE };
   g_autofree gchar *wayland_0 = NULL;
   g_autofree gchar *wayland_1 = NULL;
   g_autoptr(GError) error = NULL;
@@ -167,12 +167,12 @@ test_display_wayland_issues (Fixture *f,
 
   info = srt_system_info_new (NULL);
 
-  temp = g_dir_make_tmp (NULL, &error);
+  glnx_mkdtemp ("test-XXXXXX", 0700, &temp, &error);
   g_assert_no_error (error);
-  g_assert_nonnull (temp);
+  g_assert_nonnull (temp.path);
 
-  wayland_0 = g_build_filename (temp, "wayland-0", NULL);
-  wayland_1 = g_build_filename (temp, "wayland-1", NULL);
+  wayland_0 = g_build_filename (temp.path, "wayland-0", NULL);
+  wayland_1 = g_build_filename (temp.path, "wayland-1", NULL);
   g_file_set_contents (wayland_0, "", -1, &error);
   g_assert_no_error (error);
   g_file_set_contents (wayland_1, "", -1, &error);
@@ -182,7 +182,7 @@ test_display_wayland_issues (Fixture *f,
    * fallback to the default wayland-0 */
   env = g_get_environ ();
   env = g_environ_unsetenv (env, "WAYLAND_DISPLAY");
-  env = g_environ_setenv (env, "XDG_RUNTIME_DIR", temp, TRUE);
+  env = g_environ_setenv (env, "XDG_RUNTIME_DIR", temp.path, TRUE);
   srt_system_info_set_environ (info, env);
 
   display = srt_system_info_check_display (info);
@@ -221,7 +221,7 @@ test_display_wayland_issues (Fixture *f,
   g_assert_cmpint (wayland_issues, ==, SRT_DISPLAY_WAYLAND_ISSUES_NONE);
   g_assert_true (srt_display_info_is_wayland_session (display));
 
-  glnx_shutil_rm_rf_at (-1, temp, NULL, &error);
+  glnx_tmpdir_delete (&temp, NULL, &error);
   g_assert_no_error (error);
 }
 

@@ -68,17 +68,16 @@ typedef struct
 {
   const Config *config;
   TestsOpenFdSet old_fds;
+  GLnxTmpDir tmpdir;
   PvWrapContext *context;
   SrtSysroot *mock_host;
   FlatpakBwrap *bwrap;
   gchar *home;
-  gchar *tmpdir;
   gchar *mock_runtime;
   gchar *var;
   GQuark primary_abi;
   gchar *primary_platform;
   gchar *primary_lib;
-  int tmpdir_fd;
   int mock_runtime_fd;
   int var_fd;
 } Fixture;
@@ -293,14 +292,12 @@ setup (Fixture *f,
     f->config = &default_config;
 
   f->old_fds = tests_check_fd_leaks_enter ();
-  f->tmpdir = g_dir_make_tmp ("pressure-vessel-tests.XXXXXX", &local_error);
-  g_assert_no_error (local_error);
-  glnx_opendirat (AT_FDCWD, f->tmpdir, TRUE, &f->tmpdir_fd, &local_error);
+  glnx_mkdtemp ("pressure-vessel-tests.XXXXXX", 0700, &f->tmpdir, &local_error);
   g_assert_no_error (local_error);
 
-  mock_host = g_build_filename (f->tmpdir, "host", NULL);
-  f->mock_runtime = g_build_filename (f->tmpdir, "runtime", NULL);
-  f->var = g_build_filename (f->tmpdir, "var", NULL);
+  mock_host = g_build_filename (f->tmpdir.path, "host", NULL);
+  f->mock_runtime = g_build_filename (f->tmpdir.path, "runtime", NULL);
+  f->var = g_build_filename (f->tmpdir.path, "var", NULL);
   g_assert_no_errno (g_mkdir (mock_host, 0755));
   g_assert_no_errno (g_mkdir (f->mock_runtime, 0755));
   g_assert_no_errno (g_mkdir (f->var, 0755));
@@ -816,22 +813,17 @@ teardown (Fixture *f,
 {
   g_autoptr(GError) local_error = NULL;
 
-  glnx_close_fd (&f->tmpdir_fd);
   glnx_close_fd (&f->mock_runtime_fd);
   glnx_close_fd (&f->var_fd);
 
-  if (f->tmpdir != NULL)
-    {
-      glnx_shutil_rm_rf_at (-1, f->tmpdir, NULL, &local_error);
-      g_assert_no_error (local_error);
-    }
+  glnx_tmpdir_delete (&f->tmpdir, NULL, &local_error);
+  g_assert_no_error (local_error);
 
   g_clear_object (&f->context);
   g_clear_object (&f->mock_host);
   g_clear_pointer (&f->home, g_free);
   g_clear_pointer (&f->mock_runtime, g_free);
   g_clear_pointer (&f->home, g_free);
-  g_clear_pointer (&f->tmpdir, g_free);
   g_clear_pointer (&f->var, g_free);
   g_clear_pointer (&f->bwrap, flatpak_bwrap_free);
   g_clear_pointer (&f->primary_platform, g_free);

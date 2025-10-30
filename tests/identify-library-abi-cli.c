@@ -40,7 +40,7 @@
 #include "test-utils.h"
 
 static const char *argv0;
-static gchar *empty_temp_dir;
+static const char *empty_temp_dir;
 
 typedef struct
 {
@@ -472,14 +472,18 @@ int
 main (int argc,
       char **argv)
 {
-  int status;
-  GError *error = NULL;
+  g_auto(GLnxTmpDir) temp_dir = { .initialized = FALSE };
+  g_autoptr(GError) error = NULL;
 
   argv0 = argv[0];
 
   _srt_tests_init (&argc, &argv, NULL);
+
   /* Creates an empty temporary directory to test the --directory option */
-  empty_temp_dir = g_dir_make_tmp ("empty-dir-XXXXXX", &error);
+  glnx_mkdtemp ("empty-dir-XXXXXX", 0700, &temp_dir, &error);
+  g_assert_no_error (error);
+  empty_temp_dir = temp_dir.path;
+
   g_test_add ("/identify-library-abi-cli/arguments_validation", Fixture, NULL,
               setup, test_arguments_validation, teardown);
   g_test_add ("/identify-library-abi-cli/help-and-version", Fixture, NULL,
@@ -487,10 +491,5 @@ main (int argc,
   g_test_add ("/identify-library-abi-cli/library-identification", Fixture, NULL,
               setup, test_library_identification, teardown);
 
-  status = g_test_run ();
-
-  _srt_rm_rf (empty_temp_dir);
-  g_free (empty_temp_dir);
-
-  return status;
+  return g_test_run ();
 }

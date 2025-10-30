@@ -95,10 +95,7 @@ typedef enum
 void
 pv_per_arch_dirs_free (PvPerArchDirs *self)
 {
-  if (self->root_path != NULL)
-    _srt_rm_rf (self->root_path);
-
-  g_clear_pointer (&self->root_path, g_free);
+  (void) glnx_tmpdir_delete (&self->root, NULL, NULL);
   g_clear_pointer (&self->libdl_token_path, g_free);
   g_clear_pointer (&self->abi_paths, g_hash_table_unref);
   g_free (self);
@@ -180,10 +177,10 @@ pv_per_arch_dirs_try_scheme (PvPerArchDirs *self,
   switch (scheme)
     {
       case PV_PER_ARCH_DIRS_SCHEME_LIB:
-        self->libdl_token_path = g_build_filename (self->root_path, "${LIB}", NULL);
+        self->libdl_token_path = g_build_filename (self->root.path, "${LIB}", NULL);
         break;
       case PV_PER_ARCH_DIRS_SCHEME_PLATFORM:
-        self->libdl_token_path = g_build_filename (self->root_path, "${PLATFORM}", NULL);
+        self->libdl_token_path = g_build_filename (self->root.path, "${PLATFORM}", NULL);
         break;
       default:
         g_return_val_if_reached (FALSE);
@@ -199,7 +196,7 @@ pv_per_arch_dirs_try_scheme (PvPerArchDirs *self,
       g_assert (libdl_string != NULL);
       g_hash_table_replace (self->abi_paths,
                             GUINT_TO_POINTER (architectures[i]),
-                            g_build_filename (self->root_path, libdl_string, NULL));
+                            g_build_filename (self->root.path, libdl_string, NULL));
     }
 
   return TRUE;
@@ -216,8 +213,7 @@ pv_per_arch_dirs_new (SrtSystemInfo *info,
   g_autoptr(PvPerArchDirs) self = g_new0 (PvPerArchDirs, 1);
   gsize abi;
 
-  self->root_path = g_dir_make_tmp ("pressure-vessel-libs-XXXXXX", error);
-  if (self->root_path == NULL)
+  if (!glnx_mkdtemp ("pressure-vessel-libs-XXXXXX", 0755, &self->root, error))
     return glnx_prefix_error_null (error,
                                    "Cannot create temporary directory for platform specific libraries");
 

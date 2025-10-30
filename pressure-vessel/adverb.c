@@ -502,19 +502,37 @@ regenerate_ld_so_cache (SrtSubprocessRunner *runner,
   return TRUE;
 }
 
+/*
+ * generate_locales:
+ * @runner: Execution environment for helper tools
+ * @architecture: Our best guess at the architecture of the helper tools,
+ *  or %SRT_ARCHITECTURE_QUARK_NONE if unsure
+ * @temp_dir: Directory containing locales, to be added to `$LOCPATH`
+ *  on success
+ * @error: The usual
+ *
+ * On success, @temp_dir may either be initialized or deleted.
+ * If `temp_dir->initialized` is true, then we generated at least one locale,
+ * and the caller is responsible for cleaning up the @temp_dir when they have
+ * finished using the locales.
+ * If `temp_dir->initialized` is false, then we didn't need to generate any.
+ *
+ * On failure, the caller is responsible for eventually cleaning up
+ * the @temp_dir.
+ *
+ * Returns: %TRUE on success
+ */
 static gboolean
 generate_locales (SrtSubprocessRunner *runner,
                   GQuark architecture,
-                  gchar **locpath_out,
+                  GLnxTmpDir *temp_dir,
                   GError **error)
 {
-  g_autofree gchar *temp_dir = NULL;
   g_autoptr(GDir) dir = NULL;
   int wait_status;
   g_autofree gchar *child_stderr = NULL;
   g_autofree gchar *pvlg = NULL;
   g_autofree gchar *this_dir = NULL;
-  gboolean ret = FALSE;
   const char *locale_gen_argv[] =
   {
     NULL,   /* placeholder for /path/to/pv-locale-gen */
@@ -523,27 +541,23 @@ generate_locales (SrtSubprocessRunner *runner,
     NULL
   };
 
-  g_return_val_if_fail (locpath_out != NULL && *locpath_out == NULL, FALSE);
+  g_return_val_if_fail (temp_dir != NULL, FALSE);
+  g_return_val_if_fail (!temp_dir->initialized, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
   this_dir = _srt_find_executable_dir (error);
 
   if (this_dir == NULL)
-    goto out;
+    return FALSE;
 
   pvlg = g_build_filename (this_dir, "pv-locale-gen", NULL);
   locale_gen_argv[0] = pvlg;
 
-  temp_dir = g_dir_make_tmp ("pressure-vessel-locales-XXXXXX", error);
-  locale_gen_argv[2] = temp_dir;
+  if (!glnx_mkdtemp ("pressure-vessel-locales-XXXXXX", 0755, temp_dir, error))
+    return glnx_prefix_error (error,
+                              "Cannot create temporary directory for locales");
 
-  if (temp_dir == NULL)
-    {
-      if (error != NULL)
-        glnx_prefix_error (error,
-                           "Cannot create temporary directory for locales");
-      goto out;
-    }
+  locale_gen_argv[2] = temp_dir->path;
 
   if (!run_helper_sync (runner,
                         architecture,
@@ -551,11 +565,7 @@ generate_locales (SrtSubprocessRunner *runner,
                         &child_stderr,
                         &wait_status,
                         error))
-    {
-      if (error != NULL)
-        glnx_prefix_error (error, "Cannot run pv-locale-gen");
-      goto out;
-    }
+    return glnx_prefix_error (error, "Cannot run pv-locale-gen");
 
   if (WIFEXITED (wait_status) && WEXITSTATUS (wait_status) == EX_OSFILE)
     {
@@ -567,29 +577,21 @@ generate_locales (SrtSubprocessRunner *runner,
     }
   else if (!g_spawn_check_wait_status (wait_status, error))
     {
-      if (error != NULL)
-        glnx_prefix_error (error, "Unable to generate locales");
-      goto out;
+      return glnx_prefix_error (error, "Unable to generate locales");
     }
   /* else all locales were already present (exit status 0) */
 
-  dir = g_dir_open (temp_dir, 0, error);
-
-  ret = TRUE;
+  dir = g_dir_open (temp_dir->path, 0, error);
 
   if (dir == NULL || g_dir_read_name (dir) == NULL)
     {
       g_info ("No locales have been generated");
-      goto out;
+      glnx_tmpdir_delete (temp_dir, NULL, NULL);
+      return TRUE;
     }
 
-  *locpath_out = g_steal_pointer (&temp_dir);
-
-out:
-  if (*locpath_out == NULL && temp_dir != NULL)
-    _srt_rm_rf (temp_dir);
-
-  return ret;
+  /* Ownership of the temporary directory passes to the caller */
+  return TRUE;
 }
 
 static GOptionEntry options[] =
@@ -756,6 +758,7 @@ main (int argc,
       char *argv[])
 {
   g_auto(SrtProcessManagerOptions) process_manager_options = SRT_PROCESS_MANAGER_OPTIONS_INIT;
+  g_auto(GLnxTmpDir) locales_temp_dir = { .initialized = FALSE };
   g_auto(GStrv) envp = NULL;
   g_autoptr(GPtrArray) ld_so_conf_entries = NULL;
   g_autoptr(GOptionContext) context = NULL;
@@ -764,7 +767,6 @@ main (int argc,
   g_autoptr(SrtProcessManager) process_manager = NULL;
   GError **error = &local_error;
   int ret = EX_USAGE;
-  g_autofree gchar *locales_temp_dir = NULL;
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
   g_autoptr(FlatpakBwrap) wrapped_command = NULL;
@@ -1087,10 +1089,10 @@ main (int argc,
           g_warning ("%s", local_error->message);
           g_clear_error (error);
         }
-      else if (locales_temp_dir != NULL)
+      else if (locales_temp_dir.initialized)
         {
-          g_info ("Generated locales in %s", locales_temp_dir);
-          flatpak_bwrap_set_env (wrapped_command, "LOCPATH", locales_temp_dir, TRUE);
+          g_info ("Generated locales in %s", locales_temp_dir.path);
+          flatpak_bwrap_set_env (wrapped_command, "LOCPATH", locales_temp_dir.path, TRUE);
         }
       else
         {
@@ -1110,10 +1112,6 @@ out:
   global_options = NULL;
   g_clear_pointer (&opt_overrides, g_free);
   g_clear_pointer (&opt_regenerate_ld_so_cache, g_free);
-
-  if (locales_temp_dir != NULL)
-    _srt_rm_rf (locales_temp_dir);
-
   g_clear_pointer (&opt_preload_modules, g_array_unref);
 
   if (local_error != NULL)

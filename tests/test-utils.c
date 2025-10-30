@@ -34,7 +34,7 @@
 #include <steam-runtime-tools/steam-runtime-tools.h>
 #include "steam-runtime-tools/utils-internal.h"
 
-static gchar *fake_home_parent = NULL;
+static GLnxTmpDir fake_home_parent = { .initialized = FALSE };
 
 /**
  * _srt_global_setup_private_xdg_dirs:
@@ -58,14 +58,14 @@ _srt_global_setup_private_xdg_dirs (void)
   gchar *xdg_data_home = NULL;
 
   g_return_val_if_fail (_srt_tests_init_was_called (), NULL);
-  g_return_val_if_fail (fake_home_parent == NULL, NULL);
+  g_return_val_if_fail (!fake_home_parent.initialized, NULL);
 
   /* Create a directory that we control, and then put the fake home
    * directory inside it, so we can delete and recreate the fake home
    * directory without being vulnerable to symlink attacks. */
-  fake_home_parent = g_dir_make_tmp ("fake-home-XXXXXX", &error);
+  glnx_mkdtemp ("fake-home-XXXXXX", 0700, &fake_home_parent, &error);
   g_assert_no_error (error);
-  fake_home_path = g_build_filename (fake_home_parent, "home", NULL);
+  fake_home_path = g_build_filename (fake_home_parent.path, "home", NULL);
 
   xdg_data_home = g_build_filename (fake_home_path, ".local", "share", NULL);
 
@@ -89,17 +89,11 @@ _srt_global_setup_private_xdg_dirs (void)
 gboolean
 _srt_global_teardown_private_xdg_dirs (void)
 {
-  gboolean result;
-  g_return_val_if_fail (fake_home_parent != NULL, FALSE);
-
-  result = glnx_shutil_rm_rf_at (AT_FDCWD, fake_home_parent, NULL, NULL);
-  g_free (fake_home_parent);
-  fake_home_parent = NULL;
-
-  return result;
+  g_return_val_if_fail (fake_home_parent.initialized, FALSE);
+  return glnx_tmpdir_delete (&fake_home_parent, NULL, NULL);
 }
 
-static gchar *sysroots_parent = NULL;
+static GLnxTmpDir sysroots_parent = { .initialized = FALSE };
 
 /**
  * _srt_global_setup_sysroots:
@@ -131,14 +125,14 @@ _srt_global_setup_sysroots (const char *argv0)
   int wait_status;
 
   g_return_val_if_fail (_srt_tests_init_was_called (), NULL);
-  g_return_val_if_fail (sysroots_parent == NULL, NULL);
+  g_return_val_if_fail (!sysroots_parent.initialized, NULL);
 
   /* Create a directory that we control, and then put the fake home
    * directory inside it, so we can delete and recreate the fake home
    * directory without being vulnerable to symlink attacks. */
-  sysroots_parent = g_dir_make_tmp ("srt-test-XXXXXX", &error);
+  glnx_mkdtemp ("srt-test-XXXXXX", 0700, &sysroots_parent, &error);
   g_assert_no_error (error);
-  sysroots = g_build_filename (sysroots_parent, "sysroots", NULL);
+  sysroots = g_build_filename (sysroots_parent.path, "sysroots", NULL);
 
   srcdir = g_strdup (g_getenv ("G_TEST_SRCDIR"));
 
@@ -180,14 +174,9 @@ _srt_global_setup_sysroots (const char *argv0)
 gboolean
 _srt_global_teardown_sysroots (void)
 {
-  gboolean result;
-  g_return_val_if_fail (sysroots_parent != NULL, FALSE);
+  g_return_val_if_fail (sysroots_parent.initialized, FALSE);
 
-  result = glnx_shutil_rm_rf_at (AT_FDCWD, sysroots_parent, NULL, NULL);
-  g_free (sysroots_parent);
-  sysroots_parent = NULL;
-
-  return result;
+  return glnx_tmpdir_delete (&sysroots_parent, NULL, NULL);
 }
 
 TestsOpenFdSet
@@ -340,7 +329,7 @@ _srt_show_diff (const char *expected,
   g_autoptr(GSubprocess) diff = NULL;
   g_autoptr(GError) error = NULL;
   g_auto(GStrv) diff_opts_split = NULL;
-  g_autofree gchar *tmpdir = NULL;
+  g_auto(GLnxTmpDir) tmpdir = { .initialized = FALSE };
   g_autofree gchar *expected_path = NULL;
   g_autofree gchar *actual_path = NULL;
   glnx_autofd int stderr_dup = -1;
@@ -353,9 +342,9 @@ _srt_show_diff (const char *expected,
 
   if (artifacts == NULL)
     {
-      tmpdir = g_dir_make_tmp ("srt-tests-XXXXXX", &error);
+      glnx_mkdtemp ("srt-tests.XXXXXX", 0700, &tmpdir, &error);
       g_assert_no_error (error);
-      artifacts = tmpdir;
+      artifacts = tmpdir.path;
     }
 
   expected_path = g_build_filename (artifacts, "expected", NULL);
@@ -402,9 +391,6 @@ _srt_show_diff (const char *expected,
   g_test_message ("Files for comparison: %s %s",
                   expected_path, actual_path);
 
-  if (tmpdir != NULL)
-    {
-      glnx_shutil_rm_rf_at (AT_FDCWD, tmpdir, NULL, &error);
-      g_assert_no_error (error);
-    }
+  glnx_tmpdir_delete (&tmpdir, NULL, &error);
+  g_assert_no_error (error);
 }

@@ -824,8 +824,8 @@ _srt_get_extra_modules_directory (const gchar *library_search_path,
 {
   GList *ret = NULL;
   const gchar *libqual = NULL;
-  gchar *lib_multiarch;
-  gchar *dir;
+  g_autofree gchar *lib_multiarch = NULL;
+  g_autofree gchar *dir = NULL;
 
   g_return_val_if_fail (library_search_path != NULL, NULL);
   g_return_val_if_fail (multiarch_tuple != NULL, NULL);
@@ -868,8 +868,6 @@ _srt_get_extra_modules_directory (const gchar *library_search_path,
 
       case ELFCLASSNONE:
       default:
-        g_free (lib_multiarch);
-        g_free (dir);
         g_return_val_if_reached (NULL);
     }
 
@@ -881,8 +879,6 @@ _srt_get_extra_modules_directory (const gchar *library_search_path,
   ret = g_list_sort (ret, (GCompareFunc) strcmp);
 
 out:
-  g_free (lib_multiarch);
-  g_free (dir);
   return ret;
 }
 

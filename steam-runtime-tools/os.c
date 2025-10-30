@@ -106,7 +106,7 @@ srt_os_info_init (SrtOsInfo *self)
 static GHashTable *
 copy_str_str_hash (GHashTable *other)
 {
-  GHashTable *ret;
+  g_autoptr(GHashTable) ret = NULL;
   GHashTableIter iter;
   gpointer k, v;
 
@@ -121,7 +121,7 @@ copy_str_str_hash (GHashTable *other)
         g_hash_table_replace (ret, g_strdup (k), g_strdup (v));
     }
 
-  return ret;
+  return g_steal_pointer (&ret);
 }
 
 static void

@@ -1308,9 +1308,7 @@ ensure_hidden_deps (SrtSystemInfo *self)
       JsonArray *libraries_array = NULL;
       JsonArray *hidden_libraries_array = NULL;
       JsonObject *object;
-      gchar *soname = NULL;
       gchar *path = NULL;
-      GPtrArray *arr = NULL;
       GError *error = NULL;
 
       self->cached_hidden_deps = g_hash_table_new_full (g_str_hash,
@@ -1357,32 +1355,30 @@ ensure_hidden_deps (SrtSystemInfo *self)
 
       for (guint i = 0; i < json_array_get_length (libraries_array); i++)
         {
+          g_autoptr(GList) members = NULL;
+          g_autoptr(GPtrArray) arr = NULL;
+          g_autofree gchar *soname = NULL;
+
           node = json_array_get_element (libraries_array, i);
           if (!JSON_NODE_HOLDS_OBJECT (node))
             continue;
 
           object = json_node_get_object (node);
 
-          GList *members = json_object_get_members (object);
+          members = json_object_get_members (object);
+
           if (members == NULL)
             continue;
 
           soname = g_strdup (members->data);
-          g_list_free (members);
 
           object = json_object_get_object_member (object, soname);
           if (!json_object_has_member (object, "hidden_dependencies"))
-            {
-              g_free (soname);
-              continue;
-            }
+            continue;
 
           hidden_libraries_array = json_object_get_array_member (object, "hidden_dependencies");
           if (hidden_libraries_array == NULL || json_array_get_length (hidden_libraries_array) == 0)
-            {
-              g_free (soname);
-              continue;
-            }
+            continue;
 
           arr = g_ptr_array_new_full (json_array_get_length (hidden_libraries_array) + 1, g_free);
 
@@ -1392,7 +1388,9 @@ ensure_hidden_deps (SrtSystemInfo *self)
           g_ptr_array_add (arr, NULL);
 
           g_debug ("%s soname hidden dependencies have been parsed", soname);
-          g_hash_table_insert (self->cached_hidden_deps, g_steal_pointer (&soname), g_ptr_array_free (arr, FALSE));
+          g_hash_table_insert (self->cached_hidden_deps,
+                               g_steal_pointer (&soname),
+                               _srt_ptr_array_clear_to_array (&arr, NULL));
         }
 
       out:

@@ -23,7 +23,7 @@
 
 project(
   'steam-runtime-tools', 'c',
-  version : '0.20250926.0',
+  version : '0.20251103.0',
   default_options: [
     'c_std=c99',
     'warning_level=2',
@@ -33,7 +33,7 @@ project(
 
 api_major = '0'
 abi_major = '0'
-abi_minor = '20250926.0'
+abi_minor = '20251103.0'
 
 gnome = import('gnome')
 pkg = import('pkgconfig')

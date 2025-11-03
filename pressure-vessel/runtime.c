@@ -690,9 +690,9 @@ pv_runtime_get_graphics_provider (PvRuntime *self,
 static gboolean
 runtime_architecture_init (RuntimeArchitecture *self,
                            PvRuntime *runtime,
-                           GQuark tuple)
+                           GQuark tuple,
+                           GError **error)
 {
-  g_autoptr(GError) local_error = NULL;
   g_autoptr(GPtrArray) argv = NULL;
   PvGraphicsProvider *provider;
 
@@ -714,13 +714,10 @@ runtime_architecture_init (RuntimeArchitecture *self,
                                                                   self->tuple,
                                                                   "capsule-capture-libs",
                                                                   SRT_HELPER_FLAGS_NONE,
-                                                                  &local_error);
+                                                                  error);
 
   if (self->capsule_capture_libs == NULL)
-    {
-      g_warning ("%s", local_error->message);
-      return FALSE;
-    }
+    return FALSE;
 
   self->libdir_relative_to_overrides = g_strdup_printf ("lib/%s",
                                                         self->tuple);
@@ -743,13 +740,13 @@ runtime_architecture_init (RuntimeArchitecture *self,
    * assume that this is the same as whether we can run them
    * on the host, if different. */
   pv_run_sync (runtime->run_in_current_context, tuple,
-               (const char * const *) argv->pdata, NULL, &self->ld_so, NULL);
+               (const char * const *) argv->pdata,
+               NULL, &self->ld_so, error);
 
   if (self->ld_so == NULL)
-    {
-      g_info ("Cannot determine ld.so for %s", self->tuple);
-      return FALSE;
-    }
+    return glnx_prefix_error (error,
+                              "Cannot determine ld.so for %s",
+                              self->tuple);
 
   return TRUE;
 }
@@ -7530,7 +7527,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
       part_timer = _srt_profiling_start ("%s libraries", tuple);
       g_debug ("Checking for %s libraries...", tuple);
 
-      if (runtime_architecture_init (arch, self, tuple_quark))
+      if (runtime_architecture_init (arch, self, tuple_quark, &local_error))
         {
           g_autoptr(GPtrArray) dirs = NULL;
           g_autofree gchar *this_dri_path_in_container = g_build_filename (arch->libdir_in_container,
@@ -7776,6 +7773,10 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           if (self->mutable_sysroot != NULL &&
               !pv_runtime_remove_overridden_libraries (self, arch, error))
             return FALSE;
+        }
+      else
+        {
+          _srt_log_warning ("%s", local_error->message);
         }
 
       g_clear_pointer (&part_timer, _srt_profiling_end);

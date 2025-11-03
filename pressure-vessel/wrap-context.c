@@ -90,6 +90,8 @@ pv_wrap_options_clear (PvWrapOptions *self)
 {
   g_clear_pointer (&self->architectures, g_array_unref);
   g_clear_pointer (&self->arch_graphics_providers, g_hash_table_unref);
+  g_clear_object (&self->emulator);
+  g_clear_pointer (&self->emulator_manifest, g_free);
   g_clear_pointer (&self->env_if_host, g_strfreev);
   g_clear_pointer (&self->filesystems, g_strfreev);
   g_clear_pointer (&self->freedesktop_app_id, g_free);
@@ -214,6 +216,10 @@ static void
 pv_wrap_context_dispose (GObject *object)
 {
   PvWrapContext *self = PV_WRAP_CONTEXT (object);
+
+  /* We need to clear this early, because it now contains objects and
+   * therefore could participate in a reference cycle */
+  pv_wrap_options_clear (&self->options);
 
   g_clear_object (&self->current_root);
   g_clear_object (&self->run_in_current_context);
@@ -713,6 +719,14 @@ pv_wrap_options_parse_environment (PvWrapOptions *self,
   self->devel = _srt_boolean_environment ("PRESSURE_VESSEL_DEVEL",
                                           self->devel);
 
+  value = g_getenv ("PRESSURE_VESSEL_EMULATOR");
+
+  if (value != NULL)
+    {
+      g_free (self->emulator_manifest);
+      self->emulator_manifest = g_strdup (value);
+    }
+
   value = g_getenv ("PRESSURE_VESSEL_VARIABLE_DIR");
 
   if (value != NULL)
@@ -1105,8 +1119,6 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
                                               SrtSysroot *interpreter_root,
                                               GError **error)
 {
-  gsize i;
-
   if (self->runtime == NULL)
     {
       self->runtime = g_strdup (g_getenv ("PRESSURE_VESSEL_RUNTIME"));
@@ -1161,10 +1173,42 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
       return FALSE;
     }
 
+  if (self->emulator_manifest != NULL
+      && self->emulator_manifest[0] != '\0')
+    {
+      g_info ("Using emulator from %s", self->emulator_manifest);
+      self->emulator = _srt_emulator_new_from_manifest (self->emulator_manifest,
+                                                        error);
+
+      if (self->emulator == NULL)
+        return FALSE;
+    }
+
   /* If no architectures have been configured, the default is whatever
    * architectures are hard-coded to be supported */
   if (self->architectures->len == 0)
     _srt_architecture_array_populate_with_defaults (self->architectures);
+
+  if (self->emulator != NULL)
+    {
+      const GQuark *required_archs;
+      size_t n = 0;
+
+      required_archs = _srt_emulator_get_required_architectures (self->emulator,
+                                                                 &n);
+
+      for (size_t i = 0; i < n; i++)
+        {
+          if (_srt_architecture_array_add (self->architectures,
+                                           required_archs[i]))
+            g_info ("Added architecture %s, required by emulator",
+                    g_quark_to_string (required_archs[i]));
+        }
+
+      if (n == 0)
+        g_info ("Emulator declares no required architectures, "
+                "assuming it's statically-linked");
+    }
 
 #ifdef _SRT_MULTIARCH
   /* We expect we will need our own architecture to be able to run
@@ -1180,7 +1224,7 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
    * otherwise it'll be too late to look up their graphics providers
    * in the environment. */
 
-  for (i = 0; i < self->architectures->len; i++)
+  for (size_t i = 0; i < self->architectures->len; i++)
     {
       GQuark tuple = g_array_index (self->architectures, GQuark, i);
       gconstpointer key = GUINT_TO_POINTER (tuple);
@@ -1264,7 +1308,8 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
   if (prefix == NULL)
     return FALSE;
 
-  self->run_in_current_context = _srt_subprocess_runner_new_full (NULL,   /* envp */
+  self->run_in_current_context = _srt_subprocess_runner_new_full (self->options.emulator,
+                                                                  NULL,   /* envp */
                                                                   bindir,
                                                                   pkglibexecdir,
                                                                   SRT_TEST_FLAGS_NONE,
@@ -1508,6 +1553,53 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
     }
   else
     {
+      const char *helpers_dir;
+      SrtEmulator *emulator;
+
+      if (self->runtime != NULL)
+        {
+          emulator = pv_runtime_get_emulator_in_container (self->runtime);
+          helpers_dir = pv_runtime_get_helpers_dir_in_container (self->runtime);
+        }
+      else
+        {
+          emulator = _srt_subprocess_runner_get_emulator (self->run_in_current_context);
+          helpers_dir = _srt_subprocess_runner_get_helpers_path (self->run_in_current_context);
+        }
+
+      /* We don't actually know the architecture of the game we're launching
+       * (which could be a chain of scripts and helper executables that
+       * eventually ends up at the target executable), but we can assume that
+       * Steam wouldn't have told us to use an emulator if not needed. */
+      if (emulator != NULL)
+        {
+          const char * const *emulator_argv = _srt_emulator_get_argv (emulator);
+
+          flatpak_bwrap_append_argsv (argv_in_container,
+                                      (char **) emulator_argv, -1);
+
+          if (argc > 0 && strchr (argv[0], '/') == NULL)
+            {
+              /* The emulator most likely won't search the PATH for the
+               * executable, so we need to give it an executable that is
+               * of an architecture that it emulates, but which *will* search
+               * the PATH. */
+              const GQuark *emulated_architectures;
+
+              emulated_architectures =
+                _srt_emulator_get_emulated_architectures (emulator, NULL);
+
+              /* As above, we don't know the architecture, so we arbitrarily
+               * choose the first one supported by the emulator. */
+              g_return_val_if_fail (emulated_architectures[0] != SRT_ARCHITECTURE_QUARK_NONE,
+                                    FALSE);
+              flatpak_bwrap_add_arg_printf (argv_in_container, "%s/%s-exec",
+                                            helpers_dir,
+                                            g_quark_to_string (emulated_architectures[0]));
+              flatpak_bwrap_add_arg_printf (argv_in_container, "--");
+            }
+        }
+
       /* In non-"--launcher" mode, arguments after the "--" separator
        * are the command to execute, passed to the adverb after "--".
        * Because we always use the adverb, we don't need to worry about

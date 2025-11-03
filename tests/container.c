@@ -401,7 +401,8 @@ test_flatpak_issues (Fixture *f,
 
       /* Use a mock ${bindir} to present various results */
       path = g_build_filename (f->srcdir, test->dir, NULL);
-      runner = _srt_subprocess_runner_new_full (_srt_const_strv (environ),
+      runner = _srt_subprocess_runner_new_full (NULL,   /* no emulator */
+                                                _srt_const_strv (environ),
                                                 path,
                                                 NULL,
                                                 test_flags,
@@ -495,7 +496,8 @@ test_bwrap_issues (Fixture *f,
       else
         envp = g_environ_setenv (envp, "BWRAP", "/bin/false", TRUE);
 
-      runner = _srt_subprocess_runner_new_full (_srt_const_strv (envp),
+      runner = _srt_subprocess_runner_new_full (NULL,   /* no emulator */
+                                                _srt_const_strv (envp),
                                                 NULL,
                                                 pkglibexecdir,
                                                 SRT_TEST_FLAGS_NONE,

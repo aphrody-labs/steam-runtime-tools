@@ -13,8 +13,12 @@ typedef struct
 {
   TestsOpenFdSet old_fds;
   GError *error;
+  SrtEmulator *emulator;
+  gchar *real_true;
   gchar *mock_true;
   GStrv argv;
+  GQuark emulated_arch;
+  GQuark native_arch;
 } Fixture;
 
 typedef struct
@@ -28,6 +32,10 @@ setup (Fixture *f,
 {
   G_GNUC_UNUSED const Config *config = context;
   g_autoptr(GPtrArray) argv = NULL;
+  g_autofree char *json = NULL;
+
+  f->native_arch = g_quark_from_static_string ("mock-native");
+  f->emulated_arch = g_quark_from_static_string ("mock-emulated");
 
   /* The default GMainContext is created and never freed, and it owns
    * a GWakeup, which owns a file descriptor; so we have to ensure that
@@ -37,7 +45,13 @@ setup (Fixture *f,
 
   f->old_fds = tests_check_fd_leaks_enter ();
 
+  f->real_true = g_find_program_in_path ("true");
+  g_assert_nonnull (f->real_true);
   f->mock_true = g_test_build_filename (G_TEST_BUILT, "mock-true", NULL);
+
+  json = g_test_build_filename (G_TEST_DIST, "emulator-mock.json", NULL);
+  f->emulator = _srt_emulator_new_from_manifest (json, &f->error);
+  g_assert_no_error (f->error);
 
   argv = g_ptr_array_new_with_free_func (g_free);
   g_ptr_array_add (argv, g_strdup (f->mock_true));
@@ -54,7 +68,9 @@ teardown (Fixture *f,
   G_GNUC_UNUSED const Config *config = context;
 
   g_clear_error (&f->error);
+  g_clear_object (&f->emulator);
   g_free (f->mock_true);
+  g_free (f->real_true);
   g_strfreev (f->argv);
 
   tests_check_fd_leaks_leave (f->old_fds);
@@ -94,7 +110,8 @@ test_basic (Fixture *f,
   gboolean ok;
   gboolean timed_out = TRUE;
 
-  runner = _srt_subprocess_runner_new_full (NULL,    /* envp */
+  runner = _srt_subprocess_runner_new_full (NULL,     /* emulator */
+                                            NULL,     /* envp */
                                             "/path/to/bin",
                                             "/path/to/libexec/steam-runtime-tools-0",
                                             SRT_TEST_FLAGS_NONE,
@@ -268,7 +285,8 @@ test_chdir (Fixture *f,
   g_autoptr(SrtCompletedSubprocess) completed = NULL;
   const char * const argv[] = { "pwd", NULL };
 
-  runner = _srt_subprocess_runner_new_full (NULL,     /* envp */
+  runner = _srt_subprocess_runner_new_full (NULL,     /* emulator */
+                                            NULL,     /* envp */
                                             NULL,     /* ./bin */
                                             NULL,     /* ./libexec/s-r-t-0 */
                                             SRT_TEST_FLAGS_NONE,
@@ -337,6 +355,171 @@ test_chomp (Fixture *f,
 }
 
 /*
+ * Exercises non-transparent emulation
+ */
+static void
+test_emulator (Fixture *f,
+               gconstpointer context)
+{
+  g_autoptr(SrtSubprocessRunner) runner = NULL;
+  g_autoptr(SrtCompletedSubprocess) completed = NULL;
+  static const struct
+    {
+      const char *label;
+      const char *argv0;
+      const char *expect_exe;
+      SrtHelperFlags flags;
+      gboolean expect_error;
+    }
+  emulation_tests[] =
+    {
+      {
+        .label = "PATH search fails",
+        .flags = SRT_HELPER_FLAGS_SEARCH_PATH,
+        .argv0 = "if this exists in the PATH I will be very surprised!",
+        .expect_error = TRUE,
+      },
+      {
+        .label = "PATH search succeeds",
+        .flags = SRT_HELPER_FLAGS_SEARCH_PATH,
+        .argv0 = "true",
+      },
+      {
+        .label = "PATH search not relevant because exe is relative",
+        .flags = SRT_HELPER_FLAGS_SEARCH_PATH,
+        .argv0 = "../relative",
+        .expect_exe = "../relative",
+      },
+      {
+        .label = "PATH search not relevant because exe is absolute",
+        .flags = SRT_HELPER_FLAGS_SEARCH_PATH,
+        .argv0 = "/bin/false",
+        .expect_exe = "/bin/false",
+      },
+      {
+        .label = "Not searching the PATH so we explicitly prevent it",
+        .flags = SRT_HELPER_FLAGS_NONE,
+        .argv0 = "just-a-basename",
+        .expect_exe = "./just-a-basename",
+      },
+      {
+        .label = "Not searching the PATH but exe is absolute anyway",
+        .flags = SRT_HELPER_FLAGS_NONE,
+      },
+    };
+
+  runner = _srt_subprocess_runner_new_full (f->emulator,
+                                            NULL,   /* envp */
+                                            NULL,   /* bin_path */
+                                            NULL,   /* helpers_path */
+                                            SRT_TEST_FLAGS_NONE,
+                                            NULL);  /* cwd */
+
+  /* Unspecified architecture is assumed to be directly executable */
+  completed = _srt_subprocess_runner_run_sync (runner,
+                                               SRT_HELPER_FLAGS_NONE,
+                                               SRT_ARCHITECTURE_QUARK_NONE,
+                                               _srt_const_strv (f->argv),
+                                               SRT_SUBPROCESS_OUTPUT_CAPTURE,
+                                               SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
+                                               &f->error);
+  g_assert_no_error (f->error);
+  g_assert_nonnull (completed);
+  _srt_completed_subprocess_check (completed, &f->error);
+  g_assert_no_error (f->error);
+  g_assert_cmpstr (_srt_completed_subprocess_get_stdout (completed),
+                   ==, "");
+  g_clear_object (&completed);
+
+  /* Architecture with no emulator set is assumed to be directly executable */
+  completed = _srt_subprocess_runner_run_sync (runner,
+                                               SRT_HELPER_FLAGS_NONE,
+                                               f->native_arch,
+                                               _srt_const_strv (f->argv),
+                                               SRT_SUBPROCESS_OUTPUT_CAPTURE,
+                                               SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
+                                               &f->error);
+  g_assert_no_error (f->error);
+  g_assert_nonnull (completed);
+  _srt_completed_subprocess_check (completed, &f->error);
+  g_assert_no_error (f->error);
+  g_assert_cmpstr (_srt_completed_subprocess_get_stdout (completed),
+                   ==, "");
+  g_clear_object (&completed);
+
+  /* Architecture with an emulator set is run via the emulator */
+  for (size_t i = 0; i < G_N_ELEMENTS (emulation_tests); i++)
+    {
+      g_autoptr(GString) expected = NULL;
+      g_auto(GStrv) argv = g_strdupv (f->argv);
+      SrtHelperFlags flags = emulation_tests[i].flags;
+      const char * const *emulator_argv;
+      size_t argc;
+
+      if (emulation_tests[i].argv0 != NULL)
+        {
+          g_clear_pointer (&argv[0], g_free);
+          argv[0] = g_strdup (emulation_tests[i].argv0);
+        }
+
+      expected = g_string_new ("");
+      argc = 0;
+      emulator_argv = _srt_emulator_get_argv (f->emulator);
+
+      for (size_t j = 0; emulator_argv[j] != NULL; j++)
+        g_string_append_printf (expected, "argv[%zu]=%s\n", argc++, emulator_argv[j]);
+
+      if (emulation_tests[i].expect_exe != NULL)
+        g_string_append_printf (expected, "argv[%zu]=%s\n",
+                                argc++, emulation_tests[i].expect_exe);
+      else if (g_strcmp0 (emulation_tests[i].argv0, "true") == 0)
+        g_string_append_printf (expected, "argv[%zu]=%s\n",
+                                argc++, f->real_true);
+      else
+        g_string_append_printf (expected, "argv[%zu]=%s\n",
+                                argc++, f->mock_true);
+
+      g_string_append_printf (expected, "argv[%zu]=--arg\n", argc++);
+      g_string_append_printf (expected, "argv[%zu]=argh!\n", argc++);
+      g_string_append (expected, "not really running it\n");
+      completed = _srt_subprocess_runner_run_sync (runner,
+                                                   flags,
+                                                   f->emulated_arch,
+                                                   _srt_const_strv (argv),
+                                                   SRT_SUBPROCESS_OUTPUT_CAPTURE,
+                                                   SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
+                                                   &f->error);
+
+      if (f->error == NULL)
+        g_test_message ("emulation test %zu \"%s\" -> success",
+                        i, emulation_tests[i].label);
+      else
+        g_test_message ("emulation test %zu \"%s\" -> %s %d %s",
+                        i, emulation_tests[i].label,
+                        g_quark_to_string (f->error->domain),
+                        f->error->code,
+                        f->error->message);
+
+      if (emulation_tests[i].expect_error)
+        {
+          g_assert_nonnull (f->error);
+          g_assert_null (completed);
+          g_clear_error (&f->error);
+        }
+      else
+        {
+          g_assert_no_error (f->error);
+          g_assert_nonnull (completed);
+          _srt_completed_subprocess_check (completed, &f->error);
+          g_assert_no_error (f->error);
+          g_assert_cmpstr (_srt_completed_subprocess_get_stdout (completed),
+                           ==, expected->str);
+          g_clear_object (&completed);
+        }
+    }
+}
+
+/*
  * Exercises environment variable manipulation
  */
 static void
@@ -351,7 +534,8 @@ test_environ (Fixture *f,
                            TRUE);
   envp = g_environ_unsetenv (envp, "LIBGL_DEBUG");
 
-  runner = _srt_subprocess_runner_new_full (_srt_const_strv (envp),
+  runner = _srt_subprocess_runner_new_full (NULL,    /* emulator */
+                                            _srt_const_strv (envp),
                                             NULL,    /* ./bin */
                                             NULL,    /* ./libexec/s-r-t-0 */
                                             SRT_TEST_FLAGS_NONE,
@@ -586,7 +770,8 @@ test_timeout (Fixture *f,
   gboolean ok;
   gboolean timed_out = FALSE;
 
-  runner = _srt_subprocess_runner_new_full (NULL,    /* envp */
+  runner = _srt_subprocess_runner_new_full (NULL,    /* emulator */
+                                            NULL,    /* envp */
                                             NULL,    /* ./bin */
                                             NULL,    /* ./libexec/s-r-t-0 */
                                             SRT_TEST_FLAGS_TIME_OUT_SOONER,
@@ -647,6 +832,8 @@ main (int argc,
               setup, test_chdir, teardown);
   g_test_add ("/subproc/chomp", Fixture, NULL,
               setup, test_chomp, teardown);
+  g_test_add ("/subproc/emulator", Fixture, NULL,
+              setup, test_emulator, teardown);
   g_test_add ("/subproc/environ", Fixture, NULL,
               setup, test_environ, teardown);
   g_test_add ("/subproc/exec_failure", Fixture, NULL,

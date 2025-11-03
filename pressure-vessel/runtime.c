@@ -32,6 +32,7 @@
 #include <steam-runtime-tools/steam-runtime-tools.h>
 
 #include "steam-runtime-tools/architecture-internal.h"
+#include "steam-runtime-tools/elf-utils-internal.h"
 #include "steam-runtime-tools/file-lock-internal.h"
 #include "steam-runtime-tools/graphics-internal.h"
 #include "steam-runtime-tools/graphics-drivers-json-based-internal.h"
@@ -112,6 +113,8 @@ struct _PvRuntime
   GStrv original_environ;
 
   const SrtKnownArchitecture *adverb_architecture;
+  SrtEmulator *emulator;
+  SrtEmulator *emulator_in_container;
   const SrtKnownArchitecture *ldconfig_architecture;
   gchar *libcapsule_knowledge;  /* relative to runtime_files */
   gchar *runtime_abi_json;
@@ -129,7 +132,9 @@ struct _PvRuntime
   gchar *runtime_app;           /* runtime_files + "/app" */
   gchar *runtime_files_on_host;
   GArray *tuples;
+  const gchar *pv_prefix_in_container;
   const gchar *adverb_in_container;
+  gchar *helpers_dir_in_container;
   GPtrArray *providers;
   SrtDirentCompareFunc arbitrary_dirent_order;
   GCompareFunc arbitrary_str_order;
@@ -1331,6 +1336,7 @@ pv_runtime_initable_init (GInitable *initable,
   g_autofree gchar *contents = NULL;
   g_autofree gchar *os_release = NULL;
   g_autofree gchar *usr_mtree = NULL;
+  SrtEmulator *emulator;
   gsize len;
   PvMtreeApplyFlags mtree_flags = PV_MTREE_APPLY_FLAGS_NONE;
   struct stat ignore;
@@ -1341,6 +1347,11 @@ pv_runtime_initable_init (GInitable *initable,
 
   /* Should have been set at construct time */
   g_return_val_if_fail (self->run_in_current_context != NULL, FALSE);
+
+  emulator = _srt_subprocess_runner_get_emulator (self->run_in_current_context);
+
+  if (emulator != NULL)
+    self->emulator = g_object_ref (emulator);
 
   self->pv_prefix = _srt_find_myself (NULL, NULL, error);
 
@@ -1730,6 +1741,8 @@ pv_runtime_dispose (GObject *object)
   if (self->providers != NULL)
     g_ptr_array_set_size (self->providers, 0);
 
+  g_clear_object (&self->emulator);
+  g_clear_object (&self->emulator_in_container);
   g_clear_object (&self->mutable_sysroot);
   g_clear_object (&self->real_root);
   g_clear_object (&self->host_root);
@@ -1745,6 +1758,7 @@ pv_runtime_finalize (GObject *object)
 
   pv_runtime_cleanup (self);
   g_free (self->bubblewrap);
+  g_free (self->helpers_dir_in_container);
   g_free (self->libcapsule_knowledge);
   g_strfreev (self->original_environ);
   glnx_close_fd (&self->overrides_fd);
@@ -1872,6 +1886,89 @@ pv_runtime_new (const char *source,
                          NULL);
 }
 
+static gboolean
+pv_runtime_bind_emulator (PvRuntime *self,
+                          FlatpakExports *exports,
+                          FlatpakBwrap *bwrap,
+                          GError **error)
+{
+  g_autofree gchar *exe_now = NULL;
+  g_autofree gchar *exe_in_container = NULL;
+  const char * const *argv;
+  const char *paths[2];
+
+  g_return_val_if_fail (SRT_IS_EMULATOR (self->emulator), FALSE);
+
+  argv = _srt_emulator_get_argv (self->emulator);
+  g_return_val_if_fail (argv != NULL, FALSE);
+  g_return_val_if_fail (argv[0] != NULL, FALSE);
+
+  /* We document that we only export the path of the manifest (paths[0]),
+   * but to be nice to developers, also try to export the path to the
+   * main executable if different. */
+  paths[0] = _srt_emulator_get_manifest (self->emulator);
+  paths[1] = argv[0];
+
+  for (size_t i = 0; i < G_N_ELEMENTS (paths); i++)
+    {
+      const char *path = paths[i];
+      g_autofree gchar *parent = NULL;
+
+      if (path == NULL)
+        continue;
+
+      parent = g_path_get_dirname (path);
+
+      if (path_visible_in_provider_namespace (self->flags, parent))
+        {
+          g_info ("Emulator path %s is /usr-like, not exporting", parent);
+        }
+      else if (exports != NULL)
+        {
+          g_info ("Trying to export %s because it contains an emulator",
+                  parent);
+
+          if (!flatpak_exports_add_path_expose (exports,
+                                                FLATPAK_FILESYSTEM_MODE_READ_ONLY,
+                                                parent,
+                                                error))
+            return glnx_prefix_error (error, "Unable to export emulator \"%s\"",
+                                      parent);
+        }
+    }
+
+  exe_now = g_canonicalize_filename (argv[0], NULL);
+
+  if (path_visible_in_provider_namespace (self->flags, exe_now))
+    {
+      if (self->flags & PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX)
+        exe_in_container = g_strdup_printf ("/run/parent%s", exe_now);
+      else
+        exe_in_container = g_strdup_printf ("/run/host%s", exe_now);
+    }
+  else if ((self->flags & PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX)
+           || (exports != NULL && flatpak_exports_path_is_visible (exports, exe_now)))
+    {
+      /* It's in $HOME or some similar path, we can use it as-is.
+       * For the Flatpak case, we assume that everything visible
+       * to the Steam app is equally visible to our sub-sandbox.
+       * Otherwise, we can assume that pv_runtime_bind() already exported
+       * the emulator if necessary (and possible). */
+      exe_in_container = g_strdup (exe_now);
+    }
+  else
+    {
+      return glnx_throw (error,
+                         "Unable to work out how to run %s in container",
+                         exe_now);
+    }
+
+  self->emulator_in_container = _srt_emulator_new_modified (self->emulator,
+                                                            exe_in_container);
+  g_return_val_if_fail (SRT_IS_EMULATOR (self->emulator_in_container), FALSE);
+  return TRUE;
+}
+
 /*
  * This is chosen to be:
  * - somewhere we don't bind-mount from the runtime or host
@@ -1898,6 +1995,7 @@ pv_runtime_adverb_regenerate_ld_so_cache (PvRuntime *self,
 {
   g_autoptr(GString) ldlp_after_regen = g_string_new ("");
   g_autofree gchar *regen_dir = NULL;
+  SrtEmulator *emulator;
   gsize i;
 
   /* This directory was set up in bind_runtime_ld_so() */
@@ -1924,6 +2022,14 @@ pv_runtime_adverb_regenerate_ld_so_cache (PvRuntime *self,
   flatpak_bwrap_add_args (adverb_argv,
                           "--regenerate-ld.so-cache", regen_dir,
                           NULL);
+
+  emulator = _srt_subprocess_runner_get_emulator (self->run_in_current_context);
+
+  if (emulator != NULL && self->ldconfig_architecture != NULL)
+    flatpak_bwrap_add_args (adverb_argv,
+                            "--ldconfig-architecture",
+                            self->ldconfig_architecture->multiarch_tuple,
+                            NULL);
 
   /* This logic to build the search path matches
    * pv_runtime_set_search_paths(), except that here, we split them up:
@@ -1999,20 +2105,85 @@ pv_runtime_get_adverb (PvRuntime *self,
                        FlatpakBwrap *bwrap,
                        GError **error)
 {
+  g_autofree char *ld_library_path = NULL;
+  SrtEmulator *emulator_for_adverb;
+  GQuark adverb_arch_quark;
+
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
   /* This will be true if pv_runtime_bind() was successfully called. */
   g_return_val_if_fail (self->adverb_in_container != NULL, FALSE);
+  /* This will be true if pv_runtime_bind() was successfully called. */
+  g_return_val_if_fail ((self->emulator != NULL) == (self->emulator_in_container != NULL),
+                        FALSE);
   g_return_val_if_fail (bwrap != NULL, FALSE);
   g_return_val_if_fail (flatpak_bwrap_is_empty (bwrap), FALSE);
   g_return_val_if_fail (!pv_bwrap_was_finished (bwrap), FALSE);
 
-  if (self->workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID)
-    {
-      g_autofree char *ld_library_path = pv_runtime_get_ld_library_path (self);
-      const char *ld_so = NULL;
+  /* This should have been set in pv_runtime_initable_init() */
+  g_return_val_if_fail (self->adverb_architecture != NULL, FALSE);
+  adverb_arch_quark = g_quark_from_static_string (self->adverb_architecture->multiarch_tuple);
 
-      /* This should have been set in pv_runtime_initable_init() */
-      g_return_val_if_fail (self->adverb_architecture != NULL, FALSE);
+  emulator_for_adverb = _srt_subprocess_runner_get_emulator_for_arch (self->run_in_current_context,
+                                                                      adverb_arch_quark);
+
+  if (self->workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID)
+    ld_library_path = pv_runtime_get_ld_library_path (self);
+
+  if (emulator_for_adverb != NULL)
+    {
+      const char * const *original_argv;
+      const char * const *argv;
+
+      /* If emulator_for_adverb is non-null, then we can assume that it is
+       * the same emulator as the one we would have previously used to derive
+       * emulator_in_container, because we only support one emulator
+       * at a time. */
+      g_return_val_if_fail (self->emulator_in_container != NULL, FALSE);
+
+      if (ld_library_path != NULL)
+        {
+          /* See below - same idea, but for the emulator itself */
+          g_autoptr(GError) local_error = NULL;
+          g_autofree gchar *ld_so = NULL;
+
+          original_argv = _srt_emulator_get_argv (emulator_for_adverb);
+          g_return_val_if_fail (original_argv != NULL, FALSE);
+          ld_so = _srt_elf_path_get_pt_interp (AT_FDCWD,
+                                               original_argv[0],
+                                               &local_error);
+
+          if (ld_so != NULL)
+            {
+              g_info ("Running emulator %s via ELF interpreter %s",
+                      original_argv[0], ld_so);
+              flatpak_bwrap_add_args (bwrap,
+                                      ld_so,
+                                      "--library-path",
+                                      ld_library_path,
+                                      NULL);
+            }
+          else if (g_error_matches (local_error, SRT_LIBRARY_ERROR,
+                                    SRT_LIBRARY_ERROR_NO_INTERPRETER))
+            {
+              g_info ("Assuming emulator %s is statically linked",
+                      original_argv[0]);
+              g_clear_error (&local_error);
+            }
+          else
+            {
+              g_propagate_error (error, g_steal_pointer (&local_error));
+              return FALSE;
+            }
+        }
+
+      argv = _srt_emulator_get_argv (self->emulator_in_container);
+      g_return_val_if_fail (argv != NULL, FALSE);
+      flatpak_bwrap_append_argsv (bwrap, (char **) argv, -1);
+    }
+
+  if (ld_library_path != NULL)
+    {
+      const char *ld_so = NULL;
 
       /* We can't rely on LD_LIBRARY_PATH staying in the environment,
        * which means we can't run anything until we have invoked
@@ -2035,6 +2206,24 @@ pv_runtime_get_adverb (PvRuntime *self,
     }
 
   flatpak_bwrap_add_arg (bwrap, self->adverb_in_container);
+  flatpak_bwrap_add_arg_printf (bwrap, "--prefix=%s",
+                                self->pv_prefix_in_container);
+
+  /* We need to tell the adverb how it can run the emulator for its
+   * subprocesses, notably ldconfig. */
+  if (self->emulator_in_container != NULL)
+    {
+      g_autofree char *dest = NULL;
+
+      dest = g_strdup_printf ("%s/emulator.json", self->overrides);
+
+      if (!_srt_emulator_write_manifest (self->emulator_in_container, dest, error))
+        return FALSE;
+
+      flatpak_bwrap_add_arg_printf (bwrap,
+                                    "--emulator=%s/emulator.json",
+                                    self->overrides_in_container);
+    }
 
   if (self->flags & PV_RUNTIME_FLAGS_GENERATE_LOCALES)
     flatpak_bwrap_add_args (bwrap, "--generate-locales", NULL);
@@ -2205,6 +2394,7 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
                                      RuntimeArchitecture *arch,
                                      GError **error)
 {
+  SrtEmulator *emulator = NULL;
   const gchar *ld_library_path;
   g_autofree gchar *remap_app = NULL;
   g_autofree gchar *remap_usr = NULL;
@@ -2247,6 +2437,22 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
                                          "files \"%s\"",
                                          self->runtime_files_fd,
                                          self->runtime_files);
+
+  /* self->container_access_adverb might involve a srt-bwrap or system bwrap
+   * invocation, assumed to be of our own architecture rather than @arch,
+   * so we can't just ask the SrtSubprocessRunner to prepend the emulator
+   * to the argv. Instead we need to insert the emulator into the middle
+   * of the argv, after srt-bwrap or system bwrap, but before the
+   * ${arch}-capsule-capture-libs command. */
+  emulator = _srt_subprocess_runner_get_emulator_for_arch (self->run_in_current_context,
+                                                           arch->tuple_quark);
+
+  if (emulator != NULL)
+    {
+      const char * const *emulator_argv = _srt_emulator_get_argv (emulator);
+
+      flatpak_bwrap_append_argsv (ret, (char **) emulator_argv, -1);
+    }
 
   for (size_t i = 0; i < arch->capsule_capture_libs->len; i++)
     flatpak_bwrap_add_arg (ret, g_ptr_array_index (arch->capsule_capture_libs, i));
@@ -5361,7 +5567,9 @@ pv_runtime_get_ld_so (PvRuntime *self,
  * @patterns: (inout) (not nullable):
  */
 static void
-collect_graphics_libraries_patterns (GPtrArray *patterns)
+collect_graphics_libraries_patterns (PvRuntime *self,
+                                     RuntimeArchitecture *arch,
+                                     GPtrArray *patterns)
 {
   static const char * const sonames[] =
   {
@@ -5551,7 +5759,9 @@ collect_graphics_libraries_patterns (GPtrArray *patterns)
 }
 
 static void
-collect_core_libraries_patterns (GPtrArray *patterns)
+collect_core_libraries_patterns (PvRuntime *self,
+                                 RuntimeArchitecture *arch,
+                                 GPtrArray *patterns)
 {
   /* libudev.so.0 and libudev.so.1 have an ABI that is so close that people
    * sometimes create a symlink libudev.so.0 -> libudev.so.1, even though
@@ -5571,11 +5781,64 @@ collect_core_libraries_patterns (GPtrArray *patterns)
      * genuinely used libudev.so.0. */
     "libudev.so.0",
   };
-  gsize i;
+  SrtEmulator *emulator;
 
   g_return_if_fail (patterns != NULL);
 
-  for (i = 0; i < G_N_ELEMENTS (exact_sonames); i++)
+  emulator = _srt_subprocess_runner_get_emulator (self->run_in_current_context);
+
+  if (emulator != NULL)
+    {
+      const GQuark *required_archs;
+      size_t n;
+
+      required_archs = _srt_emulator_get_required_architectures (emulator, &n);
+
+      for (size_t i = 0; i < n; i++)
+        {
+          if (required_archs[i] == arch->tuple_quark)
+            {
+              /* If we can't find the library, we err on the side of
+               * just failing to capture it and trying to continue anyway.
+               * The worst that can happen is that the emulator doesn't work,
+               * and that's no worse than pressure-vessel failing to work. */
+              static const char mode[] = "if-exists:if-same-abi";
+              const char * const *libraries;
+
+              libraries = _srt_emulator_get_required_libraries (emulator);
+
+              /* Assume we will always need glibc for emulators,
+               * if only for its ELF interpreter,
+               * even if not explicitly declared.
+               * This automatically pulls in the rest of its family:
+               * libm.so.6, libdl.so.1 and so on. */
+              if (libraries == NULL
+                  || !g_strv_contains (libraries, "libc.so.6"))
+                g_ptr_array_add (patterns,
+                                 g_strdup_printf ("%s:libc.so.6", mode));
+
+              if (libraries != NULL && libraries[0] != NULL)
+                {
+                  for (size_t j = 0; libraries[j] != NULL; j++)
+                    {
+                      g_debug ("Emulator requires %s", libraries[j]);
+                      g_ptr_array_add (patterns,
+                                       g_strdup_printf ("%s:%s",
+                                                        mode, libraries[j]));
+                    }
+                }
+              else
+                {
+                  g_debug ("Emulator requires no libraries except maybe libc");
+                }
+
+              break;
+            }
+        }
+    }
+
+
+  for (size_t i = 0; i < G_N_ELEMENTS (exact_sonames); i++)
     g_ptr_array_add (patterns,
                      g_strdup_printf ("if-exists:if-same-abi:exact-soname:%s",
                                       exact_sonames[i]));
@@ -7324,8 +7587,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
           g_debug ("Collecting graphics drivers from provider system...");
 
-          collect_core_libraries_patterns (patterns);
-          collect_graphics_libraries_patterns (patterns);
+          collect_core_libraries_patterns (self, arch, patterns);
+          collect_graphics_libraries_patterns (self, arch, patterns);
 
           if (!collect_json_based_drivers (self,
                                            arch,
@@ -7863,6 +8126,10 @@ pv_runtime_bind (PvRuntime *self,
         return FALSE;
     }
 
+  if (self->emulator != NULL
+      && !pv_runtime_bind_emulator (self, exports, bwrap, error))
+    return FALSE;
+
   if (bwrap != NULL
       && !bind_runtime_finish (self, exports, bwrap, error))
     return FALSE;
@@ -7874,6 +8141,7 @@ pv_runtime_bind (PvRuntime *self,
       glnx_autofd int parent_dirfd = -1;
       const char *symlink_target = PV_FROM_HOST_IN_MUTABLE_SYSROOT;
 
+      self->pv_prefix_in_container = PV_FROM_HOST_IN_MUTABLE_SYSROOT;
       parent_dirfd = _srt_resolve_in_sysroot (self->mutable_sysroot->fd,
                                               PV_FROM_HOST_IN_MUTABLE_SYSROOT_PARENT,
                                               SRT_RESOLVE_FLAGS_MKDIR_P,
@@ -7931,6 +8199,7 @@ pv_runtime_bind (PvRuntime *self,
                               pressure_vessel_prefix_in_host_namespace,
                               PV_FROM_HOST_WITHOUT_MUTABLE_SYSROOT,
                               NULL);
+      self->pv_prefix_in_container = PV_FROM_HOST_WITHOUT_MUTABLE_SYSROOT;
       self->adverb_in_container = PV_ADVERB_WITHOUT_MUTABLE_SYSROOT;
     }
 
@@ -8340,4 +8609,40 @@ SrtSysroot *
 pv_runtime_get_mutable_sysroot (PvRuntime *self)
 {
   return self->mutable_sysroot;
+}
+
+/*
+ * Return the directory in which we can find helpers inside the container.
+ * Can only be called after a successful call to pv_runtime_bind().
+ *
+ * Returns: (transfer none): An absolute path, never %NULL unless a
+ *  programming error has occurred
+ */
+const char *
+pv_runtime_get_helpers_dir_in_container (PvRuntime *self)
+{
+  /* This will be true if pv_runtime_bind() was successfully called. */
+  g_return_val_if_fail (self->pv_prefix_in_container != NULL, NULL);
+
+  if (self->helpers_dir_in_container == NULL)
+    self->helpers_dir_in_container = g_build_filename (self->pv_prefix_in_container,
+                                                       PKGLIBEXECDIR,
+                                                       NULL);
+
+  return self->helpers_dir_in_container;
+}
+
+/*
+ * Return the emulator to be used for processes inside the container.
+ * Can only be called after a successful call to pv_runtime_bind().
+ *
+ * Returns: (transfer none): An emulator, or %NULL if none is in use
+ */
+SrtEmulator *
+pv_runtime_get_emulator_in_container (PvRuntime *self)
+{
+  /* This will be true if pv_runtime_bind() was successfully called. */
+  g_return_val_if_fail ((self->emulator != NULL) == (self->emulator_in_container != NULL),
+                        NULL);
+  return self->emulator_in_container;
 }

@@ -5,6 +5,7 @@
 
 #include "steam-runtime-tools/subprocess-internal.h"
 
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/enums.h"
 #include "steam-runtime-tools/utils-internal.h"
 
@@ -769,6 +770,9 @@ _srt_completed_subprocess_new_from_subprocess (SrtSubprocess *self)
 struct _SrtSubprocessRunner
 {
   GObject parent;
+  /* For now we assume that we won't need more than one emulator,
+   * so this is just a nullable pointer rather than an array. */
+  SrtEmulator *emulator;
   /* Environment */
   GStrv envp;
   /* Path to find steam-runtime-launch-client etc., or %NULL */
@@ -793,6 +797,7 @@ enum
 {
   PROP_0,
   PROP_BIN_PATH,
+  PROP_EMULATOR,
   PROP_ENVIRON,
   PROP_HELPERS_PATH,
   PROP_TEST_FLAGS,
@@ -845,6 +850,10 @@ _srt_subprocess_runner_get_property (GObject *object,
         g_value_set_string (value, self->bin_path);
         break;
 
+      case PROP_EMULATOR:
+        g_value_set_object (value, self->emulator);
+        break;
+
       case PROP_ENVIRON:
         g_value_set_boxed (value, self->envp);
         break;
@@ -883,6 +892,12 @@ _srt_subprocess_runner_set_property (GObject *object,
         self->bin_path = g_value_dup_string (value);
         break;
 
+      case PROP_EMULATOR:
+        /* Construct-only */
+        g_return_if_fail (self->emulator == NULL);
+        self->emulator = g_value_dup_object (value);
+        break;
+
       case PROP_ENVIRON:
         /* Construct-only */
         g_return_if_fail (self->envp == NULL);
@@ -917,6 +932,16 @@ _srt_subprocess_runner_set_property (GObject *object,
 }
 
 static void
+_srt_subprocess_runner_dispose (GObject *object)
+{
+  SrtSubprocessRunner *self = SRT_SUBPROCESS_RUNNER (object);
+
+  g_clear_object (&self->emulator);
+
+  G_OBJECT_CLASS (_srt_subprocess_runner_parent_class)->dispose (object);
+}
+
+static void
 _srt_subprocess_runner_finalize (GObject *object)
 {
   SrtSubprocessRunner *self = SRT_SUBPROCESS_RUNNER (object);
@@ -937,12 +962,17 @@ _srt_subprocess_runner_class_init (SrtSubprocessRunnerClass *cls)
   object_class->constructed = _srt_subprocess_runner_constructed;
   object_class->get_property = _srt_subprocess_runner_get_property;
   object_class->set_property = _srt_subprocess_runner_set_property;
+  object_class->dispose = _srt_subprocess_runner_dispose;
   object_class->finalize = _srt_subprocess_runner_finalize;
 
   properties[PROP_BIN_PATH] =
     g_param_spec_string ("bin-path", NULL, NULL, NULL,
                          G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                          G_PARAM_STATIC_STRINGS);
+  properties[PROP_EMULATOR] =
+    g_param_spec_object ("emulator", NULL, NULL, SRT_TYPE_EMULATOR,
+                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                        G_PARAM_STATIC_STRINGS);
   properties[PROP_ENVIRON] =
     g_param_spec_boxed ("environ", NULL, NULL, G_TYPE_STRV,
                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
@@ -969,7 +999,8 @@ _srt_subprocess_runner_new_swap_envp (SrtSubprocessRunner *self,
                                       const char * const *envp)
 {
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
-  return _srt_subprocess_runner_new_full (envp,
+  return _srt_subprocess_runner_new_full (self->emulator,
+                                          envp,
                                           self->bin_path,
                                           self->helpers_path,
                                           self->test_flags,
@@ -981,7 +1012,8 @@ _srt_subprocess_runner_new_swap_helpers_path (SrtSubprocessRunner *self,
                                               const char *path)
 {
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
-  return _srt_subprocess_runner_new_full (_srt_const_strv (self->envp),
+  return _srt_subprocess_runner_new_full (self->emulator,
+                                          _srt_const_strv (self->envp),
                                           self->bin_path,
                                           path,
                                           self->test_flags,
@@ -993,7 +1025,8 @@ _srt_subprocess_runner_new_swap_test_flags (SrtSubprocessRunner *self,
                                             SrtTestFlags flags)
 {
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
-  return _srt_subprocess_runner_new_full (_srt_const_strv (self->envp),
+  return _srt_subprocess_runner_new_full (self->emulator,
+                                          _srt_const_strv (self->envp),
                                           self->bin_path,
                                           self->helpers_path,
                                           flags,
@@ -1005,11 +1038,22 @@ _srt_subprocess_runner_new_swap_working_directory (SrtSubprocessRunner *self,
                                                    const char *working_directory)
 {
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
-  return _srt_subprocess_runner_new_full (_srt_const_strv (self->envp),
+  return _srt_subprocess_runner_new_full (self->emulator,
+                                          _srt_const_strv (self->envp),
                                           self->bin_path,
                                           self->helpers_path,
                                           self->test_flags,
                                           working_directory);
+}
+
+/*
+ * Returns: The emulator, or %NULL if none.
+ */
+SrtEmulator *
+_srt_subprocess_runner_get_emulator (SrtSubprocessRunner *self)
+{
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
+  return self->emulator;
 }
 
 /*
@@ -1233,6 +1277,30 @@ _srt_subprocess_runner_child_setup_cb (gpointer user_data)
   _srt_child_setup_unblock_signals (NULL);
 }
 
+SrtEmulator *
+_srt_subprocess_runner_get_emulator_for_arch (SrtSubprocessRunner *self,
+                                              GQuark architecture)
+{
+  const GQuark *archs;
+  size_t n = 0;
+
+  if (architecture == SRT_ARCHITECTURE_QUARK_NONE)
+    return NULL;
+
+  if (self->emulator == NULL)
+    return NULL;
+
+  archs = _srt_emulator_get_emulated_architectures (self->emulator, &n);
+
+  for (size_t i = 0; i < n; i++)
+    {
+      if (archs[i] == architecture)
+        return self->emulator;
+    }
+
+  return NULL;
+}
+
 static gboolean
 _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
                               SrtHelperFlags flags,
@@ -1243,8 +1311,10 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
                               SrtSubprocess *subprocess,
                               GError **error)
 {
+  g_autoptr(GPtrArray) modified_argv = NULL;
   g_auto(GStrv) my_environ = NULL;
   ChildSetupData child_setup_data = { .flags = flags };
+  SrtEmulator *emulator;
   GSpawnFlags spawn_flags = G_SPAWN_DO_NOT_REAP_CHILD;
   int *stdout_fdp = NULL;
   int *stderr_fdp = NULL;
@@ -1328,6 +1398,59 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
 
       default:
         g_return_val_if_reached (FALSE);
+    }
+
+  emulator = _srt_subprocess_runner_get_emulator_for_arch (self, architecture);
+
+  if (emulator != NULL)
+    {
+      const char * const *emulator_argv = _srt_emulator_get_argv (emulator);
+
+      modified_argv = g_ptr_array_new_with_free_func (g_free);
+
+      for (size_t i = 0; emulator_argv[i] != NULL; i++)
+        g_ptr_array_add (modified_argv, g_strdup (emulator_argv[i]));
+
+      if (strchr (argv[0], '/') == NULL)
+        {
+          if (flags & SRT_HELPER_FLAGS_SEARCH_PATH)
+            {
+              /* The emulator might not search PATH for executables
+               * (in particular, FEX doesn't) so we need to implement
+               * that ourselves. */
+              g_autofree char *in_path = g_find_program_in_path (argv[0]);
+
+              if (in_path == NULL)
+                {
+                  g_set_error (error, G_SPAWN_ERROR, G_SPAWN_ERROR_FAILED,
+                               "\"%s\" not found in PATH", argv[0]);
+                  return FALSE;
+                }
+
+              g_ptr_array_add (modified_argv, g_steal_pointer (&in_path));
+            }
+          else
+            {
+              /* In principle the emulator might search PATH for executables,
+               * so for consistency, arrange for it to not. */
+              g_ptr_array_add (modified_argv, g_strdup_printf ("./%s", argv[0]));
+            }
+        }
+      else
+        {
+          /* Absolute or relative path, can use as-is */
+          g_ptr_array_add (modified_argv, g_strdup (argv[0]));
+        }
+
+      for (size_t i = 1; argv[i] != NULL; i++)
+        g_ptr_array_add (modified_argv, g_strdup (argv[i]));
+
+      g_ptr_array_add (modified_argv, NULL);
+      argv = (const char * const *) modified_argv->pdata;
+
+      /* The emulator path from _srt_emulator_get_argv() is absolute,
+       * but just to ensure consistency, don't search the path for it. */
+      flags &= ~SRT_HELPER_FLAGS_SEARCH_PATH;
     }
 
   if (!(flags & SRT_HELPER_FLAGS_QUIET))

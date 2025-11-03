@@ -40,6 +40,7 @@ tests = [
   {'name': 'cpu-feature', 'static': true},
   {'name': 'desktop-entry'},
   {'name': 'display', 'static': true},
+  {'name': 'emulator', 'static': true},
   {'name': 'env-overlay', 'static': true},
   {'name': 'file-lock', 'static': true},
   {'name': 'graphics', 'static': true},
@@ -608,7 +609,13 @@ if get_option('pressure_vessel') and get_option('bin')
 endif
 
 if get_option('installed_tests')
-  install_data('run-in-ldlp-runtime.sh', install_dir: tests_dir)
+  install_data(
+    'emulator-mock.json',
+    'emulator-qemu-arm.json',
+    'mock-emulator.sh',
+    'run-in-ldlp-runtime.sh',
+    install_dir: tests_dir,
+  )
   test_conf = configuration_data()
   test_conf.set('TESTS', '\n'.join(relocatable_installed_tests))
   configure_file(

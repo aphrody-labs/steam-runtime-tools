@@ -562,6 +562,7 @@ class TestContainers(BaseTest):
         fake_home: bool = False,
         gc: bool = True,
         locales: bool = False,
+        mock_emulator: str = '',
         only_prepare: bool = False,
         workarounds: typing.Iterable[str] = ()
     ) -> None:
@@ -572,6 +573,7 @@ class TestContainers(BaseTest):
             gc=gc,
             is_soldier=True,
             locales=locales,
+            mock_emulator=mock_emulator,
             only_prepare=only_prepare,
             workarounds=workarounds,
         )
@@ -587,6 +589,7 @@ class TestContainers(BaseTest):
         is_scout: bool = False,
         is_soldier: bool = False,
         locales: bool = False,
+        mock_emulator: str = '',
         only_prepare: bool = False,
         workarounds: typing.Iterable[str] = ()
     ) -> None:
@@ -617,6 +620,13 @@ class TestContainers(BaseTest):
             os.path.join(self.G_TEST_SRCDIR, 'mock-drivers', 'share'),
             data_dirs,
         ])
+
+        if mock_emulator:
+            env['PRESSURE_VESSEL_EMULATOR'] = os.path.join(
+                self.G_TEST_SRCDIR,
+                'mock-emulators',
+                mock_emulator,
+            )
 
         if workarounds:
             if 'PRESSURE_VESSEL_WORKAROUNDS' in env:
@@ -757,6 +767,37 @@ class TestContainers(BaseTest):
                             "\0--{}\0{}\0{}".format(bind_mode, path, path),
                             final_argv,
                         )
+
+                if mock_emulator:
+                    path = os.path.realpath(
+                        os.path.join(
+                            self.G_TEST_SRCDIR,
+                            'mock-emulators'
+                        )
+                    )
+
+                    # In practice we usually expect this to be in $HOME
+                    if not path.startswith(('/usr', '/lib', '/var', '/run')):
+                        self.assertIn(
+                            "\0--ro-bind\0{}\0{}".format(path, path),
+                            final_argv,
+                        )
+
+                    self.assertIn('\0--emulator=', final_argv)
+                    self.assertIn('overrides/emulator.json\0', final_argv)
+
+                if mock_emulator == 'env.json':
+                    self.assertTrue(
+                        final_argv.endswith(
+                            '\0/run/host/usr/bin/env\0'
+                        )
+                    )
+                elif mock_emulator == 'sh.json':
+                    self.assertTrue(
+                        final_argv.endswith(
+                            'tests/pressure-vessel/mock-emulators/wrapper.sh\0'
+                        )
+                    )
 
             if fake_home:
                 members = set(os.listdir(fake_home_temp))
@@ -1268,6 +1309,42 @@ class TestContainers(BaseTest):
             self._test_soldier(
                 'soldier_copy', soldier, copy=True, locales=True,
             )
+
+        cls = self.__class__
+        if cls.is_x86:
+            with self.subTest('prepare-mock-emulator-usr'):
+                self._test_soldier(
+                    'soldier_prepare_mock_emulator_usr', soldier,
+                    copy=True,
+                    locales=True,
+                    mock_emulator='env.json',
+                    only_prepare=True,
+                )
+
+            with self.subTest('prepare-mock-emulator-local'):
+                self._test_soldier(
+                    'soldier_prepare_mock_emulator_local', soldier,
+                    copy=True,
+                    locales=True,
+                    mock_emulator='sh.json',
+                    only_prepare=True,
+                )
+
+            with self.subTest('mock-emulator-usr'):
+                self._test_soldier(
+                    'soldier_mock_emulator_usr', soldier,
+                    copy=True,
+                    locales=True,
+                    mock_emulator='env.json',
+                )
+
+            with self.subTest('mock-emulator-local'):
+                self._test_soldier(
+                    'soldier_mock_emulator_local', soldier,
+                    copy=True,
+                    locales=True,
+                    mock_emulator='sh.json',
+                )
 
         with self.subTest('fake-home,bwrap-setuid'):
             self._test_soldier(

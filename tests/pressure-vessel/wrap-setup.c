@@ -2167,6 +2167,111 @@ test_payload_command_basic (Fixture *f,
 }
 
 static void
+test_payload_command_emulated (Fixture *f,
+                               gconstpointer context)
+{
+  static const char * const tests[][3] =
+    {
+      {
+        "bash",
+        "-i",
+      },
+      {
+        "/bin/bash",
+      },
+    };
+  g_autoptr(GError) local_error = NULL;
+  g_autofree char *expected_emulator = NULL;
+  gboolean ok;
+
+  g_assert_null (f->context->options.emulator);
+  g_assert_null (f->context->options.emulator_manifest);
+  g_assert_false (f->context->options.launcher);
+
+  f->context->options.emulator_manifest =
+    g_test_build_filename (G_TEST_DIST, "mock-emulators", "sh.json", NULL);
+  expected_emulator =
+    g_test_build_filename (G_TEST_DIST, "mock-emulators", "wrapper.sh", NULL);
+  /* TODO: Ideally we'd call
+   * pv_wrap_options_parse_environment_after_argv() instead of hard-coding
+   * this here */
+  f->context->options.emulator =
+    _srt_emulator_new_from_manifest (f->context->options.emulator_manifest,
+                                     &local_error);
+  g_assert_no_error (local_error);
+  g_assert_nonnull (f->context->options.emulator);
+
+  /* Pretend we had finished parsing arguments, because we need this
+   * in order to have f->context->run_in_current_context */
+  ok = pv_wrap_context_after_parsing_arguments (f->context, &local_error);
+  g_assert_no_error (local_error);
+  g_assert_true (ok);
+
+  for (size_t i = 0; i < G_N_ELEMENTS (tests); i++)
+    {
+      g_autoptr(FlatpakBwrap) argv_in_container = NULL;
+      const char * const *argv = tests[i];
+      const char *arg;
+      size_t argc = _srt_strv_length (argv);
+      size_t offset = 0;
+      size_t j;
+
+      argv_in_container = flatpak_bwrap_new (flatpak_bwrap_empty_env);
+
+      ok = pv_wrap_context_append_payload_command (f->context,
+                                                   argv,
+                                                   (int) argc,
+                                                   argv_in_container,
+                                                   &local_error);
+      dump_bwrap (argv_in_container);
+      g_assert_no_error (local_error);
+      g_assert_true (ok);
+      g_assert_false (pv_bwrap_was_finished (argv_in_container));
+
+      g_assert_cmpuint (argv_in_container->argv->len, >=, 1);
+      arg = g_ptr_array_index (argv_in_container->argv, 0);
+      g_assert_cmpstr (arg, ==, expected_emulator);
+      offset++;
+
+      if (g_str_equal (argv[0], "bash"))
+        {
+          g_autofree char *expected_helper = NULL;
+          const char *helpers_dir;
+
+          g_assert_cmpuint (argv_in_container->argv->len, >=, offset + 2);
+
+          helpers_dir =
+            _srt_subprocess_runner_get_helpers_path (f->context->run_in_current_context);
+          /* The mock emulator in sh.json is hard-coded to pretend to be an
+           * emulator for the i386 architecture (only) */
+          expected_helper = g_strdup_printf ("%s/%s-exec", helpers_dir, SRT_ABI_I386);
+          arg = g_ptr_array_index (argv_in_container->argv, offset);
+          g_assert_cmpstr (arg, ==, expected_helper);
+          offset++;
+
+          arg = g_ptr_array_index (argv_in_container->argv, offset);
+          g_assert_cmpstr (arg, ==, "--");
+          offset++;
+        }
+
+      for (j = 0; j < argc; j++)
+        {
+          g_assert_cmpuint (offset + j, <, argv_in_container->argv->len);
+          arg = g_ptr_array_index (argv_in_container->argv, offset + j);
+          g_assert_cmpstr (arg, ==, argv[j]);
+        }
+
+      g_assert_cmpuint (argv_in_container->argv->len, ==, offset + j);
+
+      /* pv_wrap_context_append_payload_command() only appends arguments,
+       * not environment variables or fds */
+      g_assert_cmpstrv (argv_in_container->envp, (const char * const[]) { NULL });
+      g_assert_cmpuint (argv_in_container->fds->len, ==, 0);
+      g_assert_cmpuint (argv_in_container->noinherit_fds->len, ==, 0);
+    }
+}
+
+static void
 test_payload_command_launcher (Fixture *f,
                                gconstpointer context)
 {
@@ -2904,6 +3009,8 @@ main (int argc,
               setup, test_path_visible_in_provider_namespace, teardown);
   g_test_add ("/payload-command/basic", Fixture, NULL,
               setup, test_payload_command_basic, teardown);
+  g_test_add ("/payload-command/emulated", Fixture, NULL,
+              setup, test_payload_command_emulated, teardown);
   g_test_add ("/payload-command/launcher", Fixture, NULL,
               setup, test_payload_command_launcher, teardown);
   g_test_add ("/remap-ld-preload", Fixture, &default_config,

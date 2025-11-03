@@ -185,6 +185,39 @@ gchar *_srt_get_random_uuid (GError **error);
 const char *_srt_get_steam_app_id (void);
 
 /*
+ * _srt_ptr_array_clear_to_array:
+ * @array_p: (inout) (transfer full): A pointer array to clear
+ * @len_out: (out): Length of the returned value
+ *
+ * Steal the contents of a pointer array, freeing the pointer array wrapper.
+ *
+ * If `*array_p` previously had a free-function, the caller becomes
+ * responsible for calling it on each item of the returned array.
+ *
+ * The caller must free the returned array itself using g_free().
+ *
+ * If `*array_p` is either %NULL or empty, then the result is %NULL
+ * and `*len_out` is set to 0.
+ *
+ * Returns: (nullable) (transfer full) (array length=len_out): An array
+ *  of `*len_out` pointers to be freed by the caller, or %NULL if empty
+ */
+static inline void *
+_srt_ptr_array_clear_to_array (GPtrArray **array_p,
+                               size_t *len_out)
+{
+  g_autoptr(GPtrArray) arr = g_steal_pointer (array_p);
+
+  if (len_out != NULL)
+    *len_out = (arr != NULL ? arr->len : 0);
+
+  if (arr == NULL || arr->len == 0)
+    return NULL;
+
+  return g_ptr_array_free (g_steal_pointer (&arr), FALSE);
+}
+
+/*
  * SrtHashTableIter:
  * @real_iter: The underlying iterator
  *

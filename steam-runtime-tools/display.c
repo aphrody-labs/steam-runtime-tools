@@ -237,7 +237,7 @@ SrtDisplayInfo *
 _srt_check_display (SrtSubprocessRunner *runner,
                     GQuark arch_quark)
 {
-  GPtrArray *builder;
+  g_autoptr(GPtrArray) builder = NULL;
   g_auto(GStrv) display_environ = NULL;
   g_autoptr(GPtrArray) argv = NULL;
   g_autoptr(GError) local_error = NULL;
@@ -291,7 +291,7 @@ _srt_check_display (SrtSubprocessRunner *runner,
     }
 
   g_ptr_array_add (builder, NULL);
-  display_environ = (gchar **) g_ptr_array_free (builder, FALSE);
+  display_environ = _srt_ptr_array_clear_to_array (&builder, NULL);
 
   name = _srt_environ_getenv (envp, "WAYLAND_DISPLAY");
   /* If unset, the default fallback is `wayland-0` */
@@ -477,7 +477,7 @@ _srt_display_info_get_from_report (JsonObject *json_obj)
   SrtDisplayWaylandIssues wayland_issues = SRT_DISPLAY_WAYLAND_ISSUES_UNKNOWN;
   SrtDisplayX11Type x11_type = SRT_DISPLAY_X11_TYPE_UNKNOWN;
   gboolean wayland_session = FALSE;
-  GPtrArray *builder;
+  g_autoptr(GPtrArray) builder = NULL;
   g_auto(GStrv) display_environ = NULL;
   const gchar *x11_string = NULL;
   g_autofree gchar *x11_messages = NULL;
@@ -512,7 +512,7 @@ _srt_display_info_get_from_report (JsonObject *json_obj)
                 }
 
               g_ptr_array_add (builder, NULL);
-              display_environ = (gchar **) g_ptr_array_free (builder, FALSE);
+              display_environ = _srt_ptr_array_clear_to_array (&builder, NULL);
             }
         }
 

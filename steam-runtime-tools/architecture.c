@@ -287,9 +287,8 @@ _srt_architecture_can_run (SrtSubprocessRunner *runner,
                            GQuark arch_quark)
 {
   g_autoptr(SrtCompletedSubprocess) completed = NULL;
-  GPtrArray *argv = NULL;
-  GError *error = NULL;
-  gboolean ret = FALSE;
+  g_autoptr(GPtrArray) argv = NULL;
+  g_autoptr(GError) error = NULL;
   SrtHelperFlags helper_flags = SRT_HELPER_FLAGS_NONE;
   const char *multiarch;
 
@@ -304,7 +303,7 @@ _srt_architecture_can_run (SrtSubprocessRunner *runner,
   if (argv == NULL)
     {
       g_debug ("%s", error->message);
-      goto out;
+      return FALSE;
     }
 
   g_ptr_array_add (argv, NULL);
@@ -320,15 +319,11 @@ _srt_architecture_can_run (SrtSubprocessRunner *runner,
   if (completed == NULL || !_srt_completed_subprocess_check (completed, &error))
     {
       g_debug ("... %s", error->message);
-      goto out;
+      return FALSE;
     }
 
   g_debug ("... it works");
-  ret = TRUE;
-out:
-  g_clear_error (&error);
-  g_clear_pointer (&argv, g_ptr_array_unref);
-  return ret;
+  return TRUE;
 }
 
 /**

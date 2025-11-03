@@ -231,7 +231,7 @@ _initial_capsule_capture_libs_argv (SrtSysroot *sysroot,
                                     const char *temp_dir,
                                     GError **error)
 {
-  GPtrArray *argv = NULL;
+  g_autoptr(GPtrArray) argv = NULL;
 
   argv = _srt_subprocess_runner_get_helper (runner, multiarch_tuple,
                                             "capsule-capture-libs",
@@ -246,7 +246,7 @@ _initial_capsule_capture_libs_argv (SrtSysroot *sysroot,
   g_ptr_array_add (argv, g_strdup ("--provider"));
   g_ptr_array_add (argv, g_strdup (sysroot->path));
 
-  return argv;
+  return g_steal_pointer (&argv);
 }
 
 static GPtrArray *
@@ -257,7 +257,7 @@ _argv_for_list_vdpau_drivers (SrtSysroot *sysroot,
                               GError **error)
 {
   const gchar *vdpau_driver = NULL;
-  GPtrArray *argv;
+  g_autoptr(GPtrArray) argv = NULL;
 
   vdpau_driver = _srt_subprocess_runner_getenv (runner, "VDPAU_DRIVER");
   argv = _initial_capsule_capture_libs_argv (sysroot, runner, multiarch_tuple,
@@ -283,7 +283,7 @@ _argv_for_list_vdpau_drivers (SrtSysroot *sysroot,
   g_ptr_array_add (argv, g_strdup ("no-dependencies:if-exists:even-if-older:soname:libvdpau_radeonsi.so"));
   g_ptr_array_add (argv, g_strdup ("no-dependencies:if-exists:even-if-older:soname:libvdpau_va_gl.so"));
   g_ptr_array_add (argv, NULL);
-  return argv;
+  return g_steal_pointer (&argv);
 }
 
 static GPtrArray *
@@ -328,7 +328,7 @@ _argv_for_list_glx_icds (SrtSysroot *sysroot,
                          const char *temp_dir,
                          GError **error)
 {
-  GPtrArray *argv;
+  g_autoptr(GPtrArray) argv = NULL;
 
   argv = _initial_capsule_capture_libs_argv (sysroot, runner, multiarch_tuple,
                                              temp_dir, error);
@@ -348,7 +348,7 @@ _argv_for_list_glx_icds (SrtSysroot *sysroot,
   g_ptr_array_add (argv, g_strdup ("no-dependencies:if-exists:even-if-older:soname:libGLX_mesa.so.0"));
   g_ptr_array_add (argv, g_strdup ("no-dependencies:if-exists:even-if-older:soname:libGLX_nvidia.so.0"));
   g_ptr_array_add (argv, NULL);
-  return argv;
+  return g_steal_pointer (&argv);
 }
 
 static GPtrArray *
@@ -359,7 +359,8 @@ _argv_for_list_glx_icds_in_path (SrtSysroot *sysroot,
                                  const char *base_path,
                                  GError **error)
 {
-  GPtrArray *argv;
+  g_autofree gchar *lib_full_path = NULL;
+  g_autoptr(GPtrArray) argv = NULL;
 
   argv = _initial_capsule_capture_libs_argv (sysroot, runner, multiarch_tuple,
                                              temp_dir, error);
@@ -367,14 +368,13 @@ _argv_for_list_glx_icds_in_path (SrtSysroot *sysroot,
   if (argv == NULL)
     return NULL;
 
-  gchar *lib_full_path = g_build_filename (base_path, "lib", multiarch_tuple, "libGLX_*.so.*", NULL);
+  lib_full_path = g_build_filename (base_path, "lib", multiarch_tuple, "libGLX_*.so.*", NULL);
 
   g_ptr_array_add (argv, g_strjoin (NULL,
                                     "no-dependencies:if-exists:even-if-older:path-match:", lib_full_path,
                                     NULL));
   g_ptr_array_add (argv, NULL);
-  g_free (lib_full_path);
-  return argv;
+  return g_steal_pointer (&argv);
 }
 
 /*
@@ -409,15 +409,10 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
                                   GList **modules_out)
 {
   g_autoptr(SrtCompletedSubprocess) completed = NULL;
-  GError *error = NULL;
-  GDir *dir_iter = NULL;
-  GPtrArray *members = NULL;
+  g_autoptr(GError) error = NULL;
+  g_autoptr(GDir) dir_iter = NULL;
+  g_autoptr(GPtrArray) members = NULL;
   const gchar *member;
-  gchar *full_path = NULL;
-  gchar *driver_path = NULL;
-  gchar *driver_directory = NULL;
-  gchar *driver_link = NULL;
-  gchar *soname_path = NULL;
 
   g_return_if_fail (SRT_IS_SUBPROCESS_RUNNER (runner));
   g_return_if_fail (architecture != SRT_ARCHITECTURE_QUARK_NONE);
@@ -437,13 +432,13 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
   if (completed == NULL)
     {
       g_debug ("An error occurred calling the helper: %s", error->message);
-      goto out;
+      return;
     }
 
   if (!_srt_completed_subprocess_check (completed, &error))
     {
       g_debug ("Subprocess failed: %s", error->message);
-      goto out;
+      return;
     }
 
   dir_iter = g_dir_open (tmp_directory, 0, &error);
@@ -451,7 +446,7 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
   if (dir_iter == NULL)
     {
       g_debug ("Failed to open \"%s\": %s", tmp_directory, error->message);
-      goto out;
+      return;
     }
 
   members = g_ptr_array_new_with_free_func (g_free);
@@ -463,6 +458,11 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
 
   for (gsize i = 0; i < members->len; i++)
     {
+      g_autofree char *driver_directory = NULL;
+      g_autofree char *driver_path = NULL;
+      g_autofree char *full_path = NULL;
+      g_autofree char *soname_path = NULL;
+
       member = g_ptr_array_index (members, i);
 
       full_path = g_build_filename (tmp_directory, member, NULL);
@@ -470,15 +470,12 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
       if (driver_path == NULL)
         {
           g_debug ("An error occurred trying to read the symlink: %s", error->message);
-          g_free (full_path);
-          goto out;
+          return;
         }
       if (!g_path_is_absolute (driver_path))
         {
           g_debug ("We were expecting an absolute path, instead we have: %s", driver_path);
-          g_free (full_path);
-          g_free (driver_path);
-          goto out;
+          return;
         }
 
       switch (module)
@@ -494,16 +491,17 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
             soname_path = g_strjoin ("/", member, driver_path, NULL);
             if (!g_hash_table_contains (known_table, soname_path))
               {
-                g_hash_table_add (known_table, g_strdup (soname_path));
+                g_hash_table_add (known_table, g_steal_pointer (&soname_path));
                 *modules_out = g_list_prepend (*modules_out, srt_glx_icd_new (member, driver_path));
               }
-            g_free (soname_path);
             break;
 
           case SRT_GRAPHICS_VDPAU_MODULE:
             driver_directory = g_path_get_dirname (driver_path);
             if (!g_hash_table_contains (known_table, driver_directory))
               {
+                g_autofree char *driver_link = NULL;
+
                 /* We do not add `driver_directory` to the hash table because it contains
                  * a list of directories where we already looked into. In this case we are
                  * just adding a single driver instead of searching for all the `libvdpau_*`
@@ -512,9 +510,7 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
                 *modules_out = g_list_prepend (*modules_out, srt_vdpau_driver_new (driver_path,
                                                                                   driver_link,
                                                                                   is_extra));
-                g_free (driver_link);
               }
-            g_free (driver_directory);
             break;
 
           case SRT_GRAPHICS_DRI_MODULE:
@@ -523,16 +519,7 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
           default:
             g_return_if_reached ();
         }
-
-      g_free (full_path);
-      g_free (driver_path);
     }
-
-out:
-  if (dir_iter != NULL)
-    g_dir_close (dir_iter);
-  g_clear_pointer (&members, g_ptr_array_unref);
-  g_clear_error (&error);
 }
 
 /*
@@ -727,7 +714,7 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
     {
       const SrtKnownArchitecture *found_arch;
       SrtVaApiVersion libva_version = SRT_VA_API_VERSION_UNKNOWN;
-      gchar *this_driver_link = NULL;
+      g_autofree gchar *this_driver_link = NULL;
       g_autofree gchar *this_driver_in_provider = NULL;
       gsize i;
 
@@ -804,7 +791,6 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
                                             srt_vdpau_driver_new (this_driver_in_provider,
                                                                   this_driver_link,
                                                                   is_extra));
-            g_free (this_driver_link);
             break;
 
           case SRT_GRAPHICS_GLX_MODULE:
@@ -838,8 +824,8 @@ _srt_get_extra_modules_directory (const gchar *library_search_path,
 {
   GList *ret = NULL;
   const gchar *libqual = NULL;
-  gchar *lib_multiarch;
-  gchar *dir;
+  g_autofree gchar *lib_multiarch = NULL;
+  g_autofree gchar *dir = NULL;
 
   g_return_val_if_fail (library_search_path != NULL, NULL);
   g_return_val_if_fail (multiarch_tuple != NULL, NULL);
@@ -882,8 +868,6 @@ _srt_get_extra_modules_directory (const gchar *library_search_path,
 
       case ELFCLASSNONE:
       default:
-        g_free (lib_multiarch);
-        g_free (dir);
         g_return_val_if_reached (NULL);
     }
 
@@ -895,8 +879,6 @@ _srt_get_extra_modules_directory (const gchar *library_search_path,
   ret = g_list_sort (ret, (GCompareFunc) strcmp);
 
 out:
-  g_free (lib_multiarch);
-  g_free (dir);
   return ret;
 }
 
@@ -1060,12 +1042,11 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
                     GQuark arch_quark,
                     GList **drivers_out)
 {
-  GPtrArray *by_soname_argv = NULL;
-  GPtrArray *overrides_argv = NULL;
-  GError *error = NULL;
+  g_autoptr(GPtrArray) by_soname_argv = NULL;
+  g_autoptr(GError) error = NULL;
   g_auto(GLnxTmpDir) by_soname_tmp_dir = { .initialized = FALSE };
-  gchar *overrides_path = NULL;
-  GHashTable *known_libs = NULL;
+  g_autofree gchar *overrides_path = NULL;
+  g_autoptr(GHashTable) known_libs = NULL;
   const char *multiarch_tuple;
 
   g_return_if_fail (SRT_IS_SYSROOT (sysroot));
@@ -1079,7 +1060,7 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
   if (!glnx_mkdtemp ("glx-icds-XXXXXX", 0700, &by_soname_tmp_dir, &error))
     {
       g_debug ("An error occurred trying to create a temporary folder: %s", error->message);
-      goto out;
+      return;
     }
 
   by_soname_argv = _argv_for_list_glx_icds (sysroot, runner, multiarch_tuple,
@@ -1088,7 +1069,7 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
   if (by_soname_argv == NULL)
     {
       g_debug ("An error occurred trying to capture glx ICDs: %s", error->message);
-      goto out;
+      return;
     }
 
   _srt_list_modules_from_directory (runner,
@@ -1104,11 +1085,12 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
   if (g_file_test (overrides_path, G_FILE_TEST_IS_DIR))
     {
       g_auto(GLnxTmpDir) overrides_tmp_dir = { .initialized = FALSE };
+      g_autoptr(GPtrArray) overrides_argv = NULL;
 
       if (!glnx_mkdtemp ("glx-icds-XXXXXX", 0700, &overrides_tmp_dir, &error))
         {
           g_debug ("An error occurred trying to create a temporary folder: %s", error->message);
-          goto out;
+          return;
         }
 
       overrides_argv = _argv_for_list_glx_icds_in_path (sysroot, runner, multiarch_tuple,
@@ -1118,7 +1100,7 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
       if (overrides_argv == NULL)
         {
           g_debug ("An error occurred trying to capture glx ICDs: %s", error->message);
-          goto out;
+          return;
         }
 
       _srt_list_modules_from_directory (runner,
@@ -1126,13 +1108,6 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
                                         overrides_tmp_dir.path, known_libs,
                                         SRT_GRAPHICS_GLX_MODULE, FALSE, drivers_out);
     }
-
-out:
-  g_clear_pointer (&by_soname_argv, g_ptr_array_unref);
-  g_clear_pointer (&overrides_argv, g_ptr_array_unref);
-  g_free (overrides_path);
-  g_hash_table_unref (known_libs);
-  g_clear_error (&error);
 }
 
 /*

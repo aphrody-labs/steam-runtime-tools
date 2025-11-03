@@ -127,15 +127,13 @@ should_be_executable (SrtRuntimeIssues *issues,
                       const char *path,
                       const char *filename)
 {
-  gchar *full = g_build_filename (path, filename, NULL);
+  g_autofree gchar *full = g_build_filename (path, filename, NULL);
 
   if (!g_file_test (full, G_FILE_TEST_IS_EXECUTABLE))
     {
       g_debug ("%s is not executable", full);
       *issues |= SRT_RUNTIME_ISSUES_NOT_RUNTIME;
     }
-
-  g_free (full);
 }
 
 static void
@@ -143,15 +141,13 @@ should_be_dir (SrtRuntimeIssues *issues,
                const char *path,
                const char *filename)
 {
-  gchar *full = g_build_filename (path, filename, NULL);
+  g_autofree gchar *full = g_build_filename (path, filename, NULL);
 
   if (!g_file_test (full, G_FILE_TEST_IS_DIR))
     {
       g_debug ("%s is not a regular file", full);
       *issues |= SRT_RUNTIME_ISSUES_NOT_RUNTIME;
     }
-
-  g_free (full);
 }
 
 static void
@@ -160,15 +156,13 @@ should_be_stattable (SrtRuntimeIssues *issues,
                      const char *filename,
                      GStatBuf *buf)
 {
-  gchar *full = g_build_filename (path, filename, NULL);
+  g_autofree gchar *full = g_build_filename (path, filename, NULL);
 
   if (g_stat (full, buf) != 0)
     {
       g_debug ("stat %s: %s", full, g_strerror (errno));
       *issues |= SRT_RUNTIME_ISSUES_NOT_RUNTIME;
     }
-
-  g_free (full);
 }
 
 static void
@@ -177,15 +171,13 @@ might_be_stattable (const char *path,
                     GStatBuf *buf)
 {
   GStatBuf zeroed_stat = {};
-  gchar *full = g_build_filename (path, filename, NULL);
+  g_autofree gchar *full = g_build_filename (path, filename, NULL);
 
   if (g_stat (full, buf) != 0)
     {
       g_debug ("stat %s: %s", full, g_strerror (errno));
       *buf = zeroed_stat;
     }
-
-  g_free (full);
 }
 
 static gboolean
@@ -318,13 +310,13 @@ _srt_runtime_check_ldlp (const char *bin32,
   GStatBuf amd64_bin;
   GStatBuf i386_bin;
   const gchar *env = NULL;
-  gchar *contents = NULL;
-  gchar *expected_path = NULL;
-  gchar *path = NULL;
-  gchar *version = NULL;
-  gchar *version_txt = NULL;
+  g_autofree gchar *contents = NULL;
+  g_autofree gchar *expected_path = NULL;
+  g_autofree gchar *path = NULL;
+  g_autofree gchar *version = NULL;
+  g_autofree gchar *version_txt = NULL;
   gsize len = 0;
-  GError *error = NULL;
+  g_autoptr(GError) error = NULL;
 
   g_return_val_if_fail (version_out == NULL || *version_out == NULL,
                         SRT_RUNTIME_ISSUES_UNKNOWN);
@@ -443,8 +435,6 @@ _srt_runtime_check_ldlp (const char *bin32,
               issues |= SRT_RUNTIME_ISSUES_UNEXPECTED_VERSION;
             }
         }
-
-      g_clear_pointer (&contents, g_free);
     }
   else
     {
@@ -621,12 +611,6 @@ out:
   if (version_out != NULL)
     *version_out = g_steal_pointer (&version);
 
-  g_free (contents);
-  g_free (expected_path);
-  g_free (path);
-  g_free (version);
-  g_free (version_txt);
-  g_clear_error (&error);
   return issues;
 }
 

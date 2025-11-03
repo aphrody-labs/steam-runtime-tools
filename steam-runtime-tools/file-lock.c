@@ -264,7 +264,7 @@ SrtFileLock *
 srt_file_lock_new_take (int fd,
                         gboolean is_ofd)
 {
-  SrtFileLock *self = NULL;
+  g_autoptr(SrtFileLock) self = NULL;
 
   g_return_val_if_fail (fd >= 0, NULL);
   g_return_val_if_fail (is_ofd == 0 || is_ofd == 1, NULL);
@@ -272,7 +272,7 @@ srt_file_lock_new_take (int fd,
   self = g_slice_new0 (SrtFileLock);
   self->fd = g_steal_fd (&fd);
   self->is_ofd = is_ofd;
-  return self;
+  return g_steal_pointer (&self);
 }
 
 void

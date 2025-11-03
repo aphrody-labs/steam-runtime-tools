@@ -208,13 +208,13 @@ _srt_check_locale (SrtSubprocessRunner *runner,
                    const char *requested_name,
                    GError **error)
 {
-  GPtrArray *argv = NULL;
+  g_autoptr(GPtrArray) argv = NULL;
   const char *output = NULL;
   g_autoptr(GError) local_error = NULL;
   g_autoptr(JsonNode) node = NULL;
   g_autoptr(SrtCompletedSubprocess) completed = NULL;
   JsonObject *object = NULL;
-  SrtLocale *ret = NULL;
+  g_autoptr(SrtLocale) ret = NULL;
   int exit_status;
   SrtHelperFlags helper_flags = SRT_HELPER_FLAGS_NONE;
 
@@ -325,8 +325,7 @@ out:
       (*error)->code = SRT_LOCALE_ERROR_INTERNAL_ERROR;
     }
 
-  g_clear_pointer (&argv, g_ptr_array_unref);
-  return ret;
+  return g_steal_pointer (&ret);
 }
 
 /**
@@ -344,7 +343,7 @@ _srt_locale_get_locale_from_report (JsonObject *json_obj,
                                     const gchar *requested_name,
                                     GError **error)
 {
-  SrtLocale *locale = NULL;
+  g_autoptr(SrtLocale) locale = NULL;
   const gchar *resulting_name = NULL;
   const gchar *charset = NULL;
   gboolean is_utf8 = FALSE;
@@ -386,7 +385,7 @@ _srt_locale_get_locale_from_report (JsonObject *json_obj,
                            error_message);
     }
 
-  return locale;
+  return g_steal_pointer (&locale);
 }
 
 /**

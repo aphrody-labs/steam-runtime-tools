@@ -1264,7 +1264,7 @@ ensure_expectations (SrtSystemInfo *self)
   if (self->expectations == NULL)
     {
       const char *runtime;
-      gchar *def = NULL;
+      g_autofree gchar *def = NULL;
 
       runtime = _srt_subprocess_runner_getenv (self->runner, "STEAM_RUNTIME");
 
@@ -1289,8 +1289,6 @@ ensure_expectations (SrtSystemInfo *self)
         self->expectations = g_steal_pointer (&def);
       else
         self->expectations = g_strdup ("");
-
-      g_free (def);
     }
 
   return self->expectations[0] != '\0';
@@ -1303,15 +1301,13 @@ ensure_hidden_deps (SrtSystemInfo *self)
 
   if (self->cached_hidden_deps == NULL)
     {
-      JsonParser *parser = NULL;
+      g_autoptr(JsonParser) parser = NULL;
       JsonNode *node = NULL;
       JsonArray *libraries_array = NULL;
       JsonArray *hidden_libraries_array = NULL;
       JsonObject *object;
-      gchar *soname = NULL;
-      gchar *path = NULL;
-      GPtrArray *arr = NULL;
-      GError *error = NULL;
+      g_autofree gchar *path = NULL;
+      g_autoptr(GError) error = NULL;
 
       self->cached_hidden_deps = g_hash_table_new_full (g_str_hash,
                                                         g_str_equal,
@@ -1321,7 +1317,7 @@ ensure_hidden_deps (SrtSystemInfo *self)
       if (!ensure_expectations (self))
         {
           g_debug ("Hidden dependencies parsing skipped because of unknown expectations");
-          goto out;
+          return;
         }
 
       path = g_build_filename (self->expectations, "steam-runtime-abi.json", NULL);
@@ -1330,7 +1326,7 @@ ensure_hidden_deps (SrtSystemInfo *self)
       * from the expectations folder */
       if (!g_file_test (path, G_FILE_TEST_EXISTS))
         {
-          g_free (path);
+          g_clear_pointer (&path, g_free);
           path = g_build_filename (self->expectations, "..", "steam-runtime-abi.json", NULL);
         }
 
@@ -1338,7 +1334,7 @@ ensure_hidden_deps (SrtSystemInfo *self)
       if (!json_parser_load_from_file (parser, path, &error))
         {
           g_debug ("Error parsing the expected JSON object in \"%s\": %s", path, error->message);
-          goto out;
+          return;
         }
 
       node = json_parser_get_root (parser);
@@ -1347,42 +1343,40 @@ ensure_hidden_deps (SrtSystemInfo *self)
       if (!json_object_has_member (object, "shared_libraries"))
         {
           g_debug ("No \"shared_libraries\" in the JSON object \"%s\"", path);
-          goto out;
+          return;
         }
 
       libraries_array = json_object_get_array_member (object, "shared_libraries");
       /* If there are no libraries in the parsed JSON file we simply return */
       if (libraries_array == NULL || json_array_get_length (libraries_array) == 0)
-        goto out;
+        return;
 
       for (guint i = 0; i < json_array_get_length (libraries_array); i++)
         {
+          g_autoptr(GList) members = NULL;
+          g_autoptr(GPtrArray) arr = NULL;
+          g_autofree gchar *soname = NULL;
+
           node = json_array_get_element (libraries_array, i);
           if (!JSON_NODE_HOLDS_OBJECT (node))
             continue;
 
           object = json_node_get_object (node);
 
-          GList *members = json_object_get_members (object);
+          members = json_object_get_members (object);
+
           if (members == NULL)
             continue;
 
           soname = g_strdup (members->data);
-          g_list_free (members);
 
           object = json_object_get_object_member (object, soname);
           if (!json_object_has_member (object, "hidden_dependencies"))
-            {
-              g_free (soname);
-              continue;
-            }
+            continue;
 
           hidden_libraries_array = json_object_get_array_member (object, "hidden_dependencies");
           if (hidden_libraries_array == NULL || json_array_get_length (hidden_libraries_array) == 0)
-            {
-              g_free (soname);
-              continue;
-            }
+            continue;
 
           arr = g_ptr_array_new_full (json_array_get_length (hidden_libraries_array) + 1, g_free);
 
@@ -1392,14 +1386,10 @@ ensure_hidden_deps (SrtSystemInfo *self)
           g_ptr_array_add (arr, NULL);
 
           g_debug ("%s soname hidden dependencies have been parsed", soname);
-          g_hash_table_insert (self->cached_hidden_deps, g_steal_pointer (&soname), g_ptr_array_free (arr, FALSE));
+          g_hash_table_insert (self->cached_hidden_deps,
+                               g_steal_pointer (&soname),
+                               _srt_ptr_array_clear_to_array (&arr, NULL));
         }
-
-      out:
-        g_free (path);
-        g_clear_error (&error);
-        if (parser)
-          g_clear_object (&parser);
     }
 }
 

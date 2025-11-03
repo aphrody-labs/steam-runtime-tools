@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20251030.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251103.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
     - Fix a small memory leak in pv-adverb while setting up VDPAU drivers
@@ -13,14 +13,22 @@ steam-runtime-tools (0.20251030.0) UNRELEASED; urgency=medium
     - Add experimental option (currently only available as an environment
       variable) to set the architectures used, and which one is treated as
       primary (steamrt/tasks#786)
+      + Automatically set up pressure-vessel's own architecture to be
+        available in the container, even if the runtime doesn't have it
+        (steamrt/tasks#787)
+    - Add experimental option (currently only available as an environment
+      variable) to run foreign-architecture binaries under a non-transparent
+      emulator such as FEX without requiring binfmt_misc (steamrt/tasks#787)
+      + Automatically set up its architecture and required libraries to be
+        available in the container, even if the runtime doesn't have it
+        (steamrt/tasks#787)
     - Only look for Ubuntu's /sbin/ldconfig.real in the same graphics
       stack provider as /sbin/ldconfig (steamrt/tasks#821)
     - Stop hard-coding an array of supported architectures.
       Instead, we have a hard-coded array of default architectures,
       in practice the same list as before, but any architecture for which
       steam-runtime-tools was successfully compiled can in principle
-      be used to run a runtime for any other architecture, as long as
-      transparent emulation (binfmt_misc) is available.
+      be used to run a runtime for any other architecture.
       (steamrt/tasks#786)
     - Detect the actual architecture of pv-adverb, and use that
       information when starting it (steamrt/tasks#821)
@@ -28,6 +36,7 @@ steam-runtime-tools (0.20251030.0) UNRELEASED; urgency=medium
       information to decide which libraries will appear in /etc/ld.so.cache
       and which libraries need to remain in $LD_LIBRARY_PATH
       (steamrt/tasks#821)
+    - Use more automatic resource management
     - Refactoring (steamrt/tasks#786, steamrt/tasks#821, steamrt/tasks#787)
   * s-r-launcher-service:
     - Avoid a small memory leak if an error occurs on the deprecated
@@ -35,6 +44,7 @@ steam-runtime-tools (0.20251030.0) UNRELEASED; urgency=medium
   * Diagnostic tools:
     - Use automatic memory management in more places
   * Library code:
+    - Use more automatic resource management
     - Further refactoring of architecture handling
       (steamrt/tasks#786, steamrt/tasks#821, steamrt/tasks#787)
     - Better compatibility with GLib >= 2.78 (steamrt/tasks#787)
@@ -48,7 +58,7 @@ steam-runtime-tools (0.20251030.0) UNRELEASED; urgency=medium
       (steamrt/tasks#786, steamrt/tasks#821, steamrt/tasks#787)
     - Check for fd leaks more thoroughly (steamrt/tasks#787)
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 30 Oct 2025 14:06:48 +0000
+ -- Simon McVittie <smcv@collabora.com>  Mon, 03 Nov 2025 14:56:43 +0000
 
 steam-runtime-tools (0.20250926.0) steamrt; urgency=medium
 

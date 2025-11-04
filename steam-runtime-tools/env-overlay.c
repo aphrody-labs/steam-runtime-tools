@@ -711,3 +711,28 @@ _srt_env_overlay_create_option_group (SrtEnvOverlay *self)
 
   return g_steal_pointer (&group);
 }
+
+/*
+ * For each variable that would be set by @other,
+ * update @self to set it to the same value.
+ *
+ * For each variable that would be unset by @other,
+ * update @self to unset it.
+ */
+void
+_srt_env_overlay_update (SrtEnvOverlay *self,
+                         const SrtEnvOverlay *other)
+{
+  GHashTableIter iter;
+  void *k, *v;
+
+  g_return_if_fail (self != NULL);
+  g_return_if_fail (self->refcount > 0);
+  g_return_if_fail (other != NULL);
+  g_return_if_fail (other->refcount > 0);
+
+  g_hash_table_iter_init (&iter, other->values);
+
+  while (g_hash_table_iter_next (&iter, &k, &v))
+    g_hash_table_replace (self->values, g_strdup (k), g_strdup (v));
+}

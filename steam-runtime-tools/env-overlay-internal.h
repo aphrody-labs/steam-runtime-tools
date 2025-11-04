@@ -51,6 +51,8 @@ struct _SrtEnvOverlay
 
 SrtEnvOverlay *_srt_env_overlay_new (void);
 SrtEnvOverlay *_srt_env_overlay_ref (SrtEnvOverlay *self);
+void _srt_env_overlay_update (SrtEnvOverlay *self,
+                              const SrtEnvOverlay *other);
 void _srt_env_overlay_unref (void *p);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (SrtEnvOverlay, _srt_env_overlay_unref)
 

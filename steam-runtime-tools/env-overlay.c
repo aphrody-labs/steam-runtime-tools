@@ -42,6 +42,18 @@ _srt_env_overlay_ref (SrtEnvOverlay *self)
   return self;
 }
 
+SrtEnvOverlay *
+_srt_env_overlay_copy (const SrtEnvOverlay *self)
+{
+  g_autoptr(SrtEnvOverlay) other = _srt_env_overlay_new ();
+
+  g_return_val_if_fail (self != NULL, NULL);
+  g_return_val_if_fail (self->refcount > 0, NULL);
+
+  _srt_env_overlay_update (other, self);
+  return g_steal_pointer (&other);
+}
+
 void
 _srt_env_overlay_unref (void *p)
 {

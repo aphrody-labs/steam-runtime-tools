@@ -51,6 +51,7 @@ struct _SrtEnvOverlay
 
 SrtEnvOverlay *_srt_env_overlay_new (void);
 SrtEnvOverlay *_srt_env_overlay_ref (SrtEnvOverlay *self);
+SrtEnvOverlay *_srt_env_overlay_copy (const SrtEnvOverlay *self);
 void _srt_env_overlay_update (SrtEnvOverlay *self,
                               const SrtEnvOverlay *other);
 void _srt_env_overlay_unref (void *p);

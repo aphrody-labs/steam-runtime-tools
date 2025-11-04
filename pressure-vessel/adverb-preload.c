@@ -315,5 +315,5 @@ pv_adverb_preload_module_to_adverb_cli (PvAdverbPreloadModule *self)
       g_string_append (buf, tuple);
     }
 
-  return g_string_free (g_steal_pointer (&buf), FALSE);
+  return g_string_free_and_steal (g_steal_pointer (&buf));
 }

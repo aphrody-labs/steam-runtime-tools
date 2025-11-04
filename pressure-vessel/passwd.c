@@ -198,7 +198,7 @@ pv_generate_etc_passwd (SrtSysroot *source,
       g_clear_error (&local_error);
     }
 
-  return g_string_free (g_steal_pointer (&buffer), FALSE);
+  return g_string_free_and_steal (g_steal_pointer (&buffer));
 }
 
 /* getgrgid(), but with mock output for unit-testing */
@@ -259,5 +259,5 @@ pv_generate_etc_group (SrtSysroot *source,
       g_clear_error (&local_error);
     }
 
-  return g_string_free (g_steal_pointer (&buffer), FALSE);
+  return g_string_free_and_steal (g_steal_pointer (&buffer));
 }

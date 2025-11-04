@@ -770,7 +770,8 @@ collect_files_to_touch (GPtrArray *array,
         continue;
 
       final_path = fixture_substitute (f, touch[j], test, j);
-      g_ptr_array_add (array, g_string_free (g_steal_pointer (&final_path), FALSE));
+      g_ptr_array_add (array,
+                       g_string_free_and_steal (g_steal_pointer (&final_path)));
     }
 }
 
@@ -2377,7 +2378,7 @@ populate_ld_preload (Fixture *f,
             }
 
           final_path = fixture_substitute (f, input, test, j);
-          modules[j].preload = g_string_free (g_steal_pointer (&final_path), FALSE);
+          modules[j].preload = g_string_free_and_steal (g_steal_pointer (&final_path));
           n_modules++;
         }
 

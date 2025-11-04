@@ -8358,7 +8358,7 @@ pv_runtime_get_ld_library_path (PvRuntime *self)
       pv_search_path_append (ld_library_path, aliases);
     }
 
-  return g_string_free (g_steal_pointer (&ld_library_path), FALSE);
+  return g_string_free_and_steal (g_steal_pointer (&ld_library_path));
 }
 
 void

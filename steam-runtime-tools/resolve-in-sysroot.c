@@ -545,13 +545,13 @@ _srt_resolve_in_sysroot (int sysroot,
         }
 
       if (real_path_out != NULL)
-        *real_path_out = g_string_free (g_steal_pointer (&current_path), FALSE);
+        *real_path_out = g_string_free_and_steal (g_steal_pointer (&current_path));
 
       return g_steal_fd (&fd);
     }
 
   if (real_path_out != NULL)
-    *real_path_out = g_string_free (g_steal_pointer (&current_path), FALSE);
+    *real_path_out = g_string_free_and_steal (g_steal_pointer (&current_path));
 
   /* Taking the address might look like nonsense here, but it's
    * documented to work: g_array_index expands to fds->data[some_offset].

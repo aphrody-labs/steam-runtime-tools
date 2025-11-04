@@ -337,7 +337,7 @@ _srt_os_info_new_from_report (JsonObject *json_obj)
                 }
 
               g_hash_table_replace (fields, g_strdup ("ID_LIKE"),
-                                    g_string_free (str, FALSE));
+                                    g_string_free_and_steal (str));
             }
         }
 

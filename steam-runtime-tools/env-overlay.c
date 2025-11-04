@@ -622,7 +622,7 @@ _srt_env_overlay_to_shell (SrtEnvOverlay *self)
         }
     }
 
-  return g_string_free (buf, FALSE);
+  return g_string_free_and_steal (buf);
 }
 
 static gboolean

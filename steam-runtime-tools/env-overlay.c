@@ -236,10 +236,12 @@ _srt_env_overlay_inherit_cli (SrtEnvOverlay *self,
  * Return a sorted list of environment variables that are to be overridden.
  *
  * Returns: (transfer container): The variables that are set or forced
- *  to be unset, but not the variables that are inherited
+ *  to be unset, but not the variables that are inherited.
+ *  The caller must free the result with g_list_free(), but must not
+ *  free or modify the strings that it points to.
  */
 GList *
-_srt_env_overlay_get_vars (SrtEnvOverlay *self)
+_srt_env_overlay_get_vars (const SrtEnvOverlay *self)
 {
   g_return_val_if_fail (self != NULL, NULL);
 
@@ -256,7 +258,7 @@ _srt_env_overlay_get_vars (SrtEnvOverlay *self)
  *  or %FALSE if it is inherited
  */
 gboolean
-_srt_env_overlay_contains (SrtEnvOverlay *self,
+_srt_env_overlay_contains (const SrtEnvOverlay *self,
                            const char *var)
 {
   g_return_val_if_fail (self != NULL, FALSE);
@@ -275,7 +277,7 @@ _srt_env_overlay_contains (SrtEnvOverlay *self,
  *  unset or inherited
  */
 const char *
-_srt_env_overlay_get (SrtEnvOverlay *self,
+_srt_env_overlay_get (const SrtEnvOverlay *self,
                       const char *var)
 {
   g_return_val_if_fail (self != NULL, NULL);
@@ -500,7 +502,7 @@ _srt_env_overlay_env_fd_cli (SrtEnvOverlay *self,
  * Returns: (transfer full): The new environment block
  */
 GStrv
-_srt_env_overlay_apply (SrtEnvOverlay *self,
+_srt_env_overlay_apply (const SrtEnvOverlay *self,
                         GStrv envp)
 {
   g_autoptr(GList) vars = NULL;
@@ -544,7 +546,7 @@ byte_array_append_env0 (GByteArray *arr,
  * Returns: (transfer full): `NAME=VALUE\0NAME=VALUE\0...`
  */
 GBytes *
-_srt_env_overlay_to_env0 (SrtEnvOverlay *self)
+_srt_env_overlay_to_env0 (const SrtEnvOverlay *self)
 {
   GByteArray *arr = NULL;
   g_autoptr(GList) vars = NULL;
@@ -587,7 +589,7 @@ _srt_env_overlay_to_env0 (SrtEnvOverlay *self)
  * Returns: (transfer full): a shell script
  */
 gchar *
-_srt_env_overlay_to_shell (SrtEnvOverlay *self)
+_srt_env_overlay_to_shell (const SrtEnvOverlay *self)
 {
   GString *buf = NULL;
   g_autoptr(GList) vars = NULL;

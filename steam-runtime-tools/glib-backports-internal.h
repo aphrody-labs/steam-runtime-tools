@@ -67,3 +67,12 @@ guint my_g_string_replace (GString *string,
 /* In GLib 2.34 to 2.68, this was available under a misleading name */
 #define g_spawn_check_wait_status g_spawn_check_exit_status
 #endif
+
+#if !GLIB_CHECK_VERSION(2, 76, 0)
+#define g_string_free_and_steal(s) my_g_string_free_and_steal (s)
+static inline char *
+my_g_string_free_and_steal (GString *string)
+{
+  return g_string_free (string, FALSE);
+}
+#endif

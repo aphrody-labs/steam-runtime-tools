@@ -7813,7 +7813,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
   if (!any_architecture_works)
     {
-      GString *archs = g_string_new ("");
+      g_autoptr(GString) archs = g_string_new ("");
 
       for (i = 0; i < self->tuples->len; i++)
         {
@@ -7829,7 +7829,6 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                    "None of the supported CPU architectures are common to "
                    "the graphics provider and the container (tried: %s)",
                    archs->str);
-      g_string_free (archs, TRUE);
       return FALSE;
     }
 

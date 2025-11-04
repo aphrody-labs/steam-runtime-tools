@@ -24,6 +24,9 @@
 
 #include "steam-runtime-tools/glib-backports-internal.h"
 
+#define SRT_TYPE_ENV_OVERLAY (_srt_env_overlay_get_type ())
+GType _srt_env_overlay_get_type (void);
+
 typedef struct _SrtEnvOverlay SrtEnvOverlay;
 
 /*

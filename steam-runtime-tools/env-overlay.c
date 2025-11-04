@@ -23,6 +23,11 @@
 
 #include <fnmatch.h>
 
+G_DEFINE_BOXED_TYPE (SrtEnvOverlay,
+                     _srt_env_overlay,
+                     _srt_env_overlay_ref,
+                     _srt_env_overlay_unref)
+
 SrtEnvOverlay *
 _srt_env_overlay_new (void)
 {

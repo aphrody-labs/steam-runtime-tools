@@ -323,7 +323,7 @@ _srt_os_info_new_from_report (JsonObject *json_obj)
             }
           else
             {
-              GString *str = g_string_new ("");
+              g_autoptr(GString) str = g_string_new ("");
               guint length = json_array_get_length (array);
 
               for (i = 0; i < length; i++)
@@ -337,7 +337,7 @@ _srt_os_info_new_from_report (JsonObject *json_obj)
                 }
 
               g_hash_table_replace (fields, g_strdup ("ID_LIKE"),
-                                    g_string_free_and_steal (str));
+                                    g_string_free_and_steal (g_steal_pointer (&str)));
             }
         }
 

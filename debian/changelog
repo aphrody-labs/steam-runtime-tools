@@ -1,3 +1,13 @@
+steam-runtime-tools (0.20251105.0) UNRELEASED; urgency=medium
+
+  * pressure-vessel:
+    - Use more automatic resource management
+  * Library code:
+    - Use more automatic resource management
+    - Refactoring
+
+ -- Simon McVittie <smcv@collabora.com>  Wed, 05 Nov 2025 12:53:59 +0000
+
 steam-runtime-tools (0.20251103.0) steamrt; urgency=medium
 
   * pressure-vessel:

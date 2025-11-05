@@ -580,5 +580,5 @@ pv_stat_describe_permissions (const struct stat *stat_buf)
       g_string_append (buf, ")");
     }
 
-  return g_string_free (g_steal_pointer (&buf), FALSE);
+  return g_string_free_and_steal (g_steal_pointer (&buf));
 }

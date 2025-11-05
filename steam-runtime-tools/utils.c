@@ -1847,7 +1847,7 @@ _srt_describe_fd (int fd)
           && string_append_sockaddr (ret, &addr, addr_len))
         g_string_insert (ret, position, " -> ");
 
-      return g_string_free (g_steal_pointer (&ret), FALSE);
+      return g_string_free_and_steal (g_steal_pointer (&ret));
     }
   else if (errno == EBADF)
     {

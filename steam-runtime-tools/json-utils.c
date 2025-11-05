@@ -201,7 +201,7 @@ _srt_json_object_dup_array_of_lines_member (JsonObject *json_obj,
         g_string_append_c (ret, '\n');
     }
 
-  return g_string_free (g_steal_pointer (&ret), FALSE);
+  return g_string_free_and_steal (g_steal_pointer (&ret));
 }
 
 /**

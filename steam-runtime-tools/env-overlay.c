@@ -591,7 +591,7 @@ _srt_env_overlay_to_env0 (const SrtEnvOverlay *self)
 gchar *
 _srt_env_overlay_to_shell (const SrtEnvOverlay *self)
 {
-  GString *buf = NULL;
+  g_autoptr(GString) buf = NULL;
   g_autoptr(GList) vars = NULL;
   const GList *iter;
 
@@ -624,7 +624,7 @@ _srt_env_overlay_to_shell (const SrtEnvOverlay *self)
         }
     }
 
-  return g_string_free (buf, FALSE);
+  return g_string_free_and_steal (g_steal_pointer (&buf));
 }
 
 static gboolean

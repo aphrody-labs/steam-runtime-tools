@@ -956,7 +956,7 @@ _srt_process_check_vulkan_info (JsonNode *node,
   *device = _srt_graphics_device_new (device_name, api_version,
                                       (guint32) driver_id, driver_name, buf->str,
                                       vendor_id, device_id, device_type, issues);
-  *version_string = g_string_free (g_steal_pointer (&buf), FALSE);
+  *version_string = g_string_free_and_steal (g_steal_pointer (&buf));
 
   return issues;
 }

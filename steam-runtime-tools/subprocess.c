@@ -751,10 +751,10 @@ _srt_completed_subprocess_new_from_subprocess (SrtSubprocess *self)
     }
 
   if (self->out != NULL)
-    completed->out = g_string_free (g_steal_pointer (&self->out), FALSE);
+    completed->out = g_string_free_and_steal (g_steal_pointer (&self->out));
 
   if (self->err != NULL)
-    completed->err = g_string_free (g_steal_pointer (&self->err), FALSE);
+    completed->err = g_string_free_and_steal (g_steal_pointer (&self->err));
 
   return g_steal_pointer (&completed);
 }

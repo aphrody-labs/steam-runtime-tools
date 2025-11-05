@@ -484,6 +484,8 @@ test_emulator (Fixture *f,
 
       g_string_append_printf (expected, "argv[%zu]=--arg\n", argc++);
       g_string_append_printf (expected, "argv[%zu]=argh!\n", argc++);
+      g_string_append (expected, "$SET=set\n");
+      g_string_append (expected, "$UNSET=unset\n");
       g_string_append (expected, "not really running it\n");
       completed = _srt_subprocess_runner_run_sync (runner,
                                                    flags,

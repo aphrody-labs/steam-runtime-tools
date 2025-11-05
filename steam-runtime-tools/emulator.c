@@ -26,7 +26,9 @@ struct _SrtEmulatorClass
 enum {
   PROP_0,
   PROP_ARGV,
+  PROP_CONTAINER_ENVIRONMENT,
   PROP_EMULATED_ARCHITECTURES,
+  PROP_ENVIRONMENT,
   PROP_MANIFEST,
   PROP_REQUIRED_ARCHITECTURES,
   PROP_REQUIRED_LIBRARIES,
@@ -48,7 +50,9 @@ _srt_emulator_finalize (GObject *object)
   SrtEmulator *self = SRT_EMULATOR (object);
 
   g_strfreev (self->argv);
+  g_clear_pointer (&self->container_environment, _srt_env_overlay_unref);
   g_free (self->emulated_architectures);
+  g_clear_pointer (&self->environment, _srt_env_overlay_unref);
   g_free (self->manifest);
   g_free (self->required_architectures);
   g_strfreev (self->required_libraries);
@@ -70,10 +74,21 @@ _srt_emulator_get_property (GObject *object,
         g_value_set_boxed (value, self->argv);
         break;
 
+      case PROP_CONTAINER_ENVIRONMENT:
+        /* Copy it to avoid concurrent modification harming thread-safety */
+        g_value_take_boxed (value,
+                            _srt_env_overlay_copy (self->container_environment));
+        break;
+
       case PROP_EMULATED_ARCHITECTURES:
         g_value_take_boxed (value,
                             _srt_architecture_array_new_from_quarks (self->emulated_architectures,
                                                                      self->n_emulated_architectures));
+        break;
+
+      case PROP_ENVIRONMENT:
+        /* Copy it to avoid concurrent modification harming thread-safety */
+        g_value_take_boxed (value, _srt_env_overlay_copy (self->environment));
         break;
 
       case PROP_REQUIRED_LIBRARIES:
@@ -102,6 +117,7 @@ _srt_emulator_set_property (GObject *object,
                          GParamSpec *pspec)
 {
   SrtEmulator *self = SRT_EMULATOR (object);
+  SrtEnvOverlay *overlay;
   GArray *arr;
 
   switch (prop_id)
@@ -110,6 +126,17 @@ _srt_emulator_set_property (GObject *object,
         /* Construct-only */
         g_return_if_fail (self->argv == NULL);
         self->argv = g_value_dup_boxed (value);
+        break;
+
+      case PROP_CONTAINER_ENVIRONMENT:
+        /* Construct-only */
+        g_return_if_fail (self->container_environment == NULL);
+        /* Copy it to avoid concurrent modification harming thread-safety */
+        overlay = g_value_get_boxed (value);
+
+        if (overlay != NULL)
+          self->container_environment = _srt_env_overlay_copy (overlay);
+
         break;
 
       case PROP_EMULATED_ARCHITECTURES:
@@ -123,6 +150,17 @@ _srt_emulator_set_property (GObject *object,
                                                                             &self->n_emulated_architectures);
         else
           self->emulated_architectures = g_new0 (GQuark, 1);
+
+        break;
+
+      case PROP_ENVIRONMENT:
+        /* Construct-only */
+        g_return_if_fail (self->environment == NULL);
+        /* Copy it to avoid concurrent modification harming thread-safety */
+        overlay = g_value_get_boxed (value);
+
+        if (overlay != NULL)
+          self->environment = _srt_env_overlay_copy (overlay);
 
         break;
 
@@ -176,6 +214,12 @@ _srt_emulator_constructed (GObject *object)
       self->required_libraries = g_new0 (char *, 1);
       self->required_libraries[0] = NULL;
     }
+
+  if (self->container_environment == NULL)
+    self->container_environment = _srt_env_overlay_new ();
+
+  if (self->environment == NULL)
+    self->environment = _srt_env_overlay_new ();
 }
 
 /*
@@ -195,6 +239,37 @@ _srt_emulator_get_argv (SrtEmulator *self)
   g_return_val_if_fail (SRT_IS_EMULATOR (self), NULL);
 
   return _srt_const_strv (self->argv);
+}
+
+/*
+ * _srt_emulator_get_container_environment:
+ *
+ * Return environment variables to be set or unset when running
+ * a binary from one of the emulated architectures inside a container
+ * that has all supported architectures available in its root directory.
+ * Never %NULL unless a programming error has occurred,
+ * but may be empty.
+ *
+ * For example, FEX might return `{ "FEX_ROOTFS": "" }`.
+ *
+ * The returned environment variables should be applied in addition to
+ * _srt_emulator_get_environment(),
+ * with the version returned by this function taking precedence if there
+ * are any conflicts.
+ *
+ * These environment variables are not automatically used by interfaces such
+ * as #SrtSubprocess, but can be merged into _srt_emulator_get_environment()
+ * by calling _srt_emulator_new_for_container().
+ *
+ * The caller must not modify the returned data structure.
+ *
+ * Returns: (transfer none): the environment
+ */
+const SrtEnvOverlay *
+_srt_emulator_get_container_environment (SrtEmulator *self)
+{
+  g_return_val_if_fail (SRT_IS_EMULATOR (self), NULL);
+  return self->container_environment;
 }
 
 /*
@@ -222,6 +297,28 @@ _srt_emulator_get_emulated_architectures (SrtEmulator *self,
     *n_out = self->n_emulated_architectures;
 
   return self->emulated_architectures;
+}
+
+/*
+ * _srt_emulator_get_environment:
+ *
+ * Return environment variables to be set or unset when running
+ * a binary from one of the emulated architectures,
+ * either inside or outside a container.
+ * Never %NULL unless a programming error has occurred,
+ * but may be empty.
+ *
+ * For example, FEX might return `{ "FEX_PORTABLE": "1" }`.
+ *
+ * The caller must not modify the returned data structure.
+ *
+ * Returns: (transfer none): the environment
+ */
+const SrtEnvOverlay *
+_srt_emulator_get_environment (SrtEmulator *self)
+{
+  g_return_val_if_fail (SRT_IS_EMULATOR (self), NULL);
+  return self->environment;
 }
 
 /*
@@ -307,9 +404,21 @@ _srt_emulator_class_init (SrtEmulatorClass *cls)
                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                          G_PARAM_STATIC_STRINGS));
 
+  properties[PROP_CONTAINER_ENVIRONMENT] =
+    g_param_spec_boxed ("container-environment", NULL, NULL,
+                        SRT_TYPE_ENV_OVERLAY,
+                        (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS));
+
   properties[PROP_EMULATED_ARCHITECTURES] =
     g_param_spec_boxed ("emulated-architectures", NULL, NULL,
                         G_TYPE_ARRAY,
+                        (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS));
+
+  properties[PROP_ENVIRONMENT] =
+    g_param_spec_boxed ("environment", NULL, NULL,
+                        SRT_TYPE_ENV_OVERLAY,
                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                          G_PARAM_STATIC_STRINGS));
 
@@ -357,19 +466,30 @@ maybe_replace_argv0 (const char * const *old_argv,
 }
 
 /*
- * Return a version of @self with modifications.
+ * Return a version of @self with modifications
+ * so that it can be used inside a container.
  *
  * If @replacement_argv0 is non-%NULL, it replaces `argv[0]`.
  * For example, this can be used to swap `/usr/bin/emulator`
- * for `/run/host/usr/bin/emulator` when making an emulator
- * available inside a container.
+ * for `/run/host/usr/bin/emulator`.
+ *
+ * The returned object will return an empty overlay from
+ * _srt_emulator_get_container_environment().
+ * Instead, the overlay returned by _srt_emulator_get_environment()
+ * will include all environment variables set/unset by either
+ * `_srt_emulator_get_environment (self)`
+ * or `_srt_emulator_get_container_environment (self)`,
+ * with the latter taking precedence.
  */
 SrtEmulator *
-_srt_emulator_new_modified (SrtEmulator *self,
-                            const char *replacement_argv0)
+_srt_emulator_new_for_container (SrtEmulator *self,
+                                 const char *replacement_argv0)
 {
   g_autoptr(GArray) emulated_architectures = _srt_architecture_array_new ();
   g_autoptr(GArray) required_architectures = _srt_architecture_array_new ();
+  g_autoptr(SrtEnvOverlay) modified_environment = NULL;
+  g_autoptr(SrtEnvOverlay) empty_environment = NULL;
+  const SrtEnvOverlay *environment;
   g_autofree const char **new_argv = NULL;
 
   g_return_val_if_fail (SRT_IS_EMULATOR (self), NULL);
@@ -387,8 +507,19 @@ _srt_emulator_new_modified (SrtEmulator *self,
                          self->required_architectures,
                          self->n_required_architectures);
 
+  environment = self->environment;
+
+  if (!_srt_env_overlay_is_empty (self->container_environment))
+    {
+      modified_environment = _srt_env_overlay_copy (environment);
+      _srt_env_overlay_update (modified_environment, self->container_environment);
+      environment = modified_environment;
+    }
+
   return _srt_emulator_new (new_argv,
+                            NULL,   /* container environment == environment */
                             emulated_architectures,
+                            environment,
                             NULL,   /* no manifest */
                             required_architectures,
                             _srt_const_strv (self->required_libraries));

@@ -726,6 +726,8 @@ with contents similar to this:
     {
       "emulator_v0": {
         "argv": ["./bin/emulator", "--verbose", "--"],
+        "environment": { "MY_EMULATOR_RUNNING_UNDER_SLR": null },
+        "container_environment": { "MY_EMULATOR_RUNNING_UNDER_SLR": "1" },
         "emulated_architectures": ["x86_64-linux-gnu", "i386-linux-gnu"],
         "required_architectures": ["aarch64-linux-gnu"],
         "required_libraries": ["libc.so.6", "libstdc++.so.6"]
@@ -781,6 +783,20 @@ In this example,
 **pv-wrap** will automatically share `.../steamapps/common/MyEmulator`
 with the container,
 but the rest of `.../steamapps/common` is not guaranteed to be available.
+
+Environment variables specified in `environment` are set as if via
+**setenv**(3) whenever the emulator is invoked,
+either outside or inside the pressure-vessel container.
+The values must either be JSON strings,
+or the special JSON literal `null` to unset the variable
+(remove it from the environment) instead,
+as if via **unsetenv**(3).
+
+Environment variables specified in `container_environment` are similar,
+but they are only set or unset when the emulator is run inside the
+pressure-vessel container.
+If the same environment variable appears in both objects,
+`container_environment` takes precedence.
 
 </dd>
 <dt>

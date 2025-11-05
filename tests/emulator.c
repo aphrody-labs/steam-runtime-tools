@@ -45,6 +45,25 @@ teardown (Fixture *f,
 }
 
 static void
+dump_overlay (const char *label,
+              const SrtEnvOverlay *overlay)
+{
+  g_autoptr(GList) vars = _srt_env_overlay_get_vars (overlay);
+  const GList *iter;
+
+  for (iter = vars; iter != NULL; iter = iter->next)
+    {
+      const char *var = iter->data;
+      const char *val = _srt_env_overlay_get (overlay, var);
+
+      if (val == NULL)
+        g_test_message ("%s: unset %s", label, var);
+      else
+        g_test_message ("%s: set %s=%s", label, var, val);
+    }
+}
+
+static void
 dump_emulator (const char *label,
                SrtEmulator *emulator)
 {
@@ -53,6 +72,7 @@ dump_emulator (const char *label,
   const char *s;
   const GQuark *quarks;
   size_t n;
+  const SrtEnvOverlay *overlay;
 
   strv = _srt_emulator_get_argv (emulator);
 
@@ -84,6 +104,12 @@ dump_emulator (const char *label,
 
   for (size_t i = 0; strv != NULL && strv[i] != NULL; i++)
     g_test_message ("\tRequires library: %s", strv[i]);
+
+  overlay = _srt_emulator_get_environment (emulator);
+  dump_overlay ("\tEnvironment", overlay);
+
+  overlay = _srt_emulator_get_container_environment (emulator);
+  dump_overlay ("\tEnvironment inside container", overlay);
 }
 
 /*
@@ -113,9 +139,12 @@ test_basic (Fixture *f,
   const GQuark *arch_quarks;
   const GQuark *arch_quarks_again;
   size_t n = (size_t) -1;
+  const SrtEnvOverlay *overlay;
   g_autoptr(GArray) archs_copy = NULL;
   g_autoptr(GArray) required_archs_copy = NULL;
   g_autoptr(GPtrArray) arch_strings = NULL;
+  g_autoptr(SrtEnvOverlay) env_copy = NULL;
+  g_autoptr(SrtEnvOverlay) container_env_copy = NULL;
   g_auto(GStrv) argv_copy = NULL;
   g_auto(GStrv) libraries_copy = NULL;
   g_autofree char *manifest_realpath = NULL;
@@ -159,9 +188,21 @@ test_basic (Fixture *f,
   g_assert_nonnull (arch_quarks_again);
   g_assert_cmpuint (arch_quarks_again[0], ==, SRT_ARCHITECTURE_QUARK_NONE);
 
+  overlay = _srt_emulator_get_environment (emulator);
+  g_assert_nonnull (overlay);
+  g_assert_nonnull (overlay->values);
+  g_assert_cmpuint (g_hash_table_size (overlay->values), ==, 0);
+
+  overlay = _srt_emulator_get_container_environment (emulator);
+  g_assert_nonnull (overlay);
+  g_assert_nonnull (overlay->values);
+  g_assert_cmpuint (g_hash_table_size (overlay->values), ==, 0);
+
   g_object_get (emulator,
                 "argv", &argv_copy,
+                "container-environment", &container_env_copy,
                 "emulated-architectures", &archs_copy,
+                "environment", &env_copy,
                 "manifest", &manifest_copy,
                 "required-architectures", &required_archs_copy,
                 "required-libraries", &libraries_copy,
@@ -172,6 +213,10 @@ test_basic (Fixture *f,
   g_assert_nonnull (libraries_copy);
   g_assert_null (libraries_copy[0]);
   g_assert_cmpstr (manifest_copy, ==, manifest_realpath);
+  g_assert_nonnull (container_env_copy);
+  g_assert_cmpuint (g_hash_table_size (container_env_copy->values), ==, 0);
+  g_assert_nonnull (env_copy);
+  g_assert_cmpuint (g_hash_table_size (env_copy->values), ==, 0);
 
   for (size_t i = 0; i < archs_copy->len; i++)
     {
@@ -183,7 +228,9 @@ test_basic (Fixture *f,
 
   g_clear_object (&emulator);
   emulator = _srt_emulator_new (expected_argv,
+                                NULL,
                                 archs_copy,
+                                NULL,
                                 NULL,
                                 NULL,
                                 NULL);
@@ -228,6 +275,16 @@ test_basic (Fixture *f,
   libraries = _srt_emulator_get_required_libraries (reread);
   g_assert_nonnull (libraries);
   g_assert_null (libraries[0]);
+
+  overlay = _srt_emulator_get_environment (reread);
+  g_assert_nonnull (overlay);
+  g_assert_nonnull (overlay->values);
+  g_assert_cmpuint (g_hash_table_size (overlay->values), ==, 0);
+
+  overlay = _srt_emulator_get_container_environment (reread);
+  g_assert_nonnull (overlay);
+  g_assert_nonnull (overlay->values);
+  g_assert_cmpuint (g_hash_table_size (overlay->values), ==, 0);
 }
 
 static void
@@ -351,6 +408,24 @@ test_invalid (Fixture *f,
        "\"argv\": \"true\",\n"
        "\"emulated_architectures\": [\"x86_64-linux-gnu\", \"i386-linux-gnu\"]"
        "}}\n") },
+    { "non-object environment",
+      ("{ \"emulator_v0\": {\n"
+       "\"argv\": \"/bin/true\",\n"
+       "\"emulated_architectures\": [\"x86_64-linux-gnu\", \"i386-linux-gnu\"],\n"
+       "\"environment\": [\"DEBUG=1\"]\n"
+       "}}\n") },
+    { "non-value in environment",
+      ("{ \"emulator_v0\": {\n"
+       "\"argv\": \"/bin/true\",\n"
+       "\"emulated_architectures\": [\"x86_64-linux-gnu\", \"i386-linux-gnu\"],\n"
+       "\"environment\": {\"DEBUG\": []}\n"
+       "}}\n") },
+    { "non-string value in environment",
+      ("{ \"emulator_v0\": {\n"
+       "\"argv\": \"/bin/true\",\n"
+       "\"emulated_architectures\": [\"x86_64-linux-gnu\", \"i386-linux-gnu\"],\n"
+       "\"environment\": {\"DEBUG\": true}\n"
+       "}}\n") },
   };
   g_auto(GLnxTmpDir) tmpdir = { .initialized = FALSE };
   g_autoptr(SrtEmulator) emulator = NULL;
@@ -412,6 +487,7 @@ test_relative (Fixture *f,
   g_autofree char *expected_realpath = NULL;
   g_autofree char *actual_realpath = NULL;
   const char * const * argv;
+  const SrtEnvOverlay *overlay;
   g_autofree char *manifest_realpath = NULL;
   g_auto(GLnxTmpDir) tmpdir = { .initialized = FALSE };
   g_autofree char *write_path = NULL;
@@ -447,7 +523,29 @@ test_relative (Fixture *f,
   g_assert_cmpstr (g_quark_to_string (arch_quarks[1]), ==, SRT_ABI_I386);
   g_assert_cmpuint (arch_quarks[2], ==, SRT_ARCHITECTURE_QUARK_NONE);
 
-  modified = _srt_emulator_new_modified (emulator, "/run/host/bin/false");
+  overlay = _srt_emulator_get_environment (emulator);
+  g_assert_nonnull (overlay);
+  g_assert_nonnull (overlay->values);
+  g_assert_cmpstr (_srt_env_overlay_get (overlay, "SET"), ==, "set");
+  g_assert_cmpstr (_srt_env_overlay_get (overlay, "UNSET"), ==, NULL);
+  g_assert_true (_srt_env_overlay_contains (overlay, "UNSET"));
+  g_assert_cmpstr (_srt_env_overlay_get (overlay, "PRECEDENCE"), ==, "environment");
+  g_assert_false (_srt_env_overlay_contains (overlay, "set_inside_slr"));
+  g_assert_false (_srt_env_overlay_contains (overlay, "unset_inside_slr"));
+
+  overlay = _srt_emulator_get_container_environment (emulator);
+  g_assert_nonnull (overlay);
+  g_assert_nonnull (overlay->values);
+  g_assert_cmpstr (_srt_env_overlay_get (overlay, "set_inside_slr"), ==, "hello");
+  g_assert_cmpstr (_srt_env_overlay_get (overlay, "unset_inside_slr"), ==, NULL);
+  g_assert_true (_srt_env_overlay_contains (overlay, "unset_inside_slr"));
+  g_assert_cmpstr (_srt_env_overlay_get (overlay, "PRECEDENCE"), ==,
+                   "container_environment");
+  g_assert_false (_srt_env_overlay_contains (overlay, "SET"));
+  g_assert_false (_srt_env_overlay_contains (overlay, "UNSET"));
+
+  modified = _srt_emulator_new_for_container (emulator,
+                                              "/run/host/bin/false");
   dump_emulator ("modified", modified);
 
   argv = _srt_emulator_get_argv (modified);
@@ -470,6 +568,25 @@ test_relative (Fixture *f,
   g_assert_cmpstrv (_srt_emulator_get_required_libraries (modified),
                     expected_libraries);
   g_assert_cmpstr (_srt_emulator_get_manifest (modified), ==, NULL);
+
+  overlay = _srt_emulator_get_environment (modified);
+  g_assert_nonnull (overlay);
+  g_assert_nonnull (overlay->values);
+  g_assert_cmpstr (_srt_env_overlay_get (overlay, "SET"), ==, "set");
+  g_assert_cmpstr (_srt_env_overlay_get (overlay, "UNSET"), ==, NULL);
+  g_assert_cmpstr (_srt_env_overlay_get (overlay, "set_inside_slr"), ==, "hello");
+  g_assert_cmpstr (_srt_env_overlay_get (overlay, "unset_inside_slr"), ==, NULL);
+  g_assert_true (_srt_env_overlay_contains (overlay, "unset_inside_slr"));
+  g_assert_cmpstr (_srt_env_overlay_get (overlay, "PRECEDENCE"), ==,
+                   "container_environment");
+
+  /* Because the environment variables that were originally for the container
+   * were copied to the basic set, there's no need for the additional
+   * variables for inside the container to indicate any difference. */
+  overlay = _srt_emulator_get_container_environment (modified);
+  g_assert_nonnull (overlay);
+  g_assert_nonnull (overlay->values);
+  g_assert_cmpuint (g_hash_table_size (overlay->values), ==, 0);
 
     {
       g_autofree char *content = _srt_emulator_serialize_manifest (modified);

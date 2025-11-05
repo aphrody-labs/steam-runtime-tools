@@ -7,6 +7,7 @@
 
 #include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/json-glib-backports-internal.h"
+#include "steam-runtime-tools/json-utils-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 SrtEmulator *
@@ -234,11 +235,12 @@ _srt_emulator_serialize_manifest (SrtEmulator *self)
       json_builder_set_member_name (builder, "emulator_v0");
       json_builder_begin_object (builder);
         {
-          json_builder_set_member_name (builder, "argv");
-          json_builder_begin_array (builder);
-          for (size_t i = 0; self->argv[i] != NULL; i++)
-            json_builder_add_string_value (builder, self->argv[i]);
-          json_builder_end_array (builder);
+          _srt_json_builder_add_strv_value (builder, "argv",
+                                            _srt_const_strv (self->argv),
+                                            /* can't be NULL or empty so
+                                             * this parameter doesn't
+                                             * actually matter */
+                                            FALSE);
 
           json_builder_set_member_name (builder, "emulated_architectures");
           json_builder_begin_array (builder);
@@ -254,11 +256,10 @@ _srt_emulator_serialize_manifest (SrtEmulator *self)
                                            g_quark_to_string (self->required_architectures[i]));
           json_builder_end_array (builder);
 
-          json_builder_set_member_name (builder, "required_libraries");
-          json_builder_begin_array (builder);
-          for (size_t i = 0; self->required_libraries[i] != NULL; i++)
-            json_builder_add_string_value (builder, self->required_libraries[i]);
-          json_builder_end_array (builder);
+          _srt_json_builder_add_strv_value (builder, "required_libraries",
+                                            _srt_const_strv (self->required_libraries),
+                                            /* emit nothing if NULL or empty */
+                                            FALSE);
         }
       json_builder_end_object (builder);
     }
@@ -287,4 +288,3 @@ _srt_emulator_write_manifest (SrtEmulator *self,
   json_output[len] = '\n';
   return g_file_set_contents (path, json_output, len + 1, error);
 }
-

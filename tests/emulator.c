@@ -84,6 +84,31 @@ dump_emulator (const char *label,
     }
 
   g_test_message ("%s ->%s", label, str->str);
+  g_string_truncate (str, 0);
+
+  strv = _srt_emulator_get_container_argv (emulator);
+
+  for (size_t i = 0; strv != NULL && strv[i] != NULL; i++)
+    {
+      g_autofree gchar *quoted = g_shell_quote (strv[i]);
+
+      g_string_append_printf (str, " %s", quoted);
+    }
+
+  g_test_message ("\tWhen running in container: %s", str->str);
+  g_string_truncate (str, 0);
+
+  strv = _srt_emulator_get_main_argv (emulator);
+
+  for (size_t i = 0; strv != NULL && strv[i] != NULL; i++)
+    {
+      g_autofree gchar *quoted = g_shell_quote (strv[i]);
+
+      g_string_append_printf (str, " %s", quoted);
+    }
+
+  g_test_message ("\tWhen running main game: %s", str->str);
+  g_string_truncate (str, 0);
 
   s = _srt_emulator_get_manifest (emulator);
 
@@ -160,6 +185,8 @@ test_basic (Fixture *f,
   dump_emulator (f->qemu_json, emulator);
 
   g_assert_cmpstrv (_srt_emulator_get_argv (emulator), expected_argv);
+  g_assert_cmpstrv (_srt_emulator_get_container_argv (emulator), expected_argv);
+  g_assert_cmpstrv (_srt_emulator_get_main_argv (emulator), expected_argv);
   g_assert_cmpstr (_srt_emulator_get_manifest (emulator), ==, manifest_realpath);
   libraries = _srt_emulator_get_required_libraries (emulator);
   g_assert_nonnull (libraries);
@@ -229,12 +256,16 @@ test_basic (Fixture *f,
   g_clear_object (&emulator);
   emulator = _srt_emulator_new (expected_argv,
                                 NULL,
+                                NULL,
                                 archs_copy,
+                                NULL,
                                 NULL,
                                 NULL,
                                 NULL,
                                 NULL);
   g_assert_cmpstrv (_srt_emulator_get_argv (emulator), expected_argv);
+  g_assert_cmpstrv (_srt_emulator_get_container_argv (emulator), expected_argv);
+  g_assert_cmpstrv (_srt_emulator_get_main_argv (emulator), expected_argv);
   g_assert_cmpstr (_srt_emulator_get_manifest (emulator), ==, NULL);
   arch_quarks = _srt_emulator_get_emulated_architectures (emulator, &n);
   g_assert_cmpuint (n, ==, archs_copy->len);
@@ -265,6 +296,10 @@ test_basic (Fixture *f,
   dump_emulator ("read back from temp file", reread);
   g_assert_cmpstrv (_srt_emulator_get_argv (emulator),
                     _srt_emulator_get_argv (reread));
+  g_assert_cmpstrv (_srt_emulator_get_container_argv (emulator),
+                    _srt_emulator_get_container_argv (reread));
+  g_assert_cmpstrv (_srt_emulator_get_main_argv (emulator),
+                    _srt_emulator_get_main_argv (reread));
 
   arch_quarks = _srt_emulator_get_emulated_architectures (reread, &n);
   g_assert_cmpuint (n, ==, 3);
@@ -507,6 +542,20 @@ test_relative (Fixture *f,
   expected_path = g_test_build_filename (G_TEST_DIST, "mock-emulator.sh", NULL);
   expected_realpath = realpath (expected_path, NULL);
   g_assert_cmpstr (expected_realpath, ==, actual_realpath);
+  g_clear_pointer (&actual_realpath, g_free);
+
+  argv = _srt_emulator_get_container_argv (emulator);
+  actual_realpath = realpath (argv[0], NULL);
+  g_assert_cmpstr (expected_realpath, ==, actual_realpath);
+  g_assert_cmpstr (argv[1], ==, "--in-container");
+  g_assert_cmpstrv (&argv[2], expected_args);
+  g_clear_pointer (&actual_realpath, g_free);
+
+  argv = _srt_emulator_get_main_argv (emulator);
+  actual_realpath = realpath (argv[0], NULL);
+  g_assert_cmpstr (expected_realpath, ==, actual_realpath);
+  g_assert_cmpstr (argv[1], ==, "--main-game");
+  g_assert_cmpstrv (&argv[2], expected_args);
 
   arch_quarks = _srt_emulator_get_emulated_architectures (emulator, &n);
   g_assert_cmpuint (n, ==, 1);
@@ -545,14 +594,32 @@ test_relative (Fixture *f,
   g_assert_false (_srt_env_overlay_contains (overlay, "UNSET"));
 
   modified = _srt_emulator_new_for_container (emulator,
-                                              "/run/host/bin/false");
+                                              "/run/host/bin/false",
+                                              "/run/host/bin/game");
   dump_emulator ("modified", modified);
 
   argv = _srt_emulator_get_argv (modified);
   g_assert_nonnull (argv);
   g_assert_nonnull (argv[0]);
   g_assert_cmpstr (argv[0], ==, "/run/host/bin/false");
-  g_assert_cmpstrv (&argv[1], expected_args);
+  /* The modified emulator is for use inside the container, so we copied
+   * the original container_argv to the new argv. */
+  g_assert_cmpstr (argv[1], ==, "--in-container");
+  g_assert_cmpstrv (&argv[2], expected_args);
+
+  argv = _srt_emulator_get_container_argv (modified);
+  g_assert_nonnull (argv);
+  g_assert_nonnull (argv[0]);
+  g_assert_cmpstr (argv[0], ==, "/run/host/bin/false");
+  g_assert_cmpstr (argv[1], ==, "--in-container");
+  g_assert_cmpstrv (&argv[2], expected_args);
+
+  argv = _srt_emulator_get_main_argv (modified);
+  g_assert_nonnull (argv);
+  g_assert_nonnull (argv[0]);
+  g_assert_cmpstr (argv[0], ==, "/run/host/bin/game");
+  g_assert_cmpstr (argv[1], ==, "--main-game");
+  g_assert_cmpstrv (&argv[2], expected_args);
 
   arch_quarks = _srt_emulator_get_emulated_architectures (modified, &n);
   g_assert_cmpuint (n, ==, 1);
@@ -569,6 +636,8 @@ test_relative (Fixture *f,
                     expected_libraries);
   g_assert_cmpstr (_srt_emulator_get_manifest (modified), ==, NULL);
 
+  /* The modified emulator is for use inside the container, so we copied
+   * the original container_environment to the new environment. */
   overlay = _srt_emulator_get_environment (modified);
   g_assert_nonnull (overlay);
   g_assert_nonnull (overlay->values);
@@ -609,6 +678,10 @@ test_relative (Fixture *f,
   dump_emulator ("read back from temp file", reread);
   g_assert_cmpstrv (_srt_emulator_get_argv (modified),
                     _srt_emulator_get_argv (reread));
+  g_assert_cmpstrv (_srt_emulator_get_container_argv (modified),
+                    _srt_emulator_get_container_argv (reread));
+  g_assert_cmpstrv (_srt_emulator_get_main_argv (modified),
+                    _srt_emulator_get_main_argv (reread));
 
   arch_quarks = _srt_emulator_get_emulated_architectures (reread, &n);
   g_assert_cmpuint (n, ==, 1);

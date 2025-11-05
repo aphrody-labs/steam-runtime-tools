@@ -1939,22 +1939,27 @@ pv_runtime_bind_emulator (PvRuntime *self,
                           FlatpakBwrap *bwrap,
                           GError **error)
 {
-  g_autofree gchar *exe_now = NULL;
   g_autofree gchar *exe_in_container = NULL;
-  const char * const *argv;
-  const char *paths[2];
+  g_autofree gchar *main_exe_in_container = NULL;
+  const char * const *container_argv;
+  const char * const *main_argv;
+  const char *paths[3];
 
   g_return_val_if_fail (SRT_IS_EMULATOR (self->emulator), FALSE);
 
-  argv = _srt_emulator_get_argv (self->emulator);
-  g_return_val_if_fail (argv != NULL, FALSE);
-  g_return_val_if_fail (argv[0] != NULL, FALSE);
+  container_argv = _srt_emulator_get_container_argv (self->emulator);
+  main_argv = _srt_emulator_get_main_argv (self->emulator);
+  g_return_val_if_fail (container_argv != NULL, FALSE);
+  g_return_val_if_fail (container_argv[0] != NULL, FALSE);
+  g_return_val_if_fail (main_argv != NULL, FALSE);
+  g_return_val_if_fail (main_argv[0] != NULL, FALSE);
 
   /* We document that we only export the path of the manifest (paths[0]),
    * but to be nice to developers, also try to export the path to the
    * main executable if different. */
   paths[0] = _srt_emulator_get_manifest (self->emulator);
-  paths[1] = argv[0];
+  paths[1] = container_argv[0];
+  paths[2] = main_argv[0];
 
   for (size_t i = 0; i < G_N_ELEMENTS (paths); i++)
     {
@@ -1985,13 +1990,21 @@ pv_runtime_bind_emulator (PvRuntime *self,
     }
 
   exe_in_container = pv_runtime_remap_emulator_exe (self, exports, bwrap,
-                                                    argv[0], error);
+                                                    container_argv[0], error);
 
   if (exe_in_container == NULL)
     return FALSE;
 
+  main_exe_in_container = pv_runtime_remap_emulator_exe (self, exports, bwrap,
+                                                         main_argv[0],
+                                                         error);
+
+  if (main_exe_in_container == NULL)
+    return FALSE;
+
   self->emulator_in_container = _srt_emulator_new_for_container (self->emulator,
-                                                                 exe_in_container);
+                                                                 exe_in_container,
+                                                                 main_exe_in_container);
   g_return_val_if_fail (SRT_IS_EMULATOR (self->emulator_in_container), FALSE);
   return TRUE;
 }
@@ -2173,7 +2186,7 @@ pv_runtime_get_adverb (PvRuntime *self,
           g_autoptr(GError) local_error = NULL;
           g_autofree gchar *ld_so = NULL;
 
-          original_argv = _srt_emulator_get_argv (emulator_for_adverb);
+          original_argv = _srt_emulator_get_container_argv (emulator_for_adverb);
           g_return_val_if_fail (original_argv != NULL, FALSE);
           ld_so = _srt_elf_path_get_pt_interp (AT_FDCWD,
                                                original_argv[0],
@@ -2205,7 +2218,7 @@ pv_runtime_get_adverb (PvRuntime *self,
 
       /* This only sets the argv, not the environment variables (which are
        * placed in container_env by pv_runtime_bind()). */
-      argv = _srt_emulator_get_argv (self->emulator_in_container);
+      argv = _srt_emulator_get_container_argv (self->emulator_in_container);
       g_return_val_if_fail (argv != NULL, FALSE);
       flatpak_bwrap_append_argsv (bwrap, (char **) argv, -1);
     }

@@ -2229,9 +2229,17 @@ test_payload_command_emulated (Fixture *f,
       g_assert_true (ok);
       g_assert_false (pv_bwrap_was_finished (argv_in_container));
 
-      g_assert_cmpuint (argv_in_container->argv->len, >=, 1);
+      g_assert_cmpuint (argv_in_container->argv->len, >=, 3);
       arg = g_ptr_array_index (argv_in_container->argv, 0);
       g_assert_cmpstr (arg, ==, expected_emulator);
+      offset++;
+
+      arg = g_ptr_array_index (argv_in_container->argv, offset);
+      g_assert_cmpstr (arg, ==, "--main");
+      offset++;
+
+      arg = g_ptr_array_index (argv_in_container->argv, offset);
+      g_assert_cmpstr (arg, ==, "--");
       offset++;
 
       if (g_str_equal (argv[0], "bash"))

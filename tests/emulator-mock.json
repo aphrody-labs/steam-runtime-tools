@@ -1,6 +1,8 @@
 {
   "emulator_v0": {
     "argv": ["./mock-emulator.sh", "--"],
+    "container_argv": "./mock-emulator.sh --in-container --",
+    "main_argv": "./mock-emulator.sh --main-game --",
     "environment": {
         "SET": "set",
         "PRECEDENCE": "environment",

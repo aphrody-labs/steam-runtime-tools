@@ -334,6 +334,29 @@ _srt_emulator_class_init (SrtEmulatorClass *cls)
 }
 
 /*
+ * Returns: (transfer container): a shallow copy of @old_argv,
+ *  except @replacement_argv0 replaces `old_argv[0]` if non-%NULL
+ */
+static const char **
+maybe_replace_argv0 (const char * const *old_argv,
+                     const char *replacement_argv0)
+{
+  g_autofree const char **new_argv = NULL;
+  size_t argc;
+
+  argc = _srt_strv_length (old_argv);
+  new_argv = g_new0 (const char *, argc + 1);
+
+  for (size_t i = 0; i <= argc; i++)
+    new_argv[i] = old_argv[i];
+
+  if (replacement_argv0 != NULL)
+    new_argv[0] = replacement_argv0;
+
+  return g_steal_pointer (&new_argv);
+}
+
+/*
  * Return a version of @self with modifications.
  *
  * If @replacement_argv0 is non-%NULL, it replaces `argv[0]`.
@@ -348,17 +371,11 @@ _srt_emulator_new_modified (SrtEmulator *self,
   g_autoptr(GArray) emulated_architectures = _srt_architecture_array_new ();
   g_autoptr(GArray) required_architectures = _srt_architecture_array_new ();
   g_autofree const char **new_argv = NULL;
-  size_t argc;
 
   g_return_val_if_fail (SRT_IS_EMULATOR (self), NULL);
-  argc = g_strv_length (self->argv);
-  new_argv = g_new0 (const char *, argc + 1);
 
-  for (size_t i = 0; i <= argc; i++)
-    new_argv[i] = self->argv[i];
-
-  if (replacement_argv0 != NULL)
-    new_argv[0] = replacement_argv0;
+  new_argv = maybe_replace_argv0 (_srt_const_strv (self->argv),
+                                  replacement_argv0);
 
   if (self->n_emulated_architectures != 0)
     g_array_append_vals (emulated_architectures,

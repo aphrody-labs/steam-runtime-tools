@@ -78,15 +78,15 @@ gboolean _srt_env_overlay_pass_matching_pattern_cli (SrtEnvOverlay *self,
                                                      const char * const *envp,
                                                      GError **error);
 
-GList *_srt_env_overlay_get_vars (SrtEnvOverlay *self);
-gboolean _srt_env_overlay_contains (SrtEnvOverlay *self,
+GList *_srt_env_overlay_get_vars (const SrtEnvOverlay *self);
+gboolean _srt_env_overlay_contains (const SrtEnvOverlay *self,
                                     const char *var);
-const char *_srt_env_overlay_get (SrtEnvOverlay *self,
+const char *_srt_env_overlay_get (const SrtEnvOverlay *self,
                                   const char *var);
 
-GStrv _srt_env_overlay_apply (SrtEnvOverlay *self,
+GStrv _srt_env_overlay_apply (const SrtEnvOverlay *self,
                               GStrv envp);
-GBytes *_srt_env_overlay_to_env0 (SrtEnvOverlay *self);
-gchar *_srt_env_overlay_to_shell (SrtEnvOverlay *self);
+GBytes *_srt_env_overlay_to_env0 (const SrtEnvOverlay *self);
+gchar *_srt_env_overlay_to_shell (const SrtEnvOverlay *self);
 
 GOptionGroup *_srt_env_overlay_create_option_group (SrtEnvOverlay *self);

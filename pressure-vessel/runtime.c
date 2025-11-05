@@ -1898,6 +1898,41 @@ pv_runtime_new (const char *source,
                          NULL);
 }
 
+static gchar *
+pv_runtime_remap_emulator_exe (PvRuntime *self,
+                               FlatpakExports *exports,
+                               FlatpakBwrap *bwrap,
+                               const char *exe,
+                               GError **error)
+{
+  g_autofree gchar *exe_now = g_canonicalize_filename (exe, NULL);
+
+  if (path_visible_in_provider_namespace (self->flags, exe_now))
+    {
+      if (self->flags & PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX)
+        return g_strdup_printf ("/run/parent%s", exe_now);
+      else
+        return g_strdup_printf ("/run/host%s", exe_now);
+    }
+  else if ((self->flags & PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX)
+           || (exports != NULL
+               && flatpak_exports_path_is_visible (exports, exe_now)))
+    {
+      /* It's in $HOME or some similar path, we can use it as-is.
+       * For the Flatpak case, we assume that everything visible
+       * to the Steam app is equally visible to our sub-sandbox.
+       * Otherwise, we can assume that pv_runtime_bind() already exported
+       * the emulator if necessary (and possible). */
+      return g_strdup (exe_now);
+    }
+  else
+    {
+      return glnx_null_throw (error,
+                              "Unable to work out how to run %s in container",
+                              exe_now);
+    }
+}
+
 static gboolean
 pv_runtime_bind_emulator (PvRuntime *self,
                           FlatpakExports *exports,
@@ -1949,31 +1984,11 @@ pv_runtime_bind_emulator (PvRuntime *self,
         }
     }
 
-  exe_now = g_canonicalize_filename (argv[0], NULL);
+  exe_in_container = pv_runtime_remap_emulator_exe (self, exports, bwrap,
+                                                    argv[0], error);
 
-  if (path_visible_in_provider_namespace (self->flags, exe_now))
-    {
-      if (self->flags & PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX)
-        exe_in_container = g_strdup_printf ("/run/parent%s", exe_now);
-      else
-        exe_in_container = g_strdup_printf ("/run/host%s", exe_now);
-    }
-  else if ((self->flags & PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX)
-           || (exports != NULL && flatpak_exports_path_is_visible (exports, exe_now)))
-    {
-      /* It's in $HOME or some similar path, we can use it as-is.
-       * For the Flatpak case, we assume that everything visible
-       * to the Steam app is equally visible to our sub-sandbox.
-       * Otherwise, we can assume that pv_runtime_bind() already exported
-       * the emulator if necessary (and possible). */
-      exe_in_container = g_strdup (exe_now);
-    }
-  else
-    {
-      return glnx_throw (error,
-                         "Unable to work out how to run %s in container",
-                         exe_now);
-    }
+  if (exe_in_container == NULL)
+    return FALSE;
 
   self->emulator_in_container = _srt_emulator_new_for_container (self->emulator,
                                                                  exe_in_container);

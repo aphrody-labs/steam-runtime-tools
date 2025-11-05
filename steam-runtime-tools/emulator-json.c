@@ -259,6 +259,20 @@ _srt_emulator_new_from_manifest (const char *path,
                             _srt_const_strv (required_libraries));
 }
 
+static void
+builder_emit_architectures (JsonBuilder *builder,
+                            const GQuark *architectures,
+                            size_t n)
+{
+  json_builder_begin_array (builder);
+    {
+      for (size_t i = 0; i < n; i++)
+        json_builder_add_string_value (builder,
+                                       g_quark_to_string (architectures[i]));
+    }
+  json_builder_end_array (builder);
+}
+
 /*
  * Return a JSON manifest representing @self, with no trailing newline.
  */
@@ -284,18 +298,14 @@ _srt_emulator_serialize_manifest (SrtEmulator *self)
                                             FALSE);
 
           json_builder_set_member_name (builder, "emulated_architectures");
-          json_builder_begin_array (builder);
-          for (size_t i = 0; i < self->n_emulated_architectures; i++)
-            json_builder_add_string_value (builder,
-                                           g_quark_to_string (self->emulated_architectures[i]));
-          json_builder_end_array (builder);
+          builder_emit_architectures (builder,
+                                      self->emulated_architectures,
+                                      self->n_emulated_architectures);
 
           json_builder_set_member_name (builder, "required_architectures");
-          json_builder_begin_array (builder);
-          for (size_t i = 0; i < self->n_required_architectures; i++)
-            json_builder_add_string_value (builder,
-                                           g_quark_to_string (self->required_architectures[i]));
-          json_builder_end_array (builder);
+          builder_emit_architectures (builder,
+                                      self->required_architectures,
+                                      self->n_required_architectures);
 
           _srt_json_builder_add_strv_value (builder, "required_libraries",
                                             _srt_const_strv (self->required_libraries),

@@ -771,7 +771,7 @@ then that directory might look like this,
 with `bin/emulator` linked using `-Wl,-rpath,${ORIGIN}/../lib`:
 
     .../steamapps/common/MyEmulator/
-        emulator.ini
+        emulator.json
         bin/
             emulator
         lib/

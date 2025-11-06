@@ -92,6 +92,13 @@ SUITES = {
 }
 
 
+ARCH_TO_TUPLE = {
+    'amd64': 'x86_64-linux-gnu',
+    'arm64': 'aarch64-linux-gnu',
+    'i386': 'i386-linux-gnu',
+}
+
+
 class InvocationError(Exception):
     pass
 
@@ -450,6 +457,7 @@ me="${{me##*/}}"
 dir={escaped_dir}
 pressure_vessel="${{PRESSURE_VESSEL_PREFIX:-"${{here}}/pressure-vessel"}}"
 
+export PRESSURE_VESSEL_ARCHITECTURES={escaped_multiarch_tuples}
 export PRESSURE_VESSEL_COPY_RUNTIME=1
 export PRESSURE_VESSEL_RUNTIME="${{dir}}"
 unset PRESSURE_VESSEL_RUNTIME_ARCHIVE
@@ -518,6 +526,7 @@ class Main:
         include_sdk_sysroot: bool = False,
         layered: bool = False,
         mtree: bool = True,
+        multiarch_tuples: Sequence[str] = (),
         pressure_vessel_archive: str = '',
         pressure_vessel_from_runtime: str = '',
         pressure_vessel_from_runtime_json: str = '',
@@ -594,6 +603,7 @@ class Main:
         self.include_sdk_sysroot = include_sdk_sysroot
         self.layered = layered
         self.mtree = mtree
+        self.multiarch_tuples = multiarch_tuples
         self.pressure_vessel_ssh_host = pressure_vessel_ssh_host or ssh_host
         self.pressure_vessel_ssh_path = pressure_vessel_ssh_path
         self.pressure_vessel_uri = pressure_vessel_uri
@@ -865,6 +875,29 @@ class Main:
                 with suppress(FileNotFoundError):
                     path.unlink()
 
+    def deb_arch_to_multiarch(
+        self,
+        arch: str,
+    ) -> str:
+        if arch in ARCH_TO_TUPLE:
+            # We can do this on any system, including e.g. Arch Linux
+            return ARCH_TO_TUPLE[arch]
+        else:
+            # This will only work on a Debian derivative, so we only
+            # do this for future architectures
+            completed = subprocess.run(
+                [
+                    'dpkg-architecture',
+                    f'-a{arch}',
+                    '-qDEB_HOST_MULTIARCH',
+                ],
+                check=True,
+                stdout=subprocess.PIPE,
+            )
+            stdout = completed.stdout
+            assert stdout is not None
+            return stdout.decode('utf-8').strip()
+
     def do_container_runtime(self) -> None:
         pv_version = ComponentVersion('pressure-vessel')
 
@@ -1049,10 +1082,17 @@ class Main:
                 exist_ok=True,
             )
 
+        tuples = list(self.multiarch_tuples)
+
+        if not tuples:
+            for arch in self.default_architecture.split(','):
+                tuples.append(self.deb_arch_to_multiarch(arch))
+
         with open(os.path.join(self.depot, 'run'), 'w') as writer:
             writer.write(
                 RUN_IN_DIR_SOURCE.format(
                     escaped_dir=shlex.quote(subdir),
+                    escaped_multiarch_tuples=shlex.quote(':'.join(tuples)),
                     source_for_generated_file=(
                         'Generated file, do not edit'
                     ),
@@ -1960,6 +2000,17 @@ def main() -> None:
             'Default dpkg architecture or comma-separated list of '
             'architectures'
         )
+    )
+    parser.add_argument(
+        '--multiarch-tuple',
+        action='append',
+        default=[],
+        dest='multiarch_tuples',
+        help=(
+            'Declare that the container supports each TUPLE. '
+            'May be repeated. '
+            'The first is the primary architecture.'
+        ),
     )
     parser.add_argument(
         '--suite', default='',

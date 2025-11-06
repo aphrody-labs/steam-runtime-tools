@@ -43,7 +43,7 @@ else:
 try:
     from shlex import quote
 except ImportError:
-    from pipes import quote     # noqa
+    from pipes import quote     # type: ignore  # noqa
 
 
 logger = logging.getLogger('pressure-vessel-build-relocatable-install')

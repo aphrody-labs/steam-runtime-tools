@@ -1,12 +1,20 @@
-steam-runtime-tools (0.20251105.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251106.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
+    - If the root filesystem doesn't have glibc for a desired architecture,
+      but a non-root-filesystem graphics provider does, use the graphics
+      provider's ld.so(8) and libraries to run capsule-capture-libs.
+      This assumes that the graphics provider follows one of the common
+      filesystem layouts (in practice either Debian multiarch, Red Hat/FHS
+      multilib or Arch multilib).
+      (steamrt/tasks#809, steamrt/tasks#828)
     - Use more automatic resource management
+    - Refactoring
   * Library code:
     - Use more automatic resource management
     - Refactoring
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 05 Nov 2025 12:53:59 +0000
+ -- Simon McVittie <smcv@collabora.com>  Thu, 06 Nov 2025 14:14:46 +0000
 
 steam-runtime-tools (0.20251103.0) steamrt; urgency=medium
 

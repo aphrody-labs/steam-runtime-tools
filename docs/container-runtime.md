@@ -37,6 +37,15 @@ GPU hardware.
 The Steam Play compatibility tools automatically run pressure-vessel
 when necessary.
 
+## <a name="steamrt4"></a>Steam Linux Runtime 4.0 (steamrt4)
+
+[steamrt4]: #steamrt4
+
+Steam Linux Runtime 4.0 is in the process of becoming available.
+
+It is a newer runtime based on Debian 13 (released in 2025)
+and is structurally similar to sniper.
+
 ## <a name="sniper"></a>Steam Linux Runtime 3.0 (sniper)
 
 [sniper]: #sniper
@@ -178,23 +187,6 @@ Steam Linux Runtime 1.0 (scout) container via *Properties* → *Compatibility*.
 [Steam client 2024-11-05]: https://store.steampowered.com/news/collection/steam/?emclan=103582791457287600&emgid=4472730495692571024
 
 ## Possible future Steam Runtime branches
-
-### <a name="steamrt4"></a>Steam Runtime 4
-
-[steamrt4]: #steamrt4
-
-Steam Runtime 4 is a prototype runtime currently based on Debian 13
-(which is expected to be released in mid 2025).
-It is structurally similar to `sniper`,
-but with a newer base distribution.
-
-`steamrt4` is not yet available as a compatibility tool, and its
-contents are subject to change depending on testing results and game
-requirements.
-If it becomes available as a new runtime environment,
-the procedure for selecting it is likely to be very similar to sniper.
-
-### <a name="steamrt5"></a>Steam Runtime 5
 
 [steamrt5]: #steamrt5
 

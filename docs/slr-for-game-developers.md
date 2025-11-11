@@ -57,7 +57,7 @@ whichever one appears to be newer.
 
 The Steam Linux Runtime can be used to run three categories of games:
 
-  * Native Linux games on newer runtimes such as sniper
+  * Native Linux games on newer runtimes such as sniper and steamrt4
   * Native Linux games on scout
   * Windows games, using Proton
 
@@ -65,6 +65,14 @@ All games distributed on Steam use a compatibility tool of some sort,
 for the widest possible cross-distribution compatibility.
 There is no option for running directly on the host system with no
 compatibility tool.
+
+### <a name="steamrt4"></a>Native Linux games targeting Steam Runtime 4 'steamrt4'
+
+[Steam Runtime version 4][steamrt4]
+is a new runtime based on Debian 13 (2025).
+When it becomes available,
+it will be very similar to sniper,
+but 4 years newer.
 
 ### <a name="sniper"></a>Native Linux games targeting Steam Runtime 3 'sniper'
 
@@ -541,8 +549,9 @@ Or, to activate this programmatically, set the `STEAM_COMPAT_LAUNCHER_SERVICE`
 environment variable to the `compatmanager_layer_name` listed in the
 `toolmanifest.vdf` of the compatibility tool used to run a game:
 
-* `container-runtime` for "Steam Linux Runtime 2.0 (soldier)" or
+* `container-runtime` for "Steam Linux Runtime 2.0 (soldier)",
     "Steam Linux Runtime 3.0 (sniper)"
+    or "Steam Linux Runtime 4.0"
 
 * `proton` for any version of Proton that supports it (7.0 or later)
 
@@ -1537,6 +1546,8 @@ but does not include external modules like `pip`.
 [sniper]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/sniper/README.md
 [soldier SDK]: https://gitlab.steamos.cloud/steamrt/soldier/sdk/-/blob/steamrt/soldier/README.md
 [soldier]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/soldier/README.md
+[steamrt4 SDK]: https://gitlab.steamos.cloud/steamrt/steamrt4/sdk/-/blob/steamrt/steamrt4/README.md
+[steamrt4]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/steamrt4/README.md
 [steam-runtime-launch-client]: https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/bin/launch-client.md?ref_type=heads
 [switching a game to a beta branch]: https://help.steampowered.com/en/faqs/view/5A86-0DF4-C59E-8C4A
 [systemd-cgls]: https://www.freedesktop.org/software/systemd/man/latest/systemd-cgls.html

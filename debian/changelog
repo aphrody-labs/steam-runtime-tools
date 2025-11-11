@@ -1,5 +1,10 @@
-steam-runtime-tools (0.20251106.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251111.0) UNRELEASED; urgency=medium
 
+  * SteamLinuxRuntime_*:
+    - Write PRESSURE_VESSEL_ARCHITECTURES into ./run, so that
+      pressure-vessel automatically knows the architecture of the runtime
+      (steamrt/tasks#847)
+    - Silence a warning with newer mypy
   * pressure-vessel:
     - If the root filesystem doesn't have glibc for a desired architecture,
       but a non-root-filesystem graphics provider does, use the graphics
@@ -10,11 +15,12 @@ steam-runtime-tools (0.20251106.0) UNRELEASED; urgency=medium
       (steamrt/tasks#809, steamrt/tasks#828)
     - Use more automatic resource management
     - Refactoring
+    - Documentation fixes
   * Library code:
     - Use more automatic resource management
     - Refactoring
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 06 Nov 2025 14:14:46 +0000
+ -- Simon McVittie <smcv@collabora.com>  Tue, 11 Nov 2025 12:38:28 +0000
 
 steam-runtime-tools (0.20251103.0) steamrt; urgency=medium
 

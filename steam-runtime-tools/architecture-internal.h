@@ -97,6 +97,27 @@ GQuark _srt_architecture_guess_from_user_input (const char *alias,
                                                 GError **error);
 
 /*
+ * SrtLibdirsFlags:
+ * @SRT_LIBDIRS_FLAGS_INCLUDE_NON_STANDARD:
+ *  In addition to library paths that are expected to be searched by the
+ *  runtime linker by default, also include non-default library paths that
+ *  might be the target of mechanisms like Debian's update-alternatives(8).
+ *  Currently this means /usr/lib/MULTIARCH/mesa, used in older Debian.
+ * @SRT_LIBDIRS_FLAGS_NONE: None of the above.
+ *
+ * Flags affecting the behaviour of _srt_known_architecture_get_libdirs()
+ */
+typedef enum
+{
+  SRT_LIBDIRS_FLAGS_INCLUDE_NON_STANDARD = (1 << 0),
+  SRT_LIBDIRS_FLAGS_NONE = 0
+} SrtLibdirsFlags;
+
+GPtrArray *_srt_known_architecture_get_libdirs (const char *tuple,
+                                                const SrtKnownArchitecture *known,
+                                                SrtLibdirsFlags flags);
+
+/*
  * _srt_architecture_array_new:
  *
  * Return an empty array of GQuark (interned strings) representing

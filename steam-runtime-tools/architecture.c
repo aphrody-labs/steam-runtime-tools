@@ -826,3 +826,76 @@ _srt_architecture_get_current (void)
   return 0;
 #endif
 }
+
+/*
+ * _srt_known_architecture_get_libdirs:
+ * @tuple: (nullable): A multiarch tuple, or %NULL
+ * @known: (nullable): A known architecture, or %NULL
+ *
+ * Get the absolute paths of the library directories associated with @known,
+ * most important or unambiguous first.
+ *
+ * If @tuple is %NULL, only return generic directories like `/usr/lib`.
+ * @known must also be %NULL in this case.
+ *
+ * If only @known is %NULL, only return directories that can be derived from
+ * the @tuple, like `/usr/lib/TUPLE`, plus generic directories as above.
+ *
+ * Returns: (transfer container) (element-type filename):
+ */
+GPtrArray *
+_srt_known_architecture_get_libdirs (const char *tuple,
+                                     const SrtKnownArchitecture *known,
+                                     SrtLibdirsFlags flags)
+{
+  g_autoptr(GPtrArray) dirs = g_ptr_array_new_with_free_func (g_free);
+  gsize j;
+
+  /* It doesn't make sense to have tuple == NULL and known != NULL */
+  g_return_val_if_fail (tuple != NULL || known == NULL, NULL);
+
+  if (tuple != NULL)
+    {
+      /* Multiarch is the least ambiguous so we put it first.
+       *
+       * We historically searched /usr/lib before /lib, but Debian actually
+       * does the opposite, and we follow that here.
+       *
+       * Arguably we should search /usr/local/lib before /lib before /usr/lib,
+       * but we don't currently try /usr/local/lib. We could add a flag
+       * for that if we don't want to do it unconditionally. */
+      g_ptr_array_add (dirs,
+                       g_build_filename ("/lib", tuple, NULL));
+      g_ptr_array_add (dirs,
+                       g_build_filename ("/usr", "lib", tuple, NULL));
+
+      if (flags & SRT_LIBDIRS_FLAGS_INCLUDE_NON_STANDARD)
+        g_ptr_array_add (dirs,
+                         g_build_filename ("/usr", "lib", tuple, "mesa",
+                                           NULL));
+    }
+
+  if (known != NULL && known->multilib_suffixes != NULL)
+    {
+      /* Try other multilib variants next. This includes
+       * Exherbo/cross-compilation-style per-architecture prefixes,
+       * Red-Hat-style lib64 and Arch-style lib32. */
+      for (j = 0; known->multilib_suffixes[j] != NULL; j++)
+        {
+          const char *multilib = known->multilib_suffixes[j];
+
+          g_ptr_array_add (dirs,
+                           g_build_filename ("/", multilib, NULL));
+          g_ptr_array_add (dirs,
+                           g_build_filename ("/usr", multilib, NULL));
+        }
+    }
+
+  /* /lib and /usr/lib are lowest priority because they're the most
+   * ambiguous: we don't know whether they're meant to contain 32- or
+   * 64-bit libraries. */
+  g_ptr_array_add (dirs, g_strdup ("/lib"));
+  g_ptr_array_add (dirs, g_strdup ("/usr/lib"));
+
+  return g_steal_pointer (&dirs);
+}

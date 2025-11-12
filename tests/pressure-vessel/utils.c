@@ -559,10 +559,10 @@ test_known_arch_libdirs (Fixture *f,
 
   for (remove_overridden = 0; remove_overridden < 2; remove_overridden++)
     {
-      PvMultiarchLibdirsFlags flags = PV_MULTIARCH_LIBDIRS_FLAGS_NONE;
+      SrtLibdirsFlags flags = SRT_LIBDIRS_FLAGS_NONE;
 
       if (remove_overridden)
-        flags |= PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN;
+        flags |= SRT_LIBDIRS_FLAGS_INCLUDE_NON_STANDARD;
 
       for (i = 0; i < G_N_ELEMENTS (tests); i++)
         {
@@ -583,7 +583,7 @@ test_known_arch_libdirs (Fixture *f,
 
               if (g_str_has_prefix (item, "IF_REMOVE_OVERRIDDEN:"))
                 {
-                  if (flags & PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN)
+                  if (flags & SRT_LIBDIRS_FLAGS_INCLUDE_NON_STANDARD)
                     item = item + strlen ("IF_REMOVE_OVERRIDDEN:");
                   else
                     continue;
@@ -595,7 +595,7 @@ test_known_arch_libdirs (Fixture *f,
           if (tuple != NULL)
             known = _srt_architecture_get_by_tuple (tuple);
 
-          actual = pv_known_architecture_get_libdirs (tuple, known, flags);
+          actual = _srt_known_architecture_get_libdirs (tuple, known, flags);
 
           for (j = 0; j < expected->len; j++)
             g_test_message ("expected[%zu]: %s",

@@ -748,9 +748,9 @@ runtime_architecture_maybe_prefix_ld_so (RuntimeArchitecture *self,
             }
         }
 
-      libdirs = pv_known_architecture_get_libdirs (self->tuple,
-                                                   self->known_arch,
-                                                   PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
+      libdirs = _srt_known_architecture_get_libdirs (self->tuple,
+                                                     self->known_arch,
+                                                     SRT_LIBDIRS_FLAGS_NONE);
 
       for (size_t i = 0; i < libdirs->len; i++)
         {
@@ -4624,9 +4624,9 @@ pv_runtime_remove_overridden_libraries (PvRuntime *self,
 
   timer = _srt_profiling_start ("Removing overridden %s libraries", arch->tuple);
 
-  dirs = pv_known_architecture_get_libdirs (arch->tuple,
-                                            arch->known_arch,
-                                            PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN);
+  dirs = _srt_known_architecture_get_libdirs (arch->tuple,
+                                              arch->known_arch,
+                                              SRT_LIBDIRS_FLAGS_INCLUDE_NON_STANDARD);
   delete = g_new0 (GHashTable *, dirs->len);
   iters = g_new0 (SrtDirIter, dirs->len);
 
@@ -7852,9 +7852,9 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                                PV_RUNTIME_DATA_FLAGS_USR_SHARE_FIRST,
                                                &nvidia_data_in_provider);
 
-          dirs = pv_known_architecture_get_libdirs (arch->tuple,
-                                                    arch->known_arch,
-                                                    PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
+          dirs = _srt_known_architecture_get_libdirs (arch->tuple,
+                                                      arch->known_arch,
+                                                      SRT_LIBDIRS_FLAGS_NONE);
 
           for (j = 0; j < dirs->len; j++)
             {
@@ -8599,9 +8599,9 @@ pv_runtime_has_library (PvRuntime *self,
       gsize j;
 
       known = _srt_architecture_get_by_tuple (tuple);
-      dirs = pv_known_architecture_get_libdirs (tuple,
-                                                known,
-                                                PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
+      dirs = _srt_known_architecture_get_libdirs (tuple,
+                                                  known,
+                                                  SRT_LIBDIRS_FLAGS_NONE);
 
       for (j = 0; j < dirs->len; j++)
         {

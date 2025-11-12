@@ -608,35 +608,6 @@ test_mtree_entry_parse (Fixture *f,
     }
 }
 
-static void
-test_search_path_append (Fixture *f,
-                         gconstpointer context)
-{
-  g_autoptr(GString) str = g_string_new ("");
-
-  _srt_search_path_append (str, NULL);
-  g_assert_cmpstr (str->str, ==, "");
-
-  _srt_search_path_append (str, "");
-  g_assert_cmpstr (str->str, ==, "");
-
-  _srt_search_path_append (str, "/bin");
-  g_assert_cmpstr (str->str, ==, "/bin");
-
-  _srt_search_path_append (str, NULL);
-  g_assert_cmpstr (str->str, ==, "/bin");
-
-  _srt_search_path_append (str, "");
-  g_assert_cmpstr (str->str, ==, "/bin");
-
-  _srt_search_path_append (str, "/usr/bin");
-  g_assert_cmpstr (str->str, ==, "/bin:/usr/bin");
-
-  /* Duplicates are not removed */
-  _srt_search_path_append (str, "/usr/bin");
-  g_assert_cmpstr (str->str, ==, "/bin:/usr/bin:/usr/bin");
-}
-
 static struct stat stats_to_describe[] =
 {
   { .st_mode = 0104750, .st_uid = 0, .st_gid = 0 },
@@ -744,8 +715,6 @@ main (int argc,
   g_test_add ("/envp-cmp", Fixture, NULL, setup, test_envp_cmp, teardown);
   g_test_add ("/mtree-entry-parse", Fixture, NULL,
               setup, test_mtree_entry_parse, teardown);
-  g_test_add ("/search-path-append", Fixture, NULL,
-              setup, test_search_path_append, teardown);
   g_test_add ("/stat-describe-permissions", Fixture, NULL,
               setup, test_stat_describe_permissions, teardown);
   g_test_add ("/workarounds", Fixture, NULL,

@@ -1646,6 +1646,35 @@ test_same_file (Fixture *f,
 }
 
 static void
+test_search_path_append (Fixture *f,
+                         gconstpointer context)
+{
+  g_autoptr(GString) str = g_string_new ("");
+
+  _srt_search_path_append (str, NULL);
+  g_assert_cmpstr (str->str, ==, "");
+
+  _srt_search_path_append (str, "");
+  g_assert_cmpstr (str->str, ==, "");
+
+  _srt_search_path_append (str, "/bin");
+  g_assert_cmpstr (str->str, ==, "/bin");
+
+  _srt_search_path_append (str, NULL);
+  g_assert_cmpstr (str->str, ==, "/bin");
+
+  _srt_search_path_append (str, "");
+  g_assert_cmpstr (str->str, ==, "/bin");
+
+  _srt_search_path_append (str, "/usr/bin");
+  g_assert_cmpstr (str->str, ==, "/bin:/usr/bin");
+
+  /* Duplicates are not removed */
+  _srt_search_path_append (str, "/usr/bin");
+  g_assert_cmpstr (str->str, ==, "/bin:/usr/bin:/usr/bin");
+}
+
+static void
 test_str_is_integer (Fixture *f,
                      gconstpointer context)
 {
@@ -1952,6 +1981,8 @@ main (int argc,
               setup, test_rlimit, teardown);
   g_test_add ("/utils/same-file", Fixture, NULL,
               setup, test_same_file, teardown);
+  g_test_add ("/search-path-append", Fixture, NULL,
+              setup, test_search_path_append, teardown);
   g_test_add ("/utils/str_is_integer", Fixture, NULL,
               setup, test_str_is_integer, teardown);
   g_test_add ("/utils/string_chomp_newline", Fixture, NULL,

@@ -853,6 +853,8 @@ _srt_known_architecture_get_libdirs (const char *tuple,
 
   /* It doesn't make sense to have tuple == NULL and known != NULL */
   g_return_val_if_fail (tuple != NULL || known == NULL, NULL);
+  /* If both @tuple and @known are provided then they ought to match */
+  g_return_val_if_fail (known == NULL || g_str_equal (known->multiarch_tuple, tuple), NULL);
 
   if (tuple != NULL)
     {

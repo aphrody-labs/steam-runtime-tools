@@ -215,21 +215,6 @@ pv_get_workarounds (SrtBwrapFlags bwrap_flags,
   return flags;
 }
 
-void
-pv_search_path_append (GString *search_path,
-                       const gchar *item)
-{
-  g_return_if_fail (search_path != NULL);
-
-  if (item == NULL || item[0] == '\0')
-    return;
-
-  if (search_path->len != 0)
-    g_string_append (search_path, ":");
-
-  g_string_append (search_path, item);
-}
-
 gboolean
 pv_run_sync (SrtSubprocessRunner *runner,
              GQuark architecture,

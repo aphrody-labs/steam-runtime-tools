@@ -614,26 +614,26 @@ test_search_path_append (Fixture *f,
 {
   g_autoptr(GString) str = g_string_new ("");
 
-  pv_search_path_append (str, NULL);
+  _srt_search_path_append (str, NULL);
   g_assert_cmpstr (str->str, ==, "");
 
-  pv_search_path_append (str, "");
+  _srt_search_path_append (str, "");
   g_assert_cmpstr (str->str, ==, "");
 
-  pv_search_path_append (str, "/bin");
+  _srt_search_path_append (str, "/bin");
   g_assert_cmpstr (str->str, ==, "/bin");
 
-  pv_search_path_append (str, NULL);
+  _srt_search_path_append (str, NULL);
   g_assert_cmpstr (str->str, ==, "/bin");
 
-  pv_search_path_append (str, "");
+  _srt_search_path_append (str, "");
   g_assert_cmpstr (str->str, ==, "/bin");
 
-  pv_search_path_append (str, "/usr/bin");
+  _srt_search_path_append (str, "/usr/bin");
   g_assert_cmpstr (str->str, ==, "/bin:/usr/bin");
 
   /* Duplicates are not removed */
-  pv_search_path_append (str, "/usr/bin");
+  _srt_search_path_append (str, "/usr/bin");
   g_assert_cmpstr (str->str, ==, "/bin:/usr/bin:/usr/bin");
 }
 

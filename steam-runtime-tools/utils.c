@@ -1944,6 +1944,30 @@ _srt_string_read_fd_until_eof (GString *buf,
 }
 
 /*
+ * _srt_search_path_append:
+ * @search_path: A string
+ * @item: (nullable): Item to append to the search path
+ *
+ * If @item is non-%NULL and non-empty,
+ * append it to @search_path,
+ * adding a `:` separator between consecutive items.
+ */
+void
+_srt_search_path_append (GString *search_path,
+                         const gchar *item)
+{
+  g_return_if_fail (search_path != NULL);
+
+  if (item == NULL || item[0] == '\0')
+    return;
+
+  if (search_path->len != 0)
+    g_string_append (search_path, ":");
+
+  g_string_append (search_path, item);
+}
+
+/*
  * _srt_is_identifier:
  * @name: A non-%NULL string
  *

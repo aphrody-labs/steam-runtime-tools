@@ -68,9 +68,6 @@ typedef enum
 PvWorkaroundFlags pv_get_workarounds (SrtBwrapFlags bwrap_flags,
                                       const char * const *envp);
 
-void pv_search_path_append (GString *search_path,
-                            const gchar *item);
-
 gboolean pv_run_sync (SrtSubprocessRunner *runner,
                       GQuark architecture,
                       const char * const * argv,

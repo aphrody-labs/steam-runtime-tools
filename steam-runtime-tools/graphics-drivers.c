@@ -216,7 +216,11 @@ _srt_base_graphics_module_check_error (SrtBaseGraphicsModule *self,
   return (self->error == NULL);
 }
 
-static const SrtHelperFlags helper_flags = SRT_HELPER_FLAGS_SEARCH_PATH;
+/* We tell capsule-capture-libs to use the sysroot, via
+ * the --provider option */
+static const SrtHelperFlags capsule_capture_libs_flags =
+  (SRT_HELPER_FLAGS_SEARCH_PATH
+   | SRT_HELPER_FLAGS_SYSROOT_AWARE);
 
 /*
  * Returns: (nullable) (element-type filename) (transfer container): The
@@ -235,7 +239,7 @@ _initial_capsule_capture_libs_argv (SrtSysroot *sysroot,
 
   argv = _srt_subprocess_runner_get_helper (runner, multiarch_tuple,
                                             "capsule-capture-libs",
-                                            helper_flags,
+                                            capsule_capture_libs_flags,
                                             error);
 
   if (argv == NULL)
@@ -422,7 +426,7 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
   g_return_if_fail (modules_out != NULL);
 
   completed = _srt_subprocess_runner_run_sync (runner,
-                                               helper_flags,
+                                               capsule_capture_libs_flags,
                                                architecture,
                                                (const char * const *) argv->pdata,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
@@ -556,7 +560,7 @@ _srt_list_links_from_directory (SrtSubprocessRunner *runner,
   g_return_val_if_fail (tmp_directory != NULL, NULL);
 
   completed = _srt_subprocess_runner_run_sync (runner,
-                                               helper_flags,
+                                               capsule_capture_libs_flags,
                                                architecture,
                                                (const char * const *) argv->pdata,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,

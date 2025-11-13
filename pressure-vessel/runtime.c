@@ -823,7 +823,7 @@ runtime_architecture_init (RuntimeArchitecture *self,
   self->capsule_capture_libs = _srt_subprocess_runner_get_helper (runner,
                                                                   self->tuple,
                                                                   "capsule-capture-libs",
-                                                                  SRT_HELPER_FLAGS_NONE,
+                                                                  SRT_HELPER_FLAGS_SYSROOT_AWARE,
                                                                   error);
 
   if (self->capsule_capture_libs == NULL)

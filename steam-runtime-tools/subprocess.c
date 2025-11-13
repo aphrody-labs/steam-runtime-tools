@@ -1229,6 +1229,31 @@ _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
 
   argv = g_ptr_array_new_with_free_func (g_free);
 
+  if (self->sysroot != NULL
+      && !_srt_sysroot_is_direct (self->sysroot)
+      && !(self->test_flags & SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT))
+    {
+      if (flags & SRT_HELPER_FLAGS_WORKS_IN_SYSROOT)
+        {
+          /* TODO: Prepend sysroot's ld.so(8) and library path,
+           * or fail */
+        }
+      else if (flags & SRT_HELPER_FLAGS_SYSROOT_AWARE)
+        {
+          /* TODO: Prepend sysroot's ld.so(8) and library path,
+           * but only if an appropriate ld.so(8) doesn't exist on the host.
+           * (This is for the capsule-capture-libs use-case where the
+           * helper implements sysroot support internally.) */
+        }
+      else
+        {
+          g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+                       "Helper \"%s\" can't be used in sysroot \"%s\"",
+                       base, self->sysroot->path);
+          return NULL;
+        }
+    }
+
   if (flags & SRT_HELPER_FLAGS_IN_BIN_DIR)
     {
       /* Prefer a program from ${SRT_BIN_PATH} or ${bindir} if it exists */

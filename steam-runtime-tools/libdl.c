@@ -36,7 +36,8 @@ _srt_libdl_run_helper (SrtSubprocessRunner *runner,
                        const char *helper_name,
                        GError **error)
 {
-  SrtHelperFlags helper_flags = SRT_HELPER_FLAGS_NONE;
+  /* All dynamically-loaded libraries are relative to ${ORIGIN} */
+  SrtHelperFlags helper_flags = SRT_HELPER_FLAGS_WORKS_IN_SYSROOT;
   g_autoptr(GPtrArray) argv = NULL;
   g_autoptr(SrtCompletedSubprocess) completed = NULL;
   g_autofree gchar *child_stdout = NULL;

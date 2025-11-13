@@ -16,7 +16,10 @@ _srt_architecture_can_run (SrtSubprocessRunner *runner,
   g_autoptr(SrtCompletedSubprocess) completed = NULL;
   g_autoptr(GPtrArray) argv = NULL;
   g_autoptr(GError) error = NULL;
-  SrtHelperFlags helper_flags = SRT_HELPER_FLAGS_NONE;
+  /* x-y-z-true is self-contained, so we can run it with the sysroot's
+   * ld.so and library search paths to have a good guess at whether we
+   * would be able to run a simple executable in the sysroot */
+  SrtHelperFlags helper_flags = SRT_HELPER_FLAGS_WORKS_IN_SYSROOT;
   const char *multiarch;
 
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (runner), FALSE);

@@ -44,7 +44,10 @@
  * g_object_unref() to manage its lifecycle.
  */
 
-static const SrtHelperFlags helper_flags = SRT_HELPER_FLAGS_TIME_OUT;
+/* Libraries are loaded using the executable's "natural" search path,
+ * so we can use the sysroot's ld.so(8) and --library-path */
+static const SrtHelperFlags inspect_lib_flags = (SRT_HELPER_FLAGS_TIME_OUT
+                                                 | SRT_HELPER_FLAGS_WORKS_IN_SYSROOT);
 
 struct _SrtLibrary
 {
@@ -754,7 +757,7 @@ _srt_inspect_library (SrtSubprocessRunner *runner,
     }
 
   completed = _srt_subprocess_runner_run_sync (runner,
-                                               helper_flags,
+                                               inspect_lib_flags,
                                                arch_quark,
                                                (const char * const *) argv,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE,
@@ -996,7 +999,7 @@ _srt_check_library_presence (SrtSubprocessRunner *runner,
 
   multiarch = g_quark_to_string (arch_quark);
   argv = _srt_subprocess_runner_get_helper (runner, multiarch,
-                                            "inspect-library", helper_flags,
+                                            "inspect-library", inspect_lib_flags,
                                             &error);
 
   if (argv == NULL)
@@ -1042,7 +1045,7 @@ _srt_check_library_presence (SrtSubprocessRunner *runner,
   library_absolute_path = srt_library_get_absolute_path (details);
   argv_libelf = _srt_subprocess_runner_get_helper (runner, multiarch,
                                                    "inspect-library-libelf",
-                                                   helper_flags,
+                                                   inspect_lib_flags,
                                                    &error);
 
   if (argv_libelf == NULL)

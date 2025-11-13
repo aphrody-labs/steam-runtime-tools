@@ -406,6 +406,9 @@ pv_graphics_provider_constructed (GObject *object)
   g_return_if_fail (self->path_in_container_ns != NULL);
   g_return_if_fail (SRT_IS_SUBPROCESS_RUNNER (self->run_in_current_context));
 
+  self->run_in_sysroot = _srt_subprocess_runner_new_swap_sysroot (self->run_in_current_context,
+                                                                  self->in_current_ns);
+
   /* Path that, when resolved in the host namespace, points to us */
   self->path_in_host_ns = pv_current_namespace_path_to_host_path (self->in_current_ns->path);
 }
@@ -422,6 +425,7 @@ pv_graphics_provider_dispose (GObject *object)
 
   g_clear_object (&self->in_current_ns);
   g_clear_object (&self->run_in_current_context);
+  g_clear_object (&self->run_in_sysroot);
 
   G_OBJECT_CLASS (pv_graphics_provider_parent_class)->dispose (object);
 }
@@ -607,9 +611,7 @@ pv_graphics_provider_create_system_info (PvGraphicsProvider *self,
     flags |= SRT_CHECK_FLAGS_NO_HELPERS;
 
   system_info = srt_system_info_new (NULL);
-  runner = _srt_subprocess_runner_new_swap_sysroot (self->run_in_current_context,
-                                                    self->in_current_ns);
-  _srt_system_info_set_subprocess_runner (system_info, runner);
+  _srt_system_info_set_subprocess_runner (system_info, self->run_in_sysroot);
 
   if (single_arch != SRT_ARCHITECTURE_QUARK_NONE)
     {

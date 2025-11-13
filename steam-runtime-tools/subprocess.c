@@ -1194,6 +1194,105 @@ _srt_subprocess_runner_get_working_directory (SrtSubprocessRunner *self)
 }
 
 /*
+ * Append @ld_so and an appropriate `--library-path` to @argv,
+ * so that subsequent items in @argv will run as if they were in
+ * `self->sysroot`.
+ *
+ * This assumes that `self->sysroot` is set up in a convenient way:
+ * symlinks must be relative, and library directories must be something
+ * that we know about, for example Debian multiarch, FHS/Red Hat multilib
+ * or Arch multilib.
+ *
+ * For example, if the i386 stack is in /opt/i386, we might run:
+ *
+ * ```
+ * /opt/i386/lib/ld-linux.so.2 \
+ * --library-path /opt/i386/usr/lib/i386-linux-gnu:... \
+ * /path/to/i386-linux-gnu-capsule-capture-libs ...
+ * ```
+ */
+static void
+_srt_subprocess_runner_append_ld_so (SrtSubprocessRunner *self,
+                                     const SrtKnownArchitecture *known_arch,
+                                     GPtrArray *argv)
+{
+  g_autoptr(GPtrArray) libdirs = NULL;
+  g_autoptr(GString) lib_path = g_string_new ("");
+  const char *ld_so;
+  const char *ldlp;
+
+  g_return_if_fail (self != NULL);
+  g_return_if_fail (self->sysroot != NULL);
+  g_return_if_fail (argv != NULL);
+  g_return_if_fail (known_arch != NULL);
+  g_return_if_fail (known_arch->interoperable_runtime_linker != NULL);
+
+  ld_so = known_arch->interoperable_runtime_linker;
+
+  /* If we would have used a custom LD_LIBRARY_PATH when calling
+   * executables outside the sysroot, we want to make use of that
+   * when calling executables "inside" the sysroot. */
+  ldlp = _srt_subprocess_runner_getenv (self, "LD_LIBRARY_PATH");
+
+  if (ldlp != NULL)
+    {
+      g_auto(GStrv) entries = g_strsplit_set (ldlp, ":;", 0);
+
+      for (size_t i = 0; entries != NULL && entries[i] != NULL; i++)
+        {
+          const char *path = entries[i];
+          g_autofree char *canonicalized = NULL;
+          g_autofree char *prefixed = NULL;
+
+          if (path[0] == '\0')
+            path = ".";
+
+          /* e.g. this might be /home/me/.steam/steam/ubuntu12_32
+           * or /usr/lib/sdl2-compat */
+          canonicalized = g_canonicalize_filename (path, NULL);
+          /* e.g. this might be /opt/i386/home/me/.steam/steam/ubuntu12_32
+           * or /opt/i386/usr/lib/sdl2-compat */
+          prefixed = g_build_filename (self->sysroot->path,
+                                       canonicalized,
+                                       NULL);
+          /* We don't know whether entries in LD_LIBRARY_PATH are
+           * meant to be in the sysroot or in the
+           * current execution environment, so try both */
+          _srt_search_path_append (lib_path, prefixed);
+          _srt_search_path_append (lib_path, canonicalized);
+        }
+    }
+
+  libdirs = _srt_known_architecture_get_libdirs (known_arch->multiarch_tuple,
+                                                 known_arch,
+                                                 SRT_LIBDIRS_FLAGS_NONE);
+
+  for (size_t i = 0; i < libdirs->len; i++)
+    {
+      /* e.g. /usr/lib32 */
+      const char *path = g_ptr_array_index (libdirs, i);
+      g_autofree char *prefixed = NULL;
+
+      g_warn_if_fail (g_path_is_absolute (path));
+
+      /* e.g. /opt/i386/usr/lib32 */
+      prefixed = g_build_filename (self->sysroot->path, path, NULL);
+      _srt_search_path_append (lib_path, prefixed);
+    }
+
+  /* e.g. /opt/i386/lib/ld-linux.so.2 */
+  g_ptr_array_add (argv, g_build_filename (self->sysroot->path, ld_so, NULL));
+  g_ptr_array_add (argv, g_strdup ("--library-path"));
+  g_ptr_array_add (argv, g_string_free_and_steal (g_steal_pointer (&lib_path)));
+
+  /* We have to hope that the next argument does not start with "-"
+   * because older versions of ld.so, such as the one in glibc 2.31
+   * (Debian 11 and sniper), don't support the "--" pseudo-argument;
+   * but in practice none of our helpers have such inadvisable names,
+   * so this is fine. */
+}
+
+/*
  * _srt_subprocess_runner_get_helper:
  * @runner: The execution environment
  * @multiarch: (nullable): A multiarch tuple like %SRT_ABI_I386 to prefix
@@ -1250,15 +1349,27 @@ _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
     {
       if (flags & SRT_HELPER_FLAGS_WORKS_IN_SYSROOT)
         {
-          /* TODO: Prepend sysroot's ld.so(8) and library path,
-           * or fail */
+          if (known_arch != NULL
+              && known_arch->interoperable_runtime_linker != NULL)
+            {
+              _srt_subprocess_runner_append_ld_so (self, known_arch, argv);
+            }
+          else
+            {
+              g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+                           "Helper \"%s\" can't be used in sysroot \"%s\" "
+                           "without knowing the appropriate ld.so(8)",
+                           base, self->sysroot->path);
+              return NULL;
+            }
         }
       else if (flags & SRT_HELPER_FLAGS_SYSROOT_AWARE)
         {
-          /* TODO: Prepend sysroot's ld.so(8) and library path,
-           * but only if an appropriate ld.so(8) doesn't exist on the host.
-           * (This is for the capsule-capture-libs use-case where the
-           * helper implements sysroot support internally.) */
+          if (known_arch != NULL
+              && known_arch->interoperable_runtime_linker != NULL
+              && !g_file_test (known_arch->interoperable_runtime_linker,
+                               G_FILE_TEST_IS_EXECUTABLE))
+            _srt_subprocess_runner_append_ld_so (self, known_arch, argv);
         }
       else
         {

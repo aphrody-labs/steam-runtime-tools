@@ -734,6 +734,10 @@ test_icd_egl (Fixture *f,
   srt_system_info_set_environ (info, f->fake_icds_envp);
   srt_system_info_set_sysroot (info, f->sysroot);
   srt_system_info_set_helpers_path (info, f->builddir);
+  /* This test assumes that the results of inspect-library on the host
+   * are valid in the sysroot, which is not really right but we didn't
+   * enforce the sysroot/host separation properly in the past */
+  srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
 
   icds = srt_system_info_list_egl_icds (info, multiarchs);
 
@@ -1856,6 +1860,9 @@ test_icd_vulkan_explicit_multiarch (Fixture *f,
   srt_system_info_set_environ (info, f->fake_icds_envp);
   srt_system_info_set_sysroot (info, f->sysroot);
   srt_system_info_set_helpers_path (info, f->builddir);
+  /* This test assumes that the results of inspect-library on the host
+   * are valid in the sysroot, as above */
+  srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
 
   icds = srt_system_info_list_vulkan_icds (info, multiarchs);
 
@@ -1883,6 +1890,9 @@ test_icd_vulkan_implicit_multiarch (Fixture *f,
   srt_system_info_set_sysroot (info, f->sysroot);
   srt_system_info_set_helpers_path (info, f->builddir);
   srt_system_info_set_multiarch_tuples (info, multiarchs);
+  /* This test assumes that the results of inspect-library on the host
+   * are valid in the sysroot, as above */
+  srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
 
   icds = srt_system_info_list_vulkan_icds (info, NULL);
 
@@ -2738,6 +2748,9 @@ test_layer_vulkan (Fixture *f,
       srt_system_info_set_sysroot (info, sysroot);
       srt_system_info_set_multiarch_tuples (info, multiarchs);
       srt_system_info_set_helpers_path (info, f->builddir);
+      /* This test assumes that the results of inspect-library on the host
+       * are valid in the sysroot, as above */
+      srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
 
       explicit_layers = srt_system_info_list_explicit_vulkan_layers (info);
 
@@ -2990,6 +3003,9 @@ test_dri_debian10 (Fixture *f,
   srt_system_info_set_environ (info, envp);
   srt_system_info_set_sysroot (info, sysroot);
   srt_system_info_set_helpers_path (info, f->builddir);
+  /* This test assumes that the results of inspect-library on the host
+   * are valid in the sysroot, as above */
+  srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
 
   /* The output is guaranteed to be in aphabetical order */
   g_test_message ("i386 DRI drivers...");
@@ -3082,6 +3098,9 @@ test_dri_fedora (Fixture *f,
   srt_system_info_set_environ (info, envp);
   srt_system_info_set_sysroot (info, sysroot);
   srt_system_info_set_helpers_path (info, f->builddir);
+  /* This test assumes that the results of inspect-library on the host
+   * are valid in the sysroot, as above */
+  srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
 
   g_test_message ("i386 DRI drivers...");
   dri = srt_system_info_list_dri_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
@@ -3135,6 +3154,9 @@ test_dri_ubuntu16 (Fixture *f,
   srt_system_info_set_environ (info, envp);
   srt_system_info_set_sysroot (info, sysroot);
   srt_system_info_set_helpers_path (info, f->builddir);
+  /* This test assumes that the results of inspect-library on the host
+   * are valid in the sysroot, as above */
+  srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
 
   g_test_message ("DRI drivers...");
   dri = srt_system_info_list_dri_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
@@ -3226,6 +3248,9 @@ test_dri_with_env (Fixture *f,
   srt_system_info_set_environ (info, envp);
   srt_system_info_set_sysroot (info, sysroot);
   srt_system_info_set_helpers_path (info, f->builddir);
+  /* This test assumes that the results of inspect-library on the host
+   * are valid in the sysroot, as above */
+  srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
 
   /* The output is guaranteed to be in aphabetical order */
   g_test_message ("DRI drivers...");
@@ -3314,6 +3339,9 @@ test_dri_flatpak (Fixture *f,
   srt_system_info_set_environ (info, envp);
   srt_system_info_set_sysroot (info, sysroot);
   srt_system_info_set_helpers_path (info, f->builddir);
+  /* This test assumes that the results of inspect-library on the host
+   * are valid in the sysroot, as above */
+  srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
 
   g_test_message ("DRI drivers...");
   dri = srt_system_info_list_dri_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
@@ -3506,6 +3534,9 @@ test_vdpau (Fixture *f,
       srt_system_info_set_environ (info, envp);
       srt_system_info_set_sysroot (info, sysroot);
       srt_system_info_set_helpers_path (info, f->builddir);
+      /* This test assumes that the results of inspect-library on the host
+       * are valid in the sysroot, as above */
+      srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
 
       /* The output is guaranteed to be in aphabetical order */
       vdpau = srt_system_info_list_vdpau_drivers (info, test->multiarch_tuple, SRT_DRIVER_FLAGS_NONE);

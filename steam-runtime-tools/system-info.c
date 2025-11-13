@@ -286,20 +286,18 @@ typedef struct
 
 static Abi *
 ensure_abi_unless_immutable (SrtSystemInfo *self,
-                             const char *multiarch_tuple)
+                             GQuark arch_quark)
 {
   const SrtKnownArchitecture *iter;
-  GQuark quark;
+  const char *multiarch_tuple = g_quark_to_string (arch_quark);
   guint i;
   Abi *abi = NULL;
-
-  quark = g_quark_from_string (multiarch_tuple);
 
   for (i = 0; i < self->abis->len; i++)
     {
       abi = g_ptr_array_index (self->abis, i);
 
-      if (abi->multiarch_tuple == quark)
+      if (abi->multiarch_tuple == arch_quark)
         return abi;
     }
 
@@ -307,7 +305,7 @@ ensure_abi_unless_immutable (SrtSystemInfo *self,
     return NULL;
 
   abi = g_slice_new0 (Abi);
-  abi->multiarch_tuple = quark;
+  abi->multiarch_tuple = arch_quark;
 
   for (iter = _srt_architecture_get_known ();
        iter->multiarch_tuple != NULL;
@@ -1010,6 +1008,7 @@ srt_system_info_new_from_json (const char *path,
       multiarch_tuples = json_object_get_members (json_sub_obj);
       for (GList *l = multiarch_tuples; l != NULL; l = l->next)
         {
+          GQuark arch_quark = g_quark_from_string (l->data);
           Abi *abi = NULL;
           SrtOpenXr1Runtime *xr_rt;
 
@@ -1018,7 +1017,7 @@ srt_system_info_new_from_json (const char *path,
 
           json_arch_obj = json_object_get_object_member (json_sub_obj, l->data);
 
-          abi = ensure_abi_unless_immutable (info, l->data);
+          abi = ensure_abi_unless_immutable (info, arch_quark);
 
           abi->can_run = _srt_architecture_can_run_from_report (json_arch_obj);
 
@@ -1030,7 +1029,7 @@ srt_system_info_new_from_json (const char *path,
           get_runtime_linker_from_report (info, abi, json_arch_obj);
 
           _srt_graphics_get_from_report (json_arch_obj,
-                                         g_quark_from_string (l->data),
+                                         arch_quark,
                                          &abi->cached_graphics_results);
 
           abi->graphics_modules[SRT_GRAPHICS_DRI_MODULE].modules = _srt_dri_driver_get_from_report (json_arch_obj);
@@ -1183,7 +1182,7 @@ srt_system_info_can_run (SrtSystemInfo *self,
   g_return_val_if_fail (multiarch_tuple != NULL, FALSE);
 
   arch_quark = g_quark_from_string (multiarch_tuple);
-  abi = ensure_abi_unless_immutable (self, multiarch_tuple);
+  abi = ensure_abi_unless_immutable (self, arch_quark);
 
   if (abi == NULL)
     return FALSE;
@@ -1687,7 +1686,7 @@ srt_system_info_check_libraries (SrtSystemInfo *self,
                         SRT_LIBRARY_ISSUES_UNKNOWN);
 
   arch_quark = g_quark_from_string (multiarch_tuple);
-  abi = ensure_abi_unless_immutable (self, multiarch_tuple);
+  abi = ensure_abi_unless_immutable (self, arch_quark);
 
   if (abi == NULL)
     return SRT_LIBRARY_ISSUES_CANNOT_LOAD;
@@ -1844,7 +1843,7 @@ srt_system_info_check_library (SrtSystemInfo *self,
                         SRT_LIBRARY_ISSUES_UNKNOWN);
 
   arch_quark = g_quark_from_string (multiarch_tuple);
-  abi = ensure_abi_unless_immutable (self, multiarch_tuple);
+  abi = ensure_abi_unless_immutable (self, arch_quark);
 
   if (abi == NULL)
     return SRT_LIBRARY_ISSUES_CANNOT_LOAD;
@@ -2050,7 +2049,7 @@ srt_system_info_check_graphics (SrtSystemInfo *self,
   g_return_val_if_fail (((unsigned) rendering_interface) < SRT_N_RENDERING_INTERFACES, SRT_GRAPHICS_ISSUES_UNKNOWN);
 
   arch_quark = g_quark_from_string (multiarch_tuple);
-  abi = ensure_abi_unless_immutable (self, multiarch_tuple);
+  abi = ensure_abi_unless_immutable (self, arch_quark);
 
   if (abi == NULL)
     return SRT_GRAPHICS_ISSUES_UNKNOWN;
@@ -2115,7 +2114,7 @@ GList * srt_system_info_check_all_graphics (SrtSystemInfo *self,
   g_return_val_if_fail (SRT_IS_SYSTEM_INFO (self), NULL);
   g_return_val_if_fail (multiarch_tuple != NULL, NULL);
 
-  abi = ensure_abi_unless_immutable (self, multiarch_tuple);
+  abi = ensure_abi_unless_immutable (self, g_quark_from_string (multiarch_tuple));
 
   if (abi == NULL)
     return NULL;
@@ -3792,7 +3791,7 @@ _srt_system_info_list_graphics_modules (SrtSystemInfo *self,
   g_return_val_if_fail ((int) which < NUM_SRT_GRAPHICS_MODULES, NULL);
 
   arch_quark = g_quark_from_string (multiarch_tuple);
-  abi = ensure_abi_unless_immutable (self, multiarch_tuple);
+  abi = ensure_abi_unless_immutable (self, arch_quark);
 
   if (abi == NULL)
     return NULL;
@@ -3997,7 +3996,9 @@ srt_system_info_dup_openxr_1_runtime (SrtSystemInfo *self,
 
   if (multiarch_tuple != NULL)
     {
-      if (ensure_abi_unless_immutable (self, multiarch_tuple) == NULL)
+      GQuark arch_quark = g_quark_from_string (multiarch_tuple);
+
+      if (ensure_abi_unless_immutable (self, arch_quark) == NULL)
         return NULL;
       rt = g_hash_table_lookup (self->openxr_1_runtimes.active, multiarch_tuple);
     }
@@ -4456,8 +4457,15 @@ ensure_display_info (SrtSystemInfo *self)
   g_return_if_fail (SRT_IS_SYSTEM_INFO (self));
 
   if (self->display_info == NULL && self->from_report == NULL)
-    self->display_info = _srt_check_display (self->runner,
-                                             _srt_system_info_get_primary_multiarch_quark (self));
+    {
+      GQuark arch_quark = _srt_system_info_get_primary_multiarch_quark (self);
+      Abi *abi = ensure_abi_unless_immutable (self, arch_quark);
+
+      g_return_if_fail (abi != NULL);
+
+      self->display_info = _srt_check_display (self->runner,
+                                               arch_quark);
+    }
 }
 
 /**
@@ -4584,12 +4592,21 @@ ensure_xdg_portals_cached (SrtSystemInfo *self)
 {
   g_return_if_fail (SRT_IS_SYSTEM_INFO (self));
 
+  if (self->from_report != NULL)
+    return;
+
   if (self->xdg_portal_data == NULL)
     {
+      GQuark arch_quark = _srt_system_info_get_primary_multiarch_quark (self);
+      Abi *abi = ensure_abi_unless_immutable (self, arch_quark);
+
+      g_return_if_fail (abi != NULL);
+
       ensure_container_info (self);
+
       _srt_check_xdg_portals (self->runner,
                               srt_container_info_get_container_type (self->container_info),
-                              _srt_system_info_get_primary_multiarch_quark (self),
+                              arch_quark,
                               &self->xdg_portal_data);
     }
 }
@@ -4618,8 +4635,7 @@ srt_system_info_list_xdg_portal_backends (SrtSystemInfo *self)
 {
   g_return_val_if_fail (SRT_IS_SYSTEM_INFO (self), NULL);
 
-  if (self->from_report == NULL)
-    ensure_xdg_portals_cached (self);
+  ensure_xdg_portals_cached (self);
 
   return srt_xdg_portal_get_backends (self->xdg_portal_data);
 }
@@ -4757,7 +4773,7 @@ srt_system_info_check_runtime_linker (SrtSystemInfo *self,
   g_return_val_if_fail (SRT_IS_SYSTEM_INFO (self), FALSE);
   g_return_val_if_fail (multiarch_tuple != NULL, FALSE);
 
-  abi = ensure_abi_unless_immutable (self, multiarch_tuple);
+  abi = ensure_abi_unless_immutable (self, g_quark_from_string (multiarch_tuple));
 
   if (abi == NULL)
     {
@@ -4853,7 +4869,7 @@ srt_system_info_dup_libdl_lib (SrtSystemInfo *self,
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
   arch_quark = g_quark_from_string (multiarch_tuple);
-  abi = ensure_abi_unless_immutable (self, multiarch_tuple);
+  abi = ensure_abi_unless_immutable (self, arch_quark);
 
   if (abi == NULL)
     return glnx_null_throw (error, "ABI \"%s\" not included in report",
@@ -4926,7 +4942,7 @@ srt_system_info_dup_libdl_platform (SrtSystemInfo *self,
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
   arch_quark = g_quark_from_string (multiarch_tuple);
-  abi = ensure_abi_unless_immutable (self, multiarch_tuple);
+  abi = ensure_abi_unless_immutable (self, arch_quark);
 
   if (abi == NULL)
     return glnx_null_throw (error, "ABI \"%s\" not included in report",

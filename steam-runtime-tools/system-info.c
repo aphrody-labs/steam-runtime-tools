@@ -2068,6 +2068,16 @@ srt_system_info_check_graphics (SrtSystemInfo *self,
   if (self->from_report != NULL)
     return SRT_GRAPHICS_ISSUES_UNKNOWN;
 
+  /* Testing GL, Vulkan, etc. will load arbitrary shared libraries
+   * in a way that is not under our control and not expected to be
+   * sysroot-aware, so we can't meaningfully test this in a sysroot. */
+  if (self->sysroot != NULL && !_srt_sysroot_is_direct (self->sysroot))
+    {
+      g_debug ("Can't do functional tests on the graphics stack in a "
+               "non-trivial sysroot");
+      return SRT_GRAPHICS_ISSUES_UNKNOWN;
+    }
+
   graphics = NULL;
   issues = _srt_check_graphics (self->runner,
                                 arch_quark,

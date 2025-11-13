@@ -98,6 +98,8 @@ libsteamrt_public_headers = [
 libsteamrt_internals = [
     'architecture-internal.h',
     'architecture-checks-internal.h',
+    'architecture-libelf.c',
+    'architecture-libelf-internal.h',
     'bwrap-internal.h',
     'cpu-feature-internal.h',
     'desktop-entry-internal.h',

@@ -23,15 +23,13 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <gelf.h>
-#include <libelf.h>
+#include <elf.h>
 
 #include "steam-runtime-tools/architecture.h"
 #include "steam-runtime-tools/architecture-internal.h"
 
 #include "steam-runtime-tools/glib-backports-internal.h"
 
-#include "steam-runtime-tools/elf-utils-internal.h"
 #include "steam-runtime-tools/utils.h"
 #include "steam-runtime-tools/utils-internal.h"
 
@@ -418,95 +416,6 @@ _srt_architecture_get_by_tuple (const char *tuple)
   if (strcmp (tuple, "x86_64-mock-abi") == 0)
     return &mock_abi;
 
-  return NULL;
-}
-
-/*
- * @dfd: a directory file descriptor, `AT_FDCWD` or -1,
- *  or an open file descriptor for the library or executable itself
- *  if @file_path is %NULL
- * @file_path: (type filename): Filename to open, or %NULL if @dfd
- *  is an open file descriptor for the executable or library
- * @cls: (not optional) (out): ELF class, normally `ELFCLASS32` or `ELFCLASS64`
- * @data_encoding: (not optional) (out): ELF data encoding, normally
- *  `ELFDATA2LSB` or `ELFDATA2MSB`
- * @machine: (not optional) (out): ELF machine, for example `EM_X86_64` or
- *  `EM_386`
- * @error: On failure set to GIOErrorEnum, used to describe the error
- *
- * Returns: %TRUE on success
- */
-static gboolean
-_srt_architecture_read_elf (int dfd,
-                            const char *file_path,
-                            guint8 *cls,
-                            guint8 *data_encoding,
-                            guint16 *machine,
-                            GError **error)
-{
-  glnx_autofd int fd = -1;
-  g_autoptr(Elf) elf = NULL;
-  GElf_Ehdr eh;
-
-  g_return_val_if_fail (file_path == NULL || file_path[0] != '\0', FALSE);
-  g_return_val_if_fail (file_path != NULL || dfd >= 0, FALSE);
-  g_return_val_if_fail (cls != NULL, FALSE);
-  g_return_val_if_fail (machine != NULL, FALSE);
-  g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
-
-  if (!_srt_open_elf (dfd, file_path, &fd, &elf, error))
-    return FALSE;
-
-  if (gelf_getehdr (elf, &eh) == NULL)
-    return glnx_throw (error, "Error reading \"%s\" ELF header: %s",
-                       file_path, elf_errmsg (elf_errno ()));
-
-  *cls = eh.e_ident[EI_CLASS];
-  *data_encoding = eh.e_ident[EI_DATA];
-  *machine = eh.e_machine;
-
-  return TRUE;
-}
-
-/*
- * @dfd: a directory file descriptor, `AT_FDCWD` or -1,
- *  or an open file descriptor for the library or executable itself
- *  if @file_path is %NULL
- * @file_path: (type filename): Filename to open, or %NULL if @dfd
- *  is an open file descriptor for the executable or library
- * @error: On failure set to GIOErrorEnum or SrtArchitectureError, used to
- *  describe the error
- *
- * Returns: (nullable): The known architecture object, or %NULL on error
- */
-const SrtKnownArchitecture *
-_srt_architecture_guess_from_elf (int dfd,
-                                  const char *file_path,
-                                  GError **error)
-{
-  guint8 cls = ELFCLASSNONE;
-  guint8 data_encoding = ELFDATANONE;
-  guint16 machine = EM_NONE;
-  gsize i;
-
-  g_return_val_if_fail (file_path == NULL || file_path[0] != '\0', NULL);
-  g_return_val_if_fail (file_path != NULL || dfd >= 0, NULL);
-
-  if (!_srt_architecture_read_elf (dfd, file_path, &cls, &data_encoding, &machine, error))
-    return NULL;
-
-  for (i = 0; i < G_N_ELEMENTS (known_architectures); i++)
-    {
-      if (known_architectures[i].multiarch_tuple != NULL
-          && machine == known_architectures[i].machine_type
-          && cls == known_architectures[i].elf_class
-          && data_encoding == known_architectures[i].elf_encoding)
-        return &known_architectures[i];
-    }
-
-  g_set_error (error, SRT_ARCHITECTURE_ERROR, SRT_ARCHITECTURE_ERROR_NO_INFORMATION,
-               "ELF class, data encoding and machine (%u,%u,%u) are unknown",
-               cls, data_encoding, machine);
   return NULL;
 }
 

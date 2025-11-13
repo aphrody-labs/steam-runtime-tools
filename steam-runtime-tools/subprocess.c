@@ -1219,9 +1219,9 @@ _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
 {
   g_autofree gchar *bin_path = NULL;
   const char *helpers_path;
-  GPtrArray *argv = NULL;
-  gchar *path;
-  gchar *prefixed;
+  g_autoptr(GPtrArray) argv = NULL;
+  g_autofree gchar *path = NULL;
+  g_autofree gchar *prefixed = NULL;
 
   g_return_val_if_fail (_srt_check_not_setuid (), NULL);
   g_return_val_if_fail (base != NULL, NULL);
@@ -1242,10 +1242,7 @@ _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
           const char *prefix = _srt_find_myself (NULL, NULL, error);
 
           if (prefix == NULL)
-            {
-              g_ptr_array_unref (argv);
-              return NULL;
-            }
+            return NULL;
 
           bin_path = g_build_filename (prefix, "bin", NULL);
           helpers_path = bin_path;
@@ -1256,10 +1253,7 @@ _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
       helpers_path = _srt_subprocess_runner_resolve_helpers_path (self, error);
 
       if (helpers_path == NULL)
-        {
-          g_ptr_array_unref (argv);
-          return NULL;
-        }
+        return NULL;
     }
 
   path = g_strdup_printf ("%s/%s%s%s",
@@ -1273,21 +1267,18 @@ _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
   if (g_file_test (path, G_FILE_TEST_IS_EXECUTABLE))
     {
       g_ptr_array_add (argv, g_steal_pointer (&path));
-      return argv;
+      return g_steal_pointer (&argv);
     }
 
   if ((flags & SRT_HELPER_FLAGS_SEARCH_PATH) == 0)
     {
       g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND,
                    "%s not found", path);
-      g_free (path);
-      g_ptr_array_unref (argv);
       return NULL;
     }
 
   /* For helpers that are not part of steam-runtime-tools
    * (historically this included *-wflinfo), we fall back to searching $PATH */
-  g_free (path);
 
   if (multiarch == NULL)
     prefixed = g_strdup (base);
@@ -1295,7 +1286,7 @@ _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
     prefixed = g_strdup_printf ("%s-%s", multiarch, base);
 
   g_ptr_array_add (argv, g_steal_pointer (&prefixed));
-  return argv;
+  return g_steal_pointer (&argv);
 }
 
 typedef struct

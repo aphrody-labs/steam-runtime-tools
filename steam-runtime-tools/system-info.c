@@ -3302,7 +3302,7 @@ srt_system_info_check_locale (SrtSystemInfo *self,
     }
   else if (self->from_report != NULL)
     {
-      g_set_error (error, SRT_LOCALE_ERROR, SRT_LOCALE_ERROR_INTERNAL_ERROR,
+      g_set_error (error, SRT_LOCALE_ERROR, SRT_LOCALE_ERROR_UNKNOWN,
                    "Information about the requested locale is missing");
       return NULL;
     }

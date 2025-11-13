@@ -1478,8 +1478,12 @@ main (int argc,
 
   for (gsize i = 0; i < G_N_ELEMENTS (locales); i++)
     {
+      g_autoptr(GError) local_error = NULL;
       SrtLocale *locale = srt_system_info_check_locale (info, locales[i],
-                                                        &error);
+                                                        &local_error);
+
+      if (g_error_matches (error, SRT_LOCALE_ERROR, SRT_LOCALE_ERROR_UNKNOWN))
+        continue;
 
       if (locales[i][0] == '\0')
         json_builder_set_member_name (builder, "<default>");
@@ -1502,12 +1506,11 @@ main (int argc,
         }
       else
         {
-          _srt_json_builder_add_error_members (builder, error);
+          _srt_json_builder_add_error_members (builder, local_error);
         }
 
       json_builder_end_object (builder);
       g_clear_object (&locale);
-      g_clear_error (&error);
     }
 
   json_builder_end_object (builder);

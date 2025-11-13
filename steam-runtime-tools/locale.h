@@ -50,7 +50,9 @@ GType srt_locale_get_type (void);
 /**
  * SrtLocaleError:
  * @SRT_LOCALE_ERROR_FAILED: Unable to set the locale
- * @SRT_LOCALE_ERROR_INTERNAL_ERROR: Unable to check whether the locale
+ * @SRT_LOCALE_ERROR_INTERNAL_ERROR: An internal error occurred when
+ *  checking whether the locale could be set or not
+ * @SRT_LOCALE_ERROR_UNKNOWN: It is not known whether the locale
  *  could be set or not
  *
  * Errors in this domain indicate that problems were encountered when
@@ -60,6 +62,7 @@ typedef enum
 {
   SRT_LOCALE_ERROR_FAILED = 0,
   SRT_LOCALE_ERROR_INTERNAL_ERROR,
+  SRT_LOCALE_ERROR_UNKNOWN,
 } SrtLocaleError;
 
 #define SRT_LOCALE_ERROR (srt_locale_error_quark ())

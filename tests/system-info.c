@@ -3255,7 +3255,7 @@ static JsonTest json_test[] =
       {
         .name = "C.UTF-8",
         .error_domain = "srt-locale-error-quark",
-        .error_code = 0,
+        .error_code = SRT_LOCALE_ERROR_FAILED,
         .error_message = "No such file or directory",
       },
       {
@@ -3485,7 +3485,7 @@ static JsonTest json_test[] =
       {
         .name = "C",
         .error_domain = "srt-locale-error-quark",
-        .error_code = 1,
+        .error_code = SRT_LOCALE_ERROR_INTERNAL_ERROR,
         .error_message = "Information about the requested locale is missing",
       },
     },
@@ -4292,10 +4292,28 @@ json_parsing (Fixture *f,
       g_assert_cmpint (t->locale_issues, ==, srt_system_info_get_locale_issues (info));
       for (j = 0; t->locale[j].name != NULL; j++)
         {
+          g_test_message ("Locale #%zu: \"%s\"", j, t->locale[j].name);
+
+          if (t->locale[j].error_domain != 0)
+            g_test_message ("Expecting error %s #%d: %s",
+                            t->locale[j].error_domain,
+                            t->locale[j].error_code,
+                            t->locale[j].error_message);
+          else
+            g_test_message ("Expecting locale %s (charset %s, is UTF8: %s)",
+                            t->locale[j].resulting_name,
+                            t->locale[j].charset,
+                            t->locale[j].is_utf8 ? "yes" : "no");
+
           error = NULL;
           SrtLocale *this_locale = srt_system_info_check_locale (info, t->locale[j].name, &error);
+
           if (this_locale != NULL)
             {
+              g_test_message ("Got locale %s (charset %s, is UTF8: %s)",
+                              srt_locale_get_resulting_name (this_locale),
+                              srt_locale_get_charset (this_locale),
+                              srt_locale_is_utf8 (this_locale) ? "yes" : "no");
               g_assert_cmpstr (t->locale[j].resulting_name, ==,
                                srt_locale_get_resulting_name (this_locale));
               g_assert_cmpstr (t->locale[j].charset, ==,
@@ -4305,6 +4323,11 @@ json_parsing (Fixture *f,
             }
           else
             {
+              g_assert_nonnull (error);
+              g_test_message ("Got error %s #%d: %s",
+                              g_quark_to_string (error->domain),
+                              error->code,
+                              error->message);
               g_assert_cmpstr (t->locale[j].error_domain, ==,
                                g_quark_to_string (error->domain));
               g_assert_cmpint (t->locale[j].error_code, ==, error->code);

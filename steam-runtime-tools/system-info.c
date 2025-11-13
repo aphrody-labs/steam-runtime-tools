@@ -3284,6 +3284,17 @@ srt_system_info_check_locale (SrtSystemInfo *self,
 
   g_return_val_if_fail (SRT_IS_SYSTEM_INFO (self), NULL);
 
+  /* Our test for locales loads them directly and is not sysroot-aware,
+   * so we can't do this check in the presence of a sysroot. */
+  if (self->from_report == NULL
+      && self->sysroot != NULL
+      && !_srt_sysroot_is_direct (self->sysroot))
+    {
+      g_set_error (error, SRT_LOCALE_ERROR, SRT_LOCALE_ERROR_UNKNOWN,
+                   "Cannot check locale functionality for a sysroot");
+      return NULL;
+    }
+
   if (requested_name == NULL)
     quark = g_quark_from_string ("");
   else

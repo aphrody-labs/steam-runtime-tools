@@ -644,6 +644,8 @@ typedef struct
   const SrtKnownArchitecture *known_arch;
   /* Graphics stack provider to use */
   PvGraphicsProvider *provider;
+  /* Graphics stack provider's SrtSystemInfo for this architecture */
+  SrtSystemInfo *system_info;
   /* "lib/TUPLE/aliases", so that for example
    * /overrides/${aliases_relative_to_overrides}/libbz2.so.1 might exist
    * inside the final container */
@@ -792,6 +794,7 @@ runtime_architecture_init (RuntimeArchitecture *self,
                            GError **error)
 {
   g_autoptr(GPtrArray) argv = NULL;
+  SrtSystemInfo *arch_system_info;
   PvGraphicsProvider *provider;
 
   g_return_val_if_fail (tuple != SRT_ARCHITECTURE_QUARK_NONE, FALSE);
@@ -805,6 +808,9 @@ runtime_architecture_init (RuntimeArchitecture *self,
   g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (provider), FALSE);
   self->provider = g_object_ref (provider);
 
+  arch_system_info = pv_graphics_provider_get_system_info (self->provider,
+                                                           self->tuple_quark);
+  self->system_info = g_object_ref (arch_system_info);
   /* Could be %NULL, so be careful when dereferencing */
   self->known_arch = _srt_architecture_get_by_tuple (self->tuple);
 
@@ -875,6 +881,7 @@ runtime_architecture_clear (RuntimeArchitecture *self)
   self->tuple = NULL;
   self->tuple_quark = SRT_ARCHITECTURE_QUARK_NONE;
   g_clear_object (&self->provider);
+  g_clear_object (&self->system_info);
   g_clear_pointer (&self->capsule_capture_libs, g_ptr_array_unref);
   g_clear_pointer (&self->libdir_relative_to_overrides, g_free);
   g_clear_pointer (&self->libdir_in_container, g_free);
@@ -6034,7 +6041,6 @@ out:
  * pv_runtime_collect_libc_family:
  * @self: The runtime
  * @arch: Architecture of @libc_symlink
- * @system_info: A #SrtSystemInfo
  * @bwrap:
  * @libc_symlink: The symlink created by capsule-capture-libs,
  *  relative to /overrides.
@@ -6048,7 +6054,6 @@ out:
 static gboolean
 pv_runtime_collect_libc_family (PvRuntime *self,
                                 RuntimeArchitecture *arch,
-                                SrtSystemInfo *system_info,
                                 FlatpakBwrap *bwrap,
                                 const char *libc_symlink,
                                 const char *ld_so_in_runtime,
@@ -6069,7 +6074,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
                                             bwrap, error))
     return FALSE;
 
-  libdl_lib = srt_system_info_dup_libdl_lib (system_info,
+  libdl_lib = srt_system_info_dup_libdl_lib (arch->system_info,
                                              arch->tuple,
                                              &local_error);
 
@@ -6517,7 +6522,6 @@ collect_mesa_drirc (PvRuntime *self,
                     RuntimeArchitecture *arch,
                     GPtrArray *egl_icd_details,
                     GPtrArray *vulkan_icd_details,
-                    SrtSystemInfo *arch_system_info,
                     PvRuntimeLibraryData *drirc_data_in_provider)
 {
   g_autoptr(SrtObjectList) dri_drivers = NULL;
@@ -6573,7 +6577,7 @@ collect_mesa_drirc (PvRuntime *self,
   /* We assume that by the time we get here, this is already cached,
    * so its time cost will be trivial and therefore there's no need to
    * do additional profiling */
-  dri_drivers = srt_system_info_list_dri_drivers (arch_system_info,
+  dri_drivers = srt_system_info_list_dri_drivers (arch->system_info,
                                                   arch->tuple,
                                                   SRT_DRIVER_FLAGS_NONE);
 
@@ -7274,7 +7278,6 @@ pv_runtime_create_aliases (PvRuntime *self,
  */
 static gboolean
 collect_vdpau_drivers (PvRuntime *self,
-                       SrtSystemInfo *system_info,
                        RuntimeArchitecture *arch,
                        GPtrArray *patterns,
                        GError **error)
@@ -7292,7 +7295,7 @@ collect_vdpau_drivers (PvRuntime *self,
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) enum_timer =
         _srt_profiling_start ("Enumerating VDPAU drivers");
 
-      vdpau_drivers = srt_system_info_list_vdpau_drivers (system_info,
+      vdpau_drivers = srt_system_info_list_vdpau_drivers (arch->system_info,
                                                           arch->tuple,
                                                           SRT_DRIVER_FLAGS_NONE);
     }
@@ -7326,7 +7329,6 @@ collect_vdpau_drivers (PvRuntime *self,
  */
 static gboolean
 collect_dri_drivers (PvRuntime *self,
-                     SrtSystemInfo *system_info,
                      RuntimeArchitecture *arch,
                      GPtrArray *patterns,
                      GString *dri_path,
@@ -7347,7 +7349,7 @@ collect_dri_drivers (PvRuntime *self,
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) enum_timer =
         _srt_profiling_start ("Enumerating DRI drivers");
 
-      dri_drivers = srt_system_info_list_dri_drivers (system_info,
+      dri_drivers = srt_system_info_list_dri_drivers (arch->system_info,
                                                       arch->tuple,
                                                       SRT_DRIVER_FLAGS_NONE);
     }
@@ -7357,7 +7359,7 @@ collect_dri_drivers (PvRuntime *self,
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) enum_timer =
         _srt_profiling_start ("Enumerating VA-API drivers");
 
-      va_api_drivers = srt_system_info_list_va_api_drivers (system_info,
+      va_api_drivers = srt_system_info_list_va_api_drivers (arch->system_info,
                                                             arch->tuple,
                                                             SRT_DRIVER_FLAGS_NONE);
     }
@@ -7644,7 +7646,6 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           g_autofree gchar *libglx_mesa = NULL;
           g_autofree gchar *libglx_nvidia = NULL;
           g_autoptr(GPtrArray) patterns = NULL;
-          SrtSystemInfo *arch_system_info;
 
           if (!pv_runtime_get_ld_so (self, arch, &ld_so_in_runtime, error))
             return FALSE;
@@ -7740,19 +7741,15 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                 return FALSE;
             }
 
-          arch_system_info = pv_graphics_provider_get_system_info (arch->provider,
-                                                                   arch->tuple_quark);
-
           if ((self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
               && !collect_openxr_1_runtime (self, arch, provider_stack->openxr_1_runtime_details,
                                             patterns, error))
             return FALSE;
 
-          if (!collect_vdpau_drivers (self, arch_system_info, arch, patterns, error))
+          if (!collect_vdpau_drivers (self, arch, patterns, error))
             return FALSE;
 
-          if (!collect_dri_drivers (self, arch_system_info, arch, patterns,
-                                    dri_path, error))
+          if (!collect_dri_drivers (self, arch, patterns, dri_path, error))
             return FALSE;
 
           /* We always have at least one pattern, because
@@ -7789,7 +7786,6 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                    * gconv modules too. */
                   if (was_captured
                       && !pv_runtime_collect_libc_family (self, arch,
-                                                          arch_system_info,
                                                           bwrap,
                                                           soname_symlink,
                                                           ld_so_in_runtime,
@@ -7837,7 +7833,6 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
           collect_mesa_drirc (self, arch, provider_stack->egl_icd_details,
                               provider_stack->vulkan_icd_details,
-                              arch_system_info,
                               &drirc_data_in_provider);
 
           libglx_nvidia = g_build_filename (arch->libdir_relative_to_overrides,

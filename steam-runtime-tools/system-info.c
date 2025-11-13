@@ -2186,6 +2186,13 @@ GList * srt_system_info_check_all_graphics (SrtSystemInfo *self,
   return list;
 }
 
+SrtSubprocessRunner *
+_srt_system_info_get_subprocess_runner (SrtSystemInfo *self)
+{
+  g_return_val_if_fail (SRT_IS_SYSTEM_INFO (self), NULL);
+  return self->runner;
+}
+
 /* More efficient than calling set_environ, set_helpers_path and
  * set_test_flags separately */
 void

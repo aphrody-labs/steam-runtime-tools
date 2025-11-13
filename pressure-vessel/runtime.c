@@ -646,6 +646,8 @@ typedef struct
   PvGraphicsProvider *provider;
   /* Graphics stack provider's SrtSystemInfo for this architecture */
   SrtSystemInfo *system_info;
+  /* Graphics stack provider's SrtSystemInfo's subprocess runner */
+  SrtSubprocessRunner *runner;
   /* "lib/TUPLE/aliases", so that for example
    * /overrides/${aliases_relative_to_overrides}/libbz2.so.1 might exist
    * inside the final container */
@@ -795,6 +797,7 @@ runtime_architecture_init (RuntimeArchitecture *self,
 {
   g_autoptr(GPtrArray) argv = NULL;
   SrtSystemInfo *arch_system_info;
+  SrtSubprocessRunner *runner;
   PvGraphicsProvider *provider;
 
   g_return_val_if_fail (tuple != SRT_ARCHITECTURE_QUARK_NONE, FALSE);
@@ -811,10 +814,13 @@ runtime_architecture_init (RuntimeArchitecture *self,
   arch_system_info = pv_graphics_provider_get_system_info (self->provider,
                                                            self->tuple_quark);
   self->system_info = g_object_ref (arch_system_info);
+  runner = _srt_system_info_get_subprocess_runner (arch_system_info);
+  self->runner = g_object_ref (runner);
+
   /* Could be %NULL, so be careful when dereferencing */
   self->known_arch = _srt_architecture_get_by_tuple (self->tuple);
 
-  self->capsule_capture_libs = _srt_subprocess_runner_get_helper (runtime->run_in_current_context,
+  self->capsule_capture_libs = _srt_subprocess_runner_get_helper (runner,
                                                                   self->tuple,
                                                                   "capsule-capture-libs",
                                                                   SRT_HELPER_FLAGS_NONE,
@@ -849,7 +855,7 @@ runtime_architecture_init (RuntimeArchitecture *self,
    * for this architecture on the current environment. We
    * assume that this is the same as whether we can run them
    * on the host, if different. */
-  pv_run_sync (runtime->run_in_current_context, tuple,
+  pv_run_sync (runner, tuple,
                (const char * const *) argv->pdata,
                NULL, &self->ld_so, error);
 
@@ -882,6 +888,7 @@ runtime_architecture_clear (RuntimeArchitecture *self)
   self->tuple_quark = SRT_ARCHITECTURE_QUARK_NONE;
   g_clear_object (&self->provider);
   g_clear_object (&self->system_info);
+  g_clear_object (&self->runner);
   g_clear_pointer (&self->capsule_capture_libs, g_ptr_array_unref);
   g_clear_pointer (&self->libdir_relative_to_overrides, g_free);
   g_clear_pointer (&self->libdir_in_container, g_free);
@@ -5655,9 +5662,9 @@ pv_runtime_get_ld_so (PvRuntime *self,
                               NULL);
       flatpak_bwrap_finish (temp_bwrap);
 
-      /* We can't use self->run_in_current_context directly, because we
+      /* We can't use arch->runner directly, because we
        * altered the PATH above */
-      runner = _srt_subprocess_runner_new_swap_envp (self->run_in_current_context,
+      runner = _srt_subprocess_runner_new_swap_envp (arch->runner,
                                                      _srt_const_strv (temp_bwrap->envp));
       /* Assume bwrap can be run without a special emulator (native
        * executable or transparent emulation) */

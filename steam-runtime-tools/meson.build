@@ -37,6 +37,7 @@ libsteamrt_libc_utils_dep = declare_dependency(
 
 libsteamrt_sources = [
     'architecture.c',
+    'architecture-checks.c',
     'bwrap.c',
     'container.c',
     'cpu-feature.c',
@@ -96,6 +97,7 @@ libsteamrt_public_headers = [
 # Modules that are needed by parts of the public API
 libsteamrt_internals = [
     'architecture-internal.h',
+    'architecture-checks-internal.h',
     'bwrap-internal.h',
     'cpu-feature-internal.h',
     'desktop-entry-internal.h',

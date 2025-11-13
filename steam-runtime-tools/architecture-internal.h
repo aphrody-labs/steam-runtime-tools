@@ -28,8 +28,6 @@
 
 #include <glib.h>
 
-#include "steam-runtime-tools/subprocess-internal.h"
-
 /*
  * SRT_ARCHITECTURE_QUARK_NONE:
  *
@@ -81,9 +79,6 @@ G_GNUC_INTERNAL gboolean _srt_architecture_check_plausible_tuple (const char *tu
                                                                   GError **error);
 G_GNUC_INTERNAL const SrtKnownArchitecture *_srt_architecture_get_known (void);
 G_GNUC_INTERNAL const SrtKnownArchitecture *_srt_architecture_get_by_tuple (const char *multiarch_tuple);
-
-G_GNUC_INTERNAL gboolean _srt_architecture_can_run (SrtSubprocessRunner *runner,
-                                                    GQuark arch_quark);
 
 const SrtKnownArchitecture *_srt_architecture_get_current (void);
 const SrtKnownArchitecture *_srt_architecture_guess_from_elf (int dfd,

@@ -10,6 +10,183 @@
 #include "steam-runtime-tools/json-utils-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
+static gboolean
+manifest_read_argv (JsonObject *object,
+                    const char *member_name,
+                    const char *real_manifest,
+                    GStrv *argv_out,
+                    GError **error)
+{
+  g_auto(GStrv) argv = NULL;
+  JsonNode *member;
+
+  g_return_val_if_fail (argv_out != NULL, FALSE);
+  g_return_val_if_fail (*argv_out == NULL, FALSE);
+
+  member = json_object_get_member (object, member_name);
+
+  if (member == NULL)
+    return TRUE;
+
+  if (JSON_NODE_HOLDS_ARRAY (member))
+    {
+      JsonArray *array = json_node_get_array (member);
+      size_t len = json_array_get_length (array);
+
+      if (len == 0)
+        return glnx_throw (error, "%s array must not be empty", member_name);
+
+      argv = g_new0 (char *, len + 1);
+
+      for (size_t i = 0; i < len; i++)
+        {
+          JsonNode *element = json_array_get_element (array, i);
+          const char *s = json_node_get_string (element);
+
+          if (s == NULL)
+            return glnx_throw (error, "Elements of %s array must be strings",
+                               member_name);
+
+          argv[i] = g_strdup (s);
+        }
+
+      argv[len] = NULL;
+    }
+  else if (JSON_NODE_HOLDS_VALUE (member))
+    {
+      const char *s = json_node_get_string (member);
+
+      if (s == NULL)
+        return glnx_throw (error, "%s must be an array or a string",
+                           member_name);
+
+      if (!g_shell_parse_argv (s, NULL, &argv, error))
+        return FALSE;
+    }
+  else
+    {
+      return glnx_throw (error, "%s must be an array or a string",
+                         member_name);
+    }
+
+  if (argv == NULL || argv[0] == NULL)
+    return glnx_throw (error, "%s array must not be empty", member_name);
+
+  /* TODO: Should "argv": ["myexe"] mean ./myexe or search PATH for myexe?
+   * For now we just don't allow it, and we can give it one of those
+   * meanings later, if desired */
+  if (strchr (argv[0], '/') == NULL)
+    return glnx_throw (error,
+                       "Executable \"%s\" in %s must contain a slash (use ./exe if necessary)",
+                       argv[0], member_name);
+
+  if (!g_path_is_absolute (argv[0]))
+    {
+      g_autofree char *real_dir = g_path_get_dirname (real_manifest);
+      g_autofree char *argv0 = g_steal_pointer (&argv[0]);
+      const char *exe = argv0;
+
+      if (g_str_has_prefix (exe, "./"))
+        exe += 2;
+
+      while (exe[0] == '/')
+        exe++;
+
+      argv[0] = g_build_filename (real_dir, exe, NULL);
+    }
+
+  *argv_out = g_steal_pointer (&argv);
+  return TRUE;
+}
+
+static gboolean
+manifest_read_architectures (JsonObject *object,
+                             const char *member_name,
+                             GArray *architectures,
+                             GError **error)
+{
+  JsonNode *member;
+  JsonArray *array;
+  size_t len = 0;
+
+  member = json_object_get_member (object, member_name);
+
+  if (member == NULL)
+    return TRUE;
+
+  if (!JSON_NODE_HOLDS_ARRAY (member))
+    return glnx_throw (error, "%s must be an array", member_name);
+
+  array = json_node_get_array (member);
+  len = json_array_get_length (array);
+
+  for (size_t i = 0; i < len; i++)
+    {
+      JsonNode *element = json_array_get_element (array, i);
+      const char *s;
+      GQuark arch;
+
+      s = json_node_get_string (element);
+
+      if (s == NULL)
+        return glnx_throw (error, "Elements of %s array must be strings",
+                           member_name);
+
+      arch = _srt_architecture_guess_from_user_input (s, NULL, error);
+
+      if (arch == SRT_ARCHITECTURE_QUARK_NONE)
+        return FALSE;
+
+      g_array_append_vals (architectures, &arch, 1);
+    }
+
+  return TRUE;
+}
+
+static gboolean
+manifest_read_strv (JsonObject *object,
+                    const char *member_name,
+                    GStrv *strv_out,
+                    GError **error)
+{
+  g_auto(GStrv) strv = NULL;
+  JsonNode *member;
+
+  member = json_object_get_member (object, member_name);
+
+  if (member == NULL)
+    return TRUE;
+
+  if (JSON_NODE_HOLDS_ARRAY (member))
+    {
+      JsonArray *array = json_node_get_array (member);
+      size_t len = json_array_get_length (array);
+
+      strv = g_new0 (char *, len + 1);
+
+      for (size_t i = 0; i < len; i++)
+        {
+          JsonNode *element = json_array_get_element (array, i);
+          const char *s = json_node_get_string (element);
+
+          if (s == NULL)
+            return glnx_throw (error, "Elements of %s array must be strings",
+                               member_name);
+
+          strv[i] = g_strdup (s);
+        }
+
+      strv[len] = NULL;
+    }
+  else
+    {
+      return glnx_throw (error, "%s must be an array if present", member_name);
+    }
+
+  *strv_out = g_steal_pointer (&strv);
+  return TRUE;
+}
+
 SrtEmulator *
 _srt_emulator_new_from_manifest (const char *path,
                                  GError **error)
@@ -21,13 +198,10 @@ _srt_emulator_new_from_manifest (const char *path,
   g_auto(GStrv) argv = NULL;
   g_auto(GStrv) required_libraries = NULL;
   g_autofree char *real_manifest = NULL;
-  size_t len = 0;
-  JsonArray *array;
   JsonNode *member;
   JsonNode *root;
   JsonObject *object;
   JsonObject *root_object;
-  const char *s;
 
   real_manifest = realpath (path, NULL);
 
@@ -50,166 +224,33 @@ _srt_emulator_new_from_manifest (const char *path,
     return glnx_null_throw (error, "emulator_v0 member is missing or not an object");
 
   object = json_node_get_object (member);
-  member = json_object_get_member (object, "argv");
 
-  if (member == NULL)
-    {
-      return glnx_null_throw (error, "argv must be an array or a string");
-    }
-  else if (JSON_NODE_HOLDS_ARRAY (member))
-    {
-      array = json_node_get_array (member);
-      len = json_array_get_length (array);
-      argv = g_new0 (char *, len + 1);
+  if (!manifest_read_argv (object, "argv", real_manifest, &argv, error))
+    return NULL;
 
-      for (size_t i = 0; i < len; i++)
-        {
-          JsonNode *element = json_array_get_element (array, i);
+  if (argv == NULL)
+    return glnx_null_throw (error, "Does not declare argv");
 
-          s = json_node_get_string (element);
+  g_assert (argv[0] != NULL);
 
-          if (s == NULL)
-            return glnx_null_throw (error, "Elements of argv array must be strings");
-
-          argv[i] = g_strdup (s);
-        }
-
-      argv[len] = NULL;
-    }
-  else if (JSON_NODE_HOLDS_VALUE (member))
-    {
-      s = json_node_get_string (member);
-
-      if (s == NULL)
-        return glnx_null_throw (error, "argv must be an array or a string");
-
-      if (!g_shell_parse_argv (s, NULL, &argv, error))
-        return NULL;
-    }
-  else
-    {
-      return glnx_null_throw (error, "argv must be an array or a string");
-    }
-
-  if (argv == NULL || argv[0] == NULL)
-    return glnx_null_throw (error, "Does not declare argv[0]");
-
-  /* TODO: Should "argv": ["myexe"] mean ./myexe or search PATH for myexe?
-   * For now we just don't allow it, and we can give it one of those
-   * meanings later, if desired */
-  if (strchr (argv[0], '/') == NULL)
-    return glnx_null_throw (error,
-                            "Executable \"%s\" must contain a slash (use ./exe if necessary)",
-                            argv[0]);
-
-  if (!g_path_is_absolute (argv[0]))
-    {
-      g_autofree char *real_dir = g_path_get_dirname (real_manifest);
-      g_autofree char *argv0 = g_steal_pointer (&argv[0]);
-      const char *exe = argv0;
-
-      if (g_str_has_prefix (exe, "./"))
-        exe += 2;
-
-      while (exe[0] == '/')
-        exe++;
-
-      argv[0] = g_build_filename (real_dir, exe, NULL);
-    }
-
-  member = json_object_get_member (object, "emulated_architectures");
-
-  if (member == NULL || !JSON_NODE_HOLDS_ARRAY (member))
-    return glnx_null_throw (error, "emulated_architectures must be an array");
-
-  array = json_node_get_array (member);
-  len = json_array_get_length (array);
-
-  for (size_t i = 0; i < len; i++)
-    {
-      JsonNode *element = json_array_get_element (array, i);
-      GQuark arch;
-
-      s = json_node_get_string (element);
-
-      if (s == NULL)
-        return glnx_null_throw (error, "Elements of emulated_architectures array must be strings");
-
-      arch = _srt_architecture_guess_from_user_input (s, NULL, error);
-
-      if (arch == SRT_ARCHITECTURE_QUARK_NONE)
-        return NULL;
-
-      g_array_append_vals (emulated_architectures, &arch, 1);
-    }
+  if (!manifest_read_architectures (object, "emulated_architectures",
+                                    emulated_architectures, error))
+    return NULL;
 
   if (emulated_architectures->len == 0)
     return glnx_null_throw (error, "Does not declare support for any architectures");
 
-  member = json_object_get_member (object, "required_libraries");
+  /* Possibly NULL or empty, that's OK */
+  if (!manifest_read_strv (object, "required_libraries",
+                           &required_libraries, error))
+    return NULL;
 
-  if (member == NULL)
-    {
-      /* OK: presumably the emulator is statically-linked */
-    }
-  else if (JSON_NODE_HOLDS_ARRAY (member))
-    {
-      array = json_node_get_array (member);
-      len = json_array_get_length (array);
-      required_libraries = g_new0 (char *, len + 1);
-
-      for (size_t i = 0; i < len; i++)
-        {
-          JsonNode *element = json_array_get_element (array, i);
-
-          s = json_node_get_string (element);
-
-          if (s == NULL)
-            return glnx_null_throw (error, "Elements of required_libraries array must be strings");
-
-          required_libraries[i] = g_strdup (s);
-        }
-
-      required_libraries[len] = NULL;
-    }
-  else
-    {
-      return glnx_null_throw (error, "required_libraries must be an array if present");
-    }
-
-  member = json_object_get_member (object, "required_architectures");
-
-  if (member == NULL)
-    {
-      /* OK: presumably the emulator is statically-linked */
-    }
-  else if (JSON_NODE_HOLDS_ARRAY (member))
-    {
-      array = json_node_get_array (member);
-      len = json_array_get_length (array);
-
-      for (size_t i = 0; i < len; i++)
-        {
-          JsonNode *element = json_array_get_element (array, i);
-          GQuark arch;
-
-          s = json_node_get_string (element);
-
-          if (s == NULL)
-            return glnx_null_throw (error, "Elements of required_architectures array must be strings");
-
-          arch = _srt_architecture_guess_from_user_input (s, NULL, error);
-
-          if (arch == SRT_ARCHITECTURE_QUARK_NONE)
-            return NULL;
-
-          g_array_append_vals (required_architectures, &arch, 1);
-        }
-    }
-  else
-    {
-      return glnx_null_throw (error, "required_architectures must be an array if present");
-    }
+  /* Unlike emulated_architectures, it's OK if this array is missing
+   * or empty, in which case we assume the emulator is statically linked
+   * and doesn't need any glibc support */
+  if (!manifest_read_architectures (object, "required_architectures",
+                                    required_architectures, error))
+    return NULL;
 
   return _srt_emulator_new (_srt_const_strv (argv),
                             emulated_architectures,

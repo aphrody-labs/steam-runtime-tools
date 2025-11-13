@@ -1190,7 +1190,8 @@ srt_system_info_can_run (SrtSystemInfo *self,
 
   if (abi->can_run == TRI_MAYBE)
     {
-      if (_srt_architecture_can_run (self->runner, arch_quark))
+      if (_srt_architecture_can_run (self->runner, arch_quark,
+                                     abi->known_architecture))
         abi->can_run = TRI_YES;
       else
         abi->can_run = TRI_NO;
@@ -1763,6 +1764,7 @@ srt_system_info_check_libraries (SrtSystemInfo *self,
               abi->cached_combined_issues |= _srt_check_library_presence (self->runner,
                                                                           soname,
                                                                           arch_quark,
+                                                                          abi->known_architecture,
                                                                           symbols_file,
                                                                           (const gchar * const *)hidden_deps,
                                                                           self->check_flags,
@@ -1910,6 +1912,7 @@ srt_system_info_check_library (SrtSystemInfo *self,
                   issues = _srt_check_library_presence (self->runner,
                                                         soname_found,
                                                         arch_quark,
+                                                        abi->known_architecture,
                                                         symbols_file,
                                                         (const gchar * const *)hidden_deps,
                                                         self->check_flags,
@@ -1936,6 +1939,7 @@ srt_system_info_check_library (SrtSystemInfo *self,
   issues = _srt_check_library_presence (self->runner,
                                         requested_name,
                                         arch_quark,
+                                        abi->known_architecture,
                                         NULL,
                                         NULL,
                                         self->check_flags,
@@ -3834,6 +3838,7 @@ _srt_system_info_list_graphics_modules (SrtSystemInfo *self,
       abi->graphics_modules[which].modules = _srt_list_graphics_modules (self->sysroot,
                                                                          self->runner,
                                                                          arch_quark,
+                                                                         abi->known_architecture,
                                                                          self->check_flags,
                                                                          which);
       abi->graphics_modules[which].available = TRUE;
@@ -4926,6 +4931,7 @@ srt_system_info_dup_libdl_lib (SrtSystemInfo *self,
 
   abi->libdl_lib = _srt_libdl_detect_lib (self->runner,
                                           arch_quark,
+                                          abi->known_architecture,
                                           &abi->libdl_lib_error);
 
   if (abi->libdl_lib_error != NULL && error != NULL)
@@ -4999,6 +5005,7 @@ srt_system_info_dup_libdl_platform (SrtSystemInfo *self,
 
   abi->libdl_platform = _srt_libdl_detect_platform (self->runner,
                                                     arch_quark,
+                                                    abi->known_architecture,
                                                     &abi->libdl_platform_error);
 
   if (abi->libdl_platform_error != NULL && error != NULL)

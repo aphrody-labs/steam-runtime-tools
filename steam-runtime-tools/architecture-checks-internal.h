@@ -11,4 +11,5 @@
 #include "steam-runtime-tools/subprocess-internal.h"
 
 G_GNUC_INTERNAL gboolean _srt_architecture_can_run (SrtSubprocessRunner *runner,
-                                                    GQuark arch_quark);
+                                                    GQuark arch_quark,
+                                                    const SrtKnownArchitecture *known_arch);

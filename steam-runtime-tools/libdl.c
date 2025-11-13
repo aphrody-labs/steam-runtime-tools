@@ -33,6 +33,7 @@
 static gchar *
 _srt_libdl_run_helper (SrtSubprocessRunner *runner,
                        GQuark arch_quark,
+                       const SrtKnownArchitecture *known_arch,
                        const char *helper_name,
                        GError **error)
 {
@@ -49,7 +50,9 @@ _srt_libdl_run_helper (SrtSubprocessRunner *runner,
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
   g_return_val_if_fail (_srt_check_not_setuid (), NULL);
 
-  argv = _srt_subprocess_runner_get_helper (runner, g_quark_to_string (arch_quark),
+  argv = _srt_subprocess_runner_get_helper (runner,
+                                            g_quark_to_string (arch_quark),
+                                            known_arch,
                                             helper_name, helper_flags,
                                             error);
 
@@ -87,10 +90,12 @@ _srt_libdl_run_helper (SrtSubprocessRunner *runner,
 gchar *
 _srt_libdl_detect_platform (SrtSubprocessRunner *runner,
                             GQuark arch_quark,
+                            const SrtKnownArchitecture *known_arch,
                             GError **error)
 {
   return _srt_libdl_run_helper (runner,
                                 arch_quark,
+                                known_arch,
                                 "detect-platform",
                                 error);
 }
@@ -98,10 +103,12 @@ _srt_libdl_detect_platform (SrtSubprocessRunner *runner,
 gchar *
 _srt_libdl_detect_lib (SrtSubprocessRunner *runner,
                        GQuark arch_quark,
+                       const SrtKnownArchitecture *known_arch,
                        GError **error)
 {
   return _srt_libdl_run_helper (runner,
                                 arch_quark,
+                                known_arch,
                                 "detect-lib",
                                 error);
 }

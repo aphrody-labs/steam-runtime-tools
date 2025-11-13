@@ -1198,13 +1198,24 @@ _srt_subprocess_runner_get_working_directory (SrtSubprocessRunner *self)
  * @runner: The execution environment
  * @multiarch: (nullable): A multiarch tuple like %SRT_ABI_I386 to prefix
  *  to the executable name, or %NULL
+ * @known_arch: (nullable): Details of @multiarch if it is a known
+ *  architecture
  * @base: (not nullable): Base name of the executable
  * @flags: Flags affecting how we set up the helper
  * @error: Used to raise an error if %NULL is returned
  *
- * Find a helper executable. We return an array of arguments so that the
+ * Find a helper executable.
+ *
+ * We return an array of arguments so that the
  * helper can be wrapped by an "adverb" like `env`, `timeout` or a
  * specific `ld.so` implementation if required.
+ *
+ * If @multiarch is non-%NULL, @known_arch must either be %NULL
+ * or the same architecture.
+ * If @multiarch is %NULL, @known_arch must be %NULL too.
+ * It is only necessary to provide a non-%NULL @known_arch if the @flags
+ * include %SRT_HELPER_FLAGS_WORKS_IN_SYSROOT and/or
+ * %SRT_HELPER_FLAGS_SYSROOT_AWARE.
  *
  * Returns: (nullable) (element-type filename) (transfer container): The
  *  initial `argv` for the helper, with g_free() set as the free-function, and
@@ -1213,6 +1224,7 @@ _srt_subprocess_runner_get_working_directory (SrtSubprocessRunner *self)
 GPtrArray *
 _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
                                    const char *multiarch,
+                                   const SrtKnownArchitecture *known_arch,
                                    const char *base,
                                    SrtHelperFlags flags,
                                    GError **error)
@@ -1225,6 +1237,9 @@ _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
 
   g_return_val_if_fail (_srt_check_not_setuid (), NULL);
   g_return_val_if_fail (base != NULL, NULL);
+  g_return_val_if_fail (known_arch == NULL || multiarch != NULL, NULL);
+  g_return_val_if_fail (known_arch == NULL
+                        || g_str_equal (known_arch->multiarch_tuple, multiarch), NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
   argv = g_ptr_array_new_with_free_func (g_free);

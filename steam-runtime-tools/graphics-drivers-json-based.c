@@ -547,8 +547,14 @@ _get_library_canonical_path (SrtSubprocessRunner *runner,
                              GQuark arch_quark,
                              const gchar *library_path)
 {
+  const SrtKnownArchitecture *known_arch;
   g_autoptr(SrtLibrary) library = NULL;
-  _srt_check_library_presence (runner, library_path, arch_quark, NULL,
+
+  known_arch = _srt_architecture_get_by_tuple (g_quark_to_string (arch_quark));
+  _srt_check_library_presence (runner, library_path,
+                               arch_quark,
+                               known_arch,
+                               NULL,
                                NULL, SRT_CHECK_FLAGS_SKIP_SLOW_CHECKS,
                                SRT_LIBRARY_SYMBOLS_FORMAT_PLAIN, &library);
 

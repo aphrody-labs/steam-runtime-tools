@@ -589,6 +589,7 @@ generate_locales (SrtSubprocessRunner *runner,
 
   pvlg = _srt_subprocess_runner_get_helper (runner,
                                             NULL,   /* no tuple - it's a script */
+                                            NULL,
                                             "pv-locale-gen",
                                             SRT_HELPER_FLAGS_NONE,
                                             error);

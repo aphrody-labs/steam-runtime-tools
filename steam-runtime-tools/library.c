@@ -667,6 +667,7 @@ srt_check_library_presence (const char *requested_name,
 
   return _srt_check_library_presence (runner, requested_name,
                                       g_quark_from_string (multiarch),
+                                      _srt_architecture_get_by_tuple (multiarch),
                                       symbols_path, NULL, SRT_CHECK_FLAGS_NONE,
                                       symbols_format, more_details_out);
 }
@@ -970,6 +971,7 @@ SrtLibraryIssues
 _srt_check_library_presence (SrtSubprocessRunner *runner,
                              const char *requested_name,
                              GQuark arch_quark,
+                             const SrtKnownArchitecture *known_arch,
                              const char *symbols_path,
                              const char * const *hidden_deps,
                              SrtCheckFlags check_flags,
@@ -998,7 +1000,9 @@ _srt_check_library_presence (SrtSubprocessRunner *runner,
     issues |= SRT_LIBRARY_ISSUES_UNKNOWN_EXPECTATIONS;
 
   multiarch = g_quark_to_string (arch_quark);
-  argv = _srt_subprocess_runner_get_helper (runner, multiarch,
+  argv = _srt_subprocess_runner_get_helper (runner,
+                                            multiarch,
+                                            known_arch,
                                             "inspect-library", inspect_lib_flags,
                                             &error);
 
@@ -1043,7 +1047,9 @@ _srt_check_library_presence (SrtSubprocessRunner *runner,
     }
 
   library_absolute_path = srt_library_get_absolute_path (details);
-  argv_libelf = _srt_subprocess_runner_get_helper (runner, multiarch,
+  argv_libelf = _srt_subprocess_runner_get_helper (runner,
+                                                   multiarch,
+                                                   known_arch,
                                                    "inspect-library-libelf",
                                                    inspect_lib_flags,
                                                    &error);

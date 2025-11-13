@@ -1053,7 +1053,9 @@ _argv_for_graphics_test (SrtSubprocessRunner *runner,
     {
       case SRT_RENDERING_INTERFACE_GL:
       case SRT_RENDERING_INTERFACE_GLESV2:
-        argv = _srt_subprocess_runner_get_helper (runner, multiarch_tuple,
+        argv = _srt_subprocess_runner_get_helper (runner,
+                                                  multiarch_tuple,
+                                                  NULL,
                                                   "wflinfo", flags,
                                                   error);
 
@@ -1071,7 +1073,9 @@ _argv_for_graphics_test (SrtSubprocessRunner *runner,
         break;
 
       case SRT_RENDERING_INTERFACE_VULKAN:
-        argv = _srt_subprocess_runner_get_helper (runner, multiarch_tuple,
+        argv = _srt_subprocess_runner_get_helper (runner,
+                                                  multiarch_tuple,
+                                                  NULL,
                                                   "check-vulkan", flags,
                                                   error);
 
@@ -1081,7 +1085,9 @@ _argv_for_graphics_test (SrtSubprocessRunner *runner,
         break;
 
       case SRT_RENDERING_INTERFACE_VDPAU:
-        argv = _srt_subprocess_runner_get_helper (runner, multiarch_tuple,
+        argv = _srt_subprocess_runner_get_helper (runner,
+                                                  multiarch_tuple,
+                                                  NULL,
                                                   "check-vdpau", flags,
                                                   error);
 
@@ -1092,7 +1098,9 @@ _argv_for_graphics_test (SrtSubprocessRunner *runner,
         break;
 
       case SRT_RENDERING_INTERFACE_VAAPI:
-        argv = _srt_subprocess_runner_get_helper (runner, multiarch_tuple,
+        argv = _srt_subprocess_runner_get_helper (runner,
+                                                  multiarch_tuple,
+                                                  NULL,
                                                   "check-va-api", flags,
                                                   error);
 
@@ -1122,7 +1130,9 @@ _argv_for_check_gl (SrtSubprocessRunner *runner,
 {
   GPtrArray *argv;
 
-  argv = _srt_subprocess_runner_get_helper (runner, multiarch_tuple,
+  argv = _srt_subprocess_runner_get_helper (runner,
+                                            multiarch_tuple,
+                                            NULL,
                                             "check-gl", flags,
                                             error);
 
@@ -1199,7 +1209,9 @@ _srt_check_library_vendor (SrtSubprocessRunner *runner,
 
   /* We assume libGL and libEGL have no hidden dependencies: if they did,
    * games that dlopen them would have a problem. */
-  issues = _srt_check_library_presence (runner, soname, arch_quark,
+  issues = _srt_check_library_presence (runner, soname,
+                                        arch_quark,
+                                        NULL,
                                         NULL,   /* no symbols file */
                                         NULL,   /* no hidden dependencies */
                                         SRT_CHECK_FLAGS_NONE,
@@ -1409,7 +1421,8 @@ _srt_check_graphics (SrtSubprocessRunner *runner,
       goto out;
     }
 
-  library_vendor = _srt_check_library_vendor (runner, arch_quark,
+  library_vendor = _srt_check_library_vendor (runner,
+                                              arch_quark,
                                               window_system,
                                               rendering_interface);
 

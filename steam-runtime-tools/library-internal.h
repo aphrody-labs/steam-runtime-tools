@@ -108,6 +108,7 @@ G_GNUC_INTERNAL
 SrtLibraryIssues _srt_check_library_presence (SrtSubprocessRunner *runner,
                                               const char *requested_name,
                                               GQuark arch_quark,
+                                              const SrtKnownArchitecture *known_arch,
                                               const char *symbols_path,
                                               const char * const *hidden_deps,
                                               SrtCheckFlags check_flags,

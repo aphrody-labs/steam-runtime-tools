@@ -9,6 +9,7 @@
 #include <steam-runtime-tools/macros.h>
 #include <steam-runtime-tools/glib-backports-internal.h>
 
+#include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/emulator-internal.h"
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
 #include "steam-runtime-tools/system-info.h"
@@ -129,6 +130,7 @@ const char *_srt_subprocess_runner_resolve_helpers_path (SrtSubprocessRunner *se
                                                          GError **error);
 GPtrArray *_srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
                                               const char *multiarch,
+                                              const SrtKnownArchitecture *known_arch,
                                               const char *base,
                                               SrtHelperFlags flags,
                                               GError **error);

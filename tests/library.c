@@ -479,7 +479,9 @@ test_libraries (Fixture *f,
           g_assert_true (result);
         }
 
-      issues = _srt_check_library_presence (runner, library_name, arch_quark,
+      issues = _srt_check_library_presence (runner, library_name,
+                                            arch_quark,
+                                            NULL,
                                             test->expected_symbols == NULL ? NULL : tmp_file,
                                             NULL, SRT_CHECK_FLAGS_SKIP_SLOW_CHECKS,
                                             test->format,

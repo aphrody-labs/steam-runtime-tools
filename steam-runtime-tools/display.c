@@ -331,6 +331,7 @@ _srt_check_display (SrtSubprocessRunner *runner,
 
   argv = _srt_subprocess_runner_get_helper (runner,
                                             g_quark_to_string (arch_quark),
+                                            NULL,
                                             "is-x-server-xwayland",
                                             helper_flags, &local_error);
 

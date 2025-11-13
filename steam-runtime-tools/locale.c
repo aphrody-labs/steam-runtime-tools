@@ -224,7 +224,9 @@ _srt_check_locale (SrtSubprocessRunner *runner,
   g_return_val_if_fail (requested_name != NULL, NULL);
   g_return_val_if_fail (_srt_check_not_setuid (), NULL);
 
-  argv = _srt_subprocess_runner_get_helper (runner, g_quark_to_string (arch_quark),
+  argv = _srt_subprocess_runner_get_helper (runner,
+                                            g_quark_to_string (arch_quark),
+                                            NULL,
                                             "check-locale", helper_flags,
                                             error);
 

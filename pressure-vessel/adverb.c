@@ -976,6 +976,7 @@ main (int argc,
                                             global_envp,
                                             bindir,
                                             pkglibexecdir,
+                                            NULL,   /* no sysroot */
                                             SRT_TEST_FLAGS_NONE,
                                             NULL);  /* cwd */
 

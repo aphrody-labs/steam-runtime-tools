@@ -298,13 +298,14 @@ main (int argc,
   subproc_environ = g_environ_unsetenv (subproc_environ, "LD_AUDIT");
   subproc_environ = g_environ_unsetenv (subproc_environ, "LD_PRELOAD");
 
+  sysroot = _srt_sysroot_new_direct (&error);
   runner = _srt_subprocess_runner_new_full (NULL,   /* no emulator */
                                             _srt_const_strv (subproc_environ),
                                             NULL,
                                             NULL,
+                                            sysroot,
                                             SRT_TEST_FLAGS_NONE,
                                             NULL);    /* cwd */
-  sysroot = _srt_sysroot_new_direct (&error);
 
   if (sysroot == NULL)
     {

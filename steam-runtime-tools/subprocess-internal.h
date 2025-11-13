@@ -10,6 +10,7 @@
 #include <steam-runtime-tools/glib-backports-internal.h>
 
 #include "steam-runtime-tools/emulator-internal.h"
+#include "steam-runtime-tools/resolve-in-sysroot-internal.h"
 #include "steam-runtime-tools/system-info.h"
 
 typedef struct _SrtCompletedSubprocess SrtCompletedSubprocess;
@@ -63,6 +64,7 @@ _srt_subprocess_runner_new_full (SrtEmulator *emulator,
                                  const char * const *envp,
                                  const char *bin_path,
                                  const char *helpers_path,
+                                 SrtSysroot *sysroot,
                                  SrtTestFlags flags,
                                  const char *working_directory)
 {
@@ -71,6 +73,7 @@ _srt_subprocess_runner_new_full (SrtEmulator *emulator,
                        "environ", envp,
                        "bin-path", bin_path,
                        "helpers-path", helpers_path,
+                       "sysroot", sysroot,
                        "test-flags", flags,
                        "working-directory", working_directory,
                        NULL);
@@ -80,6 +83,8 @@ SrtSubprocessRunner *_srt_subprocess_runner_new_swap_envp (SrtSubprocessRunner *
                                                            const char * const *envp);
 SrtSubprocessRunner *_srt_subprocess_runner_new_swap_helpers_path (SrtSubprocessRunner *self,
                                                                    const char *path);
+SrtSubprocessRunner *_srt_subprocess_runner_new_swap_sysroot (SrtSubprocessRunner *self,
+                                                              SrtSysroot *sysroot);
 SrtSubprocessRunner *_srt_subprocess_runner_new_swap_test_flags (SrtSubprocessRunner *self,
                                                                  SrtTestFlags flags);
 SrtSubprocessRunner *_srt_subprocess_runner_new_swap_working_directory (SrtSubprocessRunner *self,
@@ -92,6 +97,7 @@ const char * const *_srt_subprocess_runner_get_environ (SrtSubprocessRunner *sel
 const char *_srt_subprocess_runner_getenv (SrtSubprocessRunner *self, const char *var);
 const char *_srt_subprocess_runner_get_bin_path (SrtSubprocessRunner *self);
 const char *_srt_subprocess_runner_get_helpers_path (SrtSubprocessRunner *self);
+SrtSysroot *_srt_subprocess_runner_get_sysroot (SrtSubprocessRunner *self);
 SrtTestFlags _srt_subprocess_runner_get_test_flags (SrtSubprocessRunner *self);
 const char *_srt_subprocess_runner_get_working_directory (SrtSubprocessRunner *self);
 

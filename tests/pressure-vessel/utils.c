@@ -323,6 +323,7 @@ test_run_sync (Fixture *f,
                                             _srt_const_strv (envp),
                                             NULL,   /* ./bin */
                                             NULL,   /* ./libexec/s-r-t-0 */
+                                            NULL,   /* no sysroot */
                                             SRT_TEST_FLAGS_NONE,
                                             NULL);  /* cwd */
   argv[0] = "sh";
@@ -340,6 +341,7 @@ test_run_sync (Fixture *f,
                                             _srt_const_strv (envp),
                                             NULL,   /* ./bin */
                                             NULL,   /* ./libexec/s-r-t-0 */
+                                            NULL,   /* no sysroot */
                                             SRT_TEST_FLAGS_NONE,
                                             NULL);  /* cwd */
   argv[0] = "sh";

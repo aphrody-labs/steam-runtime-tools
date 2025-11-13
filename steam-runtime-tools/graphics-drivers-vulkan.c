@@ -1572,6 +1572,7 @@ _srt_load_vulkan_layers (const char *sysroot,
                                             _srt_const_strv (envp),
                                             NULL,
                                             NULL,
+                                            sysroot_object,
                                             SRT_TEST_FLAGS_NONE,
                                             NULL);    /* cwd */
   return _srt_load_vulkan_layers_extended (sysroot_object, runner, NULL, 0,

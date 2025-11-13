@@ -380,7 +380,8 @@ srt_system_info_init (SrtSystemInfo *self)
   self->abis = g_ptr_array_new_full (2, abi_free);
 
   srt_system_info_set_sysroot (self, "/");
-  self->runner = _srt_subprocess_runner_new ();
+  /* Setting the sysroot creates this as a side-effect */
+  g_return_if_fail (self->runner != NULL);
 }
 
 static void
@@ -2209,8 +2210,12 @@ _srt_system_info_set_subprocess_runner (SrtSystemInfo *self,
   forget_xdg_portal (self);
   g_clear_pointer (&self->cached_driver_environment, g_strfreev);
 
-  old = g_steal_pointer (&self->runner);
-  self->runner = g_object_ref (runner);
+  if (g_set_object (&self->runner, runner))
+    {
+      SrtSysroot *sysroot = _srt_subprocess_runner_get_sysroot (runner);
+
+      g_set_object (&self->sysroot, sysroot);
+    }
 }
 
 /**
@@ -2309,21 +2314,42 @@ void
 _srt_system_info_set_sysroot (SrtSystemInfo *self,
                               SrtSysroot *sysroot)
 {
+  g_autoptr(SrtSubprocessRunner) runner = NULL;
+
   g_return_if_fail (SRT_IS_SYSTEM_INFO (self));
   g_return_if_fail (self->from_report == NULL);
 
-  forget_container_info (self);
-  forget_graphics_modules (self);
-  forget_libraries (self);
-  forget_graphics_results (self);
-  forget_locales (self);
+  if (self->runner != NULL)
+    {
+      if (sysroot != self->sysroot)
+        runner = _srt_subprocess_runner_new_swap_sysroot (self->runner,
+                                                          sysroot);
+    }
+  else
+    {
+      /* during initialization */
+      runner = _srt_subprocess_runner_new_full (NULL,   /* emulator */
+                                                NULL,   /* envp */
+                                                NULL,   /* bin */
+                                                NULL,   /* libexec/s-r-t-0 */
+                                                sysroot,
+                                                SRT_TEST_FLAGS_NONE,
+                                                NULL);  /* cwd */
+    }
+
+  /* This doesn't need to forget information that is also forgotten
+   * by _srt_system_info_set_subprocess_runner() */
   forget_os (self);
   forget_overrides (self);
   g_clear_object (&self->virtualization_info);
-  g_clear_object (&self->sysroot);
 
-  if (sysroot != NULL)
-    self->sysroot = g_object_ref (sysroot);
+  if (runner != NULL)
+    {
+      g_return_if_fail (_srt_subprocess_runner_get_sysroot (runner) == sysroot);
+      _srt_system_info_set_subprocess_runner (self, runner);
+    }
+
+  g_return_if_fail (self->sysroot == sysroot);
 }
 
 static void

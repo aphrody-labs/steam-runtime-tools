@@ -1312,6 +1312,7 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
                                                                   NULL,   /* envp */
                                                                   bindir,
                                                                   pkglibexecdir,
+                                                                  NULL,   /* sysroot */
                                                                   SRT_TEST_FLAGS_NONE,
                                                                   NULL);  /* cwd */
   return TRUE;

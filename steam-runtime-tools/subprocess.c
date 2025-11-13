@@ -782,6 +782,7 @@ struct _SrtSubprocessRunner
   gchar *helpers_path;
   /* Working directory, or %NULL to use current */
   gchar *working_directory;
+  SrtSysroot *sysroot;
   SrtTestFlags test_flags;
   unsigned can_use_waitid : 1;
 };
@@ -800,6 +801,7 @@ enum
   PROP_EMULATOR,
   PROP_ENVIRON,
   PROP_HELPERS_PATH,
+  PROP_SYSROOT,
   PROP_TEST_FLAGS,
   PROP_WORKING_DIRECTORY,
   N_PROPERTIES
@@ -862,6 +864,10 @@ _srt_subprocess_runner_get_property (GObject *object,
         g_value_set_string (value, self->helpers_path);
         break;
 
+      case PROP_SYSROOT:
+        g_value_set_object (value, self->sysroot);
+        break;
+
       case PROP_TEST_FLAGS:
         g_value_set_flags (value, self->test_flags);
         break;
@@ -914,6 +920,12 @@ _srt_subprocess_runner_set_property (GObject *object,
         self->helpers_path = g_value_dup_string (value);
         break;
 
+      case PROP_SYSROOT:
+        /* Construct-only */
+        g_return_if_fail (self->sysroot == NULL);
+        self->sysroot = g_value_dup_object (value);
+        break;
+
       case PROP_TEST_FLAGS:
         /* Construct-only */
         g_return_if_fail (self->test_flags == SRT_TEST_FLAGS_NONE);
@@ -937,6 +949,7 @@ _srt_subprocess_runner_dispose (GObject *object)
   SrtSubprocessRunner *self = SRT_SUBPROCESS_RUNNER (object);
 
   g_clear_object (&self->emulator);
+  g_clear_object (&self->sysroot);
 
   G_OBJECT_CLASS (_srt_subprocess_runner_parent_class)->dispose (object);
 }
@@ -981,6 +994,10 @@ _srt_subprocess_runner_class_init (SrtSubprocessRunnerClass *cls)
     g_param_spec_string ("helpers-path", NULL, NULL, NULL,
                          G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                          G_PARAM_STATIC_STRINGS);
+  properties[PROP_SYSROOT] =
+    g_param_spec_object ("sysroot", NULL, NULL, SRT_TYPE_SYSROOT,
+                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS);
   properties[PROP_TEST_FLAGS] =
     g_param_spec_flags ("test-flags", NULL, NULL,
                         SRT_TYPE_TEST_FLAGS, SRT_TEST_FLAGS_NONE,
@@ -1003,6 +1020,7 @@ _srt_subprocess_runner_new_swap_envp (SrtSubprocessRunner *self,
                                           envp,
                                           self->bin_path,
                                           self->helpers_path,
+                                          self->sysroot,
                                           self->test_flags,
                                           self->working_directory);
 }
@@ -1016,6 +1034,21 @@ _srt_subprocess_runner_new_swap_helpers_path (SrtSubprocessRunner *self,
                                           _srt_const_strv (self->envp),
                                           self->bin_path,
                                           path,
+                                          self->sysroot,
+                                          self->test_flags,
+                                          self->working_directory);
+}
+
+SrtSubprocessRunner *
+_srt_subprocess_runner_new_swap_sysroot (SrtSubprocessRunner *self,
+                                         SrtSysroot *sysroot)
+{
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
+  return _srt_subprocess_runner_new_full (self->emulator,
+                                          _srt_const_strv (self->envp),
+                                          self->bin_path,
+                                          self->helpers_path,
+                                          sysroot,
                                           self->test_flags,
                                           self->working_directory);
 }
@@ -1029,6 +1062,7 @@ _srt_subprocess_runner_new_swap_test_flags (SrtSubprocessRunner *self,
                                           _srt_const_strv (self->envp),
                                           self->bin_path,
                                           self->helpers_path,
+                                          self->sysroot,
                                           flags,
                                           self->working_directory);
 }
@@ -1042,6 +1076,7 @@ _srt_subprocess_runner_new_swap_working_directory (SrtSubprocessRunner *self,
                                           _srt_const_strv (self->envp),
                                           self->bin_path,
                                           self->helpers_path,
+                                          self->sysroot,
                                           self->test_flags,
                                           working_directory);
 }
@@ -1125,6 +1160,17 @@ _srt_subprocess_runner_resolve_helpers_path (SrtSubprocessRunner *self,
 
   g_return_val_if_fail (helpers_path != NULL, NULL);
   return helpers_path;
+}
+
+/*
+ * Returns: (transfer none): A sysroot, or %NULL as shorthand
+ *  for _srt_sysroot_new_direct()
+ */
+SrtSysroot *
+_srt_subprocess_runner_get_sysroot (SrtSubprocessRunner *self)
+{
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
+  return self->sysroot;
 }
 
 /*

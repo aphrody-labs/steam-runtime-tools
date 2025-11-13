@@ -405,6 +405,7 @@ test_flatpak_issues (Fixture *f,
                                                 _srt_const_strv (environ),
                                                 path,
                                                 NULL,
+                                                NULL,     /* no sysroot */
                                                 test_flags,
                                                 NULL);    /* cwd */
       g_assert_nonnull (runner);
@@ -500,6 +501,7 @@ test_bwrap_issues (Fixture *f,
                                                 _srt_const_strv (envp),
                                                 NULL,
                                                 pkglibexecdir,
+                                                NULL,     /* no sysroot */
                                                 SRT_TEST_FLAGS_NONE,
                                                 NULL);    /* cwd */
       actual = _srt_check_bwrap_issues (sysroot, runner, &bwrap, &message);

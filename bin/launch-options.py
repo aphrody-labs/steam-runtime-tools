@@ -169,6 +169,8 @@ class Proton(Component):
             self.runs_on = 'soldier'
         elif '1628350' in content:
             self.runs_on = 'sniper'
+        elif '4183110' in content:
+            self.runs_on = 'steamrt4'
         else:
             self.runs_on = 'scout'
 

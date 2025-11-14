@@ -101,10 +101,6 @@ It can also be installed by running this command:
 
     steam steam://install/1628350
 
-In Steam client betas since January 2024, a private copy of the sniper
-runtime is also installed into `~/.steam/root/ubuntu12_64/steam-runtime-sniper`
-and used to run the Steam client user interface (`steamwebhelper`).
-
 Documentation in the `steamrt` "metapackage" provides
 [more information about sniper](https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/sniper/README.md).
 
@@ -185,6 +181,22 @@ Users can also specifically opt-in to running specific games in the
 Steam Linux Runtime 1.0 (scout) container via *Properties* → *Compatibility*.
 
 [Steam client 2024-11-05]: https://store.steampowered.com/news/collection/steam/?emclan=103582791457287600&emgid=4472730495692571024
+
+## Special-purpose Steam Runtime branches
+
+### <a name="steamrt3c"></a>Steam client runtime 3 (steamrt3c)
+
+[steamrt3c]: #steamrt3c
+
+Steam client runtime 3 (`steamrt3c`) is a miniaturized version of [sniper][],
+used internally by components of the Steam client.
+It is installed in `~/.steam/root/steamrt64/steam-runtime-steamrt`.
+Older versions of the Steam client used sniper for this purpose.
+
+Documentation in the `steamrt` "metapackage" provides
+[more information about steamrt3c](https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/steamrt3c/README.md).
+
+Game developers should use [sniper][] instead.
 
 ## Possible future Steam Runtime branches
 

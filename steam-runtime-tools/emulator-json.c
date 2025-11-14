@@ -33,9 +33,6 @@ manifest_read_argv (JsonObject *object,
       JsonArray *array = json_node_get_array (member);
       size_t len = json_array_get_length (array);
 
-      if (len == 0)
-        return glnx_throw (error, "%s array must not be empty", member_name);
-
       argv = g_new0 (char *, len + 1);
 
       for (size_t i = 0; i < len; i++)

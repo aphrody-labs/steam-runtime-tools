@@ -8,23 +8,31 @@ steam-runtime-tools (0.20251114.0) UNRELEASED; urgency=medium
   * pressure-vessel:
     - If the root filesystem doesn't have glibc for a desired architecture,
       but a non-root-filesystem graphics provider does, use the graphics
-      provider's ld.so(8) and libraries to run capsule-capture-libs.
+      provider's ld.so(8) and libraries to run capsule-capture-libs and
+      similar helper subprocesses.
       This assumes that the graphics provider follows one of the common
       filesystem layouts (in practice either Debian multiarch, Red Hat/FHS
       multilib or Arch multilib).
       (steamrt/tasks#809, steamrt/tasks#828)
     - Use more automatic resource management
     - Refactoring
-    - Documentation fixes
   * Diagnostic tools:
     - Avoid unneeded dependencies on json-glib in tools that don't
       parse JSON, like steam-runtime-check-requirements
+    - When testing a sysroot, use the sysroot's ld.so(8) and libraries
+      to run functional tests, or skip them if they cannot usefully
+      be run in this way.
+      As with the similar pressure-vessel change, this will only work
+      if the sysroot follows one of the common filesystem layouts.
+      (steamrt/tasks#828)
+    - Introduce a new error code for "no information available"
+      when checking locales
   * Library code:
     - Use more automatic resource management
     - Refactoring (steamrt/tasks#828, steamrt/tasks#831)
   * Documentation updates
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 14 Nov 2025 15:16:09 +0000
+ -- Simon McVittie <smcv@collabora.com>  Fri, 14 Nov 2025 16:35:28 +0000
 
 steam-runtime-tools (0.20251103.0) steamrt; urgency=medium
 

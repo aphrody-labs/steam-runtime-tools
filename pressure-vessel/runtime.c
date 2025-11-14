@@ -644,6 +644,10 @@ typedef struct
   const SrtKnownArchitecture *known_arch;
   /* Graphics stack provider to use */
   PvGraphicsProvider *provider;
+  /* Graphics stack provider's SrtSystemInfo for this architecture */
+  SrtSystemInfo *system_info;
+  /* Graphics stack provider's SrtSystemInfo's subprocess runner */
+  SrtSubprocessRunner *runner;
   /* "lib/TUPLE/aliases", so that for example
    * /overrides/${aliases_relative_to_overrides}/libbz2.so.1 might exist
    * inside the final container */
@@ -688,110 +692,14 @@ pv_runtime_get_graphics_provider (PvRuntime *self,
 }
 
 static gboolean
-runtime_architecture_maybe_prefix_ld_so (RuntimeArchitecture *self,
-                                         PvRuntime *runtime,
-                                         GPtrArray *argv,
-                                         GError **error)
-{
-  g_return_val_if_fail (self->provider != NULL, FALSE);
-
-  if (self->known_arch != NULL
-      && self->known_arch->interoperable_runtime_linker != NULL
-      && !g_file_test (self->known_arch->interoperable_runtime_linker,
-                       G_FILE_TEST_IS_EXECUTABLE)
-      && !_srt_sysroot_is_direct (self->provider->in_current_ns))
-    {
-      /* If we don't have the ld.so(8) for the selected architecture
-       * available to us in the current environment, we can run the
-       * ld.so(8) from the selected architecture's graphics stack instead,
-       * telling it to search directories from that graphics stack.
-       *
-       * For example, if the i386 stack is in /opt/i386, we might run:
-       * /opt/i386/lib/ld-linux.so.2 \
-       * --library-path /opt/i386/usr/lib/i386-linux-gnu:... \
-       * /path/to/i386-linux-gnu-capsule-capture-libs ... */
-      g_autoptr(GPtrArray) libdirs = NULL;
-      g_autoptr(GString) lib_path = g_string_new ("");
-      g_autofree char *ld_so = NULL;
-      /* If we had a custom LD_LIBRARY_PATH, we want to preserve that
-       * when calling capsule-capture-libs.
-       * (Keep this in sync with pv_runtime_get_capsule_capture_libs()) */
-      const char *ldlp = g_environ_getenv (runtime->original_environ,
-                                           "LD_LIBRARY_PATH");
-
-      if (ldlp != NULL)
-        {
-          g_auto(GStrv) entries = g_strsplit_set (ldlp, ":;", 0);
-
-          for (size_t i = 0; entries != NULL && entries[i] != NULL; i++)
-            {
-              const char *path = entries[i];
-              g_autofree char *canonicalized = NULL;
-              g_autofree char *prefixed = NULL;
-
-              if (path[0] == '\0')
-                path = ".";
-
-              /* e.g. this might be /home/me/.steam/steam/ubuntu12_32
-               * or /usr/lib/sdl2-compat */
-              canonicalized = flatpak_canonicalize_filename (path);
-              /* e.g. this might be /opt/i386/home/me/.steam/steam/ubuntu12_32
-               * or /opt/i386/usr/lib/sdl2-compat */
-              prefixed = g_build_filename (self->provider->in_current_ns->path,
-                                           canonicalized,
-                                           NULL);
-              /* We don't know whether entries in LD_LIBRARY_PATH are
-               * meant to be in the graphics stack provider or in the
-               * current execution environment, so try both */
-              _srt_search_path_append (lib_path, prefixed);
-              _srt_search_path_append (lib_path, canonicalized);
-            }
-        }
-
-      libdirs = _srt_known_architecture_get_libdirs (self->tuple,
-                                                     self->known_arch,
-                                                     SRT_LIBDIRS_FLAGS_NONE);
-
-      for (size_t i = 0; i < libdirs->len; i++)
-        {
-          /* e.g. /usr/lib32 */
-          const char *path = g_ptr_array_index (libdirs, i);
-          g_autofree char *prefixed = NULL;
-
-          g_warn_if_fail (g_path_is_absolute (path));
-
-          /* e.g. /opt/i386/usr/lib32 */
-          prefixed = g_build_filename (self->provider->in_current_ns->path,
-                                       path,
-                                       NULL);
-          _srt_search_path_append (lib_path, prefixed);
-        }
-
-      /* e.g. /opt/i386/lib/ld-linux.so.2 */
-      ld_so = g_build_filename (self->provider->in_current_ns->path,
-                                self->known_arch->interoperable_runtime_linker,
-                                NULL);
-
-      g_ptr_array_insert (argv, 0, g_steal_pointer (&ld_so));
-      g_ptr_array_insert (argv, 1, g_strdup ("--library-path"));
-      g_ptr_array_insert (argv, 2,
-                          g_string_free_and_steal (g_steal_pointer (&lib_path)));
-      /* We have to hope that the next argument does not start with "-"
-       * (in practice it's an absolute path, so this is fine) because
-       * older versions of ld.so, such as the one in glibc 2.31
-       * (Debian 11 and sniper), don't support the "--" pseudo-argument. */
-    }
-
-  return TRUE;
-}
-
-static gboolean
 runtime_architecture_init (RuntimeArchitecture *self,
                            PvRuntime *runtime,
                            GQuark tuple,
                            GError **error)
 {
   g_autoptr(GPtrArray) argv = NULL;
+  SrtSystemInfo *arch_system_info;
+  SrtSubprocessRunner *runner;
   PvGraphicsProvider *provider;
 
   g_return_val_if_fail (tuple != SRT_ARCHITECTURE_QUARK_NONE, FALSE);
@@ -805,22 +713,23 @@ runtime_architecture_init (RuntimeArchitecture *self,
   g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (provider), FALSE);
   self->provider = g_object_ref (provider);
 
+  arch_system_info = pv_graphics_provider_get_system_info (self->provider,
+                                                           self->tuple_quark);
+  self->system_info = g_object_ref (arch_system_info);
+  runner = _srt_system_info_get_subprocess_runner (arch_system_info);
+  self->runner = g_object_ref (runner);
+
   /* Could be %NULL, so be careful when dereferencing */
   self->known_arch = _srt_architecture_get_by_tuple (self->tuple);
 
-  self->capsule_capture_libs = _srt_subprocess_runner_get_helper (runtime->run_in_current_context,
+  self->capsule_capture_libs = _srt_subprocess_runner_get_helper (runner,
                                                                   self->tuple,
+                                                                  self->known_arch,
                                                                   "capsule-capture-libs",
-                                                                  SRT_HELPER_FLAGS_NONE,
+                                                                  SRT_HELPER_FLAGS_SYSROOT_AWARE,
                                                                   error);
 
   if (self->capsule_capture_libs == NULL)
-    return FALSE;
-
-  if (!runtime_architecture_maybe_prefix_ld_so (self,
-                                                runtime,
-                                                self->capsule_capture_libs,
-                                                error))
     return FALSE;
 
   self->libdir_relative_to_overrides = g_strdup_printf ("lib/%s",
@@ -843,7 +752,7 @@ runtime_architecture_init (RuntimeArchitecture *self,
    * for this architecture on the current environment. We
    * assume that this is the same as whether we can run them
    * on the host, if different. */
-  pv_run_sync (runtime->run_in_current_context, tuple,
+  pv_run_sync (runner, tuple,
                (const char * const *) argv->pdata,
                NULL, &self->ld_so, error);
 
@@ -875,6 +784,8 @@ runtime_architecture_clear (RuntimeArchitecture *self)
   self->tuple = NULL;
   self->tuple_quark = SRT_ARCHITECTURE_QUARK_NONE;
   g_clear_object (&self->provider);
+  g_clear_object (&self->system_info);
+  g_clear_object (&self->runner);
   g_clear_pointer (&self->capsule_capture_libs, g_ptr_array_unref);
   g_clear_pointer (&self->libdir_relative_to_overrides, g_free);
   g_clear_pointer (&self->libdir_in_container, g_free);
@@ -5648,9 +5559,9 @@ pv_runtime_get_ld_so (PvRuntime *self,
                               NULL);
       flatpak_bwrap_finish (temp_bwrap);
 
-      /* We can't use self->run_in_current_context directly, because we
+      /* We can't use arch->runner directly, because we
        * altered the PATH above */
-      runner = _srt_subprocess_runner_new_swap_envp (self->run_in_current_context,
+      runner = _srt_subprocess_runner_new_swap_envp (arch->runner,
                                                      _srt_const_strv (temp_bwrap->envp));
       /* Assume bwrap can be run without a special emulator (native
        * executable or transparent emulation) */
@@ -6034,7 +5945,6 @@ out:
  * pv_runtime_collect_libc_family:
  * @self: The runtime
  * @arch: Architecture of @libc_symlink
- * @system_info: A #SrtSystemInfo
  * @bwrap:
  * @libc_symlink: The symlink created by capsule-capture-libs,
  *  relative to /overrides.
@@ -6048,7 +5958,6 @@ out:
 static gboolean
 pv_runtime_collect_libc_family (PvRuntime *self,
                                 RuntimeArchitecture *arch,
-                                SrtSystemInfo *system_info,
                                 FlatpakBwrap *bwrap,
                                 const char *libc_symlink,
                                 const char *ld_so_in_runtime,
@@ -6069,7 +5978,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
                                             bwrap, error))
     return FALSE;
 
-  libdl_lib = srt_system_info_dup_libdl_lib (system_info,
+  libdl_lib = srt_system_info_dup_libdl_lib (arch->system_info,
                                              arch->tuple,
                                              &local_error);
 
@@ -6517,7 +6426,6 @@ collect_mesa_drirc (PvRuntime *self,
                     RuntimeArchitecture *arch,
                     GPtrArray *egl_icd_details,
                     GPtrArray *vulkan_icd_details,
-                    SrtSystemInfo *arch_system_info,
                     PvRuntimeLibraryData *drirc_data_in_provider)
 {
   g_autoptr(SrtObjectList) dri_drivers = NULL;
@@ -6573,7 +6481,7 @@ collect_mesa_drirc (PvRuntime *self,
   /* We assume that by the time we get here, this is already cached,
    * so its time cost will be trivial and therefore there's no need to
    * do additional profiling */
-  dri_drivers = srt_system_info_list_dri_drivers (arch_system_info,
+  dri_drivers = srt_system_info_list_dri_drivers (arch->system_info,
                                                   arch->tuple,
                                                   SRT_DRIVER_FLAGS_NONE);
 
@@ -7274,7 +7182,6 @@ pv_runtime_create_aliases (PvRuntime *self,
  */
 static gboolean
 collect_vdpau_drivers (PvRuntime *self,
-                       SrtSystemInfo *system_info,
                        RuntimeArchitecture *arch,
                        GPtrArray *patterns,
                        GError **error)
@@ -7292,7 +7199,7 @@ collect_vdpau_drivers (PvRuntime *self,
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) enum_timer =
         _srt_profiling_start ("Enumerating VDPAU drivers");
 
-      vdpau_drivers = srt_system_info_list_vdpau_drivers (system_info,
+      vdpau_drivers = srt_system_info_list_vdpau_drivers (arch->system_info,
                                                           arch->tuple,
                                                           SRT_DRIVER_FLAGS_NONE);
     }
@@ -7326,7 +7233,6 @@ collect_vdpau_drivers (PvRuntime *self,
  */
 static gboolean
 collect_dri_drivers (PvRuntime *self,
-                     SrtSystemInfo *system_info,
                      RuntimeArchitecture *arch,
                      GPtrArray *patterns,
                      GString *dri_path,
@@ -7347,7 +7253,7 @@ collect_dri_drivers (PvRuntime *self,
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) enum_timer =
         _srt_profiling_start ("Enumerating DRI drivers");
 
-      dri_drivers = srt_system_info_list_dri_drivers (system_info,
+      dri_drivers = srt_system_info_list_dri_drivers (arch->system_info,
                                                       arch->tuple,
                                                       SRT_DRIVER_FLAGS_NONE);
     }
@@ -7357,7 +7263,7 @@ collect_dri_drivers (PvRuntime *self,
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) enum_timer =
         _srt_profiling_start ("Enumerating VA-API drivers");
 
-      va_api_drivers = srt_system_info_list_va_api_drivers (system_info,
+      va_api_drivers = srt_system_info_list_va_api_drivers (arch->system_info,
                                                             arch->tuple,
                                                             SRT_DRIVER_FLAGS_NONE);
     }
@@ -7644,7 +7550,6 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           g_autofree gchar *libglx_mesa = NULL;
           g_autofree gchar *libglx_nvidia = NULL;
           g_autoptr(GPtrArray) patterns = NULL;
-          SrtSystemInfo *arch_system_info;
 
           if (!pv_runtime_get_ld_so (self, arch, &ld_so_in_runtime, error))
             return FALSE;
@@ -7740,19 +7645,15 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                 return FALSE;
             }
 
-          arch_system_info = pv_graphics_provider_get_system_info (arch->provider,
-                                                                   arch->tuple_quark);
-
           if ((self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
               && !collect_openxr_1_runtime (self, arch, provider_stack->openxr_1_runtime_details,
                                             patterns, error))
             return FALSE;
 
-          if (!collect_vdpau_drivers (self, arch_system_info, arch, patterns, error))
+          if (!collect_vdpau_drivers (self, arch, patterns, error))
             return FALSE;
 
-          if (!collect_dri_drivers (self, arch_system_info, arch, patterns,
-                                    dri_path, error))
+          if (!collect_dri_drivers (self, arch, patterns, dri_path, error))
             return FALSE;
 
           /* We always have at least one pattern, because
@@ -7789,7 +7690,6 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                    * gconv modules too. */
                   if (was_captured
                       && !pv_runtime_collect_libc_family (self, arch,
-                                                          arch_system_info,
                                                           bwrap,
                                                           soname_symlink,
                                                           ld_so_in_runtime,
@@ -7837,7 +7737,6 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
           collect_mesa_drirc (self, arch, provider_stack->egl_icd_details,
                               provider_stack->vulkan_icd_details,
-                              arch_system_info,
                               &drirc_data_in_provider);
 
           libglx_nvidia = g_build_filename (arch->libdir_relative_to_overrides,

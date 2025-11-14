@@ -43,6 +43,7 @@ struct _PvGraphicsProvider
   /* All public members are read-only after initable_init(), which means
    * it's OK to access this object from more than one thread. */
   SrtSubprocessRunner *run_in_current_context;
+  SrtSubprocessRunner *run_in_sysroot;
   SrtSysroot *in_current_ns;
   gchar *path_in_container_ns;
   gchar *path_in_host_ns;

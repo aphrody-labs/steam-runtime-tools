@@ -514,7 +514,9 @@ _srt_check_xdg_portals (SrtSubprocessRunner *runner,
   g_return_val_if_fail (details_out == NULL || *details_out == NULL,
                         SRT_XDG_PORTAL_ISSUES_UNKNOWN);
 
-  argv = _srt_subprocess_runner_get_helper (runner, g_quark_to_string (arch_quark),
+  argv = _srt_subprocess_runner_get_helper (runner,
+                                            g_quark_to_string (arch_quark),
+                                            NULL,
                                             "check-xdg-portal", helper_flags,
                                             &local_error);
 

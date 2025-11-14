@@ -213,7 +213,9 @@ test_check_xdg_portal (Fixture *f,
       info = srt_system_info_new (NULL);
       srt_system_info_set_helpers_path (info, f->builddir);
       srt_system_info_set_primary_multiarch_tuple (info, t->multiarch_tuple);
-      srt_system_info_set_test_flags (info, t->test_flags);
+      srt_system_info_set_test_flags (info,
+                                      (t->test_flags
+                                       | SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT));
       if (t->sysroot != NULL)
         {
           sysroot = g_build_filename (global_sysroots, t->sysroot, NULL);

@@ -44,7 +44,10 @@
  * g_object_unref() to manage its lifecycle.
  */
 
-static const SrtHelperFlags helper_flags = SRT_HELPER_FLAGS_TIME_OUT;
+/* Libraries are loaded using the executable's "natural" search path,
+ * so we can use the sysroot's ld.so(8) and --library-path */
+static const SrtHelperFlags inspect_lib_flags = (SRT_HELPER_FLAGS_TIME_OUT
+                                                 | SRT_HELPER_FLAGS_WORKS_IN_SYSROOT);
 
 struct _SrtLibrary
 {
@@ -664,6 +667,7 @@ srt_check_library_presence (const char *requested_name,
 
   return _srt_check_library_presence (runner, requested_name,
                                       g_quark_from_string (multiarch),
+                                      _srt_architecture_get_by_tuple (multiarch),
                                       symbols_path, NULL, SRT_CHECK_FLAGS_NONE,
                                       symbols_format, more_details_out);
 }
@@ -754,7 +758,7 @@ _srt_inspect_library (SrtSubprocessRunner *runner,
     }
 
   completed = _srt_subprocess_runner_run_sync (runner,
-                                               helper_flags,
+                                               inspect_lib_flags,
                                                arch_quark,
                                                (const char * const *) argv,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE,
@@ -967,6 +971,7 @@ SrtLibraryIssues
 _srt_check_library_presence (SrtSubprocessRunner *runner,
                              const char *requested_name,
                              GQuark arch_quark,
+                             const SrtKnownArchitecture *known_arch,
                              const char *symbols_path,
                              const char * const *hidden_deps,
                              SrtCheckFlags check_flags,
@@ -995,8 +1000,10 @@ _srt_check_library_presence (SrtSubprocessRunner *runner,
     issues |= SRT_LIBRARY_ISSUES_UNKNOWN_EXPECTATIONS;
 
   multiarch = g_quark_to_string (arch_quark);
-  argv = _srt_subprocess_runner_get_helper (runner, multiarch,
-                                            "inspect-library", helper_flags,
+  argv = _srt_subprocess_runner_get_helper (runner,
+                                            multiarch,
+                                            known_arch,
+                                            "inspect-library", inspect_lib_flags,
                                             &error);
 
   if (argv == NULL)
@@ -1040,9 +1047,11 @@ _srt_check_library_presence (SrtSubprocessRunner *runner,
     }
 
   library_absolute_path = srt_library_get_absolute_path (details);
-  argv_libelf = _srt_subprocess_runner_get_helper (runner, multiarch,
+  argv_libelf = _srt_subprocess_runner_get_helper (runner,
+                                                   multiarch,
+                                                   known_arch,
                                                    "inspect-library-libelf",
-                                                   helper_flags,
+                                                   inspect_lib_flags,
                                                    &error);
 
   if (argv_libelf == NULL)

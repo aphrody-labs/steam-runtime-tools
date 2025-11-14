@@ -761,6 +761,7 @@ _srt_check_flatpak_subsandbox (SrtSubprocessRunner *runner)
 
   argv = _srt_subprocess_runner_get_helper (runner,
                                             NULL,
+                                            NULL,
                                             "steam-runtime-launch-client",
                                             SRT_HELPER_FLAGS_IN_BIN_DIR,
                                             &local_error);

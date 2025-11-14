@@ -11,12 +11,16 @@
 
 gboolean
 _srt_architecture_can_run (SrtSubprocessRunner *runner,
-                           GQuark arch_quark)
+                           GQuark arch_quark,
+                           const SrtKnownArchitecture *known_arch)
 {
   g_autoptr(SrtCompletedSubprocess) completed = NULL;
   g_autoptr(GPtrArray) argv = NULL;
   g_autoptr(GError) error = NULL;
-  SrtHelperFlags helper_flags = SRT_HELPER_FLAGS_NONE;
+  /* x-y-z-true is self-contained, so we can run it with the sysroot's
+   * ld.so and library search paths to have a good guess at whether we
+   * would be able to run a simple executable in the sysroot */
+  SrtHelperFlags helper_flags = SRT_HELPER_FLAGS_WORKS_IN_SYSROOT;
   const char *multiarch;
 
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (runner), FALSE);
@@ -24,8 +28,12 @@ _srt_architecture_can_run (SrtSubprocessRunner *runner,
   g_return_val_if_fail (_srt_check_not_setuid (), FALSE);
 
   multiarch = g_quark_to_string (arch_quark);
-  argv = _srt_subprocess_runner_get_helper (runner, multiarch, "true",
-                                            helper_flags, &error);
+  argv = _srt_subprocess_runner_get_helper (runner,
+                                            multiarch,
+                                            known_arch,
+                                            "true",
+                                            helper_flags,
+                                            &error);
 
   if (argv == NULL)
     {
@@ -81,7 +89,9 @@ srt_architecture_can_run_i386 (void)
 {
   g_autoptr(SrtSubprocessRunner) runner = _srt_subprocess_runner_new ();
 
-  return _srt_architecture_can_run (runner, g_quark_from_static_string (SRT_ABI_I386));
+  return _srt_architecture_can_run (runner,
+                                    g_quark_from_static_string (SRT_ABI_I386),
+                                    _srt_architecture_get_by_tuple (SRT_ABI_I386));
 }
 
 /**
@@ -101,5 +111,7 @@ srt_architecture_can_run_x86_64 (void)
 {
   g_autoptr(SrtSubprocessRunner) runner = _srt_subprocess_runner_new ();
 
-  return _srt_architecture_can_run (runner, g_quark_from_static_string (SRT_ABI_X86_64));
+  return _srt_architecture_can_run (runner,
+                                    g_quark_from_static_string (SRT_ABI_X86_64),
+                                    _srt_architecture_get_by_tuple (SRT_ABI_X86_64));
 }

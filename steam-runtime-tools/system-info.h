@@ -50,6 +50,9 @@
  * SrtTestFlags:
  * @SRT_TEST_FLAGS_NONE: Behave normally
  * @SRT_TEST_FLAGS_TIME_OUT_SOONER: Reduce arbitrary timeouts
+ * @SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT: Assume that helper executables
+ *  have been replaced with mock versions that work as intended in a sysroot,
+ *  even if the normal version would not
  *
  * A bitfield with flags representing behaviour changes used in automated
  * tests, or %SRT_TEST_FLAGS_NONE (which is numerically zero) for normal
@@ -58,6 +61,7 @@
 typedef enum
 {
   SRT_TEST_FLAGS_TIME_OUT_SOONER = (1 << 0),
+  SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT = (1 << 1),
   SRT_TEST_FLAGS_NONE = 0
 } SrtTestFlags;
 

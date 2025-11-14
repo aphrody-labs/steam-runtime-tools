@@ -114,6 +114,7 @@ test_basic (Fixture *f,
                                             NULL,     /* envp */
                                             "/path/to/bin",
                                             "/path/to/libexec/steam-runtime-tools-0",
+                                            NULL,     /* sysroot */
                                             SRT_TEST_FLAGS_NONE,
                                             NULL);   /* cwd */
   g_assert_nonnull (_srt_subprocess_runner_get_environ (runner));
@@ -289,6 +290,7 @@ test_chdir (Fixture *f,
                                             NULL,     /* envp */
                                             NULL,     /* ./bin */
                                             NULL,     /* ./libexec/s-r-t-0 */
+                                            NULL,     /* sysroot */
                                             SRT_TEST_FLAGS_NONE,
                                             "/");
 
@@ -412,6 +414,7 @@ test_emulator (Fixture *f,
                                             NULL,   /* envp */
                                             NULL,   /* bin_path */
                                             NULL,   /* helpers_path */
+                                            NULL,   /* sysroot */
                                             SRT_TEST_FLAGS_NONE,
                                             NULL);  /* cwd */
 
@@ -538,6 +541,7 @@ test_environ (Fixture *f,
                                             _srt_const_strv (envp),
                                             NULL,    /* ./bin */
                                             NULL,    /* ./libexec/s-r-t-0 */
+                                            NULL,    /* sysroot */
                                             SRT_TEST_FLAGS_NONE,
                                             NULL);   /* cwd */
 
@@ -774,6 +778,7 @@ test_timeout (Fixture *f,
                                             NULL,    /* envp */
                                             NULL,    /* ./bin */
                                             NULL,    /* ./libexec/s-r-t-0 */
+                                            NULL,    /* sysroot */
                                             SRT_TEST_FLAGS_TIME_OUT_SOONER,
                                             NULL);   /* cwd */
   g_assert_cmpint (_srt_subprocess_runner_get_test_flags (runner),

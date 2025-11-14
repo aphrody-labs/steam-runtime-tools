@@ -312,6 +312,7 @@ G_GNUC_INTERNAL
 GList *_srt_list_graphics_modules (SrtSysroot *sysroot,
                                    SrtSubprocessRunner *runner,
                                    GQuark arch_quark,
+                                   const SrtKnownArchitecture *known_arch,
                                    SrtCheckFlags check_flags,
                                    SrtGraphicsModule which);
 

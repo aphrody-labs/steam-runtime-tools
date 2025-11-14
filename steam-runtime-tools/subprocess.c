@@ -782,6 +782,7 @@ struct _SrtSubprocessRunner
   gchar *helpers_path;
   /* Working directory, or %NULL to use current */
   gchar *working_directory;
+  SrtSysroot *sysroot;
   SrtTestFlags test_flags;
   unsigned can_use_waitid : 1;
 };
@@ -800,6 +801,7 @@ enum
   PROP_EMULATOR,
   PROP_ENVIRON,
   PROP_HELPERS_PATH,
+  PROP_SYSROOT,
   PROP_TEST_FLAGS,
   PROP_WORKING_DIRECTORY,
   N_PROPERTIES
@@ -862,6 +864,10 @@ _srt_subprocess_runner_get_property (GObject *object,
         g_value_set_string (value, self->helpers_path);
         break;
 
+      case PROP_SYSROOT:
+        g_value_set_object (value, self->sysroot);
+        break;
+
       case PROP_TEST_FLAGS:
         g_value_set_flags (value, self->test_flags);
         break;
@@ -914,6 +920,12 @@ _srt_subprocess_runner_set_property (GObject *object,
         self->helpers_path = g_value_dup_string (value);
         break;
 
+      case PROP_SYSROOT:
+        /* Construct-only */
+        g_return_if_fail (self->sysroot == NULL);
+        self->sysroot = g_value_dup_object (value);
+        break;
+
       case PROP_TEST_FLAGS:
         /* Construct-only */
         g_return_if_fail (self->test_flags == SRT_TEST_FLAGS_NONE);
@@ -937,6 +949,7 @@ _srt_subprocess_runner_dispose (GObject *object)
   SrtSubprocessRunner *self = SRT_SUBPROCESS_RUNNER (object);
 
   g_clear_object (&self->emulator);
+  g_clear_object (&self->sysroot);
 
   G_OBJECT_CLASS (_srt_subprocess_runner_parent_class)->dispose (object);
 }
@@ -981,6 +994,10 @@ _srt_subprocess_runner_class_init (SrtSubprocessRunnerClass *cls)
     g_param_spec_string ("helpers-path", NULL, NULL, NULL,
                          G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                          G_PARAM_STATIC_STRINGS);
+  properties[PROP_SYSROOT] =
+    g_param_spec_object ("sysroot", NULL, NULL, SRT_TYPE_SYSROOT,
+                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS);
   properties[PROP_TEST_FLAGS] =
     g_param_spec_flags ("test-flags", NULL, NULL,
                         SRT_TYPE_TEST_FLAGS, SRT_TEST_FLAGS_NONE,
@@ -1003,6 +1020,7 @@ _srt_subprocess_runner_new_swap_envp (SrtSubprocessRunner *self,
                                           envp,
                                           self->bin_path,
                                           self->helpers_path,
+                                          self->sysroot,
                                           self->test_flags,
                                           self->working_directory);
 }
@@ -1016,6 +1034,21 @@ _srt_subprocess_runner_new_swap_helpers_path (SrtSubprocessRunner *self,
                                           _srt_const_strv (self->envp),
                                           self->bin_path,
                                           path,
+                                          self->sysroot,
+                                          self->test_flags,
+                                          self->working_directory);
+}
+
+SrtSubprocessRunner *
+_srt_subprocess_runner_new_swap_sysroot (SrtSubprocessRunner *self,
+                                         SrtSysroot *sysroot)
+{
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
+  return _srt_subprocess_runner_new_full (self->emulator,
+                                          _srt_const_strv (self->envp),
+                                          self->bin_path,
+                                          self->helpers_path,
+                                          sysroot,
                                           self->test_flags,
                                           self->working_directory);
 }
@@ -1029,6 +1062,7 @@ _srt_subprocess_runner_new_swap_test_flags (SrtSubprocessRunner *self,
                                           _srt_const_strv (self->envp),
                                           self->bin_path,
                                           self->helpers_path,
+                                          self->sysroot,
                                           flags,
                                           self->working_directory);
 }
@@ -1042,6 +1076,7 @@ _srt_subprocess_runner_new_swap_working_directory (SrtSubprocessRunner *self,
                                           _srt_const_strv (self->envp),
                                           self->bin_path,
                                           self->helpers_path,
+                                          self->sysroot,
                                           self->test_flags,
                                           working_directory);
 }
@@ -1128,6 +1163,17 @@ _srt_subprocess_runner_resolve_helpers_path (SrtSubprocessRunner *self,
 }
 
 /*
+ * Returns: (transfer none): A sysroot, or %NULL as shorthand
+ *  for _srt_sysroot_new_direct()
+ */
+SrtSysroot *
+_srt_subprocess_runner_get_sysroot (SrtSubprocessRunner *self)
+{
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
+  return self->sysroot;
+}
+
+/*
  * Returns: Test flags
  */
 SrtTestFlags
@@ -1148,17 +1194,127 @@ _srt_subprocess_runner_get_working_directory (SrtSubprocessRunner *self)
 }
 
 /*
+ * Append @ld_so and an appropriate `--library-path` to @argv,
+ * so that subsequent items in @argv will run as if they were in
+ * `self->sysroot`.
+ *
+ * This assumes that `self->sysroot` is set up in a convenient way:
+ * symlinks must be relative, and library directories must be something
+ * that we know about, for example Debian multiarch, FHS/Red Hat multilib
+ * or Arch multilib.
+ *
+ * For example, if the i386 stack is in /opt/i386, we might run:
+ *
+ * ```
+ * /opt/i386/lib/ld-linux.so.2 \
+ * --library-path /opt/i386/usr/lib/i386-linux-gnu:... \
+ * /path/to/i386-linux-gnu-capsule-capture-libs ...
+ * ```
+ */
+static void
+_srt_subprocess_runner_append_ld_so (SrtSubprocessRunner *self,
+                                     const SrtKnownArchitecture *known_arch,
+                                     GPtrArray *argv)
+{
+  g_autoptr(GPtrArray) libdirs = NULL;
+  g_autoptr(GString) lib_path = g_string_new ("");
+  const char *ld_so;
+  const char *ldlp;
+
+  g_return_if_fail (self != NULL);
+  g_return_if_fail (self->sysroot != NULL);
+  g_return_if_fail (argv != NULL);
+  g_return_if_fail (known_arch != NULL);
+  g_return_if_fail (known_arch->interoperable_runtime_linker != NULL);
+
+  ld_so = known_arch->interoperable_runtime_linker;
+
+  /* If we would have used a custom LD_LIBRARY_PATH when calling
+   * executables outside the sysroot, we want to make use of that
+   * when calling executables "inside" the sysroot. */
+  ldlp = _srt_subprocess_runner_getenv (self, "LD_LIBRARY_PATH");
+
+  if (ldlp != NULL)
+    {
+      g_auto(GStrv) entries = g_strsplit_set (ldlp, ":;", 0);
+
+      for (size_t i = 0; entries != NULL && entries[i] != NULL; i++)
+        {
+          const char *path = entries[i];
+          g_autofree char *canonicalized = NULL;
+          g_autofree char *prefixed = NULL;
+
+          if (path[0] == '\0')
+            path = ".";
+
+          /* e.g. this might be /home/me/.steam/steam/ubuntu12_32
+           * or /usr/lib/sdl2-compat */
+          canonicalized = g_canonicalize_filename (path, NULL);
+          /* e.g. this might be /opt/i386/home/me/.steam/steam/ubuntu12_32
+           * or /opt/i386/usr/lib/sdl2-compat */
+          prefixed = g_build_filename (self->sysroot->path,
+                                       canonicalized,
+                                       NULL);
+          /* We don't know whether entries in LD_LIBRARY_PATH are
+           * meant to be in the sysroot or in the
+           * current execution environment, so try both */
+          _srt_search_path_append (lib_path, prefixed);
+          _srt_search_path_append (lib_path, canonicalized);
+        }
+    }
+
+  libdirs = _srt_known_architecture_get_libdirs (known_arch->multiarch_tuple,
+                                                 known_arch,
+                                                 SRT_LIBDIRS_FLAGS_NONE);
+
+  for (size_t i = 0; i < libdirs->len; i++)
+    {
+      /* e.g. /usr/lib32 */
+      const char *path = g_ptr_array_index (libdirs, i);
+      g_autofree char *prefixed = NULL;
+
+      g_warn_if_fail (g_path_is_absolute (path));
+
+      /* e.g. /opt/i386/usr/lib32 */
+      prefixed = g_build_filename (self->sysroot->path, path, NULL);
+      _srt_search_path_append (lib_path, prefixed);
+    }
+
+  /* e.g. /opt/i386/lib/ld-linux.so.2 */
+  g_ptr_array_add (argv, g_build_filename (self->sysroot->path, ld_so, NULL));
+  g_ptr_array_add (argv, g_strdup ("--library-path"));
+  g_ptr_array_add (argv, g_string_free_and_steal (g_steal_pointer (&lib_path)));
+
+  /* We have to hope that the next argument does not start with "-"
+   * because older versions of ld.so, such as the one in glibc 2.31
+   * (Debian 11 and sniper), don't support the "--" pseudo-argument;
+   * but in practice none of our helpers have such inadvisable names,
+   * so this is fine. */
+}
+
+/*
  * _srt_subprocess_runner_get_helper:
  * @runner: The execution environment
  * @multiarch: (nullable): A multiarch tuple like %SRT_ABI_I386 to prefix
  *  to the executable name, or %NULL
+ * @known_arch: (nullable): Details of @multiarch if it is a known
+ *  architecture
  * @base: (not nullable): Base name of the executable
  * @flags: Flags affecting how we set up the helper
  * @error: Used to raise an error if %NULL is returned
  *
- * Find a helper executable. We return an array of arguments so that the
+ * Find a helper executable.
+ *
+ * We return an array of arguments so that the
  * helper can be wrapped by an "adverb" like `env`, `timeout` or a
  * specific `ld.so` implementation if required.
+ *
+ * If @multiarch is non-%NULL, @known_arch must either be %NULL
+ * or the same architecture.
+ * If @multiarch is %NULL, @known_arch must be %NULL too.
+ * It is only necessary to provide a non-%NULL @known_arch if the @flags
+ * include %SRT_HELPER_FLAGS_WORKS_IN_SYSROOT and/or
+ * %SRT_HELPER_FLAGS_SYSROOT_AWARE.
  *
  * Returns: (nullable) (element-type filename) (transfer container): The
  *  initial `argv` for the helper, with g_free() set as the free-function, and
@@ -1167,21 +1323,62 @@ _srt_subprocess_runner_get_working_directory (SrtSubprocessRunner *self)
 GPtrArray *
 _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
                                    const char *multiarch,
+                                   const SrtKnownArchitecture *known_arch,
                                    const char *base,
                                    SrtHelperFlags flags,
                                    GError **error)
 {
   g_autofree gchar *bin_path = NULL;
   const char *helpers_path;
-  GPtrArray *argv = NULL;
-  gchar *path;
-  gchar *prefixed;
+  g_autoptr(GPtrArray) argv = NULL;
+  g_autofree gchar *path = NULL;
+  g_autofree gchar *prefixed = NULL;
 
   g_return_val_if_fail (_srt_check_not_setuid (), NULL);
   g_return_val_if_fail (base != NULL, NULL);
+  g_return_val_if_fail (known_arch == NULL || multiarch != NULL, NULL);
+  g_return_val_if_fail (known_arch == NULL
+                        || g_str_equal (known_arch->multiarch_tuple, multiarch), NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
   argv = g_ptr_array_new_with_free_func (g_free);
+
+  if (self->sysroot != NULL
+      && !_srt_sysroot_is_direct (self->sysroot)
+      && !(self->test_flags & SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT))
+    {
+      if (flags & SRT_HELPER_FLAGS_WORKS_IN_SYSROOT)
+        {
+          if (known_arch != NULL
+              && known_arch->interoperable_runtime_linker != NULL)
+            {
+              _srt_subprocess_runner_append_ld_so (self, known_arch, argv);
+            }
+          else
+            {
+              g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+                           "Helper \"%s\" can't be used in sysroot \"%s\" "
+                           "without knowing the appropriate ld.so(8)",
+                           base, self->sysroot->path);
+              return NULL;
+            }
+        }
+      else if (flags & SRT_HELPER_FLAGS_SYSROOT_AWARE)
+        {
+          if (known_arch != NULL
+              && known_arch->interoperable_runtime_linker != NULL
+              && !g_file_test (known_arch->interoperable_runtime_linker,
+                               G_FILE_TEST_IS_EXECUTABLE))
+            _srt_subprocess_runner_append_ld_so (self, known_arch, argv);
+        }
+      else
+        {
+          g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+                       "Helper \"%s\" can't be used in sysroot \"%s\"",
+                       base, self->sysroot->path);
+          return NULL;
+        }
+    }
 
   if (flags & SRT_HELPER_FLAGS_IN_BIN_DIR)
     {
@@ -1196,10 +1393,7 @@ _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
           const char *prefix = _srt_find_myself (NULL, NULL, error);
 
           if (prefix == NULL)
-            {
-              g_ptr_array_unref (argv);
-              return NULL;
-            }
+            return NULL;
 
           bin_path = g_build_filename (prefix, "bin", NULL);
           helpers_path = bin_path;
@@ -1210,10 +1404,7 @@ _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
       helpers_path = _srt_subprocess_runner_resolve_helpers_path (self, error);
 
       if (helpers_path == NULL)
-        {
-          g_ptr_array_unref (argv);
-          return NULL;
-        }
+        return NULL;
     }
 
   path = g_strdup_printf ("%s/%s%s%s",
@@ -1227,21 +1418,18 @@ _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
   if (g_file_test (path, G_FILE_TEST_IS_EXECUTABLE))
     {
       g_ptr_array_add (argv, g_steal_pointer (&path));
-      return argv;
+      return g_steal_pointer (&argv);
     }
 
   if ((flags & SRT_HELPER_FLAGS_SEARCH_PATH) == 0)
     {
       g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND,
                    "%s not found", path);
-      g_free (path);
-      g_ptr_array_unref (argv);
       return NULL;
     }
 
   /* For helpers that are not part of steam-runtime-tools
    * (historically this included *-wflinfo), we fall back to searching $PATH */
-  g_free (path);
 
   if (multiarch == NULL)
     prefixed = g_strdup (base);
@@ -1249,7 +1437,7 @@ _srt_subprocess_runner_get_helper (SrtSubprocessRunner *self,
     prefixed = g_strdup_printf ("%s-%s", multiarch, base);
 
   g_ptr_array_add (argv, g_steal_pointer (&prefixed));
-  return argv;
+  return g_steal_pointer (&argv);
 }
 
 typedef struct

@@ -68,5 +68,6 @@ const char *_srt_system_info_get_sysroot_path (SrtSystemInfo *self);
 void _srt_system_info_set_sysroot (SrtSystemInfo *self,
                                    SrtSysroot *sysroot);
 
+SrtSubprocessRunner *_srt_system_info_get_subprocess_runner (SrtSystemInfo *self);
 void _srt_system_info_set_subprocess_runner (SrtSystemInfo *self,
                                              SrtSubprocessRunner *runner);

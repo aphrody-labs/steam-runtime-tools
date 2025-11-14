@@ -3485,7 +3485,7 @@ static JsonTest json_test[] =
       {
         .name = "C",
         .error_domain = "srt-locale-error-quark",
-        .error_code = SRT_LOCALE_ERROR_INTERNAL_ERROR,
+        .error_code = SRT_LOCALE_ERROR_UNKNOWN,
         .error_message = "Information about the requested locale is missing",
       },
     },

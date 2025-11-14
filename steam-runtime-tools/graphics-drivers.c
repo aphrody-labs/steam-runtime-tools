@@ -216,9 +216,24 @@ _srt_base_graphics_module_check_error (SrtBaseGraphicsModule *self,
   return (self->error == NULL);
 }
 
-static const SrtHelperFlags helper_flags = SRT_HELPER_FLAGS_SEARCH_PATH;
+/* We tell capsule-capture-libs to use the sysroot, via
+ * the --provider option */
+static const SrtHelperFlags capsule_capture_libs_flags =
+  (SRT_HELPER_FLAGS_SEARCH_PATH
+   | SRT_HELPER_FLAGS_SYSROOT_AWARE);
 
 /*
+ * _initial_capsule_capture_libs_argv:
+ * @sysroot: The sysroot we are inspecting
+ * @runner: Execution environment
+ * @multiarch_tuple: The architecture of interest
+ * @known_arch: Details of @multiarch_tuple if known
+ * @temp_dir: Directory where output symlinks will appear
+ * @error: The usual
+ *
+ * Return the beginning of the `argv` for capsule-capture-libs, ready to
+ * append patterns.
+ *
  * Returns: (nullable) (element-type filename) (transfer container): The
  *  initial `argv` for the capsule-capture-libs helper, with g_free() set
  *  as the free-function, and no %NULL terminator. Free with g_ptr_array_unref()
@@ -228,14 +243,17 @@ static GPtrArray *
 _initial_capsule_capture_libs_argv (SrtSysroot *sysroot,
                                     SrtSubprocessRunner *runner,
                                     const char *multiarch_tuple,
+                                    const SrtKnownArchitecture *known_arch,
                                     const char *temp_dir,
                                     GError **error)
 {
   g_autoptr(GPtrArray) argv = NULL;
 
-  argv = _srt_subprocess_runner_get_helper (runner, multiarch_tuple,
+  argv = _srt_subprocess_runner_get_helper (runner,
+                                            multiarch_tuple,
+                                            known_arch,
                                             "capsule-capture-libs",
-                                            helper_flags,
+                                            capsule_capture_libs_flags,
                                             error);
 
   if (argv == NULL)
@@ -253,6 +271,7 @@ static GPtrArray *
 _argv_for_list_vdpau_drivers (SrtSysroot *sysroot,
                               SrtSubprocessRunner *runner,
                               const char *multiarch_tuple,
+                              const SrtKnownArchitecture *known_arch,
                               const char *temp_dir,
                               GError **error)
 {
@@ -260,7 +279,8 @@ _argv_for_list_vdpau_drivers (SrtSysroot *sysroot,
   g_autoptr(GPtrArray) argv = NULL;
 
   vdpau_driver = _srt_subprocess_runner_getenv (runner, "VDPAU_DRIVER");
-  argv = _initial_capsule_capture_libs_argv (sysroot, runner, multiarch_tuple,
+  argv = _initial_capsule_capture_libs_argv (sysroot, runner,
+                                             multiarch_tuple, known_arch,
                                              temp_dir, error);
 
   if (argv == NULL)
@@ -290,6 +310,7 @@ static GPtrArray *
 _argv_for_list_loader_libraries (SrtSysroot *sysroot,
                                  SrtSubprocessRunner *runner,
                                  const char *multiarch_tuple,
+                                 const SrtKnownArchitecture *known_arch,
                                  const char *temp_dir,
                                  const char * const *loader_libraries,
                                  GError **error)
@@ -300,7 +321,8 @@ _argv_for_list_loader_libraries (SrtSysroot *sysroot,
   g_return_val_if_fail (loader_libraries != NULL, NULL);
   g_return_val_if_fail (loader_libraries[0] != NULL, NULL);
 
-  argv = _initial_capsule_capture_libs_argv (sysroot, runner, multiarch_tuple,
+  argv = _initial_capsule_capture_libs_argv (sysroot, runner,
+                                             multiarch_tuple, known_arch,
                                              temp_dir, error);
 
   if (argv == NULL)
@@ -325,12 +347,14 @@ static GPtrArray *
 _argv_for_list_glx_icds (SrtSysroot *sysroot,
                          SrtSubprocessRunner *runner,
                          const char *multiarch_tuple,
+                         const SrtKnownArchitecture *known_arch,
                          const char *temp_dir,
                          GError **error)
 {
   g_autoptr(GPtrArray) argv = NULL;
 
-  argv = _initial_capsule_capture_libs_argv (sysroot, runner, multiarch_tuple,
+  argv = _initial_capsule_capture_libs_argv (sysroot, runner,
+                                             multiarch_tuple, known_arch,
                                              temp_dir, error);
 
   if (argv == NULL)
@@ -355,6 +379,7 @@ static GPtrArray *
 _argv_for_list_glx_icds_in_path (SrtSysroot *sysroot,
                                  SrtSubprocessRunner *runner,
                                  const char *multiarch_tuple,
+                                 const SrtKnownArchitecture *known_arch,
                                  const char *temp_dir,
                                  const char *base_path,
                                  GError **error)
@@ -362,7 +387,8 @@ _argv_for_list_glx_icds_in_path (SrtSysroot *sysroot,
   g_autofree gchar *lib_full_path = NULL;
   g_autoptr(GPtrArray) argv = NULL;
 
-  argv = _initial_capsule_capture_libs_argv (sysroot, runner, multiarch_tuple,
+  argv = _initial_capsule_capture_libs_argv (sysroot, runner,
+                                             multiarch_tuple, known_arch,
                                              temp_dir, error);
 
   if (argv == NULL)
@@ -422,7 +448,7 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
   g_return_if_fail (modules_out != NULL);
 
   completed = _srt_subprocess_runner_run_sync (runner,
-                                               helper_flags,
+                                               capsule_capture_libs_flags,
                                                architecture,
                                                (const char * const *) argv->pdata,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
@@ -556,7 +582,7 @@ _srt_list_links_from_directory (SrtSubprocessRunner *runner,
   g_return_val_if_fail (tmp_directory != NULL, NULL);
 
   completed = _srt_subprocess_runner_run_sync (runner,
-                                               helper_flags,
+                                               capsule_capture_libs_flags,
                                                architecture,
                                                (const char * const *) argv->pdata,
                                                SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
@@ -620,6 +646,7 @@ _srt_list_links_from_directory (SrtSubprocessRunner *runner,
  * @runner: The execution environment
  * @want_arch_quark: A nonzero quark representing a Debian-style multiarch tuple
  *  such as %SRT_ABI_X86_64
+ * @known_arch: Details of @want_arch_quark if known
  * @check_flags: Flags affecting how we do the search
  * @module_directory_path: (not nullable) (type filename): Path, in @sysroot namespace,
  *  to search for driver modules
@@ -639,6 +666,7 @@ static void
 _srt_get_modules_from_path (SrtSysroot *sysroot,
                             SrtSubprocessRunner *runner,
                             GQuark want_arch_quark,
+                            const SrtKnownArchitecture *known_arch,
                             SrtCheckFlags check_flags,
                             const char *module_directory_path,
                             gboolean is_extra,
@@ -748,7 +776,9 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
                                               dfd_iter.real_iter.fd,
                                               dent->d_name);
           issues = _srt_check_library_presence (runner, driver_proc_path,
-                                                want_arch_quark, NULL, NULL,
+                                                want_arch_quark,
+                                                known_arch,
+                                                NULL, NULL,
                                                 SRT_CHECK_FLAGS_SKIP_SLOW_CHECKS,
                                                 SRT_LIBRARY_SYMBOLS_FORMAT_PLAIN, NULL);
 
@@ -933,6 +963,9 @@ _srt_get_library_class (const char * const *envp,
  * @sysroot: The root directory, usually '/'
  * @loader_path: absolute and canonicalized path to a loader
  *  such as libva.so.2
+ * @arch_quark: A quark representing a Debian-style multiarch tuple
+ *  such as %SRT_ABI_X86_64
+ * @known_arch: Details of @arch_quark if known
  * @is_extra: If true, any modules found will be marked as "extra"
  * @module: Which kind of loader this is, currently DRI, VA-API or VDPAU
  * @drivers_set: Set of directories we already checked for @module.
@@ -947,6 +980,7 @@ _srt_get_modules_from_loader_library (SrtSysroot *sysroot,
                                       SrtSubprocessRunner *runner,
                                       const gchar *loader_path,
                                       GQuark arch_quark,
+                                      const SrtKnownArchitecture *known_arch,
                                       SrtCheckFlags check_flags,
                                       gboolean is_extra,
                                       SrtGraphicsModule module,
@@ -973,7 +1007,9 @@ _srt_get_modules_from_loader_library (SrtSysroot *sysroot,
   if (!g_hash_table_contains (drivers_set, libdir_driver))
     {
       g_hash_table_add (drivers_set, g_strdup (libdir_driver));
-      _srt_get_modules_from_path (sysroot, runner, arch_quark,
+      _srt_get_modules_from_path (sysroot, runner,
+                                  arch_quark,
+                                  known_arch,
                                   check_flags, libdir_driver, is_extra, module,
                                   drivers_out);
     }
@@ -989,7 +1025,9 @@ _srt_get_modules_from_loader_library (SrtSysroot *sysroot,
       if (!g_hash_table_contains (drivers_set, slackware))
         {
           _srt_get_modules_from_path (sysroot, runner,
-                                      arch_quark, check_flags, slackware,
+                                      arch_quark,
+                                      known_arch,
+                                      check_flags, slackware,
                                       is_extra, module, drivers_out);
           g_hash_table_add (drivers_set, g_steal_pointer (&slackware));
         }
@@ -1014,7 +1052,9 @@ _srt_get_modules_from_loader_library (SrtSysroot *sysroot,
                            (gchar *)this_extra_path->data);
                   g_hash_table_add (drivers_set, g_strdup (this_extra_path->data));
                   _srt_get_modules_from_path (sysroot, runner,
-                                              arch_quark, check_flags,
+                                              arch_quark,
+                                              known_arch,
+                                              check_flags,
                                               this_extra_path->data, TRUE,
                                               module, drivers_out);
                 }
@@ -1031,6 +1071,7 @@ _srt_get_modules_from_loader_library (SrtSysroot *sysroot,
  * @runner: The execution environment
  * @arch_quark: Nonzero quark representing a Debian-style multiarch tuple
  *  such as %SRT_ABI_X86_64
+ * @known_arch: Details of @arch_quark if known
  * @drivers_out: (inout): Prepend the found drivers to this list as opaque
  *  #SrtGlxIcd objects. There is no guarantee about the order of the list
  *
@@ -1040,6 +1081,7 @@ static void
 _srt_list_glx_icds (SrtSysroot *sysroot,
                     SrtSubprocessRunner *runner,
                     GQuark arch_quark,
+                    const SrtKnownArchitecture *known_arch,
                     GList **drivers_out)
 {
   g_autoptr(GPtrArray) by_soname_argv = NULL;
@@ -1063,7 +1105,8 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
       return;
     }
 
-  by_soname_argv = _argv_for_list_glx_icds (sysroot, runner, multiarch_tuple,
+  by_soname_argv = _argv_for_list_glx_icds (sysroot, runner,
+                                            multiarch_tuple, known_arch,
                                             by_soname_tmp_dir.path, &error);
 
   if (by_soname_argv == NULL)
@@ -1093,7 +1136,8 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
           return;
         }
 
-      overrides_argv = _argv_for_list_glx_icds_in_path (sysroot, runner, multiarch_tuple,
+      overrides_argv = _argv_for_list_glx_icds_in_path (sysroot, runner,
+                                                        multiarch_tuple, known_arch,
                                                         overrides_tmp_dir.path,
                                                         overrides_path, &error);
 
@@ -1116,6 +1160,7 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
  * @runner: The execution environment
  * @multiarch_tuple: (not nullable) (type filename): A Debian-style multiarch tuple
  *  such as %SRT_ABI_X86_64
+ * @known_arch: Details of @arch_quark if known
  * @check_flags: Flags affecting how we do the search
  * @module: Which graphic module to search
  * @drivers_out: (inout): Prepend the found drivers to this list.
@@ -1132,6 +1177,7 @@ static void
 _srt_get_modules_full (SrtSysroot *sysroot,
                        SrtSubprocessRunner *runner,
                        GQuark arch_quark,
+                       const SrtKnownArchitecture *known_arch,
                        SrtCheckFlags check_flags,
                        SrtGraphicsModule module,
                        GList **drivers_out)
@@ -1223,7 +1269,9 @@ _srt_get_modules_full (SrtSysroot *sysroot,
           if (!g_hash_table_contains (drivers_set, *entry))
             {
               g_hash_table_add (drivers_set, g_strdup (*entry));
-              _srt_get_modules_from_path (sysroot, runner, arch_quark,
+              _srt_get_modules_from_path (sysroot, runner,
+                                          arch_quark,
+                                          known_arch,
                                           check_flags, *entry, FALSE, module, drivers_out);
             }
         }
@@ -1268,14 +1316,18 @@ _srt_get_modules_full (SrtSysroot *sysroot,
             {
               g_hash_table_add (drivers_set, g_strdup (libdir_dri));
               _srt_get_modules_from_path (sysroot, runner,
-                                          arch_quark, check_flags, libdir_dri,
+                                          arch_quark,
+                                          known_arch,
+                                          check_flags, libdir_dri,
                                           is_extra, module, drivers_out);
             }
           if (!g_hash_table_contains (drivers_set, intel_vaapi))
             {
               g_hash_table_add (drivers_set, g_strdup (intel_vaapi));
               _srt_get_modules_from_path (sysroot, runner,
-                                          arch_quark, check_flags, intel_vaapi,
+                                          arch_quark,
+                                          known_arch,
+                                          check_flags, intel_vaapi,
                                           is_extra, module, drivers_out);
             }
         }
@@ -1288,7 +1340,9 @@ _srt_get_modules_full (SrtSysroot *sysroot,
             {
               g_hash_table_add (drivers_set, g_strdup (gl_lib_dri));
               _srt_get_modules_from_path (sysroot, runner,
-                                          arch_quark, check_flags, gl_lib_dri,
+                                          arch_quark,
+                                          known_arch,
+                                          check_flags, gl_lib_dri,
                                           is_extra, module, drivers_out);
             }
         }
@@ -1343,6 +1397,7 @@ _srt_get_modules_full (SrtSysroot *sysroot,
                   g_debug ("Searching modules in the library path \"%s\"", library_path);
                   _srt_get_modules_from_loader_library (sysroot, runner, library_path,
                                                         arch_quark,
+                                                        known_arch,
                                                         check_flags, is_extra, module,
                                                         drivers_set, drivers_out);
                   break;
@@ -1376,6 +1431,7 @@ _srt_get_modules_full (SrtSysroot *sysroot,
 
       gfx_argv = _argv_for_list_loader_libraries (sysroot, runner,
                                                   multiarch_tuple,
+                                                  known_arch,
                                                   capture_libs_output_dir.path,
                                                   loader_libraries, &error);
       if (gfx_argv == NULL)
@@ -1393,6 +1449,7 @@ _srt_get_modules_full (SrtSysroot *sysroot,
           g_debug ("Searching modules using the loader path \"%s\"", loader_lib_link[i]);
           _srt_get_modules_from_loader_library (sysroot, runner, loader_lib_link[i],
                                                 arch_quark,
+                                                known_arch,
                                                 check_flags, is_extra, module,
                                                 drivers_set, drivers_out);
         }
@@ -1408,6 +1465,7 @@ _srt_get_modules_full (SrtSysroot *sysroot,
           issues = _srt_check_library_presence (runner,
                                                 loader_libraries[i],
                                                 arch_quark,
+                                                known_arch,
                                                 NULL,   /* symbols path */
                                                 NULL,   /* hidden dependencies */
                                                 SRT_CHECK_FLAGS_SKIP_SLOW_CHECKS,
@@ -1448,6 +1506,7 @@ _srt_get_modules_full (SrtSysroot *sysroot,
 
           _srt_get_modules_from_loader_library (sysroot, runner, driver_canonical_path,
                                                 arch_quark,
+                                                known_arch,
                                                 check_flags, is_extra, module,
                                                 drivers_set, drivers_out);
         }
@@ -1496,7 +1555,9 @@ _srt_get_modules_full (SrtSysroot *sysroot,
                 {
                   g_hash_table_add (drivers_set, g_strdup (absolute_path_in_sysroot));
                   _srt_get_modules_from_path (sysroot, runner,
-                                              arch_quark, check_flags,
+                                              arch_quark,
+                                              known_arch,
+                                              check_flags,
                                               absolute_path_in_sysroot, is_extra,
                                               module, drivers_out);
                 }
@@ -1512,7 +1573,8 @@ _srt_get_modules_full (SrtSysroot *sysroot,
         }
 
       vdpau_argv = _argv_for_list_vdpau_drivers (sysroot, runner,
-                                                 multiarch_tuple, tmp_dir.path, &error);
+                                                 multiarch_tuple, known_arch,
+                                                 tmp_dir.path, &error);
       if (vdpau_argv == NULL)
         {
           g_debug ("An error occurred trying to capture VDPAU drivers: %s", error->message);
@@ -1535,7 +1597,9 @@ _srt_get_modules_full (SrtSysroot *sysroot,
           if (!g_hash_table_contains (drivers_set, debian_additional))
             {
               _srt_get_modules_from_path (sysroot, runner,
-                                          arch_quark, check_flags, debian_additional,
+                                          arch_quark,
+                                          known_arch,
+                                          check_flags, debian_additional,
                                           TRUE, module, drivers_out);
             }
         }
@@ -1548,6 +1612,7 @@ _srt_get_modules_full (SrtSysroot *sysroot,
  * @runner: The execution environment
  * @multiarch_tuple: (not nullable) (type filename): A Debian-style multiarch tuple
  *  such as %SRT_ABI_X86_64
+ * @known_arch: Details of @arch_quark if known
  * @check_flags: Flags affecting how we do the search
  * @which: Graphics modules to look for
  *
@@ -1568,6 +1633,7 @@ GList *
 _srt_list_graphics_modules (SrtSysroot *sysroot,
                             SrtSubprocessRunner *runner,
                             GQuark arch_quark,
+                            const SrtKnownArchitecture *known_arch,
                             SrtCheckFlags check_flags,
                             SrtGraphicsModule which)
 {
@@ -1577,9 +1643,9 @@ _srt_list_graphics_modules (SrtSysroot *sysroot,
   g_return_val_if_fail (arch_quark != SRT_ARCHITECTURE_QUARK_NONE, NULL);
 
   if (which == SRT_GRAPHICS_GLX_MODULE)
-    _srt_list_glx_icds (sysroot, runner, arch_quark, &drivers);
+    _srt_list_glx_icds (sysroot, runner, arch_quark, known_arch, &drivers);
   else
-    _srt_get_modules_full (sysroot, runner, arch_quark,
+    _srt_get_modules_full (sysroot, runner, arch_quark, known_arch,
                            check_flags, which, &drivers);
 
   return g_list_reverse (drivers);

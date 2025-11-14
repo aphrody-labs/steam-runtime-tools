@@ -31,10 +31,12 @@
 
 G_GNUC_INTERNAL gchar *_srt_libdl_detect_platform (SrtSubprocessRunner *runner,
                                                    GQuark arch_quark,
+                                                   const SrtKnownArchitecture *known_arch,
                                                    GError **error);
 
 G_GNUC_INTERNAL gchar *_srt_libdl_detect_lib (SrtSubprocessRunner *runner,
                                               GQuark arch_quark,
+                                              const SrtKnownArchitecture *known_arch,
                                               GError **error);
 
 typedef enum

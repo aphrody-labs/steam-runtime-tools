@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20251112.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251114.0) UNRELEASED; urgency=medium
 
   * SteamLinuxRuntime_*:
     - Write PRESSURE_VESSEL_ARCHITECTURES into ./run, so that
@@ -16,12 +16,15 @@ steam-runtime-tools (0.20251112.0) UNRELEASED; urgency=medium
     - Use more automatic resource management
     - Refactoring
     - Documentation fixes
+  * Diagnostic tools:
+    - Avoid unneeded dependencies on json-glib in tools that don't
+      parse JSON, like steam-runtime-check-requirements
   * Library code:
     - Use more automatic resource management
-    - Refactoring
+    - Refactoring (steamrt/tasks#828, steamrt/tasks#831)
   * Documentation updates
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 12 Nov 2025 12:20:04 +0000
+ -- Simon McVittie <smcv@collabora.com>  Fri, 14 Nov 2025 15:16:09 +0000
 
 steam-runtime-tools (0.20251103.0) steamrt; urgency=medium
 

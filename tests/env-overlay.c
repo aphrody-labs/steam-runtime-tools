@@ -134,6 +134,7 @@ dump_env0 (GBytes *env0)
     }
 }
 
+/* Exercise _srt_env_overlay_to_env0() and _srt_env_overlay_copy() */
 static void
 test_to_env0 (Fixture *f,
               gconstpointer context)
@@ -146,12 +147,18 @@ test_to_env0 (Fixture *f,
     "LD_AUDIT=audit2.so",
     NULL
   };
-  g_autoptr(GBytes) env0 = _srt_env_overlay_to_env0 (f->container_env);
+  g_autoptr(GBytes) env0 = NULL;
+  g_autoptr(SrtEnvOverlay) copy = _srt_env_overlay_copy (f->container_env);
   size_t len;
   size_t i = 0;
-  const char *data = g_bytes_get_data (env0, &len);
+  const char *data;
 
+  /* Modifying the original does not change the copy */
+  _srt_env_overlay_set (f->container_env, "LD_AUDIT", "different");
+
+  env0 = _srt_env_overlay_to_env0 (copy);
   dump_env0 (env0);
+  data = g_bytes_get_data (env0, &len);
 
   while (len > 0)
     {
@@ -259,6 +266,28 @@ test_to_shell (Fixture *f,
     }
 }
 
+static void
+test_update (Fixture *f,
+             gconstpointer context)
+{
+  g_autoptr(SrtEnvOverlay) other = _srt_env_overlay_new ();
+
+  _srt_env_overlay_set (other, "LD_AUDIT", NULL);
+  _srt_env_overlay_set (other, "TMPDIR", "/tmp");
+  _srt_env_overlay_inherit (other, "G_MESSAGES_DEBUG");
+
+  _srt_env_overlay_update (f->container_env, other);
+  /* Setting a variable in the source sets it in the destination */
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "TMPDIR"), ==, "/tmp");
+  /* Unsetting a variable in the source unsets it in the destination */
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "LD_AUDIT"), ==, NULL);
+  g_assert_true (_srt_env_overlay_contains (f->container_env, "LD_AUDIT"));
+  /* Setting a variable to be inherited in the source has no effect on
+   * the destination */
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "G_MESSAGES_DEBUG"),
+                   ==, "all");
+}
+
 int
 main (int argc,
       char **argv)
@@ -272,6 +301,8 @@ main (int argc,
               setup, test_to_env0, teardown);
   g_test_add ("/env-overlay/to-shell", Fixture, NULL,
               setup, test_to_shell, teardown);
+  g_test_add ("/env-overlay/update", Fixture, NULL,
+              setup, test_update, teardown);
 
   return g_test_run ();
 }

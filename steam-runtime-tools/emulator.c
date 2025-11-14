@@ -355,7 +355,6 @@ _srt_emulator_new_from_manifest (const char *path,
   g_autoptr(JsonParser) parser = json_parser_new ();
   g_auto(GStrv) argv = NULL;
   g_auto(GStrv) required_libraries = NULL;
-  g_autofree char *exec = NULL;
   g_autofree char *real_manifest = NULL;
   size_t len = 0;
   JsonArray *array;

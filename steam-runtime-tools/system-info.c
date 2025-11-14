@@ -31,6 +31,7 @@
 #include "steam-runtime-tools/json-glib-backports-internal.h"
 
 #include "steam-runtime-tools/architecture.h"
+#include "steam-runtime-tools/architecture-checks-internal.h"
 #include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/container-internal.h"
 #include "steam-runtime-tools/cpu-feature-internal.h"

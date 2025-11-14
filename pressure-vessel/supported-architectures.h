@@ -24,20 +24,4 @@
 #include "steam-runtime-tools/architecture.h"
 #include "steam-runtime-tools/architecture-internal.h"
 
-/*
- * PvMultiarchLibdirsFlags:
- * @PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN:
- *  Return all library directories from which we might need to delete
- *  overridden libraries shipped in the runtime.
- */
-typedef enum
-{
-  PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN = (1 << 0),
-  PV_MULTIARCH_LIBDIRS_FLAGS_NONE = 0
-} PvMultiarchLibdirsFlags;
-
-GPtrArray *pv_known_architecture_get_libdirs (const char *tuple,
-                                              const SrtKnownArchitecture *known,
-                                              PvMultiarchLibdirsFlags flags);
-
 void pv_architecture_array_populate_from_environ (GArray *arch_quarks);

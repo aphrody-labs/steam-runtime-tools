@@ -37,6 +37,7 @@ libsteamrt_libc_utils_dep = declare_dependency(
 
 libsteamrt_sources = [
     'architecture.c',
+    'architecture-checks.c',
     'bwrap.c',
     'container.c',
     'cpu-feature.c',
@@ -96,6 +97,9 @@ libsteamrt_public_headers = [
 # Modules that are needed by parts of the public API
 libsteamrt_internals = [
     'architecture-internal.h',
+    'architecture-checks-internal.h',
+    'architecture-libelf.c',
+    'architecture-libelf-internal.h',
     'bwrap-internal.h',
     'cpu-feature-internal.h',
     'desktop-entry-internal.h',
@@ -106,6 +110,7 @@ libsteamrt_internals = [
     'elf-utils-internal.h',
     'emulator.c',
     'emulator-internal.h',
+    'emulator-private.h',
     'glib-backports.c',
     'glib-backports-internal.h',
     'graphics-internal.h',
@@ -146,6 +151,7 @@ libsteamrt_internals = [
 # Modules that are needed by bin/ or pressure-vessel/ but not by the
 # library API
 libsteamrt_static_extras = [
+    'emulator-json.c',
     'env-overlay.c',
     'env-overlay-internal.h',
     'file-lock.c',

@@ -23,15 +23,13 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <gelf.h>
-#include <libelf.h>
+#include <elf.h>
 
 #include "steam-runtime-tools/architecture.h"
 #include "steam-runtime-tools/architecture-internal.h"
 
 #include "steam-runtime-tools/glib-backports-internal.h"
 
-#include "steam-runtime-tools/elf-utils-internal.h"
 #include "steam-runtime-tools/utils.h"
 #include "steam-runtime-tools/utils-internal.h"
 
@@ -282,101 +280,6 @@ _srt_architecture_get_known (void)
   return &known_architectures[0];
 }
 
-gboolean
-_srt_architecture_can_run (SrtSubprocessRunner *runner,
-                           GQuark arch_quark)
-{
-  g_autoptr(SrtCompletedSubprocess) completed = NULL;
-  g_autoptr(GPtrArray) argv = NULL;
-  g_autoptr(GError) error = NULL;
-  SrtHelperFlags helper_flags = SRT_HELPER_FLAGS_NONE;
-  const char *multiarch;
-
-  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (runner), FALSE);
-  g_return_val_if_fail (arch_quark != SRT_ARCHITECTURE_QUARK_NONE, FALSE);
-  g_return_val_if_fail (_srt_check_not_setuid (), FALSE);
-
-  multiarch = g_quark_to_string (arch_quark);
-  argv = _srt_subprocess_runner_get_helper (runner, multiarch, "true",
-                                            helper_flags, &error);
-
-  if (argv == NULL)
-    {
-      g_debug ("%s", error->message);
-      return FALSE;
-    }
-
-  g_ptr_array_add (argv, NULL);
-
-  completed = _srt_subprocess_runner_run_sync (runner,
-                                               helper_flags,
-                                               arch_quark,
-                                               (const char * const *) argv->pdata,
-                                               SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
-                                               SRT_SUBPROCESS_OUTPUT_CAPTURE_DEBUG,
-                                               &error);
-
-  if (completed == NULL || !_srt_completed_subprocess_check (completed, &error))
-    {
-      g_debug ("... %s", error->message);
-      return FALSE;
-    }
-
-  g_debug ("... it works");
-  return TRUE;
-}
-
-/**
- * srt_architecture_can_run_i386:
- *
- * Check whether we can run an i386 (%SRT_ABI_I386) executable.
- *
- * For this check to work as intended, the contents of the
- * `libsteam-runtime-tools-0-helpers:i386` package must be available
- * in the same directory hierarchy as the `libsteam-runtime-tools-0`
- * shared library, something like this:
- *
- * |[
- * any directory/
- *      lib/
- *          x86_64-linux-gnu/
- *              libsteam-runtime-tools-0.so.0
- *      libexec/
- *          steam-runtime-tools-0/
- *              i386-linux-gnu-*
- *              x86_64-linux-gnu-*
- * ]|
- *
- * Returns: %TRUE if we can run an i386 executable.
- */
-gboolean
-srt_architecture_can_run_i386 (void)
-{
-  g_autoptr(SrtSubprocessRunner) runner = _srt_subprocess_runner_new ();
-
-  return _srt_architecture_can_run (runner, g_quark_from_static_string (SRT_ABI_I386));
-}
-
-/**
- * srt_architecture_can_run_x86_64:
- *
- * Check whether we can run an x86_64 (%SRT_ABI_X86_64) executable.
- *
- * For this check to work as intended, the contents of the
- * `libsteam-runtime-tools-0-helpers:amd64` package must be available
- * in the same directory hierarchy as the `libsteam-runtime-tools-0`
- * shared library. See srt_architecture_can_run_i386() for details.
- *
- * Returns: %TRUE if we can run an x86_64 executable.
- */
-gboolean
-srt_architecture_can_run_x86_64 (void)
-{
-  g_autoptr(SrtSubprocessRunner) runner = _srt_subprocess_runner_new ();
-
-  return _srt_architecture_can_run (runner, g_quark_from_static_string (SRT_ABI_X86_64));
-}
-
 /*
  * _srt_architecture_ldconfig_knows_architecture:
  * @maybe_known: (nullable): A #SrtKnownArchitecture or %NULL
@@ -513,95 +416,6 @@ _srt_architecture_get_by_tuple (const char *tuple)
   if (strcmp (tuple, "x86_64-mock-abi") == 0)
     return &mock_abi;
 
-  return NULL;
-}
-
-/*
- * @dfd: a directory file descriptor, `AT_FDCWD` or -1,
- *  or an open file descriptor for the library or executable itself
- *  if @file_path is %NULL
- * @file_path: (type filename): Filename to open, or %NULL if @dfd
- *  is an open file descriptor for the executable or library
- * @cls: (not optional) (out): ELF class, normally `ELFCLASS32` or `ELFCLASS64`
- * @data_encoding: (not optional) (out): ELF data encoding, normally
- *  `ELFDATA2LSB` or `ELFDATA2MSB`
- * @machine: (not optional) (out): ELF machine, for example `EM_X86_64` or
- *  `EM_386`
- * @error: On failure set to GIOErrorEnum, used to describe the error
- *
- * Returns: %TRUE on success
- */
-static gboolean
-_srt_architecture_read_elf (int dfd,
-                            const char *file_path,
-                            guint8 *cls,
-                            guint8 *data_encoding,
-                            guint16 *machine,
-                            GError **error)
-{
-  glnx_autofd int fd = -1;
-  g_autoptr(Elf) elf = NULL;
-  GElf_Ehdr eh;
-
-  g_return_val_if_fail (file_path == NULL || file_path[0] != '\0', FALSE);
-  g_return_val_if_fail (file_path != NULL || dfd >= 0, FALSE);
-  g_return_val_if_fail (cls != NULL, FALSE);
-  g_return_val_if_fail (machine != NULL, FALSE);
-  g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
-
-  if (!_srt_open_elf (dfd, file_path, &fd, &elf, error))
-    return FALSE;
-
-  if (gelf_getehdr (elf, &eh) == NULL)
-    return glnx_throw (error, "Error reading \"%s\" ELF header: %s",
-                       file_path, elf_errmsg (elf_errno ()));
-
-  *cls = eh.e_ident[EI_CLASS];
-  *data_encoding = eh.e_ident[EI_DATA];
-  *machine = eh.e_machine;
-
-  return TRUE;
-}
-
-/*
- * @dfd: a directory file descriptor, `AT_FDCWD` or -1,
- *  or an open file descriptor for the library or executable itself
- *  if @file_path is %NULL
- * @file_path: (type filename): Filename to open, or %NULL if @dfd
- *  is an open file descriptor for the executable or library
- * @error: On failure set to GIOErrorEnum or SrtArchitectureError, used to
- *  describe the error
- *
- * Returns: (nullable): The known architecture object, or %NULL on error
- */
-const SrtKnownArchitecture *
-_srt_architecture_guess_from_elf (int dfd,
-                                  const char *file_path,
-                                  GError **error)
-{
-  guint8 cls = ELFCLASSNONE;
-  guint8 data_encoding = ELFDATANONE;
-  guint16 machine = EM_NONE;
-  gsize i;
-
-  g_return_val_if_fail (file_path == NULL || file_path[0] != '\0', NULL);
-  g_return_val_if_fail (file_path != NULL || dfd >= 0, NULL);
-
-  if (!_srt_architecture_read_elf (dfd, file_path, &cls, &data_encoding, &machine, error))
-    return NULL;
-
-  for (i = 0; i < G_N_ELEMENTS (known_architectures); i++)
-    {
-      if (known_architectures[i].multiarch_tuple != NULL
-          && machine == known_architectures[i].machine_type
-          && cls == known_architectures[i].elf_class
-          && data_encoding == known_architectures[i].elf_encoding)
-        return &known_architectures[i];
-    }
-
-  g_set_error (error, SRT_ARCHITECTURE_ERROR, SRT_ARCHITECTURE_ERROR_NO_INFORMATION,
-               "ELF class, data encoding and machine (%u,%u,%u) are unknown",
-               cls, data_encoding, machine);
   return NULL;
 }
 
@@ -825,4 +639,79 @@ _srt_architecture_get_current (void)
 #else
   return 0;
 #endif
+}
+
+/*
+ * _srt_known_architecture_get_libdirs:
+ * @tuple: (nullable): A multiarch tuple, or %NULL
+ * @known: (nullable): A known architecture, or %NULL
+ *
+ * Get the absolute paths of the library directories associated with @known,
+ * most important or unambiguous first.
+ *
+ * If @tuple is %NULL, only return generic directories like `/usr/lib`.
+ * @known must also be %NULL in this case.
+ *
+ * If only @known is %NULL, only return directories that can be derived from
+ * the @tuple, like `/usr/lib/TUPLE`, plus generic directories as above.
+ *
+ * Returns: (transfer container) (element-type filename):
+ */
+GPtrArray *
+_srt_known_architecture_get_libdirs (const char *tuple,
+                                     const SrtKnownArchitecture *known,
+                                     SrtLibdirsFlags flags)
+{
+  g_autoptr(GPtrArray) dirs = g_ptr_array_new_with_free_func (g_free);
+  gsize j;
+
+  /* It doesn't make sense to have tuple == NULL and known != NULL */
+  g_return_val_if_fail (tuple != NULL || known == NULL, NULL);
+  /* If both @tuple and @known are provided then they ought to match */
+  g_return_val_if_fail (known == NULL || g_str_equal (known->multiarch_tuple, tuple), NULL);
+
+  if (tuple != NULL)
+    {
+      /* Multiarch is the least ambiguous so we put it first.
+       *
+       * We historically searched /usr/lib before /lib, but Debian actually
+       * does the opposite, and we follow that here.
+       *
+       * Arguably we should search /usr/local/lib before /lib before /usr/lib,
+       * but we don't currently try /usr/local/lib. We could add a flag
+       * for that if we don't want to do it unconditionally. */
+      g_ptr_array_add (dirs,
+                       g_build_filename ("/lib", tuple, NULL));
+      g_ptr_array_add (dirs,
+                       g_build_filename ("/usr", "lib", tuple, NULL));
+
+      if (flags & SRT_LIBDIRS_FLAGS_INCLUDE_NON_STANDARD)
+        g_ptr_array_add (dirs,
+                         g_build_filename ("/usr", "lib", tuple, "mesa",
+                                           NULL));
+    }
+
+  if (known != NULL && known->multilib_suffixes != NULL)
+    {
+      /* Try other multilib variants next. This includes
+       * Exherbo/cross-compilation-style per-architecture prefixes,
+       * Red-Hat-style lib64 and Arch-style lib32. */
+      for (j = 0; known->multilib_suffixes[j] != NULL; j++)
+        {
+          const char *multilib = known->multilib_suffixes[j];
+
+          g_ptr_array_add (dirs,
+                           g_build_filename ("/", multilib, NULL));
+          g_ptr_array_add (dirs,
+                           g_build_filename ("/usr", multilib, NULL));
+        }
+    }
+
+  /* /lib and /usr/lib are lowest priority because they're the most
+   * ambiguous: we don't know whether they're meant to contain 32- or
+   * 64-bit libraries. */
+  g_ptr_array_add (dirs, g_strdup ("/lib"));
+  g_ptr_array_add (dirs, g_strdup ("/usr/lib"));
+
+  return g_steal_pointer (&dirs);
 }

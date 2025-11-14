@@ -299,11 +299,11 @@ pv_wrap_set_icons_env_vars (SrtEnvOverlay *container_env,
 
       /* Note that unlike most path-searching implementations, libXcursor and
        * the derived code in Wayland expand '~' to the home directory. */
-      pv_search_path_append (new_xcursor_path, data_home_icons);
-      pv_search_path_append (new_xcursor_path, "~/.icons");
-      pv_search_path_append (new_xcursor_path, "/usr/share/icons");
-      pv_search_path_append (new_xcursor_path, "/usr/share/pixmaps");
-      pv_search_path_append (new_xcursor_path, "/usr/X11R6/lib/X11/icons");
+      _srt_search_path_append (new_xcursor_path, data_home_icons);
+      _srt_search_path_append (new_xcursor_path, "~/.icons");
+      _srt_search_path_append (new_xcursor_path, "/usr/share/icons");
+      _srt_search_path_append (new_xcursor_path, "/usr/share/pixmaps");
+      _srt_search_path_append (new_xcursor_path, "/usr/X11R6/lib/X11/icons");
     }
   else
     {
@@ -311,11 +311,11 @@ pv_wrap_set_icons_env_vars (SrtEnvOverlay *container_env,
        * only for the paths that have been bind-mounted to the same exact
        * location inside the container. One example would be the home directory,
        * unless pv was executed with the `--unshare-home` option. */
-      pv_search_path_append (new_xcursor_path, original_xcursor_path);
+      _srt_search_path_append (new_xcursor_path, original_xcursor_path);
     }
   /* Finally append the binded paths from the host */
-  pv_search_path_append (new_xcursor_path, "/run/host/user-share/icons");
-  pv_search_path_append (new_xcursor_path, "/run/host/share/icons");
+  _srt_search_path_append (new_xcursor_path, "/run/host/user-share/icons");
+  _srt_search_path_append (new_xcursor_path, "/run/host/share/icons");
   _srt_env_overlay_set (container_env, "XCURSOR_PATH", new_xcursor_path->str);
 
   initial_xdg_data_dirs = _srt_env_overlay_get (container_env, "XDG_DATA_DIRS");
@@ -329,9 +329,9 @@ pv_wrap_set_icons_env_vars (SrtEnvOverlay *container_env,
 
   /* Append the host "share" directories to "XDG_DATA_DIRS".
    * Currently this is only useful to load the provider's icons */
-  pv_search_path_append (new_data_dirs, initial_xdg_data_dirs);
-  pv_search_path_append (new_data_dirs, "/run/host/user-share");
-  pv_search_path_append (new_data_dirs, "/run/host/share");
+  _srt_search_path_append (new_data_dirs, initial_xdg_data_dirs);
+  _srt_search_path_append (new_data_dirs, "/run/host/user-share");
+  _srt_search_path_append (new_data_dirs, "/run/host/share");
   _srt_env_overlay_set (container_env, "XDG_DATA_DIRS", new_data_dirs->str);
 }
 

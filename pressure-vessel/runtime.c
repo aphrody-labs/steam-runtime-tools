@@ -743,14 +743,14 @@ runtime_architecture_maybe_prefix_ld_so (RuntimeArchitecture *self,
               /* We don't know whether entries in LD_LIBRARY_PATH are
                * meant to be in the graphics stack provider or in the
                * current execution environment, so try both */
-              pv_search_path_append (lib_path, prefixed);
-              pv_search_path_append (lib_path, canonicalized);
+              _srt_search_path_append (lib_path, prefixed);
+              _srt_search_path_append (lib_path, canonicalized);
             }
         }
 
-      libdirs = pv_known_architecture_get_libdirs (self->tuple,
-                                                   self->known_arch,
-                                                   PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
+      libdirs = _srt_known_architecture_get_libdirs (self->tuple,
+                                                     self->known_arch,
+                                                     SRT_LIBDIRS_FLAGS_NONE);
 
       for (size_t i = 0; i < libdirs->len; i++)
         {
@@ -764,7 +764,7 @@ runtime_architecture_maybe_prefix_ld_so (RuntimeArchitecture *self,
           prefixed = g_build_filename (self->provider->in_current_ns->path,
                                        path,
                                        NULL);
-          pv_search_path_append (lib_path, prefixed);
+          _srt_search_path_append (lib_path, prefixed);
         }
 
       /* e.g. /opt/i386/lib/ld-linux.so.2 */
@@ -2183,9 +2183,9 @@ pv_runtime_adverb_regenerate_ld_so_cache (PvRuntime *self,
         keep_in_ldlp = TRUE;
 
       if (keep_in_ldlp)
-        pv_search_path_append (ldlp_after_regen, ld_path);
+        _srt_search_path_append (ldlp_after_regen, ld_path);
 
-      pv_search_path_append (ldlp_after_regen, aliases);
+      _srt_search_path_append (ldlp_after_regen, aliases);
     }
 
   flatpak_bwrap_add_args (adverb_argv,
@@ -3114,7 +3114,7 @@ bind_icds (PvRuntime *self,
 
           in_container = g_build_filename (arch->libdir_in_container,
                                            subdir, seq_str, NULL);
-          pv_search_path_append (search_path, in_container);
+          _srt_search_path_append (search_path, in_container);
         }
 
       dependency_pattern = g_strdup_printf ("only-dependencies:%s:path:%s",
@@ -4624,9 +4624,9 @@ pv_runtime_remove_overridden_libraries (PvRuntime *self,
 
   timer = _srt_profiling_start ("Removing overridden %s libraries", arch->tuple);
 
-  dirs = pv_known_architecture_get_libdirs (arch->tuple,
-                                            arch->known_arch,
-                                            PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN);
+  dirs = _srt_known_architecture_get_libdirs (arch->tuple,
+                                              arch->known_arch,
+                                              SRT_LIBDIRS_FLAGS_INCLUDE_NON_STANDARD);
   delete = g_new0 (GHashTable *, dirs->len);
   iters = g_new0 (SrtDirIter, dirs->len);
 
@@ -5339,7 +5339,7 @@ setup_json_manifest (PvRuntime *self,
               g_return_val_if_reached (FALSE);
             }
 
-          pv_search_path_append (search_path, json_in_container);
+          _srt_search_path_append (search_path, json_in_container);
         }
       else
         {
@@ -5384,7 +5384,7 @@ setup_json_manifest (PvRuntime *self,
                                           error))
         return FALSE;
 
-      pv_search_path_append (search_path, json_in_container);
+      _srt_search_path_append (search_path, json_in_container);
     }
 
   return TRUE;
@@ -7485,7 +7485,7 @@ pv_append_host_dri_library_paths (PvRuntime *self,
                                     self->arbitrary_str_order);
 
   while (_srt_hash_table_iter_next (&iter, &drivers_path, NULL))
-    pv_search_path_append (search_path, drivers_path);
+    _srt_search_path_append (search_path, drivers_path);
 }
 
 /* Prepend the given @new_entry to the colon-delimited directory list in the
@@ -7664,8 +7664,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           g_debug ("Container path: %s -> %s",
                    arch->ld_so, ld_so_in_runtime);
 
-          pv_search_path_append (dri_path, this_dri_path_in_container);
-          pv_search_path_append (va_api_path, this_dri_path_in_container);
+          _srt_search_path_append (dri_path, this_dri_path_in_container);
+          _srt_search_path_append (va_api_path, this_dri_path_in_container);
 
           if (!glnx_shutil_mkdir_p_at (self->overrides_fd,
                                        arch->libdir_relative_to_overrides,
@@ -7852,9 +7852,9 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                                PV_RUNTIME_DATA_FLAGS_USR_SHARE_FIRST,
                                                &nvidia_data_in_provider);
 
-          dirs = pv_known_architecture_get_libdirs (arch->tuple,
-                                                    arch->known_arch,
-                                                    PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
+          dirs = _srt_known_architecture_get_libdirs (arch->tuple,
+                                                      arch->known_arch,
+                                                      SRT_LIBDIRS_FLAGS_NONE);
 
           for (j = 0; j < dirs->len; j++)
             {
@@ -7971,7 +7971,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
         {
           IcdDetails *details = g_ptr_array_index (host_stack->egl_icd_details, i);
           SrtEglIcd *icd = SRT_EGL_ICD (details->icd);
-          pv_search_path_append (egl_path, srt_egl_icd_get_json_path (icd));
+          _srt_search_path_append (egl_path, srt_egl_icd_get_json_path (icd));
         }
     }
 
@@ -7987,8 +7987,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
         {
           IcdDetails *details = g_ptr_array_index (host_stack->egl_ext_platform_details, i);
           SrtEglExternalPlatform *ext_platform = SRT_EGL_EXTERNAL_PLATFORM (details->icd);
-          pv_search_path_append (egl_ext_platform_path,
-                                 srt_egl_external_platform_get_json_path (ext_platform));
+          _srt_search_path_append (egl_ext_platform_path,
+                                   srt_egl_external_platform_get_json_path (ext_platform));
         }
     }
 
@@ -8004,7 +8004,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
         {
           IcdDetails *details = g_ptr_array_index (host_stack->vulkan_icd_details, i);
           SrtVulkanIcd *icd = SRT_VULKAN_ICD (details->icd);
-          pv_search_path_append (vulkan_path, srt_vulkan_icd_get_json_path (icd));
+          _srt_search_path_append (vulkan_path, srt_vulkan_icd_get_json_path (icd));
         }
     }
 
@@ -8023,7 +8023,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
             {
               IcdDetails *details = g_ptr_array_index (host_stack->vulkan_exp_layer_details, i);
               SrtVulkanLayer *layer = SRT_VULKAN_LAYER (details->icd);
-              pv_search_path_append (vulkan_exp_layer_path, srt_vulkan_layer_get_json_path (layer));
+              _srt_search_path_append (vulkan_exp_layer_path, srt_vulkan_layer_get_json_path (layer));
             }
         }
 
@@ -8040,7 +8040,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
             {
               IcdDetails *details = g_ptr_array_index (host_stack->vulkan_imp_layer_details, i);
               SrtVulkanLayer *layer = SRT_VULKAN_LAYER (details->icd);
-              pv_search_path_append (vulkan_imp_layer_path, srt_vulkan_layer_get_json_path (layer));
+              _srt_search_path_append (vulkan_imp_layer_path, srt_vulkan_layer_get_json_path (layer));
             }
         }
     }
@@ -8459,8 +8459,8 @@ pv_runtime_get_ld_library_path (PvRuntime *self)
       aliases = g_build_filename (self->overrides_in_container, "lib",
                                   tuple, "aliases", NULL);
 
-      pv_search_path_append (ld_library_path, ld_path);
-      pv_search_path_append (ld_library_path, aliases);
+      _srt_search_path_append (ld_library_path, ld_path);
+      _srt_search_path_append (ld_library_path, aliases);
     }
 
   return g_string_free_and_steal (g_steal_pointer (&ld_library_path));
@@ -8599,9 +8599,9 @@ pv_runtime_has_library (PvRuntime *self,
       gsize j;
 
       known = _srt_architecture_get_by_tuple (tuple);
-      dirs = pv_known_architecture_get_libdirs (tuple,
-                                                known,
-                                                PV_MULTIARCH_LIBDIRS_FLAGS_NONE);
+      dirs = _srt_known_architecture_get_libdirs (tuple,
+                                                  known,
+                                                  SRT_LIBDIRS_FLAGS_NONE);
 
       for (j = 0; j < dirs->len; j++)
         {

@@ -558,6 +558,139 @@ test_architecture_guess_from_user_input (Fixture *f,
 }
 
 static void
+test_architecture_libdirs (Fixture *f,
+                           gconstpointer context)
+{
+  static const struct
+  {
+    const char *tuple;
+    /* Length is arbitrary, extend as needed */
+    const char * const expected[10];
+  } tests[] =
+  {
+    {
+      SRT_ABI_I386,
+      {
+        "/lib/" SRT_ABI_I386,
+        "/usr/lib/" SRT_ABI_I386,
+        "NONSTANDARD:/usr/lib/" SRT_ABI_I386 "/mesa",
+        "/i686-pc-linux-gnu/lib",
+        "/usr/i686-pc-linux-gnu/lib",
+        "/lib32",
+        "/usr/lib32",
+        "/lib",
+        "/usr/lib",
+        NULL
+      },
+    },
+    {
+      SRT_ABI_X86_64,
+      {
+        "/lib/" SRT_ABI_X86_64,
+        "/usr/lib/" SRT_ABI_X86_64,
+        "NONSTANDARD:/usr/lib/" SRT_ABI_X86_64 "/mesa",
+        "/x86_64-pc-linux-gnu/lib",
+        "/usr/x86_64-pc-linux-gnu/lib",
+        "/lib64",
+        "/usr/lib64",
+        "/lib",
+        "/usr/lib",
+        NULL
+      },
+    },
+    {
+      SRT_ABI_AARCH64,
+      {
+        "/lib/" SRT_ABI_AARCH64,
+        "/usr/lib/" SRT_ABI_AARCH64,
+        "NONSTANDARD:/usr/lib/" SRT_ABI_AARCH64 "/mesa",
+        "/aarch64-unknown-linux-gnueabi/lib",
+        "/usr/aarch64-unknown-linux-gnueabi/lib",
+        "/lib",
+        "/usr/lib",
+        NULL
+      },
+    },
+    {
+      /* An architecture for which we have no hard-coded knowledge */
+      "potato-glados-eabi",
+      {
+        "/lib/potato-glados-eabi",
+        "/usr/lib/potato-glados-eabi",
+        "NONSTANDARD:/usr/lib/potato-glados-eabi/mesa",
+        "/lib",
+        "/usr/lib",
+        NULL
+      },
+    },
+    {
+      NULL,
+      {
+        "/lib",
+        "/usr/lib",
+        NULL
+      },
+    },
+  };
+  gsize i;
+  gsize with_nonstandard;
+
+  for (with_nonstandard = 0; with_nonstandard < 2; with_nonstandard++)
+    {
+      SrtLibdirsFlags flags = SRT_LIBDIRS_FLAGS_NONE;
+
+      if (with_nonstandard)
+        flags |= SRT_LIBDIRS_FLAGS_INCLUDE_NON_STANDARD;
+
+      for (i = 0; i < G_N_ELEMENTS (tests); i++)
+        {
+          g_autoptr(GPtrArray) expected = g_ptr_array_new ();
+          g_autoptr(GPtrArray) actual = NULL;
+          const SrtKnownArchitecture *known = NULL;
+          const char *tuple = tests[i].tuple;
+          gsize j;
+
+          g_test_message ("test: %s, flags: 0x%x", tuple ?: "(null)", flags);
+
+          for (j = 0; j < G_N_ELEMENTS (tests[i].expected); j++)
+            {
+              const char *item = tests[i].expected[j];
+
+              if (item == NULL)
+                break;
+
+              if (g_str_has_prefix (item, "NONSTANDARD:"))
+                {
+                  if (flags & SRT_LIBDIRS_FLAGS_INCLUDE_NON_STANDARD)
+                    item = item + strlen ("NONSTANDARD:");
+                  else
+                    continue;
+                }
+
+              g_ptr_array_add (expected, (gchar *) item);
+            }
+
+          if (tuple != NULL)
+            known = _srt_architecture_get_by_tuple (tuple);
+
+          actual = _srt_known_architecture_get_libdirs (tuple, known, flags);
+
+          for (j = 0; j < expected->len; j++)
+            g_test_message ("expected[%zu]: %s",
+                            j, (const char *) g_ptr_array_index (expected, j));
+
+          for (j = 0; j < actual->len; j++)
+            g_test_message ("actual[%zu]: %s",
+                            j, (const char *) g_ptr_array_index (actual, j));
+
+          g_ptr_array_add (expected, NULL);
+          g_ptr_array_add (actual, NULL);
+          g_assert_cmpstrv ((GStrv) actual->pdata, (GStrv) expected->pdata);
+        }
+    }
+}
+
+static void
 test_architecture_ldconfig_knows_arch (Fixture *f,
                                        gconstpointer context)
 {
@@ -811,6 +944,8 @@ main (int argc,
               setup, test_architecture_guess_from_user_input, teardown);
   g_test_add ("/architecture/ldconfig_knows_arch", Fixture, NULL,
               setup, test_architecture_ldconfig_knows_arch, teardown);
+  g_test_add ("/architecture/libdirs", Fixture, NULL,
+              setup, test_architecture_libdirs, teardown);
   g_test_add ("/architecture/plausible_tuple", Fixture, NULL,
               setup, test_architecture_plausible_tuple, teardown);
   g_test_add ("/elf-utils/open", Fixture, NULL,

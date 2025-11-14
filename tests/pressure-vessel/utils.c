@@ -480,139 +480,6 @@ test_envp_cmp (Fixture *f,
 }
 
 static void
-test_known_arch_libdirs (Fixture *f,
-                         gconstpointer context)
-{
-  static const struct
-  {
-    const char *tuple;
-    /* Length is arbitrary, extend as needed */
-    const char * const expected[10];
-  } tests[] =
-  {
-    {
-      SRT_ABI_I386,
-      {
-        "/lib/" SRT_ABI_I386,
-        "/usr/lib/" SRT_ABI_I386,
-        "IF_REMOVE_OVERRIDDEN:/usr/lib/" SRT_ABI_I386 "/mesa",
-        "/i686-pc-linux-gnu/lib",
-        "/usr/i686-pc-linux-gnu/lib",
-        "/lib32",
-        "/usr/lib32",
-        "/lib",
-        "/usr/lib",
-        NULL
-      },
-    },
-    {
-      SRT_ABI_X86_64,
-      {
-        "/lib/" SRT_ABI_X86_64,
-        "/usr/lib/" SRT_ABI_X86_64,
-        "IF_REMOVE_OVERRIDDEN:/usr/lib/" SRT_ABI_X86_64 "/mesa",
-        "/x86_64-pc-linux-gnu/lib",
-        "/usr/x86_64-pc-linux-gnu/lib",
-        "/lib64",
-        "/usr/lib64",
-        "/lib",
-        "/usr/lib",
-        NULL
-      },
-    },
-    {
-      SRT_ABI_AARCH64,
-      {
-        "/lib/" SRT_ABI_AARCH64,
-        "/usr/lib/" SRT_ABI_AARCH64,
-        "IF_REMOVE_OVERRIDDEN:/usr/lib/" SRT_ABI_AARCH64 "/mesa",
-        "/aarch64-unknown-linux-gnueabi/lib",
-        "/usr/aarch64-unknown-linux-gnueabi/lib",
-        "/lib",
-        "/usr/lib",
-        NULL
-      },
-    },
-    {
-      /* An architecture for which we have no hard-coded knowledge */
-      "potato-glados-eabi",
-      {
-        "/lib/potato-glados-eabi",
-        "/usr/lib/potato-glados-eabi",
-        "IF_REMOVE_OVERRIDDEN:/usr/lib/potato-glados-eabi/mesa",
-        "/lib",
-        "/usr/lib",
-        NULL
-      },
-    },
-    {
-      NULL,
-      {
-        "/lib",
-        "/usr/lib",
-        NULL
-      },
-    },
-  };
-  gsize i;
-  gsize remove_overridden;
-
-  for (remove_overridden = 0; remove_overridden < 2; remove_overridden++)
-    {
-      PvMultiarchLibdirsFlags flags = PV_MULTIARCH_LIBDIRS_FLAGS_NONE;
-
-      if (remove_overridden)
-        flags |= PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN;
-
-      for (i = 0; i < G_N_ELEMENTS (tests); i++)
-        {
-          g_autoptr(GPtrArray) expected = g_ptr_array_new ();
-          g_autoptr(GPtrArray) actual = NULL;
-          const SrtKnownArchitecture *known = NULL;
-          const char *tuple = tests[i].tuple;
-          gsize j;
-
-          g_test_message ("test: %s, flags: 0x%x", tuple ?: "(null)", flags);
-
-          for (j = 0; j < G_N_ELEMENTS (tests[i].expected); j++)
-            {
-              const char *item = tests[i].expected[j];
-
-              if (item == NULL)
-                break;
-
-              if (g_str_has_prefix (item, "IF_REMOVE_OVERRIDDEN:"))
-                {
-                  if (flags & PV_MULTIARCH_LIBDIRS_FLAGS_REMOVE_OVERRIDDEN)
-                    item = item + strlen ("IF_REMOVE_OVERRIDDEN:");
-                  else
-                    continue;
-                }
-
-              g_ptr_array_add (expected, (gchar *) item);
-            }
-
-          if (tuple != NULL)
-            known = _srt_architecture_get_by_tuple (tuple);
-
-          actual = pv_known_architecture_get_libdirs (tuple, known, flags);
-
-          for (j = 0; j < expected->len; j++)
-            g_test_message ("expected[%zu]: %s",
-                            j, (const char *) g_ptr_array_index (expected, j));
-
-          for (j = 0; j < actual->len; j++)
-            g_test_message ("actual[%zu]: %s",
-                            j, (const char *) g_ptr_array_index (actual, j));
-
-          g_ptr_array_add (expected, NULL);
-          g_ptr_array_add (actual, NULL);
-          g_assert_cmpstrv ((GStrv) actual->pdata, (GStrv) expected->pdata);
-        }
-    }
-}
-
-static void
 test_mtree_entry_parse (Fixture *f,
                         gconstpointer context)
 {
@@ -741,35 +608,6 @@ test_mtree_entry_parse (Fixture *f,
     }
 }
 
-static void
-test_search_path_append (Fixture *f,
-                         gconstpointer context)
-{
-  g_autoptr(GString) str = g_string_new ("");
-
-  pv_search_path_append (str, NULL);
-  g_assert_cmpstr (str->str, ==, "");
-
-  pv_search_path_append (str, "");
-  g_assert_cmpstr (str->str, ==, "");
-
-  pv_search_path_append (str, "/bin");
-  g_assert_cmpstr (str->str, ==, "/bin");
-
-  pv_search_path_append (str, NULL);
-  g_assert_cmpstr (str->str, ==, "/bin");
-
-  pv_search_path_append (str, "");
-  g_assert_cmpstr (str->str, ==, "/bin");
-
-  pv_search_path_append (str, "/usr/bin");
-  g_assert_cmpstr (str->str, ==, "/bin:/usr/bin");
-
-  /* Duplicates are not removed */
-  pv_search_path_append (str, "/usr/bin");
-  g_assert_cmpstr (str->str, ==, "/bin:/usr/bin:/usr/bin");
-}
-
 static struct stat stats_to_describe[] =
 {
   { .st_mode = 0104750, .st_uid = 0, .st_gid = 0 },
@@ -875,12 +713,8 @@ main (int argc,
   g_test_add ("/delete-dangling-symlink", Fixture, NULL,
               setup, test_delete_dangling_symlink, teardown);
   g_test_add ("/envp-cmp", Fixture, NULL, setup, test_envp_cmp, teardown);
-  g_test_add ("/known-arch-libdirs", Fixture, NULL,
-              setup, test_known_arch_libdirs, teardown);
   g_test_add ("/mtree-entry-parse", Fixture, NULL,
               setup, test_mtree_entry_parse, teardown);
-  g_test_add ("/search-path-append", Fixture, NULL,
-              setup, test_search_path_append, teardown);
   g_test_add ("/stat-describe-permissions", Fixture, NULL,
               setup, test_stat_describe_permissions, teardown);
   g_test_add ("/workarounds", Fixture, NULL,

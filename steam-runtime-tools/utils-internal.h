@@ -685,6 +685,9 @@ _srt_string_ends_with (const GString *str,
   return _srt_string_ends_with_len (str, suffix, strlen (suffix));
 }
 
+void _srt_search_path_append (GString *search_path,
+                              const gchar *item);
+
 gboolean _srt_is_identifier (const char *name);
 
 #define _SRT_RECURSIVE_EXEC_GUARD_ENV "SRT_RECURSIVE_EXEC_GUARD"

@@ -7,6 +7,7 @@
 #include "adverb-preload.h"
 
 #include "steam-runtime-tools/architecture-internal.h"
+#include "steam-runtime-tools/utils-internal.h"
 
 #include "utils.h"
 
@@ -47,7 +48,7 @@ ptr_array_add_unique (GPtrArray *arr,
 static void
 append_to_search_path (const gchar *item, GString *search_path)
 {
-  pv_search_path_append (search_path, item);
+  _srt_search_path_append (search_path, item);
 }
 
 static void

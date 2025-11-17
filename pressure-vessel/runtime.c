@@ -5882,7 +5882,6 @@ collect_core_libraries_patterns (PvRuntime *self,
         }
     }
 
-
   for (size_t i = 0; i < G_N_ELEMENTS (exact_sonames); i++)
     g_ptr_array_add (patterns,
                      g_strdup_printf ("if-exists:if-same-abi:exact-soname:%s",

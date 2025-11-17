@@ -36,13 +36,14 @@ steam-runtime-tools (0.20251117.0) UNRELEASED; urgency=medium
     - Introduce a new error code for "no information available"
       when checking locales
   * s-r-launch-options:
-    - Automatically detect if a future version of Proton requires steamrt4
+    - Automatically detect if a future version of Proton requires
+      steamrt4 (or steamrt5, for future-proofing)
   * Library code:
     - Use more automatic resource management
     - Refactoring (steamrt/tasks#828, steamrt/tasks#831)
   * Documentation updates
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 17 Nov 2025 14:56:22 +0000
+ -- Simon McVittie <smcv@collabora.com>  Mon, 17 Nov 2025 15:40:52 +0000
 
 steam-runtime-tools (0.20251103.0) steamrt; urgency=medium
 

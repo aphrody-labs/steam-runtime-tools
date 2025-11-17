@@ -800,6 +800,8 @@ class TestContainers(BaseTest):
                     self.assertTrue(
                         final_argv.endswith(
                             'tests/pressure-vessel/mock-emulators/wrapper.sh\0'
+                            '--main\0'
+                            '--\0'
                         )
                     )
 

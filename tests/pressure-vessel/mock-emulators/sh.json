@@ -1,6 +1,8 @@
 {
   "emulator_v0": {
-    "argv": "./wrapper.sh",
+    "argv": "./wrapper.sh --",
+    "container_argv": "./wrapper.sh --container --",
+    "main_argv": "./wrapper.sh --main --",
     "environment": {
       "PV_TEST_SET_WHEN_EMULATING": "set",
       "PV_TEST_UNSET_WHEN_EMULATING": null

@@ -725,7 +725,9 @@ with contents similar to this:
 
     {
       "emulator_v0": {
-        "argv": ["./bin/emulator", "--verbose", "--"],
+        "argv": ["./bin/emulator", "--quick", "--"],
+        "container_argv": ["./bin/emulator", "--sysroot=/", "--"],
+        "main_argv": ["./bin/emulator-wrapper", "--sysroot=/", "--"],
         "environment": { "MY_EMULATOR_RUNNING_UNDER_SLR": null },
         "container_environment": { "MY_EMULATOR_RUNNING_UNDER_SLR": "1" },
         "emulated_architectures": ["x86_64-linux-gnu", "i386-linux-gnu"],
@@ -783,6 +785,29 @@ In this example,
 **pv-wrap** will automatically share `.../steamapps/common/MyEmulator`
 with the container,
 but the rest of `.../steamapps/common` is not guaranteed to be available.
+
+The `container_argv` are similar to the `argv`,
+but are used when running setup commands such as `ldconfig`
+inside the container.
+For example,
+on an aarch64 system,
+they might use a special executable that has its `DT_RPATH` set to search
+`/usr/lib/pressure-vessel/overrides/aarch64-linux-gnu` for libraries.
+If not specified,
+the default is to copy the `argv`.
+The first argument (the executable) will have its path adjusted to reflect
+its location inside the container if necessary,
+for example replacing `/usr` with `/run/host/usr`.
+
+The `main_argv` are similar to the `container_argv`,
+but are only used when running the *COMMAND*
+(the application, game or compatibility tool)
+inside the container.
+For example,
+they might use a wrapper executable that applies game-specific configuration
+before starting the actual emulator.
+If not specified,
+the default is to copy the `container_argv` or the `argv`.
 
 Environment variables specified in `environment` are set as if via
 **setenv**(3) whenever the emulator is invoked,

@@ -26,9 +26,11 @@ struct _SrtEmulatorClass
 enum {
   PROP_0,
   PROP_ARGV,
+  PROP_CONTAINER_ARGV,
   PROP_CONTAINER_ENVIRONMENT,
   PROP_EMULATED_ARCHITECTURES,
   PROP_ENVIRONMENT,
+  PROP_MAIN_ARGV,
   PROP_MANIFEST,
   PROP_REQUIRED_ARCHITECTURES,
   PROP_REQUIRED_LIBRARIES,
@@ -50,9 +52,11 @@ _srt_emulator_finalize (GObject *object)
   SrtEmulator *self = SRT_EMULATOR (object);
 
   g_strfreev (self->argv);
+  g_strfreev (self->container_argv);
   g_clear_pointer (&self->container_environment, _srt_env_overlay_unref);
   g_free (self->emulated_architectures);
   g_clear_pointer (&self->environment, _srt_env_overlay_unref);
+  g_strfreev (self->main_argv);
   g_free (self->manifest);
   g_free (self->required_architectures);
   g_strfreev (self->required_libraries);
@@ -74,6 +78,10 @@ _srt_emulator_get_property (GObject *object,
         g_value_set_boxed (value, self->argv);
         break;
 
+      case PROP_CONTAINER_ARGV:
+        g_value_set_boxed (value, self->container_argv);
+        break;
+
       case PROP_CONTAINER_ENVIRONMENT:
         /* Copy it to avoid concurrent modification harming thread-safety */
         g_value_take_boxed (value,
@@ -93,6 +101,10 @@ _srt_emulator_get_property (GObject *object,
 
       case PROP_REQUIRED_LIBRARIES:
         g_value_set_boxed (value, self->required_libraries);
+        break;
+
+      case PROP_MAIN_ARGV:
+        g_value_set_boxed (value, self->main_argv);
         break;
 
       case PROP_MANIFEST:
@@ -126,6 +138,12 @@ _srt_emulator_set_property (GObject *object,
         /* Construct-only */
         g_return_if_fail (self->argv == NULL);
         self->argv = g_value_dup_boxed (value);
+        break;
+
+      case PROP_CONTAINER_ARGV:
+        /* Construct-only */
+        g_return_if_fail (self->container_argv == NULL);
+        self->container_argv = g_value_dup_boxed (value);
         break;
 
       case PROP_CONTAINER_ENVIRONMENT:
@@ -170,6 +188,12 @@ _srt_emulator_set_property (GObject *object,
         self->required_libraries = g_value_dup_boxed (value);
         break;
 
+      case PROP_MAIN_ARGV:
+        /* Construct-only */
+        g_return_if_fail (self->main_argv == NULL);
+        self->main_argv = g_value_dup_boxed (value);
+        break;
+
       case PROP_MANIFEST:
         /* Construct-only */
         g_return_if_fail (self->manifest == NULL);
@@ -205,6 +229,10 @@ _srt_emulator_constructed (GObject *object)
   g_return_if_fail (self->argv != NULL);
   g_return_if_fail (self->n_emulated_architectures != 0);
   g_return_if_fail (self->emulated_architectures != NULL);
+  g_return_if_fail (self->container_argv == NULL
+                    || self->container_argv[0] != NULL);
+  g_return_if_fail (self->main_argv == NULL
+                    || self->main_argv[0] != NULL);
   /* manifest may be NULL */
   g_return_if_fail (self->required_architectures != NULL);
   /* n_required_architectures may be 0 */
@@ -226,7 +254,8 @@ _srt_emulator_constructed (GObject *object)
  * _srt_emulator_get_argv:
  *
  * Return the arguments to be prepended to `argv` to execute
- * a binary from one of the emulated architectures.
+ * a binary from one of the emulated architectures in the current
+ * execution environment.
  * Never %NULL or empty unless a programming error has occurred.
  *
  * For example, qemu-user might return `{ "/usr/bin/qemu-x86_64", NULL }`.
@@ -239,6 +268,64 @@ _srt_emulator_get_argv (SrtEmulator *self)
   g_return_val_if_fail (SRT_IS_EMULATOR (self), NULL);
 
   return _srt_const_strv (self->argv);
+}
+
+/*
+ * _srt_emulator_get_container_argv:
+ *
+ * Return the arguments to be prepended to `argv` to execute
+ * a binary from one of the emulated architectures,
+ * for example /sbin/ldconfig or /usr/bin/localedef,
+ * inside the pressure-vessel container.
+ * Never %NULL or empty unless a programming error has occurred:
+ * if the manifest does not specify `container_argv`,
+ * then the `argv` will be returned instead.
+ *
+ * These arguments are not automatically used by interfaces such
+ * as #SrtSubprocess, but calling _srt_emulator_new_for_container()
+ * will use them for the result of _srt_emulator_get_argv() in the
+ * new emulator object.
+ *
+ * Returns: (transfer none) (array zero-terminated=1) (element-type filename):
+ */
+const char * const *
+_srt_emulator_get_container_argv (SrtEmulator *self)
+{
+  g_return_val_if_fail (SRT_IS_EMULATOR (self), NULL);
+
+  return _srt_const_strv (self->container_argv ?: self->argv);
+}
+
+/*
+ * _srt_emulator_get_main_argv:
+ *
+ * Return the arguments to be prepended to `argv` to execute
+ * a game,
+ * application
+ * or nested compatibility tool (such as Proton)
+ * from one of the emulated architectures,
+ * inside the pressure-vessel container.
+ * Never %NULL or empty unless a programming error has occurred:
+ * if the manifest does not specify `main_argv`,
+ * then the `container_argv` or `argv` will be returned instead.
+ *
+ * For example, this might be a wrapper executable that sets up
+ * game-specific emulation parameters before exec'ing the real
+ * interpreter.
+ *
+ * These arguments are not automatically used by interfaces such
+ * as #SrtSubprocess,
+ * which are not aware of whether they are being called for a setup step
+ * or the final game/application.
+ *
+ * Returns: (transfer none) (array zero-terminated=1) (element-type filename):
+ */
+const char * const *
+_srt_emulator_get_main_argv (SrtEmulator *self)
+{
+  g_return_val_if_fail (SRT_IS_EMULATOR (self), NULL);
+
+  return _srt_const_strv (self->main_argv ?: (self->container_argv ?: self->argv));
 }
 
 /*
@@ -404,6 +491,12 @@ _srt_emulator_class_init (SrtEmulatorClass *cls)
                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                          G_PARAM_STATIC_STRINGS));
 
+  properties[PROP_CONTAINER_ARGV] =
+    g_param_spec_boxed ("container-argv", NULL, NULL,
+                        G_TYPE_STRV,
+                        (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS));
+
   properties[PROP_CONTAINER_ENVIRONMENT] =
     g_param_spec_boxed ("container-environment", NULL, NULL,
                         SRT_TYPE_ENV_OVERLAY,
@@ -419,6 +512,12 @@ _srt_emulator_class_init (SrtEmulatorClass *cls)
   properties[PROP_ENVIRONMENT] =
     g_param_spec_boxed ("environment", NULL, NULL,
                         SRT_TYPE_ENV_OVERLAY,
+                        (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS));
+
+  properties[PROP_MAIN_ARGV] =
+    g_param_spec_boxed ("main-argv", NULL, NULL,
+                        G_TYPE_STRV,
                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                          G_PARAM_STATIC_STRINGS));
 
@@ -469,9 +568,19 @@ maybe_replace_argv0 (const char * const *old_argv,
  * Return a version of @self with modifications
  * so that it can be used inside a container.
  *
- * If @replacement_argv0 is non-%NULL, it replaces `argv[0]`.
+ * Calling either _srt_emulator_get_argv()
+ * or _srt_emulator_get_container_argv()
+ * on the new object will have a result
+ * similar to calling `_srt_emulator_get_container_argv (self)`.
+ *
+ * If @replacement_argv0 is non-%NULL,
+ * it replaces `argv[0]` in the results of both of those functions.
  * For example, this can be used to swap `/usr/bin/emulator`
  * for `/run/host/usr/bin/emulator`.
+ *
+ * Similarly,
+ * if @replacement_main_argv0 is non-%NULL,
+ * it replaces `argv[0]` in the result of _srt_emulator_get_main_argv().
  *
  * The returned object will return an empty overlay from
  * _srt_emulator_get_container_environment().
@@ -483,7 +592,8 @@ maybe_replace_argv0 (const char * const *old_argv,
  */
 SrtEmulator *
 _srt_emulator_new_for_container (SrtEmulator *self,
-                                 const char *replacement_argv0)
+                                 const char *replacement_argv0,
+                                 const char *replacement_main_argv0)
 {
   g_autoptr(GArray) emulated_architectures = _srt_architecture_array_new ();
   g_autoptr(GArray) required_architectures = _srt_architecture_array_new ();
@@ -491,11 +601,17 @@ _srt_emulator_new_for_container (SrtEmulator *self,
   g_autoptr(SrtEnvOverlay) empty_environment = NULL;
   const SrtEnvOverlay *environment;
   g_autofree const char **new_argv = NULL;
+  g_autofree const char **new_main_argv = NULL;
 
   g_return_val_if_fail (SRT_IS_EMULATOR (self), NULL);
 
-  new_argv = maybe_replace_argv0 (_srt_const_strv (self->argv),
+  new_argv = maybe_replace_argv0 (_srt_emulator_get_container_argv (self),
                                   replacement_argv0);
+
+  if (self->main_argv != NULL
+      || g_strcmp0 (replacement_argv0, replacement_main_argv0) != 0)
+    new_main_argv = maybe_replace_argv0 (_srt_emulator_get_main_argv (self),
+                                         replacement_main_argv0);
 
   if (self->n_emulated_architectures != 0)
     g_array_append_vals (emulated_architectures,
@@ -517,9 +633,11 @@ _srt_emulator_new_for_container (SrtEmulator *self,
     }
 
   return _srt_emulator_new (new_argv,
+                            NULL,   /* container argv == argv */
                             NULL,   /* container environment == environment */
                             emulated_architectures,
                             environment,
+                            new_main_argv,
                             NULL,   /* no manifest */
                             required_architectures,
                             _srt_const_strv (self->required_libraries));

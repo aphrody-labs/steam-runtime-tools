@@ -1577,7 +1577,7 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
        * placed in container_env by pv_runtime_bind()). */
       if (emulator != NULL)
         {
-          const char * const *emulator_argv = _srt_emulator_get_argv (emulator);
+          const char * const *emulator_argv = _srt_emulator_get_main_argv (emulator);
 
           flatpak_bwrap_append_argsv (argv_in_container,
                                       (char **) emulator_argv, -1);

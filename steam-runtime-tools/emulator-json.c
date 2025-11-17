@@ -264,6 +264,8 @@ _srt_emulator_new_from_manifest (const char *path,
   g_autoptr(SrtEnvOverlay) environment = _srt_env_overlay_new ();
   g_autoptr(SrtEnvOverlay) container_environment = _srt_env_overlay_new ();
   g_auto(GStrv) argv = NULL;
+  g_auto(GStrv) container_argv = NULL;
+  g_auto(GStrv) main_argv = NULL;
   g_auto(GStrv) required_libraries = NULL;
   g_autofree char *real_manifest = NULL;
   JsonNode *member;
@@ -301,6 +303,14 @@ _srt_emulator_new_from_manifest (const char *path,
 
   g_assert (argv[0] != NULL);
 
+  if (!manifest_read_argv (object, "container_argv", real_manifest,
+                           &container_argv, error))
+    return NULL;
+
+  if (!manifest_read_argv (object, "main_argv", real_manifest,
+                           &main_argv, error))
+    return NULL;
+
   if (!manifest_read_architectures (object, "emulated_architectures",
                                     emulated_architectures, error))
     return NULL;
@@ -328,9 +338,11 @@ _srt_emulator_new_from_manifest (const char *path,
     return NULL;
 
   return _srt_emulator_new (_srt_const_strv (argv),
+                            _srt_const_strv (container_argv),
                             container_environment,
                             emulated_architectures,
                             environment,
+                            _srt_const_strv (main_argv),
                             real_manifest,
                             required_architectures,
                             _srt_const_strv (required_libraries));
@@ -393,6 +405,14 @@ _srt_emulator_serialize_manifest (SrtEmulator *self)
                                             /* can't be NULL or empty so
                                              * this parameter doesn't
                                              * actually matter */
+                                            FALSE);
+          _srt_json_builder_add_strv_value (builder, "container_argv",
+                                            _srt_const_strv (self->container_argv),
+                                            /* emit nothing if NULL */
+                                            FALSE);
+          _srt_json_builder_add_strv_value (builder, "main_argv",
+                                            _srt_const_strv (self->main_argv),
+                                            /* emit nothing if NULL */
                                             FALSE);
 
           json_builder_set_member_name (builder, "environment");

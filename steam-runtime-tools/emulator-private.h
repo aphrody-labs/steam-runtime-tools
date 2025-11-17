@@ -12,9 +12,11 @@ struct _SrtEmulator
 {
   GObject parent;
   GStrv argv;
+  GStrv container_argv;
   SrtEnvOverlay *container_environment;
   GQuark *emulated_architectures;
   SrtEnvOverlay *environment;
+  GStrv main_argv;
   gchar *manifest;
   GQuark *required_architectures;
   GStrv required_libraries;

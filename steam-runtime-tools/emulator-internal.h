@@ -26,6 +26,8 @@ GType _srt_emulator_get_type (void);
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (SrtEmulator, g_object_unref)
 
 const char * const *_srt_emulator_get_argv (SrtEmulator *self);
+const char * const *_srt_emulator_get_container_argv (SrtEmulator *self);
+const char * const *_srt_emulator_get_main_argv (SrtEmulator *self);
 const GQuark *_srt_emulator_get_emulated_architectures (SrtEmulator *self,
                                                         size_t *n_out);
 const char * const *_srt_emulator_get_required_libraries (SrtEmulator *self);
@@ -37,26 +39,33 @@ const SrtEnvOverlay *_srt_emulator_get_container_environment (SrtEmulator *self)
 
 static inline SrtEmulator *
 _srt_emulator_new (const char * const *argv,
+                   const char * const *container_argv,
                    const SrtEnvOverlay *container_environment,
                    GArray *emulated_architectures,
                    const SrtEnvOverlay *environment,
+                   const char * const *main_argv,
                    const char *manifest,
                    GArray *required_architectures,
                    const char * const *required_libraries)
 {
   g_return_val_if_fail (argv != NULL, NULL);
   g_return_val_if_fail (argv[0] != NULL, NULL);
+  g_return_val_if_fail (container_argv == NULL || container_argv[0] != NULL,
+                        NULL);
   g_return_val_if_fail (emulated_architectures != NULL, NULL);
   g_return_val_if_fail (emulated_architectures->len != 0, NULL);
+  g_return_val_if_fail (main_argv == NULL || main_argv[0] != NULL, NULL);
   /* manifest may be NULL */
   /* required_architectures may be NULL */
   /* required_libraries may be NULL */
 
   return g_object_new (SRT_TYPE_EMULATOR,
                        "argv", argv,
+                       "container-argv", container_argv,
                        "container-environment", container_environment,
                        "emulated-architectures", emulated_architectures,
                        "environment", environment,
+                       "main-argv", main_argv,
                        "manifest", manifest,
                        "required-architectures", required_architectures,
                        "required-libraries", required_libraries,
@@ -66,7 +75,8 @@ _srt_emulator_new (const char * const *argv,
 SrtEmulator *_srt_emulator_new_from_manifest (const char *path,
                                               GError **error);
 SrtEmulator *_srt_emulator_new_for_container (SrtEmulator *self,
-                                              const char *replacement_argv0);
+                                              const char *replacement_argv0,
+                                              const char *replacement_main_argv0);
 gchar *_srt_emulator_serialize_manifest (SrtEmulator *self);
 gboolean _srt_emulator_write_manifest (SrtEmulator *self,
                                        const char *path,

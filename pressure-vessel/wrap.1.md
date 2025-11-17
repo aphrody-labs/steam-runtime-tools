@@ -4,7 +4,7 @@ section: 1
 ...
 
 <!-- This document:
-Copyright © 2020-2021 Collabora Ltd.
+Copyright © 2020-2025 Collabora Ltd.
 SPDX-License-Identifier: MIT
 -->
 
@@ -84,7 +84,7 @@ but makes it easier to compare log files.
 
 Run in a mode that enables experimental or developer-oriented features.
 Please see
-[Steam Linux Runtime - guide for game developers](https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/docs/slr-for-game-developers.md#developer-mode)
+[Steam Linux Runtime - guide for game developers][developer mode]
 for more details of the precise meaning of this option.
 
 </dd>
@@ -718,110 +718,10 @@ without needing `binfmt_misc`.
 `pressure-vessel-wrap` itself must be directly runnable,
 or runnable via transparent emulation.
 
-If non-empty,
-each item in this list must be the path to a manifest file using
-`.desktop`-compatible syntax,
-with contents similar to this:
-
-    {
-      "emulator_v0": {
-        "argv": ["./bin/emulator", "--quick", "--"],
-        "container_argv": ["./bin/emulator", "--sysroot=/", "--"],
-        "main_argv": ["./bin/emulator-wrapper", "--sysroot=/", "--"],
-        "environment": { "MY_EMULATOR_RUNNING_UNDER_SLR": null },
-        "container_environment": { "MY_EMULATOR_RUNNING_UNDER_SLR": "1" },
-        "emulated_architectures": ["x86_64-linux-gnu", "i386-linux-gnu"],
-        "required_architectures": ["aarch64-linux-gnu"],
-        "required_libraries": ["libc.so.6", "libstdc++.so.6"]
-      }
-    }
-
 This emulator is assumed to be appropriate for the *COMMAND*.
 
-The emulator will be used to run programs of the `emulated_architectures`,
-which will be appended to the `argv` command-line.
-Programs of any architecture not listed will be run directly.
-
-The `argv` command-line may be either an array or a string.
-If it is a string, it is parsed with a subset of shell syntax,
-the same as `Exec` in the the Desktop Entry Specification.
-See documentation for `g_shell_parse_argv()` for details.
-
-The first word of the command-line must either be an absolute path
-such as `/usr/bin/qemu-arm`,
-or a relative path containing `/`,
-taken to be relative to the manifest file.
-The emulator itself must be an ELF executable:
-it cannot be a shell script or another script starting with `#!`.
-
-The remaining words of the command-line must be valid both outside and
-inside the pressure-vessel container;
-in particular,
-they cannot usefully be filenames in `/usr` or in `/run/host`.
-If necessary, the emulator executable can be a wrapper program that
-locates itself with logic similar to `_srt_find_myself()`,
-and then uses paths relative to its own location to find resources and
-`execve()` the actual emulator.
-
-If the emulator is not in `/usr`,
-then the parent directory of the manifest must contain all of its dependencies,
-other than what is provided by the runtime or the graphics stack.
-That parent directory will automatically be shared with the container.
-
-For example,
-if the environment variable is
-`PRESSURE_VESSEL_EMULATOR=/.../steamapps/common/MyEmulator/emulator.json`,
-then that directory might look like this,
-with `bin/emulator` linked using `-Wl,-rpath,${ORIGIN}/../lib`:
-
-    .../steamapps/common/MyEmulator/
-        emulator.json
-        bin/
-            emulator
-        lib/
-            libdependency.so.0
-
-In this example,
-**pv-wrap** will automatically share `.../steamapps/common/MyEmulator`
-with the container,
-but the rest of `.../steamapps/common` is not guaranteed to be available.
-
-The `container_argv` are similar to the `argv`,
-but are used when running setup commands such as `ldconfig`
-inside the container.
-For example,
-on an aarch64 system,
-they might use a special executable that has its `DT_RPATH` set to search
-`/usr/lib/pressure-vessel/overrides/aarch64-linux-gnu` for libraries.
-If not specified,
-the default is to copy the `argv`.
-The first argument (the executable) will have its path adjusted to reflect
-its location inside the container if necessary,
-for example replacing `/usr` with `/run/host/usr`.
-
-The `main_argv` are similar to the `container_argv`,
-but are only used when running the *COMMAND*
-(the application, game or compatibility tool)
-inside the container.
-For example,
-they might use a wrapper executable that applies game-specific configuration
-before starting the actual emulator.
-If not specified,
-the default is to copy the `container_argv` or the `argv`.
-
-Environment variables specified in `environment` are set as if via
-**setenv**(3) whenever the emulator is invoked,
-either outside or inside the pressure-vessel container.
-The values must either be JSON strings,
-or the special JSON literal `null` to unset the variable
-(remove it from the environment) instead,
-as if via **unsetenv**(3).
-
-Environment variables specified in `container_environment` are similar,
-but they are only set or unset when the emulator is run inside the
-pressure-vessel container.
-If the same environment variable appears in both objects,
-`container_environment` takes precedence.
+The referenced file must be in **steam-runtime-emulator.json**(5) format.
+See [steam-runtime emulator.json(5)][].
 
 </dd>
 <dt>
@@ -1782,5 +1682,8 @@ then type `"$@"` (including the double quotes) to run the game itself.
 
 * <https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/docs/container-runtime.md>
 * <https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/docs/slr-for-game-developers.md>
+
+[developer mode]: https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/docs/slr-for-game-developers.md#developer-mode
+[steam-runtime emulator.json(5)]: https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/docs/steam-runtime-emulator.json.5.md
 
 <!-- vim:set sw=4 sts=4 et: -->

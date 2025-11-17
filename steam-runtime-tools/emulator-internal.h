@@ -9,6 +9,7 @@
 #include <steam-runtime-tools/macros.h>
 #include <steam-runtime-tools/glib-backports-internal.h>
 
+#include "steam-runtime-tools/env-overlay-internal.h"
 #include "steam-runtime-tools/system-info.h"
 
 typedef struct _SrtEmulator SrtEmulator;
@@ -31,10 +32,14 @@ const char * const *_srt_emulator_get_required_libraries (SrtEmulator *self);
 const char *_srt_emulator_get_manifest (SrtEmulator *self);
 const GQuark *_srt_emulator_get_required_architectures (SrtEmulator *self,
                                                         size_t *n_out);
+const SrtEnvOverlay *_srt_emulator_get_environment (SrtEmulator *self);
+const SrtEnvOverlay *_srt_emulator_get_container_environment (SrtEmulator *self);
 
 static inline SrtEmulator *
 _srt_emulator_new (const char * const *argv,
+                   const SrtEnvOverlay *container_environment,
                    GArray *emulated_architectures,
+                   const SrtEnvOverlay *environment,
                    const char *manifest,
                    GArray *required_architectures,
                    const char * const *required_libraries)
@@ -49,7 +54,9 @@ _srt_emulator_new (const char * const *argv,
 
   return g_object_new (SRT_TYPE_EMULATOR,
                        "argv", argv,
+                       "container-environment", container_environment,
                        "emulated-architectures", emulated_architectures,
+                       "environment", environment,
                        "manifest", manifest,
                        "required-architectures", required_architectures,
                        "required-libraries", required_libraries,
@@ -58,8 +65,8 @@ _srt_emulator_new (const char * const *argv,
 
 SrtEmulator *_srt_emulator_new_from_manifest (const char *path,
                                               GError **error);
-SrtEmulator *_srt_emulator_new_modified (SrtEmulator *self,
-                                         const char *replacement_argv0);
+SrtEmulator *_srt_emulator_new_for_container (SrtEmulator *self,
+                                              const char *replacement_argv0);
 gchar *_srt_emulator_serialize_manifest (SrtEmulator *self);
 gboolean _srt_emulator_write_manifest (SrtEmulator *self,
                                        const char *path,

@@ -33,9 +33,6 @@ manifest_read_argv (JsonObject *object,
       JsonArray *array = json_node_get_array (member);
       size_t len = json_array_get_length (array);
 
-      if (len == 0)
-        return glnx_throw (error, "%s array must not be empty", member_name);
-
       argv = g_new0 (char *, len + 1);
 
       for (size_t i = 0; i < len; i++)
@@ -97,6 +94,75 @@ manifest_read_argv (JsonObject *object,
 
   *argv_out = g_steal_pointer (&argv);
   return TRUE;
+}
+
+typedef struct
+{
+  const char *object_name;
+  SrtEnvOverlay *overlay;
+  GError **error;
+  gboolean ok;
+} ManifestReadEnvironmentData;
+
+static void
+foreach_environment_cb (JsonObject *env_object,
+                        const char *name,
+                        JsonNode *value,
+                        void *user_data)
+{
+  ManifestReadEnvironmentData *data = user_data;
+  const char *str = NULL;
+
+  if (!data->ok)
+    return;
+
+  if (JSON_NODE_HOLDS_NULL (value))
+    {
+      _srt_env_overlay_set (data->overlay, name, NULL);
+      return;
+    }
+
+  if (JSON_NODE_HOLDS_VALUE (value))
+    str = json_node_get_string (value);
+
+  if (str == NULL)
+    {
+      glnx_throw (data->error, "Values in %s must be strings",
+                  data->object_name);
+      data->ok = FALSE;
+      return;
+    }
+
+  _srt_env_overlay_set (data->overlay, name, str);
+}
+
+static gboolean
+manifest_read_environment (JsonObject *object,
+                           const char *member_name,
+                           SrtEnvOverlay *overlay,
+                           GError **error)
+{
+  ManifestReadEnvironmentData data =
+    {
+      .object_name = member_name,
+      .overlay = overlay,
+      .error = error,
+      .ok = TRUE,
+    };
+  JsonNode *member;
+  JsonObject *env_object;
+
+  member = json_object_get_member (object, member_name);
+
+  if (member == NULL)
+    return TRUE;
+
+  if (!JSON_NODE_HOLDS_OBJECT (member))
+    return glnx_throw (error, "%s must be an object", member_name);
+
+  env_object = json_node_get_object (member);
+  json_object_foreach_member (env_object, foreach_environment_cb, &data);
+  return data.ok;
 }
 
 static gboolean
@@ -195,6 +261,8 @@ _srt_emulator_new_from_manifest (const char *path,
   g_autoptr(GArray) emulated_architectures = _srt_architecture_array_new ();
   g_autoptr(GArray) required_architectures = _srt_architecture_array_new ();
   g_autoptr(JsonParser) parser = json_parser_new ();
+  g_autoptr(SrtEnvOverlay) environment = _srt_env_overlay_new ();
+  g_autoptr(SrtEnvOverlay) container_environment = _srt_env_overlay_new ();
   g_auto(GStrv) argv = NULL;
   g_auto(GStrv) required_libraries = NULL;
   g_autofree char *real_manifest = NULL;
@@ -252,8 +320,17 @@ _srt_emulator_new_from_manifest (const char *path,
                                     required_architectures, error))
     return NULL;
 
+  if (!manifest_read_environment (object, "environment", environment, error))
+    return NULL;
+
+  if (!manifest_read_environment (object, "container_environment",
+                                  container_environment, error))
+    return NULL;
+
   return _srt_emulator_new (_srt_const_strv (argv),
+                            container_environment,
                             emulated_architectures,
+                            environment,
                             real_manifest,
                             required_architectures,
                             _srt_const_strv (required_libraries));
@@ -271,6 +348,27 @@ builder_emit_architectures (JsonBuilder *builder,
                                        g_quark_to_string (architectures[i]));
     }
   json_builder_end_array (builder);
+}
+
+static void
+builder_emit_environment (JsonBuilder *builder,
+                          SrtEnvOverlay *overlay)
+{
+  json_builder_begin_object (builder);
+    {
+      g_autoptr(GList) vars = _srt_env_overlay_get_vars (overlay);
+      const GList *iter;
+
+      for (iter = vars; iter != NULL; iter = iter->next)
+        {
+          const char *var = iter->data;
+
+          json_builder_set_member_name (builder, var);
+          json_builder_add_string_value (builder,
+                                         _srt_env_overlay_get (overlay, var));
+        }
+    }
+  json_builder_end_object (builder);
 }
 
 /*
@@ -296,6 +394,11 @@ _srt_emulator_serialize_manifest (SrtEmulator *self)
                                              * this parameter doesn't
                                              * actually matter */
                                             FALSE);
+
+          json_builder_set_member_name (builder, "environment");
+          builder_emit_environment (builder, self->environment);
+          json_builder_set_member_name (builder, "container_environment");
+          builder_emit_environment (builder, self->container_environment);
 
           json_builder_set_member_name (builder, "emulated_architectures");
           builder_emit_architectures (builder,

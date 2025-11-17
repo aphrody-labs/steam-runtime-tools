@@ -111,6 +111,8 @@ libsteamrt_internals = [
     'emulator.c',
     'emulator-internal.h',
     'emulator-private.h',
+    'env-overlay.c',
+    'env-overlay-internal.h',
     'glib-backports.c',
     'glib-backports-internal.h',
     'graphics-internal.h',
@@ -152,8 +154,6 @@ libsteamrt_internals = [
 # library API
 libsteamrt_static_extras = [
     'emulator-json.c',
-    'env-overlay.c',
-    'env-overlay-internal.h',
     'file-lock.c',
     'file-lock-internal.h',
     'logger.c',

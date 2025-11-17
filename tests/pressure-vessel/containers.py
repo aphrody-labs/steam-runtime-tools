@@ -611,6 +611,10 @@ class TestContainers(BaseTest):
         final_argv_path = os.path.join(artifacts, 'final-argv')
 
         env = os.environ.copy()
+        env['PV_TEST_SET_WHEN_EMULATING'] = 'set-me'
+        env['PV_TEST_UNSET_WHEN_EMULATING'] = 'unset-me'
+        env['PV_TEST_SET_IN_CONTAINER'] = 'set-me'
+        env['PV_TEST_UNSET_IN_CONTAINER'] = 'unset-me'
 
         if 'G_DEBUG' not in env:
             env['G_DEBUG'] = 'fatal-criticals'

@@ -1975,8 +1975,8 @@ pv_runtime_bind_emulator (PvRuntime *self,
                          exe_now);
     }
 
-  self->emulator_in_container = _srt_emulator_new_modified (self->emulator,
-                                                            exe_in_container);
+  self->emulator_in_container = _srt_emulator_new_for_container (self->emulator,
+                                                                 exe_in_container);
   g_return_val_if_fail (SRT_IS_EMULATOR (self->emulator_in_container), FALSE);
   return TRUE;
 }
@@ -2188,6 +2188,8 @@ pv_runtime_get_adverb (PvRuntime *self,
             }
         }
 
+      /* This only sets the argv, not the environment variables (which are
+       * placed in container_env by pv_runtime_bind()). */
       argv = _srt_emulator_get_argv (self->emulator_in_container);
       g_return_val_if_fail (argv != NULL, FALSE);
       flatpak_bwrap_append_argsv (bwrap, (char **) argv, -1);
@@ -2463,8 +2465,10 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
   if (emulator != NULL)
     {
       const char * const *emulator_argv = _srt_emulator_get_argv (emulator);
+      const SrtEnvOverlay *emulator_env = _srt_emulator_get_environment (emulator);
 
       flatpak_bwrap_append_argsv (ret, (char **) emulator_argv, -1);
+      ret->envp = _srt_env_overlay_apply (emulator_env, ret->envp);
     }
 
   for (size_t i = 0; i < arch->capsule_capture_libs->len; i++)
@@ -8335,6 +8339,23 @@ pv_runtime_bind (PvRuntime *self,
 
   _srt_env_overlay_set (container_env, "PRESSURE_VESSEL_ARCHITECTURES",
                         archs_string->str);
+
+  /* This is the emulator used to run the adverb (if the adverb is a foreign
+   * binary) and the actual game (if it's a foreign binary), which do not
+   * go via a SrtSubprocessLauncher. */
+  if (self->emulator_in_container != NULL)
+    {
+      _srt_env_overlay_update (container_env,
+                               _srt_emulator_get_environment (self->emulator_in_container));
+
+      /* All relevant environment variables have been folded into
+       * get_environment(), leaving get_container_environment() empty,
+       * so the above is sufficient. */
+      g_return_val_if_fail (
+        _srt_env_overlay_is_empty (
+          _srt_emulator_get_container_environment (self->emulator_in_container)),
+        FALSE);
+    }
 
   return TRUE;
 }

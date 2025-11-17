@@ -96,3 +96,12 @@ GBytes *_srt_env_overlay_to_env0 (const SrtEnvOverlay *self);
 gchar *_srt_env_overlay_to_shell (const SrtEnvOverlay *self);
 
 GOptionGroup *_srt_env_overlay_create_option_group (SrtEnvOverlay *self);
+
+/*
+ * Returns: %TRUE if this environment overlay does not set or unset anything.
+ */
+static inline gboolean
+_srt_env_overlay_is_empty (const SrtEnvOverlay *self)
+{
+  return (g_hash_table_size (self->values) == 0);
+}

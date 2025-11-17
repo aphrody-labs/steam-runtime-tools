@@ -13,5 +13,8 @@ while [ "$#" -gt 0 ]; do
     shift
 done
 
+printf '$%s=%s\n' SET "${SET-unset}"
+printf '$%s=%s\n' UNSET "${UNSET-unset}"
+
 printf 'not really running it\n'
 exit 0

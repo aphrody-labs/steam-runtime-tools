@@ -1593,6 +1593,7 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
   if (emulator != NULL)
     {
       const char * const *emulator_argv = _srt_emulator_get_argv (emulator);
+      const SrtEnvOverlay *env;
 
       modified_argv = g_ptr_array_new_with_free_func (g_free);
 
@@ -1639,6 +1640,16 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
       /* The emulator path from _srt_emulator_get_argv() is absolute,
        * but just to ensure consistency, don't search the path for it. */
       flags &= ~SRT_HELPER_FLAGS_SEARCH_PATH;
+
+      env = _srt_emulator_get_environment (emulator);
+
+      if (!_srt_env_overlay_is_empty (env))
+        {
+          if (my_environ == NULL)
+            my_environ = g_strdupv (self->envp);
+
+          my_environ = _srt_env_overlay_apply (env, my_environ);
+        }
     }
 
   if (!(flags & SRT_HELPER_FLAGS_QUIET))

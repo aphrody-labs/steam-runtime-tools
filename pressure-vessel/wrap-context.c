@@ -1571,7 +1571,10 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
       /* We don't actually know the architecture of the game we're launching
        * (which could be a chain of scripts and helper executables that
        * eventually ends up at the target executable), but we can assume that
-       * Steam wouldn't have told us to use an emulator if not needed. */
+       * Steam wouldn't have told us to use an emulator if not needed.
+       *
+       * This only sets the argv, not the environment variables (which are
+       * placed in container_env by pv_runtime_bind()). */
       if (emulator != NULL)
         {
           const char * const *emulator_argv = _srt_emulator_get_argv (emulator);

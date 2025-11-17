@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20251114.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251117.0) UNRELEASED; urgency=medium
 
   * SteamLinuxRuntime_*:
     - Write PRESSURE_VESSEL_ARCHITECTURES into ./run, so that
@@ -14,6 +14,14 @@ steam-runtime-tools (0.20251114.0) UNRELEASED; urgency=medium
       filesystem layouts (in practice either Debian multiarch, Red Hat/FHS
       multilib or Arch multilib).
       (steamrt/tasks#809, steamrt/tasks#828)
+    - emulator.json files can set/unset environment variables, either for
+      all emulated processes or only inside the container
+      (steamrt/tasks#831)
+    - emulator.json files can have different configurations when running
+      setup commands outside the SLR container, setup commands inside the
+      SLR container, or the main command (app, game or Proton) inside the
+      SLR container
+      (steamrt/tasks#839)
     - Use more automatic resource management
     - Refactoring
   * Diagnostic tools:
@@ -27,12 +35,14 @@ steam-runtime-tools (0.20251114.0) UNRELEASED; urgency=medium
       (steamrt/tasks#828)
     - Introduce a new error code for "no information available"
       when checking locales
+  * s-r-launch-options:
+    - Automatically detect if a future version of Proton requires steamrt4
   * Library code:
     - Use more automatic resource management
     - Refactoring (steamrt/tasks#828, steamrt/tasks#831)
   * Documentation updates
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 14 Nov 2025 16:35:28 +0000
+ -- Simon McVittie <smcv@collabora.com>  Mon, 17 Nov 2025 14:56:22 +0000
 
 steam-runtime-tools (0.20251103.0) steamrt; urgency=medium
 

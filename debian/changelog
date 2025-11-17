@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20251117.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251117.0) steamrt; urgency=medium
 
   * SteamLinuxRuntime_*:
     - Write PRESSURE_VESSEL_ARCHITECTURES into ./run, so that
@@ -43,7 +43,7 @@ steam-runtime-tools (0.20251117.0) UNRELEASED; urgency=medium
     - Refactoring (steamrt/tasks#828, steamrt/tasks#831)
   * Documentation updates
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 17 Nov 2025 15:40:52 +0000
+ -- Simon McVittie <smcv@collabora.com>  Mon, 17 Nov 2025 18:48:17 +0000
 
 steam-runtime-tools (0.20251103.0) steamrt; urgency=medium
 

@@ -293,6 +293,23 @@ Some environment variables are set by Steam, including:
     In the legacy [scout `LD_LIBRARY_PATH` runtime][ldlp], this variable
     is not set.
 
+* `STEAM_COMPAT_EMULATOR`:
+
+    Absolute or relative path (an absolute path is recommended)
+    to a file in the format described by
+    [**steam-runtime-emulator.json**(5)][steam-runtime-emulator.json(5)].
+    This should be set by Steam when using CPU emulation
+    (for example running x86\_64 or i386 games on aarch64)
+    in conjunction with a [container runtime][],
+    instead of adding the emulator to the exec chain,
+    so that the container runtime machinery can use the emulator during setup.
+
+    When not using CPU emulation
+    (x86\_64 or i386 games on x86\_64,
+    native aarch64 games on aarch64,
+    or a compatibility tool on aarch64 whose ELF binaries are all aarch64),
+    this variable should remain unset.
+
 * `STEAM_COMPAT_FLAGS`:
 
     A comma-separated sequence of tokens set by Steam according to the
@@ -666,6 +683,7 @@ unless this is set to the game's top-level directory.
 [Steamworks launch options]: https://partner.steamgames.com/doc/sdk/uploading
 [VDF]: https://developer.valvesoftware.com/wiki/KeyValues
 [app891390-info]: https://steamdb.info/app/891390/info/
+[container runtime]: container-runtime.md
 [install folder]: https://partner.steamgames.com/doc/store/application/depots
 [install script]: https://partner.steamgames.com/doc/sdk/installscripts
 [install scripts]: https://partner.steamgames.com/doc/sdk/installscripts
@@ -676,3 +694,4 @@ unless this is set to the game's top-level directory.
 [sniper]: container-runtime.md#sniper
 [soldier]: container-runtime.md#soldier
 [steamrt4]: container-runtime.md#steamrt4
+[steam-runtime-emulator.json(5)]: steam-runtime-emulator.json.5.md

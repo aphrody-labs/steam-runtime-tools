@@ -32,6 +32,10 @@ steam-runtime emulator.json - manifest describing a CPU emulator
 An **emulator.json** file configures non-transparent CPU emulation,
 without needing `binfmt_misc`.
 
+Steam activates this feature by setting the environment variable
+`STEAM_COMPAT_EMULATOR` when it launches a game of a foreign architecture
+inside a container runtime.
+
 This emulator is assumed to be appropriate for the *COMMAND*
 that will be passed to **pressure-vessel-wrap**(1).
 
@@ -46,7 +50,7 @@ That parent directory will automatically be shared with the container.
 
 For example,
 if the environment variable is
-`PRESSURE_VESSEL_EMULATOR=/.../steamapps/common/MyEmulator/emulator.json`,
+`STEAM_COMPAT_EMULATOR=/.../steamapps/common/MyEmulator/emulator.json`,
 then that directory might look like this,
 with `bin/emulator` linked using `-Wl,-rpath,${ORIGIN}/../lib`
 so that it can find `libdependency.so.0`:
@@ -252,6 +256,20 @@ A manifest describing FEX-Emu might look like this:
         "required_libraries": ["libc.so.6", "libstdc++.so.6"]
       }
     }
+
+When launching an x86 game on an aarch64 system inside a
+pressure-vessel-based container,
+Steam could activate this emulator by doing the equivalent of:
+
+    export STEAM_COMPAT_EMULATOR=…/FEX-Emu/emulator.json
+
+and then using an exec chain that is similar to what it would do for an
+x86 game on x86 or an aarch64 game on aarch64:
+
+    "…/steam-launch-wrapper" … -- \
+    "…/reaper" SteamLaunch … -- \
+    "…/SteamLinuxRuntime_sniper/_v2-entry-point" --verb=waitforexitandrun -- \
+    "/path/to/game/executable"
 
 # SEE ALSO
 

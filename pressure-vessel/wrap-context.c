@@ -721,6 +721,9 @@ pv_wrap_options_parse_environment (PvWrapOptions *self,
 
   value = g_getenv ("PRESSURE_VESSEL_EMULATOR");
 
+  if (value == NULL)
+    value = g_getenv ("STEAM_COMPAT_EMULATOR");
+
   if (value != NULL)
     {
       g_free (self->emulator_manifest);

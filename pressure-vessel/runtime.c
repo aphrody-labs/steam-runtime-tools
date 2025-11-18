@@ -5814,6 +5814,12 @@ collect_core_libraries_patterns (PvRuntime *self,
    * the container, it breaks our use of ldconfig. */
   static const char * const exact_sonames[] =
   {
+    /* We dlopen libsystemd.so.0 for logging to the Journal.
+     * In principle we could skip this if the runtime already has it
+     * (in practice all since soldier do) and the architecture of pv-adverb
+     * is one of the architectures of the runtime, but there's no real reason
+     * to go to a lot of effort not to import this. */
+    "libsystemd.so.0",
     /* If we have libudev from the graphics-stack provider (in practice
      * the host system), it's a lot more likely to be able to understand
      * the data in /run/udev, which is private to the version of udevd

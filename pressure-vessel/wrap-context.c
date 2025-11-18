@@ -1138,6 +1138,9 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
     self->graphics_provider = g_strdup (g_getenv ("PRESSURE_VESSEL_GRAPHICS_PROVIDER"));
 
   if (self->graphics_provider == NULL)
+    self->graphics_provider = g_strdup (g_getenv ("STEAM_COMPAT_GRAPHICS_PROVIDER"));
+
+  if (self->graphics_provider == NULL)
     {
       /* Also check the deprecated 'PRESSURE_VESSEL_HOST_GRAPHICS' */
       Tristate value = tristate_environment ("PRESSURE_VESSEL_HOST_GRAPHICS");

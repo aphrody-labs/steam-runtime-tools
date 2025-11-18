@@ -177,8 +177,10 @@ incompatibility with recent GPUs or a crash, and is only intended to
 be done for development or debugging.
 
 Otherwise, *DIR* must be the absolute path to a directory that is
-the root of an operating system installation (a "sysroot"). The
-default is `/`.
+the root of an operating system installation (a "sysroot").
+
+The default is `$STEAM_COMPAT_GRAPHICS_PROVIDER` if set,
+or `/` otherwise.
 
 If prefixed with a multiarch tuple such as **x86_64-linux-gnu**,
 use *DIR* or *MANIFEST* for graphics drivers for that architecture only,
@@ -788,6 +790,9 @@ If set to `0`, equivalent to `--no-generate-locales`.
 </dt><dd>
 
 Equivalent to `--graphics-provider="$PRESSURE_VESSEL_GRAPHICS_PROVIDER"`.
+If both this variable and `STEAM_COMPAT_GRAPHICS_PROVIDER` are set,
+this variable takes precedence:
+it is intended for debugging and development rather than for production use.
 
 </dd>
 <dt>
@@ -1134,6 +1139,17 @@ The emulator itself should not be included in the *COMMAND*.
 `runtime-sdl3` is equivalent to `STEAM_COMPAT_RUNTIME_SDL3=1`.
 Other tokens are ignored by pressure-vessel-wrap, but might
 have an effect on other components.
+
+</dd>
+<dt>
+
+`STEAM_COMPAT_GRAPHICS_PROVIDER` (absolute path)
+
+</dt><dd>
+
+Equivalent to `--graphics-provider="$STEAM_COMPAT_GRAPHICS_PROVIDER"`,
+but with a lower precedence.
+This variable is intended to be set by Steam during emulation.
 
 </dd>
 <dt>

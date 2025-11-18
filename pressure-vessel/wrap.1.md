@@ -167,6 +167,9 @@ If the argument is a the absolute path to a regular file,
 parse it as a JSON manifest as described in
 **steam-runtime-graphics-provider.json**(5)
 and use graphics drivers according to the contents of that manifest.
+On architectures that are not supported by the graphics provider described
+by the manifest,
+fall back to using graphics drivers from the real root directory.
 
 If *DIR* is the empty string, take the graphics drivers from the
 runtime. This will often lead to software rendering, poor performance,

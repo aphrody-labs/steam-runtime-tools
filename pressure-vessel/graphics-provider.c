@@ -866,7 +866,10 @@ pv_graphics_provider_build_array (SrtSubprocessRunner *run_in_current_context,
   g_autoptr(GPtrArray) ret = g_ptr_array_new_with_free_func (g_object_unref);
   g_autoptr(SrtGraphicsProvider) provider_details = NULL;
   g_autoptr(PvGraphicsProvider) graphics_provider = NULL;
+  g_autoptr(PvGraphicsProvider) root_provider = NULL;
   g_autofree gchar *mount_point = NULL;
+  GQuark need_fallback[n_tuples];
+  size_t n_fallback = 0;
   gsize i;
 
   g_return_val_if_fail (tuples != NULL, NULL);
@@ -897,6 +900,50 @@ pv_graphics_provider_build_array (SrtSubprocessRunner *run_in_current_context,
   if (graphics_provider == NULL)
     return NULL;
 
+  /* If the configured default graphics provider was specified as a
+   * JSON manifest, it might declare that it doesn't support all of the
+   * architectures we need. If so, fall back to using the root directory. */
+  for (i = 0; i < n_tuples; i++)
+    {
+      GQuark q = tuples[i];
+
+      if (_srt_graphics_provider_get_architecture (provider_details, q) == NULL)
+        {
+          need_fallback[n_fallback] = q;
+          n_fallback++;
+        }
+    }
+
+  if (n_fallback != 0)
+    {
+      g_autoptr(SrtGraphicsProvider) root_details = NULL;
+      g_autoptr(SrtSysroot) root = _srt_sysroot_new_direct (error);
+      g_autofree gchar *root_mount = NULL;
+
+      if (root == NULL)
+        return FALSE;
+
+      root_details = _srt_graphics_provider_new_for_directory (root,
+                                                               need_fallback,
+                                                               n_fallback);
+      root_mount = pv_graphics_provider_choose_mount_point (root_details,
+                                                            NULL,
+                                                            flags,
+                                                            error);
+
+      if (root_mount == NULL)
+        return NULL;
+
+      root_provider = pv_graphics_provider_new (run_in_current_context,
+                                                root_details,
+                                                root_mount,
+                                                PV_GRAPHICS_PROVIDER_FLAGS_NONE,
+                                                error);
+
+      if (root_provider == NULL)
+        return NULL;
+    }
+
   for (i = 0; i < n_tuples; i++)
     {
       g_autoptr(PvGraphicsProvider) arch_provider = NULL;
@@ -908,10 +955,29 @@ pv_graphics_provider_build_array (SrtSubprocessRunner *run_in_current_context,
         arch_path = g_hash_table_lookup (quark_to_provider,
                                          GUINT_TO_POINTER (q));
 
-      if (arch_path == NULL || g_str_equal (arch_path, provider_path))
+      if (arch_path == NULL)
         {
-          arch_path = provider_path;
+          if (_srt_graphics_provider_get_architecture (provider_details, q) != NULL)
+            arch_provider = g_object_ref (graphics_provider);
+          else if (root_provider != NULL)
+            arch_provider = g_object_ref (root_provider);
+          else
+            /* We should have a root provider whenever provider_details
+             * doesn't cover every architecture */
+            g_return_val_if_reached (FALSE);
+
+        }
+      else if (g_str_equal (arch_path, provider_path))
+        {
+          /* If explicitly asked to use a specific provider for a
+           * specific architecture, try to do so, even if it might not
+           * actually support that architecture */
           arch_provider = g_object_ref (graphics_provider);
+        }
+      else if (g_str_equal (arch_path, "/")
+               && root_provider != NULL)
+        {
+          arch_provider = g_object_ref (root_provider);
         }
       else
         {

@@ -2292,10 +2292,7 @@ srt_system_info_set_sysroot (SrtSystemInfo *self,
   if (root == NULL)
     root = "/";
 
-  if (g_str_equal (root, "/"))
-    sysroot = _srt_sysroot_new_direct (&local_error);
-  else
-    sysroot = _srt_sysroot_new (root, &local_error);
+  sysroot = _srt_sysroot_new_maybe_direct (root, &local_error);
 
   if (sysroot == NULL)
     g_warning ("Unable to open sysroot %s: %s",

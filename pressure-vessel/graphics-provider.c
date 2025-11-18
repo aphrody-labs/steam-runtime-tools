@@ -559,10 +559,7 @@ pv_graphics_provider_new (SrtSubprocessRunner *run_in_current_context,
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (run_in_current_context), NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
-  if (g_str_equal (path_in_current_ns, "/"))
-    sysroot = _srt_sysroot_new_direct (error);
-  else
-    sysroot = _srt_sysroot_new (path_in_current_ns, error);
+  sysroot = _srt_sysroot_new_maybe_direct (path_in_current_ns, error);
 
   if (sysroot == NULL)
     return NULL;

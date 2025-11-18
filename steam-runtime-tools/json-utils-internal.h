@@ -50,6 +50,18 @@ gchar *_srt_json_object_dup_array_of_lines_member (JsonObject *json_obj,
 const gchar *_srt_json_object_get_string_member (JsonObject *object,
                                                  const char *member_name);
 
+typedef enum
+{
+  SRT_JSON_GET_BOOLEAN_RESULT_FALSE = 0,
+  SRT_JSON_GET_BOOLEAN_RESULT_TRUE,
+  SRT_JSON_GET_BOOLEAN_RESULT_UNSPECIFIED,
+  SRT_JSON_GET_BOOLEAN_RESULT_ERROR
+} SrtJsonGetBooleanResult;
+
+SrtJsonGetBooleanResult _srt_json_object_get_boolean_strict (JsonObject *object,
+                                                             const char *member_name,
+                                                             GError **error);
+
 void _srt_json_builder_add_array_of_lines (JsonBuilder *builder,
                                            const char *name,
                                            const char *value);

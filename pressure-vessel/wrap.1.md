@@ -157,11 +157,16 @@ behaviour of **pv-adverb**(1).
 </dd>
 <dt>
 
-**--graphics-provider** *DIR*, **--graphics-provider** *TUPLE=DIR*
+**--graphics-provider** *DIR*|*MANIFEST*, **--graphics-provider** *TUPLE*__=__*DIR*|*MANIFEST*,
 
 </dt><dd>
 
-If using a `--runtime`, use *DIR* to provide graphics drivers.
+If using a `--runtime`, use *DIR* or *MANIFEST* to provide graphics drivers.
+
+If the argument is a the absolute path to a regular file,
+parse it as a JSON manifest as described in
+**steam-runtime-graphics-provider.json**(5)
+and use graphics drivers according to the contents of that manifest.
 
 If *DIR* is the empty string, take the graphics drivers from the
 runtime. This will often lead to software rendering, poor performance,
@@ -173,12 +178,12 @@ the root of an operating system installation (a "sysroot"). The
 default is `/`.
 
 If prefixed with a multiarch tuple such as **x86_64-linux-gnu**,
-use *DIR* for graphics drivers for that architecture only,
+use *DIR* or *MANIFEST* for graphics drivers for that architecture only,
 overriding any non-architecture-specific choice.
 For example,
 `--graphics-provider=/ --graphics-provider=i386-linux-gnu=/opt/32`
 would take `i386` graphics drivers from the sysroot `/opt/32`,
-but `x86_64` graphics drivers from the root directory,
+but `x86_64` graphics drivers from the root directory.
 
 </dd>
 <dt>

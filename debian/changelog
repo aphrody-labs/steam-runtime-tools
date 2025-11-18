@@ -1,3 +1,12 @@
+steam-runtime-tools (0.20251118.0) UNRELEASED; urgency=medium
+
+  * pressure-vessel:
+    - Import libsystemd.so.0 into the container if available.
+      We use this if logging to the systemd Journal has been enabled.
+      (steamrt/tasks#853)
+
+ -- Simon McVittie <smcv@collabora.com>  Tue, 18 Nov 2025 11:52:28 +0000
+
 steam-runtime-tools (0.20251117.0) steamrt; urgency=medium
 
   * SteamLinuxRuntime_*:

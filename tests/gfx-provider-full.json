@@ -1,0 +1,17 @@
+{
+  "graphics_provider_v0": {
+    "root": "./",
+    "hypothetical future member": 42,
+    "architectures": {
+      "x86_64-linux-gnu": {
+        "hypothetical future member": 86.64
+      },
+      "i386-linux-gnu": {
+        "hypothetical future member": 386
+      }
+    }
+  },
+  "graphics_provider_v1": {
+    "hypothetically": "we could have info for newer versions here"
+  }
+}

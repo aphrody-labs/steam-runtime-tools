@@ -644,6 +644,11 @@ typedef struct
   const SrtKnownArchitecture *known_arch;
   /* Graphics stack provider to use */
   PvGraphicsProvider *provider;
+  /* Details from provider manifest */
+  SrtGraphicsProvider *provider_details;
+  /* Per-architecture details from provider manifest.
+   * Owned by @provider_details */
+  const SrtGraphicsProviderArchitecture *provider_arch_details;
   /* Graphics stack provider's SrtSystemInfo for this architecture */
   SrtSystemInfo *system_info;
   /* Graphics stack provider's SrtSystemInfo's subprocess runner */
@@ -666,6 +671,7 @@ typedef struct
   gchar *ld_so;
   /* Architecture tuple as a quark */
   GQuark tuple_quark;
+  SrtGraphicsProviderFeatureFlags provider_features;
 } RuntimeArchitecture;
 
 static PvGraphicsProvider *
@@ -712,6 +718,11 @@ runtime_architecture_init (RuntimeArchitecture *self,
   provider = pv_runtime_get_graphics_provider (runtime, self->tuple_quark);
   g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (provider), FALSE);
   self->provider = g_object_ref (provider);
+
+  self->provider_details = g_object_ref (provider->details);
+  self->provider_arch_details = _srt_graphics_provider_get_architecture (self->provider_details,
+                                                                         tuple);
+  self->provider_features = _srt_graphics_provider_architecture_get_features (self->provider_arch_details);
 
   arch_system_info = pv_graphics_provider_get_system_info (self->provider,
                                                            self->tuple_quark);
@@ -784,6 +795,7 @@ runtime_architecture_clear (RuntimeArchitecture *self)
   self->tuple = NULL;
   self->tuple_quark = SRT_ARCHITECTURE_QUARK_NONE;
   g_clear_object (&self->provider);
+  g_clear_object (&self->provider_details);
   g_clear_object (&self->system_info);
   g_clear_object (&self->runner);
   g_clear_pointer (&self->capsule_capture_libs, g_ptr_array_unref);

@@ -7700,8 +7700,11 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                             patterns, error))
             return FALSE;
 
-          if (!collect_vdpau_drivers (self, arch, patterns, error))
-            return FALSE;
+          if (arch->provider_features & SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VDPAU)
+            {
+              if (!collect_vdpau_drivers (self, arch, patterns, error))
+                return FALSE;
+            }
 
           if (!collect_dri_drivers (self, arch, patterns, dri_path, error))
             return FALSE;

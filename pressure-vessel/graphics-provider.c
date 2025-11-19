@@ -619,6 +619,7 @@ pv_graphics_provider_create_system_info (PvGraphicsProvider *self,
 
   system_info = srt_system_info_new (NULL);
   _srt_system_info_set_subprocess_runner (system_info, self->run_in_sysroot);
+  _srt_system_info_set_graphics_provider (system_info, self->details);
 
   if (single_arch != SRT_ARCHITECTURE_QUARK_NONE)
     {

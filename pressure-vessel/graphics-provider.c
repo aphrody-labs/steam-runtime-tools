@@ -139,8 +139,6 @@ enumerate_arch (gpointer data)
   if (g_cancellable_is_cancelled (inputs->cancellable))
     goto out;
 
-  g_free (srt_system_info_dup_libdl_platform (system_info, tuple, NULL));
-
 out:
   enumeration_thread_inputs_free (inputs);
   return g_steal_pointer (&system_info);

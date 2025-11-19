@@ -6018,6 +6018,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
   g_autoptr(GError) local_error = NULL;
   g_autofree char *libc_target = NULL;
   g_autofree char *libdl_lib = NULL;
+  const char *gconv_path;
 
   g_return_val_if_fail (arch->provider != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
@@ -6026,6 +6027,34 @@ pv_runtime_collect_libc_family (PvRuntime *self,
                                             ld_so_in_runtime,
                                             bwrap, error))
     return FALSE;
+
+  gconv_path =
+    _srt_graphics_provider_architecture_get_gconv_path (arch->provider_arch_details);
+
+  if (gconv_path != NULL)
+    {
+      /* The graphics provider directly told us what directory to use,
+       * so we don't need to spend time figuring it out automatically. */
+
+      /* In practice this always starts with a slash, but
+       * pv_runtime_library_data_try() wants paths with no slash */
+      if (G_LIKELY (gconv_path[0] == '/'))
+        gconv_path++;
+
+      if (!pv_runtime_library_data_try (gconv_in_provider,
+                                        gconv_path,
+                                        arch->provider,
+                                        "graphics provider manifest",
+                                        _srt_graphics_provider_describe (arch->provider_details),
+                                        NULL))
+        g_warning ("Graphics provider %s declared gconv directory %s "
+                   "but it was not found",
+                   _srt_graphics_provider_describe (arch->provider_details),
+                   gconv_path);
+
+      /* Don't second-guess what we were told, even if it was wrong */
+      return TRUE;
+    }
 
   libdl_lib = srt_system_info_dup_libdl_lib (arch->system_info,
                                              arch->tuple,

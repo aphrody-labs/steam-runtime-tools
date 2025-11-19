@@ -12,12 +12,14 @@
 
 struct _SrtGraphicsProviderArchitecture
 {
+  char *gconv_path;
   GQuark tuple_quark;
   SrtGraphicsProviderFeatureFlags features;
 };
 
 #define SRT_GRAPHICS_PROVIDER_ARCHITECTURE_INIT \
 { \
+  .gconv_path = NULL, \
   .tuple_quark = SRT_ARCHITECTURE_QUARK_NONE, \
   .features = SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_NONE, \
 }

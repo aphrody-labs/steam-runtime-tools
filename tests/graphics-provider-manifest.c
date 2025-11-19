@@ -82,11 +82,19 @@ static void
 dump_architecture (const SrtGraphicsProviderArchitecture *arch)
 {
   GQuark q;
+  const char *s;
 
   q = _srt_graphics_provider_architecture_get_tuple (arch);
   g_test_message ("\tarchitecture: %s", g_quark_to_string (q));
 
   dump_feature_flags ("\t\t", _srt_graphics_provider_architecture_get_features (arch));
+
+  s = _srt_graphics_provider_architecture_get_gconv_path (arch);
+
+  if (s != NULL)
+    g_test_message ("\t\tgconv path in sysroot: %s", s);
+  else
+    g_test_message ("\t\tgconv path unknown");
 }
 
 static void
@@ -127,6 +135,9 @@ assert_arch_equivalent (const SrtGraphicsProviderArchitecture *a,
   g_assert_cmpuint (_srt_graphics_provider_architecture_get_features (a),
                     ==,
                     _srt_graphics_provider_architecture_get_features (b));
+  g_assert_cmpstr (_srt_graphics_provider_architecture_get_gconv_path (a),
+                   ==,
+                   _srt_graphics_provider_architecture_get_gconv_path (b));
 }
 
 /*
@@ -253,6 +264,8 @@ test_basic (Fixture *f,
       g_assert_cmpuint (features,
                         ==,
                         SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_DEFAULT);
+      s = _srt_graphics_provider_architecture_get_gconv_path (arch);
+      g_assert_cmpstr (s, ==, NULL);
 
       g_object_get (provider,
                     "architectures", &archs_copy,
@@ -473,6 +486,8 @@ test_full (Fixture *f,
                         ==,
                         (SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VA_API
                          | SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VDPAU));
+      s = _srt_graphics_provider_architecture_get_gconv_path (x86_64);
+      g_assert_cmpstr (s, ==, "/usr/lib/gconv");
 
       i386 = _srt_graphics_provider_get_nth_architecture (provider, i386_index);
       g_assert_true (_srt_graphics_provider_get_architecture (provider, i386_quark)
@@ -482,6 +497,8 @@ test_full (Fixture *f,
       /* In the example file, i386 explicitly turns off VA-API */
       features = _srt_graphics_provider_architecture_get_features (i386);
       g_assert_cmpuint (features, ==, SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_NONE);
+      s = _srt_graphics_provider_architecture_get_gconv_path (i386);
+      g_assert_cmpstr (s, ==, "/usr/lib32/gconv");
 
       g_object_get (provider,
                     "architectures", &archs_copy,
@@ -580,6 +597,25 @@ test_invalid (Fixture *f,
       "{\"graphics_provider_v0\": {\n"
       "  \"architectures\": [\"i386-linux-gnu\"],\n"
       "  \"vdpau\": \"yes\"\n"
+      "}}\n" },
+    { "non-string gconv",
+      "{\"graphics_provider_v0\": {\n"
+      "  \"architectures\": {\n"
+      "    \"i386-linux-gnu\": {\n"
+      "      \"gconv\": []\n"
+      "    }\n"
+      "  }\n"
+      "}}\n" },
+    /* We reserve relative paths for gconv modules as maybe meaning
+     * relative to some default location in future, so for now we don't
+     * allow them at all */
+    { "non-absolute gconv",
+      "{\"graphics_provider_v0\": {\n"
+      "  \"architectures\": {\n"
+      "    \"i386-linux-gnu\": {\n"
+      "      \"gconv\": \"lib32/gconv\"\n"
+      "    }\n"
+      "  }\n"
       "}}\n" },
     { "non-boolean va_api in architecture",
       "{\"graphics_provider_v0\": {\n"

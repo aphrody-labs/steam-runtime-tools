@@ -8,6 +8,32 @@
 #include "steam-runtime-tools/json-glib-backports-internal.h"
 #include "steam-runtime-tools/json-utils-internal.h"
 
+static gboolean
+manifest_copy_optional_string (JsonObject *object,
+                               const char *member_name,
+                               char **value_out,
+                               GError **error)
+{
+  const char *value;
+  JsonNode *member;
+
+  g_return_val_if_fail (value_out != NULL, FALSE);
+  g_return_val_if_fail (*value_out == NULL, FALSE);
+
+  member = json_object_get_member (object, member_name);
+
+  if (member == NULL)
+    return TRUE;
+
+  value = json_node_get_string (member);
+
+  if (value == NULL)
+    return glnx_throw (error, "Value of \"%s\" must be a string", member_name);
+
+  *value_out = g_strdup (value);
+  return TRUE;
+}
+
 static SrtSysroot *
 manifest_read_root (JsonObject *object,
                     const char *member_name,
@@ -173,6 +199,16 @@ foreach_arch_object_cb (JsonObject *archs_object,
     }
 
   object = json_node_get_object (value);
+
+  if (!manifest_copy_optional_string (object, "gconv",
+                                      &arch.gconv_path, data->error))
+    goto fail;
+
+  if (arch.gconv_path != NULL && arch.gconv_path[0] != '/')
+    {
+      glnx_throw (data->error, "\"gconv\" value must be an absolute path");
+      goto fail;
+    }
 
   if (!manifest_read_features (object, &arch.features, data->error))
     goto fail;

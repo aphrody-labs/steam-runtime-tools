@@ -41,10 +41,25 @@ when necessary.
 
 [steamrt4]: #steamrt4
 
-Steam Linux Runtime 4.0 is in the process of becoming available.
+Steam Linux Runtime 4.0 is a newer runtime based on Debian 13
+(released in 2025)
+and is structurally similar to [sniper](#sniper).
 
-It is a newer runtime based on Debian 13 (released in 2025)
-and is structurally similar to sniper.
+The *Steam Linux Runtime 4.0* compatibility tool, app ID 4183110,
+will automatically be downloaded to your Steam library as
+`steamapps/common/SteamLinuxRuntime_4` if a game or a version of
+Proton requires it.
+It can also be installed by running this command:
+
+    steam steam://install/4183110
+
+Steam Linux Runtime 4.0 is not yet available to be selected in the
+Steamworks partner web interface.
+When it becomes available,
+we expect the procedure for selecting it to be the same as for sniper.
+
+Documentation in the `steamrt` "metapackage" provides
+[more information about steamrt4][steamrt4 README].
 
 ## <a name="sniper"></a>Steam Linux Runtime 3.0 (sniper)
 
@@ -102,7 +117,7 @@ It can also be installed by running this command:
     steam steam://install/1628350
 
 Documentation in the `steamrt` "metapackage" provides
-[more information about sniper](https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/sniper/README.md).
+[more information about sniper][sniper README].
 
 ## <a name="soldier"></a>Steam Linux Runtime 2.0 (soldier)
 
@@ -130,7 +145,7 @@ It can also be installed by running this command:
     steam steam://install/1391110
 
 Documentation in the `steamrt` "metapackage" provides
-[more information about soldier](https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/soldier/README.md).
+[more information about soldier][soldier README].
 
 ## <a name="scout-on-soldier"></a>Steam Linux Runtime 1.0 (scout)
 
@@ -194,7 +209,7 @@ It is installed in `~/.steam/root/steamrt64/steam-runtime-steamrt`.
 Older versions of the Steam client used sniper for this purpose.
 
 Documentation in the `steamrt` "metapackage" provides
-[more information about steamrt3c](https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/steamrt3c/README.md).
+[more information about steamrt3c][steamrt3c README].
 
 Game developers should use [sniper][] instead.
 
@@ -282,4 +297,9 @@ contributed to the Linux kernel.
 [ldlp]: ld-library-path-runtime.md
 [libcapsule]: https://gitlab.collabora.com/vivek/libcapsule
 [pressure-vessel]: pressure-vessel.md
+[sniper README]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/sniper/README.md
 [sniper SDK]: https://gitlab.steamos.cloud/steamrt/sniper/sdk/-/blob/steamrt/sniper/README.md
+[soldier README]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/soldier/README.md
+[steamrt3c README]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/steamrt3c/README.md
+[steamrt4 README]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/steamrt4/README.md
+[steamrt4 SDK]: https://gitlab.steamos.cloud/steamrt/steamrt4/sdk/-/blob/steamrt/steamrt4/README.md

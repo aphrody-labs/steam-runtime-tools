@@ -70,9 +70,19 @@ compatibility tool.
 
 [Steam Runtime version 4][steamrt4]
 is a new runtime based on Debian 13 (2025).
-When it becomes available,
-it will be very similar to sniper,
+It is structurally very similar to sniper,
 but 4 years newer.
+
+Steam Linux Runtime 4.0 is not yet available to be selected in the
+Steamworks partner web interface.
+When it becomes available,
+we expect the procedure for selecting it to be the same as for sniper.
+
+For development, debugging and experiments,
+if it is useful to run a game under `steamrt4`,
+replacing `SteamLinuxRuntime_sniper` with `SteamLinuxRuntime_4`
+or `sniper` with `steamrt4`
+in instructions that refer to `sniper` should usually work.
 
 ### <a name="sniper"></a>Native Linux games targeting Steam Runtime 3 'sniper'
 

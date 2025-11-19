@@ -42,6 +42,9 @@ static SrtSystemInfo *pv_graphics_provider_create_system_info (PvGraphicsProvide
 typedef struct
 {
   SrtSystemInfo *system_info;
+  SrtGraphicsProvider *details;
+  /* Owned by @details */
+  const SrtGraphicsProviderArchitecture *arch_details;
   GCancellable *cancellable;
   GQuark arch_tuple;
   PvRuntimeFlags runtime_flags;
@@ -62,7 +65,15 @@ enumeration_thread_inputs_new (GQuark arch_tuple,
   self->provider_flags = provider->flags;
   self->system_info = pv_graphics_provider_create_system_info (provider,
                                                                arch_tuple);
+  self->details = g_object_ref (provider->details);
   self->cancellable = g_object_ref (cancellable);
+
+  if (arch_tuple != 0)
+    self->arch_details = _srt_graphics_provider_get_architecture (self->details,
+                                                                  arch_tuple);
+  else
+    self->arch_details = NULL;
+
   return self;
 }
 
@@ -71,6 +82,7 @@ static void
 enumeration_thread_inputs_free (EnumerationThreadInputs *self)
 {
   g_object_unref (self->cancellable);
+  g_clear_object (&self->details);
   g_clear_object (&self->system_info);
   g_free (self);
 }

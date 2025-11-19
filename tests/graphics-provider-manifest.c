@@ -51,12 +51,42 @@ teardown (Fixture *f,
 }
 
 static void
+append_flag (GString *str,
+             const char *addition)
+{
+  if (str->len != 0)
+    g_string_append (str, " | ");
+
+  g_string_append (str, addition);
+}
+
+static void
+dump_feature_flags (const char *indent,
+                    SrtGraphicsProviderFeatureFlags features)
+{
+  g_autoptr(GString) str = g_string_new ("");
+
+  if (features & SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VA_API)
+    append_flag (str, "VA_API");
+
+  if (features & SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VDPAU)
+    append_flag (str, "VDPAU");
+
+  if (str->len == 0)
+    g_string_append (str, "NONE");
+
+  g_test_message ("%sfeature flags: %s", indent, str->str);
+}
+
+static void
 dump_architecture (const SrtGraphicsProviderArchitecture *arch)
 {
   GQuark q;
 
   q = _srt_graphics_provider_architecture_get_tuple (arch);
   g_test_message ("\tarchitecture: %s", g_quark_to_string (q));
+
+  dump_feature_flags ("\t\t", _srt_graphics_provider_architecture_get_features (arch));
 }
 
 static void
@@ -73,6 +103,8 @@ dump_graphics_provider (SrtGraphicsProvider *provider)
 
   g_return_if_fail (SRT_IS_SYSROOT (root));
   g_test_message ("\troot: %s", root->path);
+
+  dump_feature_flags ("\t", _srt_graphics_provider_get_features (provider));
 
   _srt_graphics_provider_get_architectures (provider, &n);
 
@@ -92,6 +124,9 @@ assert_arch_equivalent (const SrtGraphicsProviderArchitecture *a,
   g_assert_cmpstr (g_quark_to_string (_srt_graphics_provider_architecture_get_tuple (a)),
                    ==,
                    g_quark_to_string (_srt_graphics_provider_architecture_get_tuple (b)));
+  g_assert_cmpuint (_srt_graphics_provider_architecture_get_features (a),
+                    ==,
+                    _srt_graphics_provider_architecture_get_features (b));
 }
 
 /*
@@ -117,6 +152,7 @@ test_basic (Fixture *f,
       g_autoptr(SrtSysroot) root_copy = NULL;
       g_autofree char *manifest_copy = NULL;
       SrtSysroot *root;
+      SrtGraphicsProviderFeatureFlags features;
       const SrtGraphicsProviderArchitecture *arch;
       const SrtGraphicsProviderArchitecture *arch_copy;
       size_t n = 0;
@@ -193,6 +229,11 @@ test_basic (Fixture *f,
       s = _srt_graphics_provider_get_root_path (provider);
       g_assert_cmpstr (s, ==, root->path);
 
+      features = _srt_graphics_provider_get_features (provider);
+      g_assert_cmpuint (features,
+                        ==,
+                        SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_DEFAULT);
+
       quarks = _srt_graphics_provider_get_architectures (provider, &n);
       g_assert_cmpuint (n, ==, 1);
       g_assert_cmpstr (g_quark_to_string (quarks[0]),
@@ -208,13 +249,21 @@ test_basic (Fixture *f,
       q = _srt_graphics_provider_architecture_get_tuple (arch);
       g_assert_cmpstr (g_quark_to_string (q),
                        ==, g_quark_to_string (glados));
+      features = _srt_graphics_provider_architecture_get_features (arch);
+      g_assert_cmpuint (features,
+                        ==,
+                        SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_DEFAULT);
 
       g_object_get (provider,
                     "architectures", &archs_copy,
+                    "features", &features,
                     "manifest", &manifest_copy,
                     "root", &root_copy,
                     NULL);
       g_assert_true (root == root_copy);
+      g_assert_cmpuint (features,
+                        ==,
+                        SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_DEFAULT);
       g_assert_cmpstr (_srt_graphics_provider_get_manifest_path (provider),
                        ==, manifest_copy);
 
@@ -285,6 +334,7 @@ test_full (Fixture *f,
       g_autoptr(SrtSysroot) root_copy = NULL;
       g_autofree char *manifest_copy = NULL;
       SrtSysroot *root;
+      SrtGraphicsProviderFeatureFlags features;
       const SrtGraphicsProviderArchitecture *arch;
       const SrtGraphicsProviderArchitecture *i386;
       const SrtGraphicsProviderArchitecture *x86_64;
@@ -363,6 +413,10 @@ test_full (Fixture *f,
           case FROM_DIRECTORY:
             /* We didn't actually read the manifest, so we have
              * some defaults. */
+            features = _srt_graphics_provider_get_features (provider);
+            g_assert_cmpuint (features,
+                              ==,
+                              SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_DEFAULT);
 
             /* We told the constructor to assume that only i386 is supported */
             quarks = _srt_graphics_provider_get_architectures (provider, &n);
@@ -380,6 +434,11 @@ test_full (Fixture *f,
           default:
             g_assert_not_reached ();
         }
+
+      features = _srt_graphics_provider_get_features (provider);
+      g_assert_cmpuint (features,
+                        ==,
+                        SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VDPAU);
 
       quarks = _srt_graphics_provider_get_architectures (provider, &n);
       g_assert_cmpuint (n, ==, 2);
@@ -408,19 +467,32 @@ test_full (Fixture *f,
                      == x86_64);
       q = _srt_graphics_provider_architecture_get_tuple (x86_64);
       g_assert_cmpstr (g_quark_to_string (q), ==, SRT_ABI_X86_64);
+      /* In the example file, x86_64 explicitly turns on VA-API */
+      features = _srt_graphics_provider_architecture_get_features (x86_64);
+      g_assert_cmpuint (features,
+                        ==,
+                        (SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VA_API
+                         | SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VDPAU));
 
       i386 = _srt_graphics_provider_get_nth_architecture (provider, i386_index);
       g_assert_true (_srt_graphics_provider_get_architecture (provider, i386_quark)
                      == i386);
       q = _srt_graphics_provider_architecture_get_tuple (i386);
       g_assert_cmpstr (g_quark_to_string (q), ==, SRT_ABI_I386);
+      /* In the example file, i386 explicitly turns off VA-API */
+      features = _srt_graphics_provider_architecture_get_features (i386);
+      g_assert_cmpuint (features, ==, SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_NONE);
 
       g_object_get (provider,
                     "architectures", &archs_copy,
+                    "features", &features,
                     "manifest", &manifest_copy,
                     "root", &root_copy,
                     NULL);
       g_assert_true (root == root_copy);
+      g_assert_cmpuint (features,
+                        ==,
+                        SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VDPAU);
       g_assert_cmpstr (_srt_graphics_provider_get_manifest_path (provider),
                        ==, manifest_copy);
 
@@ -498,6 +570,24 @@ test_invalid (Fixture *f,
       "{\"graphics_provider_v0\": {\n"
       "  \"architectures\": [\"i386-linux-gnu\"],\n"
       "  \"root\": \"/nonexistent\"\n"
+      "}}\n" },
+    { "non-boolean va_api",
+      "{\"graphics_provider_v0\": {\n"
+      "  \"architectures\": [\"i386-linux-gnu\"],\n"
+      "  \"va_api\": 1\n"
+      "}}\n" },
+    { "non-boolean vdpau",
+      "{\"graphics_provider_v0\": {\n"
+      "  \"architectures\": [\"i386-linux-gnu\"],\n"
+      "  \"vdpau\": \"yes\"\n"
+      "}}\n" },
+    { "non-boolean va_api in architecture",
+      "{\"graphics_provider_v0\": {\n"
+      "  \"architectures\": {\n"
+      "    \"i386-linux-gnu\": {\n"
+      "      \"va_api\": []\n"
+      "    }\n"
+      "  }\n"
       "}}\n" },
   };
   g_auto(GLnxTmpDir) tmpdir = { .initialized = FALSE };

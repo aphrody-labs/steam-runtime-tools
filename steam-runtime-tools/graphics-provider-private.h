@@ -13,11 +13,13 @@
 struct _SrtGraphicsProviderArchitecture
 {
   GQuark tuple_quark;
+  SrtGraphicsProviderFeatureFlags features;
 };
 
 #define SRT_GRAPHICS_PROVIDER_ARCHITECTURE_INIT \
 { \
   .tuple_quark = SRT_ARCHITECTURE_QUARK_NONE, \
+  .features = SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_NONE, \
 }
 
 void _srt_graphics_provider_architecture_clear (void *p);
@@ -25,7 +27,8 @@ G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (SrtGraphicsProviderArchitecture,
                                   _srt_graphics_provider_architecture_clear)
 
 GArray *_srt_graphics_provider_architecture_array_new (const GQuark *tuple_quarks,
-                                                       size_t n_tuple_quarks);
+                                                       size_t n_tuple_quarks,
+                                                       SrtGraphicsProviderFeatureFlags features);
 
 struct _SrtGraphicsProvider
 {
@@ -35,10 +38,12 @@ struct _SrtGraphicsProvider
   /* (element-type SrtGraphicsProviderArchitecture) */
   GArray *archs;
   GQuark *tuple_quarks;
+  SrtGraphicsProviderFeatureFlags features;
 };
 
 static inline SrtGraphicsProvider *
 _srt_graphics_provider_new (GArray *archs,
+                            SrtGraphicsProviderFeatureFlags features,
                             const char *manifest,
                             SrtSysroot *root)
 {
@@ -49,6 +54,7 @@ _srt_graphics_provider_new (GArray *archs,
 
   return g_object_new (SRT_TYPE_GRAPHICS_PROVIDER,
                        "architectures", archs,
+                       "features", features,
                        "manifest", manifest,
                        "root", root,
                        NULL);

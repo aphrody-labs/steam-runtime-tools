@@ -94,8 +94,12 @@ libsteamrt_public_headers = [
     'xdg-portal.h',
 ]
 
+enums_internal_headers = [
+    'graphics-provider-internal.h',
+]
+
 # Modules that are needed by parts of the public API
-libsteamrt_internals = [
+libsteamrt_internals = enums_internal_headers + [
     'architecture-internal.h',
     'architecture-checks-internal.h',
     'architecture-libelf.c',
@@ -157,7 +161,6 @@ libsteamrt_static_extras = [
     'file-lock.c',
     'file-lock-internal.h',
     'graphics-provider.c',
-    'graphics-provider-internal.h',
     'graphics-provider-json.c',
     'graphics-provider-private.h',
     'logger.c',
@@ -237,13 +240,24 @@ systemd_codegen_dep = declare_dependency(
   sources : systemd_dbus[1],
 )
 
+enums_internal = gnome.mkenums_simple(
+  'enums-internal',
+  header_prefix : '/*< private_header >*/',
+  install_header : false,
+  sources : enums_internal_headers,
+)
+
 libsteamrt_generated_headers_dep = declare_dependency(
   include_directories : project_include_dirs,
-  sources : [enums[1]],
+  sources : [enums[1], enums_internal[1]],
 )
 libsteamrt_base = static_library(
   'steam-runtime-tools-base',
-  libsteamrt_sources + libsteamrt_internals + libsteamrt_public_headers + enums,
+  libsteamrt_sources
+  + libsteamrt_internals
+  + libsteamrt_public_headers
+  + enums
+  + enums_internal,
   c_args : srt_c_args,
   include_directories : project_include_dirs,
   dependencies : [

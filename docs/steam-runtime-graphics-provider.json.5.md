@@ -107,9 +107,35 @@ For example,
 the `bin` compatibility symlink should point to `usr/bin`,
 not `/usr/bin`.
 
+### `va_api` (boolean)
+
+If `false`,
+compatibility tools may assume that VA-API is not useful on this system
+and therefore the necessary setup steps for VA-API drivers can be skipped.
+The default is `true`.
+
+### `vdpau` (boolean)
+
+If `false`,
+compatibility tools may assume that VDPAU is not useful on this system
+and therefore the necessary setup steps for VDPAU drivers can be skipped.
+The default is `true`.
+
 ## PER-ARCHITECTURE FIELDS
 
-Currently no per-architecture fields are defined.
+Known fields in the per-architecture objects are:
+
+### `va_api` (boolean)
+
+If present,
+this overrides the field of the same name in the `emulator_v0` object,
+but only for this architecture.
+
+### `vdpau` (boolean)
+
+If present,
+this overrides the field of the same name in the `emulator_v0` object,
+but only for this architecture.
 
 ## COMPATIBILITY
 

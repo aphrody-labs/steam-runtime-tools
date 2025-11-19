@@ -24,6 +24,7 @@ _srt_graphics_provider_architecture_clear (void *p)
   static const SrtGraphicsProviderArchitecture blank = SRT_GRAPHICS_PROVIDER_ARCHITECTURE_INIT;
   SrtGraphicsProviderArchitecture *self = p;
 
+  g_clear_pointer (&self->dri_path, g_free);
   g_clear_pointer (&self->gconv_path, g_free);
   *self = blank;
 }
@@ -33,6 +34,7 @@ arch_copy (SrtGraphicsProviderArchitecture *dest,
            const SrtGraphicsProviderArchitecture *src)
 {
   _srt_graphics_provider_architecture_clear (dest);
+  dest->dri_path = g_strdup (src->dri_path);
   dest->gconv_path = g_strdup (src->gconv_path);
   dest->tuple_quark = src->tuple_quark;
   dest->features = src->features;
@@ -125,6 +127,28 @@ GQuark
 _srt_graphics_provider_architecture_get_tuple (const SrtGraphicsProviderArchitecture *self)
 {
   return self->tuple_quark;
+}
+
+/*
+ * _srt_graphics_provider_architecture_get_dri_path:
+ * @self: An architecture
+ *
+ * Return the directory containing Mesa DRI drivers and VA-API drivers
+ * for this architecture, or %NULL if unknown.
+ *
+ * The returned path should be looked up inside the sysroot returned by
+ * _srt_graphics_provider_get_root(), not the real root.
+ *
+ * The returned string is only valid as long as a reference to
+ * the #SrtGraphicsProvider is held.
+ *
+ * Returns: (nullable) (type filename): A path such as `/usr/lib64/dri`,
+ *  or %NULL if unknown
+ */
+const char *
+_srt_graphics_provider_architecture_get_dri_path (const SrtGraphicsProviderArchitecture *self)
+{
+  return self->dri_path;
 }
 
 /*

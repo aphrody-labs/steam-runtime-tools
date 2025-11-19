@@ -125,6 +125,22 @@ The default is `true`.
 
 Known fields in the per-architecture objects are:
 
+### `dri` (string)
+
+An absolute path (starting with `/`).
+If present,
+compatibility tools may assume that Mesa DRI drivers in this graphics provider
+are files named `*_dri.so` in the given directory inside the `root`,
+and VA-API drivers are files named `*_drv_video.so` in the same directory.
+
+Relative paths as values for this field are not allowed
+(they are reserved for possible future use).
+
+If not specified,
+the default is to auto-detect it,
+which may incur a startup time cost
+(especially when running under CPU emulation).
+
 ### `gconv` (string)
 
 An absolute path (starting with `/`).

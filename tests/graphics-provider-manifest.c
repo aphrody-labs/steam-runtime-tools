@@ -87,6 +87,13 @@ dump_architecture (const SrtGraphicsProviderArchitecture *arch)
   q = _srt_graphics_provider_architecture_get_tuple (arch);
   g_test_message ("\tarchitecture: %s", g_quark_to_string (q));
 
+  s = _srt_graphics_provider_architecture_get_dri_path (arch);
+
+  if (s != NULL)
+    g_test_message ("\t\tDRI path in sysroot: %s", s);
+  else
+    g_test_message ("\t\tDRI path unknown");
+
   dump_feature_flags ("\t\t", _srt_graphics_provider_architecture_get_features (arch));
 
   s = _srt_graphics_provider_architecture_get_gconv_path (arch);
@@ -132,6 +139,9 @@ assert_arch_equivalent (const SrtGraphicsProviderArchitecture *a,
   g_assert_cmpstr (g_quark_to_string (_srt_graphics_provider_architecture_get_tuple (a)),
                    ==,
                    g_quark_to_string (_srt_graphics_provider_architecture_get_tuple (b)));
+  g_assert_cmpstr (_srt_graphics_provider_architecture_get_dri_path (a),
+                   ==,
+                   _srt_graphics_provider_architecture_get_dri_path (b));
   g_assert_cmpuint (_srt_graphics_provider_architecture_get_features (a),
                     ==,
                     _srt_graphics_provider_architecture_get_features (b));
@@ -260,6 +270,8 @@ test_basic (Fixture *f,
       q = _srt_graphics_provider_architecture_get_tuple (arch);
       g_assert_cmpstr (g_quark_to_string (q),
                        ==, g_quark_to_string (glados));
+      s = _srt_graphics_provider_architecture_get_dri_path (arch);
+      g_assert_cmpstr (s, ==, NULL);
       features = _srt_graphics_provider_architecture_get_features (arch);
       g_assert_cmpuint (features,
                         ==,
@@ -480,6 +492,8 @@ test_full (Fixture *f,
                      == x86_64);
       q = _srt_graphics_provider_architecture_get_tuple (x86_64);
       g_assert_cmpstr (g_quark_to_string (q), ==, SRT_ABI_X86_64);
+      s = _srt_graphics_provider_architecture_get_dri_path (x86_64);
+      g_assert_cmpstr (s, ==, "/usr/lib/dri");
       /* In the example file, x86_64 explicitly turns on VA-API */
       features = _srt_graphics_provider_architecture_get_features (x86_64);
       g_assert_cmpuint (features,
@@ -494,6 +508,8 @@ test_full (Fixture *f,
                      == i386);
       q = _srt_graphics_provider_architecture_get_tuple (i386);
       g_assert_cmpstr (g_quark_to_string (q), ==, SRT_ABI_I386);
+      s = _srt_graphics_provider_architecture_get_dri_path (i386);
+      g_assert_cmpstr (s, ==, "/usr/lib32/dri");
       /* In the example file, i386 explicitly turns off VA-API */
       features = _srt_graphics_provider_architecture_get_features (i386);
       g_assert_cmpuint (features, ==, SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_NONE);
@@ -598,6 +614,25 @@ test_invalid (Fixture *f,
       "  \"architectures\": [\"i386-linux-gnu\"],\n"
       "  \"vdpau\": \"yes\"\n"
       "}}\n" },
+    { "non-string dri",
+      "{\"graphics_provider_v0\": {\n"
+      "  \"architectures\": {\n"
+      "    \"i386-linux-gnu\": {\n"
+      "      \"dri\": true\n"
+      "    }\n"
+      "  }\n"
+      "}}\n" },
+    /* We reserve relative paths for dri modules as maybe meaning
+     * relative to some default location in future, so for now we don't
+     * allow them at all */
+    { "non-absolute dri",
+      "{\"graphics_provider_v0\": {\n"
+      "  \"architectures\": {\n"
+      "    \"i386-linux-gnu\": {\n"
+      "      \"dri\": \"./dri\"\n"
+      "    }\n"
+      "  }\n"
+      "}}\n" },
     { "non-string gconv",
       "{\"graphics_provider_v0\": {\n"
       "  \"architectures\": {\n"
@@ -606,9 +641,7 @@ test_invalid (Fixture *f,
       "    }\n"
       "  }\n"
       "}}\n" },
-    /* We reserve relative paths for gconv modules as maybe meaning
-     * relative to some default location in future, so for now we don't
-     * allow them at all */
+    /* We reserve relative paths for gconv modules, as above */
     { "non-absolute gconv",
       "{\"graphics_provider_v0\": {\n"
       "  \"architectures\": {\n"

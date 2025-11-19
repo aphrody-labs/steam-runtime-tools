@@ -200,6 +200,16 @@ foreach_arch_object_cb (JsonObject *archs_object,
 
   object = json_node_get_object (value);
 
+  if (!manifest_copy_optional_string (object, "dri",
+                                      &arch.dri_path, data->error))
+    goto fail;
+
+  if (arch.dri_path != NULL && arch.dri_path[0] != '/')
+    {
+      glnx_throw (data->error, "\"dri\" value must be an absolute path");
+      goto fail;
+    }
+
   if (!manifest_copy_optional_string (object, "gconv",
                                       &arch.gconv_path, data->error))
     goto fail;

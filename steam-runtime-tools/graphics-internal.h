@@ -29,6 +29,7 @@
 #include "steam-runtime-tools/steam-runtime-tools.h"
 
 #include "steam-runtime-tools/architecture-internal.h"
+#include "steam-runtime-tools/graphics-provider-internal.h"
 #include "steam-runtime-tools/subprocess-internal.h"
 #include "steam-runtime-tools/system-info-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
@@ -311,6 +312,7 @@ void _srt_load_openxr_1_runtimes (SrtSysroot *sysroot,
 G_GNUC_INTERNAL
 GList *_srt_list_graphics_modules (SrtSysroot *sysroot,
                                    SrtSubprocessRunner *runner,
+                                   SrtGraphicsProvider *provider,
                                    GQuark arch_quark,
                                    const SrtKnownArchitecture *known_arch,
                                    SrtCheckFlags check_flags,

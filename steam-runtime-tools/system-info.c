@@ -2405,6 +2405,8 @@ _srt_system_info_set_graphics_provider (SrtSystemInfo *self,
     {
       SrtSysroot *root;
 
+      forget_graphics_modules (self);
+
       root = _srt_graphics_provider_get_root (provider);
 
       if (root != self->sysroot)
@@ -3886,6 +3888,7 @@ _srt_system_info_list_graphics_modules (SrtSystemInfo *self,
     {
       abi->graphics_modules[which].modules = _srt_list_graphics_modules (self->sysroot,
                                                                          self->runner,
+                                                                         self->graphics_provider,
                                                                          arch_quark,
                                                                          abi->known_architecture,
                                                                          self->check_flags,

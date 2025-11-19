@@ -7307,11 +7307,12 @@ collect_dri_drivers (PvRuntime *self,
                                                       SRT_DRIVER_FLAGS_NONE);
     }
 
-  g_debug ("Enumerating %s VA-API drivers on provider...", arch->tuple);
+  if (arch->provider_features & SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VA_API)
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) enum_timer =
         _srt_profiling_start ("Enumerating VA-API drivers");
 
+      g_debug ("Enumerating %s VA-API drivers on provider...", arch->tuple);
       va_api_drivers = srt_system_info_list_va_api_drivers (arch->system_info,
                                                             arch->tuple,
                                                             SRT_DRIVER_FLAGS_NONE);

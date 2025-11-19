@@ -96,6 +96,9 @@ enumerate_arch (gpointer data)
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
     _srt_profiling_start ("Enumerating %s drivers in thread", tuple);
   g_autoptr(SrtSystemInfo) system_info = g_steal_pointer (&inputs->system_info);
+  SrtGraphicsProviderFeatureFlags features;
+
+  features = _srt_graphics_provider_architecture_get_features (inputs->arch_details);
 
   if (g_cancellable_is_cancelled (inputs->cancellable))
     goto out;
@@ -136,7 +139,7 @@ enumerate_arch (gpointer data)
   if (g_cancellable_is_cancelled (inputs->cancellable))
     goto out;
 
-  if (TRUE)
+  if (features & SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VA_API)
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
         _srt_profiling_start ("Enumerating %s VA-API drivers in thread",

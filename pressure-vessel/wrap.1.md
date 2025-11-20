@@ -157,11 +157,19 @@ behaviour of **pv-adverb**(1).
 </dd>
 <dt>
 
-**--graphics-provider** *DIR*, **--graphics-provider** *TUPLE=DIR*
+**--graphics-provider** *DIR*|*MANIFEST*, **--graphics-provider** *TUPLE*__=__*DIR*|*MANIFEST*,
 
 </dt><dd>
 
-If using a `--runtime`, use *DIR* to provide graphics drivers.
+If using a `--runtime`, use *DIR* or *MANIFEST* to provide graphics drivers.
+
+If the argument is a the absolute path to a regular file,
+parse it as a JSON manifest as described in
+**steam-runtime-graphics-provider.json**(5)
+and use graphics drivers according to the contents of that manifest.
+On architectures that are not supported by the graphics provider described
+by the manifest,
+fall back to using graphics drivers from the real root directory.
 
 If *DIR* is the empty string, take the graphics drivers from the
 runtime. This will often lead to software rendering, poor performance,
@@ -169,16 +177,18 @@ incompatibility with recent GPUs or a crash, and is only intended to
 be done for development or debugging.
 
 Otherwise, *DIR* must be the absolute path to a directory that is
-the root of an operating system installation (a "sysroot"). The
-default is `/`.
+the root of an operating system installation (a "sysroot").
+
+The default is `$STEAM_COMPAT_GRAPHICS_PROVIDER` if set,
+or `/` otherwise.
 
 If prefixed with a multiarch tuple such as **x86_64-linux-gnu**,
-use *DIR* for graphics drivers for that architecture only,
+use *DIR* or *MANIFEST* for graphics drivers for that architecture only,
 overriding any non-architecture-specific choice.
 For example,
 `--graphics-provider=/ --graphics-provider=i386-linux-gnu=/opt/32`
 would take `i386` graphics drivers from the sysroot `/opt/32`,
-but `x86_64` graphics drivers from the root directory,
+but `x86_64` graphics drivers from the root directory.
 
 </dd>
 <dt>
@@ -780,6 +790,9 @@ If set to `0`, equivalent to `--no-generate-locales`.
 </dt><dd>
 
 Equivalent to `--graphics-provider="$PRESSURE_VESSEL_GRAPHICS_PROVIDER"`.
+If both this variable and `STEAM_COMPAT_GRAPHICS_PROVIDER` are set,
+this variable takes precedence:
+it is intended for debugging and development rather than for production use.
 
 </dd>
 <dt>
@@ -1126,6 +1139,17 @@ The emulator itself should not be included in the *COMMAND*.
 `runtime-sdl3` is equivalent to `STEAM_COMPAT_RUNTIME_SDL3=1`.
 Other tokens are ignored by pressure-vessel-wrap, but might
 have an effect on other components.
+
+</dd>
+<dt>
+
+`STEAM_COMPAT_GRAPHICS_PROVIDER` (absolute path)
+
+</dt><dd>
+
+Equivalent to `--graphics-provider="$STEAM_COMPAT_GRAPHICS_PROVIDER"`,
+but with a lower precedence.
+This variable is intended to be set by Steam during emulation.
 
 </dd>
 <dt>

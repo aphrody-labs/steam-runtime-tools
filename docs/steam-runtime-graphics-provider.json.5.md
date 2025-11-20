@@ -1,0 +1,188 @@
+---
+title: steam-runtime-graphics-provider.json
+section: 5
+...
+
+<!-- This document:
+Copyright © 2020-2025 Collabora Ltd.
+SPDX-License-Identifier: MIT
+-->
+
+# NAME
+
+steam-runtime graphics-provider.json - manifest describing a graphics stack
+
+# SYNOPSIS
+
+
+# DESCRIPTION
+
+A **graphics-provider.json** file configures a sysroot-like tree in which
+**pressure-vessel-wrap**(1) can find user-space graphics drivers
+and their dependencies,
+including glibc.
+
+If the graphics provider manifest specified in configuration involves
+any symbolic links,
+then it is resolved to a physical path as if via **realpath**(3)
+before using it as a basis for relative paths.
+
+## FORMAT VERSION 0
+
+Version 0 of the file format uses a **graphics_provider_v0** key in the
+top-level object.
+The corresponding value must be another object.
+Known fields in this object are:
+
+### `architectures` (object or array of strings)
+
+The architectures supported by this graphics provider.
+This field is required.
+
+If the value is an object,
+then the keys are [multiarch tuples][] and the values are objects.
+Each architecture object may contain the keys and values specified
+in **PER-ARCHITECTURE FIELDS**,
+below.
+
+If the value is an array of strings,
+then they are [multiarch tuples][].
+This is exactly equivalent to providing an object where the keys are
+the same multiarch tuples,
+and the values are all empty objects,
+`{}`.
+
+### `root` (string)
+
+Path to a directory to use as if it was the root filesystem.
+If relative,
+it is interpreted as being relative to the graphics provider manifest.
+
+This field is optional.
+If not specified,
+the default is `./`,
+meaning that the parent of the `realpath()` of the graphics provider manifest
+is the directory to use.
+For example, it might have this layout:
+
+    /opt/gfx/
+        graphics-provider.json
+        bin -> usr/bin
+        etc/
+            ld.so.cache (etc.)
+        lib -> usr/lib
+        lib64 -> usr/lib64
+        sbin -> usr/sbin
+        usr/
+            bin/
+                localedef (etc.)
+            lib/
+                ld-linux.so.2
+                libc.so.6
+                (etc.)
+            lib64/
+                ld-linux-x86-64.so.2
+                libc.so.6
+                (etc.)
+            sbin/
+                ldconfig (etc.)
+
+The `root` must have the layout of a root filesystem,
+as though it was going to be used as a chroot or container,
+or with `cc -sysroot`.
+A "merged-`/usr`" directory is recommended.
+
+The `root` must contain at least `etc/ld.so.cache`,
+`usr/lib*`,
+`sbin/ldconfig`,
+the architectures' interoperable dynamic linkers
+(`/lib64/ld-linux-x86-64.so.2`, `/lib/ld-linux.so.2` and so on),
+the graphics drivers to be used
+(OpenGL, EGL, Vulkan and so on),
+and their recursive dependencies (all the way down to glibc).
+
+For the `root` to work correctly,
+any functionally-significant symbolic links in the `root` must be relative.
+For example,
+the `bin` compatibility symlink should point to `usr/bin`,
+not `/usr/bin`.
+
+## PER-ARCHITECTURE FIELDS
+
+Currently no per-architecture fields are defined.
+
+## COMPATIBILITY
+
+If a new version of **pressure-vessel-wrap**(1) or other Steam compatibility
+infrastructure requires file format changes,
+then it should introduce a new top-level item such as `graphics_provider_v1`.
+
+Consumers of this file format should accept and ignore object members
+that they do not understand,
+allowing for backward-compatibility.
+In particular,
+if the file contains both `graphics_provider_v0` and `graphics_provider_v1`,
+then older versions of the compatibility infrastructure may continue to
+parse and use `graphics_provider_v0`,
+ignoring `graphics_provider_v1`.
+
+If there is an incompatible semantic break that causes older compatibility
+infrastructure to be incompatible with a new graphics provider,
+then the `graphics_provider_v0` top-level item should be removed,
+leaving only `graphics_provider_v1`.
+Older consumers of the file format should treat the absence of
+`graphics_provider_v0` as a fatal error and refuse to parse the file.
+
+If a consumer of this file format encounters an object member that it
+understands,
+with an invalid type or value
+(for example `environment` set to an array rather than an object,
+or a `null` entry in `argv`),
+then it should treat that as a fatal error and refuse to parse the file.
+
+# EXAMPLE
+
+A minimal manifest describing i386 graphics drivers in `/srv/chroots/i386`
+might look like this:
+
+    {
+      "graphics_provider_v0": {
+        "root": "/srv/chroots/i386",
+        "architectures": ["i386-linux-gnu"]
+      }
+    }
+
+A manifest describing x86\_64 and i386 graphics drivers derived from
+an Arch Linux derivative such as SteamOS,
+on a platform that does not use VA-API or VDPAU,
+might look like this:
+
+    {
+      "graphics_provider_v0": {
+        "root": "./",
+        "va_api": false,
+        "vdpau": false,
+        "architectures": {
+          "x86_64-linux-gnu": {
+            "${LIB}": "lib",
+            "dri": "/usr/lib/dri",
+            "gconv": "/usr/lib/gconv"
+          },
+          "i386-linux-gnu": {
+            "${LIB}": "lib32",
+            "dri": "/usr/lib32/dri",
+            "gconv": "/usr/lib32/gconv"
+          }
+        }
+      }
+    }
+
+# SEE ALSO
+
+* **pressure-vessel-wrap**(1)
+* `PvGraphicsProvider` in [steam-runtime-tools][] source code
+
+[multiarch tuples]: https://wiki.debian.org/Multiarch/Tuples
+[steam-runtime-tools]: https://gitlab.steamos.cloud/steamrt/steam-runtime-tools
+
+<!-- vim:set sw=4 sts=4 et: -->

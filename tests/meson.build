@@ -53,6 +53,7 @@ tests = [
       'mock-input-device.h',
     ],
   },
+  {'name': 'graphics-provider-manifest', 'static': true},
   {'name': 'libc-utils', 'libc': true},
   {'name': 'json-utils', 'static': true},
   {'name': 'libdl', 'static': true},
@@ -612,6 +613,9 @@ if get_option('installed_tests')
   install_data(
     'emulator-mock.json',
     'emulator-qemu-arm.json',
+    'gfx-provider-full.json',
+    'gfx-provider-minimal.json',
+    'gfx-provider-root.json',
     'mock-emulator.sh',
     'run-in-ldlp-runtime.sh',
     install_dir: tests_dir,

@@ -28,6 +28,7 @@
 #include <steam-runtime-tools/steam-runtime-tools.h>
 
 #include "steam-runtime-tools/architecture-internal.h"
+#include "steam-runtime-tools/graphics-provider-internal.h"
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
 #include "steam-runtime-tools/subprocess-internal.h"
 
@@ -42,6 +43,7 @@ struct _PvGraphicsProvider
 
   /* All public members are read-only after initable_init(), which means
    * it's OK to access this object from more than one thread. */
+  SrtGraphicsProvider *details;
   SrtSubprocessRunner *run_in_current_context;
   SrtSubprocessRunner *run_in_sysroot;
   SrtSysroot *in_current_ns;

@@ -29,8 +29,8 @@
 
 enum {
   PROP_0,
+  PROP_DETAILS,
   PROP_FLAGS,
-  PROP_IN_CURRENT_NS,
   PROP_PATH_IN_CONTAINER_NS,
   PROP_RUN_IN_CURRENT_CONTEXT,
   N_PROPERTIES
@@ -333,12 +333,12 @@ pv_graphics_provider_get_property (GObject *object,
 
   switch (prop_id)
     {
-      case PROP_FLAGS:
-        g_value_set_flags (value, self->flags);
+      case PROP_DETAILS:
+        g_value_set_object (value, self->details);
         break;
 
-      case PROP_IN_CURRENT_NS:
-        g_value_set_object (value, self->in_current_ns);
+      case PROP_FLAGS:
+        g_value_set_flags (value, self->flags);
         break;
 
       case PROP_PATH_IN_CONTAINER_NS:
@@ -364,14 +364,14 @@ pv_graphics_provider_set_property (GObject *object,
 
   switch (prop_id)
     {
-      case PROP_FLAGS:
-        self->flags = g_value_get_flags (value);
+      case PROP_DETAILS:
+        /* Construct-only */
+        g_return_if_fail (self->details == NULL);
+        self->details = g_value_dup_object (value);
         break;
 
-      case PROP_IN_CURRENT_NS:
-        /* Construct-only */
-        g_return_if_fail (self->in_current_ns == NULL);
-        self->in_current_ns = g_value_dup_object (value);
+      case PROP_FLAGS:
+        self->flags = g_value_get_flags (value);
         break;
 
       case PROP_PATH_IN_CONTAINER_NS:
@@ -398,6 +398,8 @@ pv_graphics_provider_constructed (GObject *object)
 
   G_OBJECT_CLASS (pv_graphics_provider_parent_class)->constructed (object);
 
+  g_return_if_fail (SRT_IS_GRAPHICS_PROVIDER (self->details));
+  self->in_current_ns = g_object_ref (_srt_graphics_provider_get_root (self->details));
   g_return_if_fail (SRT_IS_SYSROOT (self->in_current_ns));
   g_return_if_fail (self->in_current_ns->path != NULL);
   g_return_if_fail (self->in_current_ns->fd >= 0);
@@ -421,6 +423,7 @@ pv_graphics_provider_dispose (GObject *object)
   g_clear_pointer (&priv->arch_threads, g_array_unref);
   g_clear_object (&priv->system_info);
 
+  g_clear_object (&self->details);
   g_clear_object (&self->in_current_ns);
   g_clear_object (&self->run_in_current_context);
   g_clear_object (&self->run_in_sysroot);
@@ -453,6 +456,12 @@ pv_graphics_provider_class_init (PvGraphicsProviderClass *cls)
   object_class->dispose = pv_graphics_provider_dispose;
   object_class->finalize = pv_graphics_provider_finalize;
 
+  properties[PROP_DETAILS] =
+    g_param_spec_object ("details", NULL, NULL,
+                         SRT_TYPE_GRAPHICS_PROVIDER,
+                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                          G_PARAM_STATIC_STRINGS));
+
   properties[PROP_FLAGS] =
     g_param_spec_flags ("flags", "Flags",
                         "Flags describing this graphics provider",
@@ -460,14 +469,6 @@ pv_graphics_provider_class_init (PvGraphicsProviderClass *cls)
                         PV_GRAPHICS_PROVIDER_FLAGS_NONE,
                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                         G_PARAM_STATIC_STRINGS);
-
-  properties[PROP_IN_CURRENT_NS] =
-    g_param_spec_object ("in-current-ns", "Representation in current namespace",
-                         ("Path and file descriptor for this provider in the "
-                          "current execution environment"),
-                         SRT_TYPE_SYSROOT,
-                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
-                          G_PARAM_STATIC_STRINGS));
 
   properties[PROP_PATH_IN_CONTAINER_NS] =
     g_param_spec_string ("path-in-container-ns", "Path in container namespace",
@@ -545,25 +546,20 @@ pv_graphics_provider_search_in_path_and_bin (PvGraphicsProvider *self,
 
 static PvGraphicsProvider *
 pv_graphics_provider_new (SrtSubprocessRunner *run_in_current_context,
-                          const char *path_in_current_ns,
+                          SrtGraphicsProvider *details,
                           const char *path_in_container_ns,
                           PvGraphicsProviderFlags flags,
                           GError **error)
 {
   g_autoptr(SrtSysroot) sysroot = NULL;
 
-  g_return_val_if_fail (path_in_current_ns != NULL, NULL);
+  g_return_val_if_fail (SRT_IS_GRAPHICS_PROVIDER (details), NULL);
   g_return_val_if_fail (path_in_container_ns != NULL, NULL);
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (run_in_current_context), NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
-  sysroot = _srt_sysroot_new_maybe_direct (path_in_current_ns, error);
-
-  if (sysroot == NULL)
-    return NULL;
-
   return g_object_new (PV_TYPE_GRAPHICS_PROVIDER,
-                       "in-current-ns", sysroot,
+                       "details", details,
                        "path-in-container-ns", path_in_container_ns,
                        "run-in-current-context", run_in_current_context,
                        "flags", flags,
@@ -810,17 +806,17 @@ pv_graphics_provider_get_system_info (PvGraphicsProvider *self,
 }
 
 static gchar *
-pv_graphics_provider_choose_mount_point (const char *path_in_current_ns,
+pv_graphics_provider_choose_mount_point (SrtGraphicsProvider *details,
                                          const char *specific_tuple,
                                          PvRuntimeFlags flags,
                                          GError **error)
 {
   if (flags & PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX)
     {
-      if (g_strcmp0 (path_in_current_ns, "/") == 0)
+      if (g_strcmp0 (_srt_graphics_provider_get_root_path (details), "/") == 0)
         return g_strdup ("/run/parent");
 
-      if (g_strcmp0 (path_in_current_ns, "/run/host") == 0)
+      if (g_strcmp0 (_srt_graphics_provider_get_root_path (details), "/run/host") == 0)
         {
           g_warning ("Using host graphics drivers in a Flatpak subsandbox "
                      "probably won't work");
@@ -848,7 +844,7 @@ pv_graphics_provider_choose_mount_point (const char *path_in_current_ns,
       return g_strdup ("/var/pressure-vessel/gfx/main");
     }
 
-  if (g_strcmp0 (path_in_current_ns, "/") == 0)
+  if (g_strcmp0 (_srt_graphics_provider_get_root_path (details), "/") == 0)
     return g_strdup ("/run/host");
 
   if (specific_tuple != NULL)
@@ -868,14 +864,25 @@ pv_graphics_provider_build_array (SrtSubprocessRunner *run_in_current_context,
                                   GError **error)
 {
   g_autoptr(GPtrArray) ret = g_ptr_array_new_with_free_func (g_object_unref);
+  g_autoptr(SrtGraphicsProvider) provider_details = NULL;
   g_autoptr(PvGraphicsProvider) graphics_provider = NULL;
+  g_autoptr(PvGraphicsProvider) root_provider = NULL;
   g_autofree gchar *mount_point = NULL;
+  GQuark need_fallback[n_tuples];
+  size_t n_fallback = 0;
   gsize i;
 
   g_return_val_if_fail (tuples != NULL, NULL);
   g_return_val_if_fail (n_tuples > 0, NULL);
 
-  mount_point = pv_graphics_provider_choose_mount_point (provider_path,
+  provider_details = _srt_graphics_provider_new_for_path (provider_path,
+                                                          tuples, n_tuples,
+                                                          error);
+
+  if (provider_details == NULL)
+    return NULL;
+
+  mount_point = pv_graphics_provider_choose_mount_point (provider_details,
                                                          NULL,
                                                          flags,
                                                          error);
@@ -883,14 +890,59 @@ pv_graphics_provider_build_array (SrtSubprocessRunner *run_in_current_context,
   if (mount_point == NULL)
     return NULL;
 
+  g_return_val_if_fail (SRT_IS_GRAPHICS_PROVIDER (provider_details), NULL);
   graphics_provider = pv_graphics_provider_new (run_in_current_context,
-                                                provider_path,
+                                                provider_details,
                                                 mount_point,
                                                 PV_GRAPHICS_PROVIDER_FLAGS_NONE,
                                                 error);
 
   if (graphics_provider == NULL)
     return NULL;
+
+  /* If the configured default graphics provider was specified as a
+   * JSON manifest, it might declare that it doesn't support all of the
+   * architectures we need. If so, fall back to using the root directory. */
+  for (i = 0; i < n_tuples; i++)
+    {
+      GQuark q = tuples[i];
+
+      if (_srt_graphics_provider_get_architecture (provider_details, q) == NULL)
+        {
+          need_fallback[n_fallback] = q;
+          n_fallback++;
+        }
+    }
+
+  if (n_fallback != 0)
+    {
+      g_autoptr(SrtGraphicsProvider) root_details = NULL;
+      g_autoptr(SrtSysroot) root = _srt_sysroot_new_direct (error);
+      g_autofree gchar *root_mount = NULL;
+
+      if (root == NULL)
+        return FALSE;
+
+      root_details = _srt_graphics_provider_new_for_directory (root,
+                                                               need_fallback,
+                                                               n_fallback);
+      root_mount = pv_graphics_provider_choose_mount_point (root_details,
+                                                            NULL,
+                                                            flags,
+                                                            error);
+
+      if (root_mount == NULL)
+        return NULL;
+
+      root_provider = pv_graphics_provider_new (run_in_current_context,
+                                                root_details,
+                                                root_mount,
+                                                PV_GRAPHICS_PROVIDER_FLAGS_NONE,
+                                                error);
+
+      if (root_provider == NULL)
+        return NULL;
+    }
 
   for (i = 0; i < n_tuples; i++)
     {
@@ -903,16 +955,43 @@ pv_graphics_provider_build_array (SrtSubprocessRunner *run_in_current_context,
         arch_path = g_hash_table_lookup (quark_to_provider,
                                          GUINT_TO_POINTER (q));
 
-      if (arch_path == NULL || g_str_equal (arch_path, provider_path))
+      if (arch_path == NULL)
         {
-          arch_path = provider_path;
+          if (_srt_graphics_provider_get_architecture (provider_details, q) != NULL)
+            arch_provider = g_object_ref (graphics_provider);
+          else if (root_provider != NULL)
+            arch_provider = g_object_ref (root_provider);
+          else
+            /* We should have a root provider whenever provider_details
+             * doesn't cover every architecture */
+            g_return_val_if_reached (FALSE);
+
+        }
+      else if (g_str_equal (arch_path, provider_path))
+        {
+          /* If explicitly asked to use a specific provider for a
+           * specific architecture, try to do so, even if it might not
+           * actually support that architecture */
           arch_provider = g_object_ref (graphics_provider);
+        }
+      else if (g_str_equal (arch_path, "/")
+               && root_provider != NULL)
+        {
+          arch_provider = g_object_ref (root_provider);
         }
       else
         {
+          g_autoptr(SrtGraphicsProvider) arch_details = NULL;
           g_autofree gchar *arch_mount = NULL;
 
-          arch_mount = pv_graphics_provider_choose_mount_point (arch_path,
+          arch_details = _srt_graphics_provider_new_for_path (arch_path,
+                                                              tuples, n_tuples,
+                                                              error);
+
+          if (arch_details == NULL)
+            return NULL;
+
+          arch_mount = pv_graphics_provider_choose_mount_point (arch_details,
                                                                 tuple,
                                                                 flags,
                                                                 error);
@@ -921,7 +1000,7 @@ pv_graphics_provider_build_array (SrtSubprocessRunner *run_in_current_context,
             return NULL;
 
           arch_provider = pv_graphics_provider_new (run_in_current_context,
-                                                    arch_path,
+                                                    arch_details,
                                                     arch_mount,
                                                     PV_GRAPHICS_PROVIDER_FLAGS_NONE,
                                                     error);
@@ -930,8 +1009,16 @@ pv_graphics_provider_build_array (SrtSubprocessRunner *run_in_current_context,
             return NULL;
         }
 
+      if (_srt_graphics_provider_get_architecture (arch_provider->details, q) == NULL)
+        return glnx_null_throw (error,
+                                "Graphics provider \"%s\" does not support %s architecture",
+                                _srt_graphics_provider_describe (arch_provider->details),
+                                tuple);
+
       g_debug ("Architecture %s graphics stack provided by %s -> %s",
-               tuple, arch_path, arch_provider->path_in_container_ns);
+               tuple,
+               _srt_graphics_provider_describe (arch_provider->details),
+               arch_provider->path_in_container_ns);
 
       pv_graphics_provider_add_architecture (arch_provider, q);
 
@@ -966,15 +1053,23 @@ pv_graphics_provider_build_array (SrtSubprocessRunner *run_in_current_context,
        * this if the host is not a supported architecture. */
       if (host_machine != NULL)
         {
+          g_autoptr(SrtGraphicsProvider) host_details = NULL;
+          g_autoptr(SrtSysroot) root = _srt_sysroot_new_real_root (error);
           GQuark q;
 
-          g_debug ("Interpreter host %s graphics stack provided by /proc/self/root",
-                   host_machine->multiarch_tuple);
+          if (root == NULL)
+            return NULL;
+
+          q = g_quark_from_static_string (host_machine->multiarch_tuple);
+          host_details = _srt_graphics_provider_new_for_directory (root, &q, 1);
+          g_debug ("Interpreter host %s graphics stack provided by %s",
+                   host_machine->multiarch_tuple,
+                   _srt_graphics_provider_describe (host_details));
 
           /* The trailing slash is needed to allow open(2) to work even if
            * it's using the O_NOFOLLOW flag. */
           graphics_provider = pv_graphics_provider_new (run_in_current_context,
-                                                        "/proc/self/root/",
+                                                        host_details,
                                                         "/proc/self/root/",
                                                         PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST,
                                                         error);
@@ -982,7 +1077,6 @@ pv_graphics_provider_build_array (SrtSubprocessRunner *run_in_current_context,
           if (graphics_provider == NULL)
             return NULL;
 
-          q = g_quark_from_static_string (host_machine->multiarch_tuple);
           pv_graphics_provider_add_architecture (graphics_provider, q);
           /* As with the graphics providers for the runtime's architectures,
            * we can start enumeration immediately and let it run in

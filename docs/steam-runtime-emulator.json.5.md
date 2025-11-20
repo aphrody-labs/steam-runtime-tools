@@ -262,6 +262,8 @@ pressure-vessel-based container,
 Steam could activate this emulator by doing the equivalent of:
 
     export STEAM_COMPAT_EMULATOR=…/FEX-Emu/emulator.json
+    # see steam-runtime-graphics-provider.json(5)
+    export STEAM_COMPAT_GRAPHICS_PROVIDER=…/graphics-provider.json
 
 and then using an exec chain that is similar to what it would do for an
 x86 game on x86 or an aarch64 game on aarch64:
@@ -273,6 +275,7 @@ x86 game on x86 or an aarch64 game on aarch64:
 
 # SEE ALSO
 
+* **steam-runtime-graphics-provider.json**(5)
 * **pressure-vessel-wrap**(1)
 * `SrtEmulator` in [steam-runtime-tools][] source code
 

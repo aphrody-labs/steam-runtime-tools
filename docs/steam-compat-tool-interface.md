@@ -348,6 +348,36 @@ Some environment variables are set by Steam, including:
     * Other tokens are likely to be added in future.
         Games and compatibility tools should ignore unknown flags.
 
+* `STEAM_COMPAT_GRAPHICS_PROVIDER`:
+
+    Absolute path to a file in the format described by
+    [**steam-runtime-graphics-provider.json**(5)][steam-runtime-graphics-provider.json(5)].
+
+    The graphics stack provider described in this file will be used
+    for each architecture listed in its `architectures` field.
+    Additional architectures will be taken from the real root directory
+    as usual.
+
+    This should be set by Steam when using CPU emulation
+    (for example running x86\_64 or i386 games on aarch64)
+    if the **ld.so**(8),
+    glibc
+    and graphics drivers for the emulated architectures are not available
+    in the real root directory.
+    For example,
+    when using an Arch-derived operating system,
+    it is not possible to install both x86\_64 and aarch64 glibc into the
+    same root directory because they both want to create `/usr/lib/libc.so.6`.
+    In this situation,
+    the Steam client would typically set `STEAM_COMPAT_GRAPHICS_PROVIDER` to
+    reference a directory containing x86\_64 and i386 **ld.so**(8),
+    glibc and graphics drivers,
+    leaving the real root directory responsible for providing the aarch64
+    **ld.so**(8) and libraries.
+
+    This variable could potentially also be used in the future to provide
+    an i386 library stack on purely x86\_64 operating systems.
+
 * `STEAM_COMPAT_INSTALL_PATH`:
 
     The absolute path to the game's [install folder][], for example
@@ -695,3 +725,4 @@ unless this is set to the game's top-level directory.
 [soldier]: container-runtime.md#soldier
 [steamrt4]: container-runtime.md#steamrt4
 [steam-runtime-emulator.json(5)]: steam-runtime-emulator.json.5.md
+[steam-runtime-graphics-provider.json(5)]: steam-runtime-graphics-provider.json.5.md

@@ -1984,6 +1984,25 @@ forget_libraries (SrtSystemInfo *self)
 }
 
 /*
+ * Forget cached libdl information.
+ */
+static void
+forget_libdl (SrtSystemInfo *self)
+{
+  gsize i;
+
+  for (i = 0; i < self->abis->len; i++)
+    {
+      Abi *abi = g_ptr_array_index (self->abis, i);
+
+      g_clear_pointer (&abi->libdl_lib, g_free);
+      g_clear_error (&abi->libdl_lib_error);
+      g_clear_pointer (&abi->libdl_platform, g_free);
+      g_clear_error (&abi->libdl_platform_error);
+    }
+}
+
+/*
  * Forget cached graphics results.
  */
 static void
@@ -2214,6 +2233,7 @@ _srt_system_info_set_subprocess_runner (SrtSystemInfo *self,
   forget_drivers (self);
   forget_graphics_modules (self);
   forget_graphics_results (self);
+  forget_libdl (self);
   forget_libraries (self);
   forget_locales (self);
   forget_pinned_libs (self);
@@ -2292,10 +2312,7 @@ srt_system_info_set_sysroot (SrtSystemInfo *self,
   if (root == NULL)
     root = "/";
 
-  if (g_str_equal (root, "/"))
-    sysroot = _srt_sysroot_new_direct (&local_error);
-  else
-    sysroot = _srt_sysroot_new (root, &local_error);
+  sysroot = _srt_sysroot_new_maybe_direct (root, &local_error);
 
   if (sysroot == NULL)
     g_warning ("Unable to open sysroot %s: %s",

@@ -66,6 +66,16 @@ SrtSysroot *_srt_sysroot_new_flatpak_host (GError **error);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (SrtSysroot, g_object_unref)
 
+static inline SrtSysroot *
+_srt_sysroot_new_maybe_direct (const char *path,
+                               GError **error)
+{
+  if (g_strcmp0 (path, "/") == 0)
+    return _srt_sysroot_new_direct (error);
+  else
+    return _srt_sysroot_new (path, error);
+}
+
 static inline const char *
 _srt_sysroot_get_path (SrtSysroot *self)
 {

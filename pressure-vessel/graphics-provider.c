@@ -139,8 +139,6 @@ enumerate_arch (gpointer data)
   if (g_cancellable_is_cancelled (inputs->cancellable))
     goto out;
 
-  g_free (srt_system_info_dup_libdl_platform (system_info, tuple, NULL));
-
 out:
   enumeration_thread_inputs_free (inputs);
   return g_steal_pointer (&system_info);
@@ -559,10 +557,7 @@ pv_graphics_provider_new (SrtSubprocessRunner *run_in_current_context,
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (run_in_current_context), NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
-  if (g_str_equal (path_in_current_ns, "/"))
-    sysroot = _srt_sysroot_new_direct (error);
-  else
-    sysroot = _srt_sysroot_new (path_in_current_ns, error);
+  sysroot = _srt_sysroot_new_maybe_direct (path_in_current_ns, error);
 
   if (sysroot == NULL)
     return NULL;

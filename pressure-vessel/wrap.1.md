@@ -713,15 +713,11 @@ If set to `0`, no effect.
 
 </dt><dd>
 
-Experimental option to configure non-transparent CPU emulation,
-without needing `binfmt_misc`.
-`pressure-vessel-wrap` itself must be directly runnable,
-or runnable via transparent emulation.
-
-This emulator is assumed to be appropriate for the *COMMAND*.
-
-The referenced file must be in **steam-runtime-emulator.json**(5) format.
-See [steam-runtime emulator.json(5)][].
+Equivalent to `STEAM_COMPAT_EMULATOR`.
+If both are set,
+this one takes precedence:
+this is intended for developer/debugging use,
+rather than being set by Steam.
 
 </dd>
 <dt>
@@ -1098,6 +1094,26 @@ This is made available read/write in the container.
 When used as a Steam compatibility tool, the absolute path to the
 variable data directory used by Proton, if any.
 This is made available read/write in the container.
+
+</dd>
+<dt>
+
+`STEAM_COMPAT_EMULATOR` (path to a JSON file)
+
+</dt><dd>
+
+Experimental option to configure non-transparent CPU emulation,
+without needing `binfmt_misc`.
+`pressure-vessel-wrap` itself must be directly runnable,
+or runnable via transparent emulation.
+This variable is intended to be set by Steam during emulation.
+
+This emulator is assumed to be appropriate for the *COMMAND*.
+
+The referenced file must be in **steam-runtime-emulator.json**(5) format.
+See [steam-runtime emulator.json(5)][].
+
+The emulator itself should not be included in the *COMMAND*.
 
 </dd>
 <dt>

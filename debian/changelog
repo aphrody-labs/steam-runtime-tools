@@ -1,11 +1,20 @@
-steam-runtime-tools (0.20251118.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251120.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
+    - Accept STEAM_COMPAT_EMULATOR as equivalent to
+      PRESSURE_VESSEL_EMULATOR (steamrt/tasks#844)
     - Import libsystemd.so.0 into the container if available.
       We use this if logging to the systemd Journal has been enabled.
       (steamrt/tasks#853)
+    - pv-wrap: Don't cache the libdl ${PLATFORM}, no longer used
+      (steamrt/tasks#851)
+  * Library code:
+    - Correctly forget cached libdl info if the execution environment is
+      reconfigured (steamrt/tasks#851)
+    - Refactoring (steamrt/tasks#846)
+  * Documentation updates for steamrt4 release (steamrt/tasks#854)
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 18 Nov 2025 11:52:28 +0000
+ -- Simon McVittie <smcv@collabora.com>  Thu, 20 Nov 2025 11:38:15 +0000
 
 steam-runtime-tools (0.20251117.0) steamrt; urgency=medium
 

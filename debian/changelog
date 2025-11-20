@@ -1,8 +1,20 @@
 steam-runtime-tools (0.20251120.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
-    - Accept STEAM_COMPAT_EMULATOR as equivalent to
-      PRESSURE_VESSEL_EMULATOR (steamrt/tasks#844)
+    - Accept STEAM_COMPAT_EMULATOR (which is intended to be set by Steam
+      when appropriate) as equivalent to PRESSURE_VESSEL_EMULATOR
+      (which is reserved for development and debugging)
+      (steamrt/tasks#844)
+    - Graphics stacks can be specified with a JSON manifest, in either
+      STEAM_COMPAT_GRAPHICS_PROVIDER (intended to be set by Steam when
+      appropriate) or PRESSURE_VESSEL_GRAPHICS_PROVIDER (reserved for
+      development and debugging).
+      The JSON manifest lists the architectures supported by the graphics
+      provider, and the root filesystem will be used for any remaining
+      architectures. Additional fields are likely to be added to the JSON
+      manifest in future pressure-vessel releases to reduce startup delays
+      during emulation.
+      (steamrt/tasks#846, steamrt/tasks#851)
     - Import libsystemd.so.0 into the container if available.
       We use this if logging to the systemd Journal has been enabled.
       (steamrt/tasks#853)
@@ -14,7 +26,7 @@ steam-runtime-tools (0.20251120.0) UNRELEASED; urgency=medium
     - Refactoring (steamrt/tasks#846)
   * Documentation updates for steamrt4 release (steamrt/tasks#854)
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 20 Nov 2025 11:38:15 +0000
+ -- Simon McVittie <smcv@collabora.com>  Thu, 20 Nov 2025 17:14:12 +0000
 
 steam-runtime-tools (0.20251117.0) steamrt; urgency=medium
 

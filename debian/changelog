@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20251120.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251120.0) steamrt; urgency=medium
 
   * pressure-vessel:
     - Accept STEAM_COMPAT_EMULATOR (which is intended to be set by Steam
@@ -26,7 +26,7 @@ steam-runtime-tools (0.20251120.0) UNRELEASED; urgency=medium
     - Refactoring (steamrt/tasks#846)
   * Documentation updates for steamrt4 release (steamrt/tasks#854)
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 20 Nov 2025 17:14:12 +0000
+ -- Simon McVittie <smcv@collabora.com>  Thu, 20 Nov 2025 19:53:38 +0000
 
 steam-runtime-tools (0.20251117.0) steamrt; urgency=medium
 

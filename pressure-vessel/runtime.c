@@ -698,12 +698,43 @@ pv_runtime_get_graphics_provider (PvRuntime *self,
 }
 
 static gboolean
+runtime_architecture_detect_ld_so (RuntimeArchitecture *self,
+                                   GError **error)
+{
+  g_autoptr(GPtrArray) argv = NULL;
+
+  g_return_val_if_fail (self->ld_so == NULL, TRUE);
+
+  argv = g_ptr_array_sized_new (self->capsule_capture_libs->len + 2);
+
+  for (size_t i = 0; i < self->capsule_capture_libs->len; i++)
+    g_ptr_array_add (argv, g_ptr_array_index (self->capsule_capture_libs, i));
+
+  g_ptr_array_add (argv, (char *) "--print-ld.so");
+  g_ptr_array_add (argv, NULL);
+
+  /* This has the side-effect of testing whether we can run binaries
+   * for this architecture on the current environment. We
+   * assume that this is the same as whether we can run them
+   * on the host, if different. */
+  pv_run_sync (self->runner, self->tuple_quark,
+               (const char * const *) argv->pdata,
+               NULL, &self->ld_so, error);
+
+  if (self->ld_so == NULL)
+    return glnx_prefix_error (error,
+                              "Cannot determine ld.so for %s",
+                              self->tuple);
+
+  return TRUE;
+}
+
+static gboolean
 runtime_architecture_init (RuntimeArchitecture *self,
                            PvRuntime *runtime,
                            GQuark tuple,
                            GError **error)
 {
-  g_autoptr(GPtrArray) argv = NULL;
   SrtSystemInfo *arch_system_info;
   SrtSubprocessRunner *runner;
   PvGraphicsProvider *provider;
@@ -751,27 +782,51 @@ runtime_architecture_init (RuntimeArchitecture *self,
   self->aliases_relative_to_overrides = g_strdup_printf ("lib/%s/aliases",
                                                          self->tuple);
 
-  argv = g_ptr_array_sized_new (self->capsule_capture_libs->len + 2);
+  if (self->known_arch == NULL
+      || self->known_arch->interoperable_runtime_linker == NULL)
+    {
+      /* This is unlikely: we wouldn't do official binary builds of
+       * capsule-capture-libs for an architecture we know nothing about.
+       * But maybe someone built it unofficially? */
+      g_info ("ld.so(8) for %s not known, attempting to auto-detect",
+              self->tuple);
 
-  for (size_t i = 0; i < self->capsule_capture_libs->len; i++)
-    g_ptr_array_add (argv, g_ptr_array_index (self->capsule_capture_libs, i));
+      if (!runtime_architecture_detect_ld_so (self, error))
+        return FALSE;
+    }
+  else if (_srt_graphics_provider_get_manifest_path (self->provider_details) == NULL)
+    {
+      /* This is the typical case on x86: there is no specific graphics
+       * provider (or it was specified as a directory, without metadata)
+       * so the graphics provider's architectures are merely a best guess,
+       * and we don't actually know whether we can run this architecture's
+       * executables. For example, a pure x86_64 system might not be able
+       * to run i386-linux-gnu-capsule-capture-libs. In this case we
+       * make runtime_architecture_init() fail, which is not fatal,
+       * so our caller will skip this architecture with a warning:
+       * a container that can only run x86_64 code is better than nothing.
+       * Run capsule-capture-libs --print-ld-so for its side-effect of
+       * determining whether we can run this architecture at all. */
+      g_debug ("Checking whether we can run architecture %s...", self->tuple);
 
-  g_ptr_array_add (argv, (char *) "--print-ld.so");
-  g_ptr_array_add (argv, NULL);
+      if (!runtime_architecture_detect_ld_so (self, error))
+        return FALSE;
+    }
+  else
+    {
+      /* If we've explicitly been told to use a specific graphics provider
+       * in the form of a JSON manifest, we can save some time by not
+       * checking whether we can actually run this architecture.
+       * If we can't, that's a configuration error by whoever supplied the
+       * graphics provider, so it's OK that subsequent calls to
+       * capsule-capture-libs will fail. */
+      g_debug ("Graphics provider lists %s in its manifest, "
+               "assuming we can run its executables",
+               self->tuple);
+      self->ld_so = g_strdup (self->known_arch->interoperable_runtime_linker);
+    }
 
-  /* This has the side-effect of testing whether we can run binaries
-   * for this architecture on the current environment. We
-   * assume that this is the same as whether we can run them
-   * on the host, if different. */
-  pv_run_sync (runner, tuple,
-               (const char * const *) argv->pdata,
-               NULL, &self->ld_so, error);
-
-  if (self->ld_so == NULL)
-    return glnx_prefix_error (error,
-                              "Cannot determine ld.so for %s",
-                              self->tuple);
-
+  g_return_val_if_fail (self->ld_so != NULL, FALSE);
   return TRUE;
 }
 

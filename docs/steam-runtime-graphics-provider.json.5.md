@@ -164,12 +164,10 @@ might look like this:
         "vdpau": false,
         "architectures": {
           "x86_64-linux-gnu": {
-            "${LIB}": "lib",
             "dri": "/usr/lib/dri",
             "gconv": "/usr/lib/gconv"
           },
           "i386-linux-gnu": {
-            "${LIB}": "lib32",
             "dri": "/usr/lib32/dri",
             "gconv": "/usr/lib32/gconv"
           }

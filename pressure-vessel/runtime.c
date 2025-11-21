@@ -2510,6 +2510,7 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
   g_autofree gchar *remap_lib = NULL;
   g_autoptr(FlatpakBwrap) ret = NULL;
   glnx_autofd int runtime_files_fd = -1;
+  const char * const *fallbacks;
 
   g_return_val_if_fail (arch->provider != NULL, NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
@@ -2571,6 +2572,16 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
 
   if (_srt_util_get_log_flags () & SRT_LOG_FLAGS_LEVEL)
     flatpak_bwrap_add_arg (ret, "--level-prefix");
+
+  fallbacks =
+    _srt_graphics_provider_architecture_get_fallback_library_paths (
+        arch->provider_arch_details);
+
+  if (fallbacks != NULL)
+    {
+      flatpak_bwrap_add_arg (ret, "--fallback-paths");
+      flatpak_bwrap_take_arg (ret, g_strjoinv (":", (char **) fallbacks));
+    }
 
   flatpak_bwrap_add_args (ret,
                           "--remap-link-prefix", remap_app,

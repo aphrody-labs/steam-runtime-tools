@@ -42,6 +42,9 @@ static SrtSystemInfo *pv_graphics_provider_create_system_info (PvGraphicsProvide
 typedef struct
 {
   SrtSystemInfo *system_info;
+  SrtGraphicsProvider *details;
+  /* Owned by @details */
+  const SrtGraphicsProviderArchitecture *arch_details;
   GCancellable *cancellable;
   GQuark arch_tuple;
   PvRuntimeFlags runtime_flags;
@@ -62,7 +65,15 @@ enumeration_thread_inputs_new (GQuark arch_tuple,
   self->provider_flags = provider->flags;
   self->system_info = pv_graphics_provider_create_system_info (provider,
                                                                arch_tuple);
+  self->details = g_object_ref (provider->details);
   self->cancellable = g_object_ref (cancellable);
+
+  if (arch_tuple != 0)
+    self->arch_details = _srt_graphics_provider_get_architecture (self->details,
+                                                                  arch_tuple);
+  else
+    self->arch_details = NULL;
+
   return self;
 }
 
@@ -71,6 +82,7 @@ static void
 enumeration_thread_inputs_free (EnumerationThreadInputs *self)
 {
   g_object_unref (self->cancellable);
+  g_clear_object (&self->details);
   g_clear_object (&self->system_info);
   g_free (self);
 }
@@ -84,6 +96,9 @@ enumerate_arch (gpointer data)
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
     _srt_profiling_start ("Enumerating %s drivers in thread", tuple);
   g_autoptr(SrtSystemInfo) system_info = g_steal_pointer (&inputs->system_info);
+  SrtGraphicsProviderFeatureFlags features;
+
+  features = _srt_graphics_provider_architecture_get_features (inputs->arch_details);
 
   if (g_cancellable_is_cancelled (inputs->cancellable))
     goto out;
@@ -91,7 +106,8 @@ enumerate_arch (gpointer data)
   /* At the moment the real host is included only when FEX emulator is in use.
    * Skipping VDPAU until there is a real use case for it, because
    * it only supports one search path entry, which is problematic for us. */
-  if (!(inputs->provider_flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST))
+  if ((features & SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VDPAU)
+      && !(inputs->provider_flags & PV_GRAPHICS_PROVIDER_FLAGS_INTERPRETER_HOST))
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
         _srt_profiling_start ("Enumerating %s VDPAU drivers in thread",
@@ -124,7 +140,7 @@ enumerate_arch (gpointer data)
   if (g_cancellable_is_cancelled (inputs->cancellable))
     goto out;
 
-  if (TRUE)
+  if (features & SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VA_API)
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
         _srt_profiling_start ("Enumerating %s VA-API drivers in thread",
@@ -603,6 +619,7 @@ pv_graphics_provider_create_system_info (PvGraphicsProvider *self,
 
   system_info = srt_system_info_new (NULL);
   _srt_system_info_set_subprocess_runner (system_info, self->run_in_sysroot);
+  _srt_system_info_set_graphics_provider (system_info, self->details);
 
   if (single_arch != SRT_ARCHITECTURE_QUARK_NONE)
     {

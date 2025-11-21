@@ -5,6 +5,7 @@
 
 #include "steam-runtime-tools/graphics-provider-private.h"
 
+#include "steam-runtime-tools/enums-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 /*
@@ -23,6 +24,8 @@ _srt_graphics_provider_architecture_clear (void *p)
   static const SrtGraphicsProviderArchitecture blank = SRT_GRAPHICS_PROVIDER_ARCHITECTURE_INIT;
   SrtGraphicsProviderArchitecture *self = p;
 
+  g_clear_pointer (&self->dri_path, g_free);
+  g_clear_pointer (&self->gconv_path, g_free);
   *self = blank;
 }
 
@@ -31,7 +34,10 @@ arch_copy (SrtGraphicsProviderArchitecture *dest,
            const SrtGraphicsProviderArchitecture *src)
 {
   _srt_graphics_provider_architecture_clear (dest);
+  dest->dri_path = g_strdup (src->dri_path);
+  dest->gconv_path = g_strdup (src->gconv_path);
   dest->tuple_quark = src->tuple_quark;
+  dest->features = src->features;
 }
 
 /*
@@ -56,12 +62,14 @@ archs_array_extend (GArray *dest,
  * @tuple_quarks: (nullable) (array length=n_tuple_quarks): An array of
  *  nonzero quarks representing multiarch tuples
  * @n_tuple_quarks: Number of items in @tuple_quarks
+ * @features: Each architecture is assumed to have these features
  *
  * Returns: (element-type SrtGraphicsProviderArchitecture):
  */
 GArray *
 _srt_graphics_provider_architecture_array_new (const GQuark *tuple_quarks,
-                                               size_t n_tuple_quarks)
+                                               size_t n_tuple_quarks,
+                                               SrtGraphicsProviderFeatureFlags features)
 {
   g_autoptr(GArray) archs = NULL;
   /* typically contains at most x86_64 and i386 */
@@ -84,10 +92,28 @@ _srt_graphics_provider_architecture_array_new (const GQuark *tuple_quarks,
 
       g_return_val_if_fail (tuple_quarks[i] != SRT_ARCHITECTURE_QUARK_NONE, NULL);
       arch.tuple_quark = tuple_quarks[i];
+      arch.features = features;
       g_array_append_vals (archs, &arch, 1);
     }
 
   return g_steal_pointer (&archs);
+}
+
+/*
+ * _srt_graphics_provider_architecture_get_features:
+ * @self: An architecture
+ *
+ * Return features expected to be present on this architecture.
+ * For example, if the result does not
+ * include %SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VA_API, then discovery
+ * of VA-API drivers can safely be skipped when using this graphics stack.
+ *
+ * Returns: Feature flags applicable to this specific architecture
+ */
+SrtGraphicsProviderFeatureFlags
+_srt_graphics_provider_architecture_get_features (const SrtGraphicsProviderArchitecture *self)
+{
+  return self->features;
 }
 
 /*
@@ -103,6 +129,50 @@ _srt_graphics_provider_architecture_get_tuple (const SrtGraphicsProviderArchitec
   return self->tuple_quark;
 }
 
+/*
+ * _srt_graphics_provider_architecture_get_dri_path:
+ * @self: An architecture
+ *
+ * Return the directory containing Mesa DRI drivers and VA-API drivers
+ * for this architecture, or %NULL if unknown.
+ *
+ * The returned path should be looked up inside the sysroot returned by
+ * _srt_graphics_provider_get_root(), not the real root.
+ *
+ * The returned string is only valid as long as a reference to
+ * the #SrtGraphicsProvider is held.
+ *
+ * Returns: (nullable) (type filename): A path such as `/usr/lib64/dri`,
+ *  or %NULL if unknown
+ */
+const char *
+_srt_graphics_provider_architecture_get_dri_path (const SrtGraphicsProviderArchitecture *self)
+{
+  return self->dri_path;
+}
+
+/*
+ * _srt_graphics_provider_architecture_get_gconv_path:
+ * @self: An architecture
+ *
+ * Return the directory containing glibc character-set conversion modules
+ * for this architecture, or %NULL if unknown.
+ *
+ * The returned path should be looked up inside the sysroot returned by
+ * _srt_graphics_provider_get_root(), not the real root.
+ *
+ * The returned string is only valid as long as a reference to
+ * the #SrtGraphicsProvider is held.
+ *
+ * Returns: (nullable) (type filename): A path such as `/usr/lib64/gconv`,
+ *  or %NULL if unknown
+ */
+const char *
+_srt_graphics_provider_architecture_get_gconv_path (const SrtGraphicsProviderArchitecture *self)
+{
+  return self->gconv_path;
+}
+
 struct _SrtGraphicsProviderClass
 {
   GObjectClass parent_class;
@@ -111,6 +181,7 @@ struct _SrtGraphicsProviderClass
 enum {
   PROP_0,
   PROP_ARCHITECTURES,
+  PROP_FEATURES,
   PROP_MANIFEST,
   PROP_ROOT,
   N_PROPERTIES
@@ -124,7 +195,8 @@ static void
 _srt_graphics_provider_init (SrtGraphicsProvider *self)
 {
   self->archs =
-    _srt_graphics_provider_architecture_array_new (NULL, 0);
+    _srt_graphics_provider_architecture_array_new (NULL, 0,
+                                                   SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_NONE);
 }
 
 static void
@@ -140,9 +212,14 @@ _srt_graphics_provider_get_property (GObject *object,
     {
       case PROP_ARCHITECTURES:
         /* Copy them to avoid concurrent modification harming thread-safety */
-        arr = _srt_graphics_provider_architecture_array_new (NULL, 0);
+        arr = _srt_graphics_provider_architecture_array_new (NULL, 0,
+                                                             SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_NONE);
         archs_array_extend (arr, self->archs);
         g_value_take_boxed (value, g_steal_pointer (&arr));
+        break;
+
+      case PROP_FEATURES:
+        g_value_set_flags (value, self->features);
         break;
 
       case PROP_MANIFEST:
@@ -178,6 +255,10 @@ _srt_graphics_provider_set_property (GObject *object,
         if (arr != NULL)
           archs_array_extend (self->archs, arr);
 
+        break;
+
+      case PROP_FEATURES:
+        self->features = g_value_get_flags (value);
         break;
 
       case PROP_MANIFEST:
@@ -255,6 +336,13 @@ _srt_graphics_provider_class_init (SrtGraphicsProviderClass *cls)
   properties[PROP_ARCHITECTURES] =
     g_param_spec_boxed ("architectures", NULL, NULL,
                         G_TYPE_ARRAY,
+                        (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS));
+
+  properties[PROP_FEATURES] =
+    g_param_spec_flags ("features", NULL, NULL,
+                        SRT_TYPE_GRAPHICS_PROVIDER_FEATURE_FLAGS,
+                        SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_DEFAULT,
                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                          G_PARAM_STATIC_STRINGS));
 
@@ -343,6 +431,23 @@ _srt_graphics_provider_get_root (SrtGraphicsProvider *self)
 {
   g_return_val_if_fail (SRT_IS_GRAPHICS_PROVIDER (self), NULL);
   return self->root;
+}
+
+/*
+ * _srt_graphics_provider_get_features:
+ * @self: A graphics provider
+ *
+ * Return features expected to be present in this graphics provider.
+ *
+ * _srt_graphics_provider_architecture_get_features() is a more specific
+ * version of this information.
+ */
+SrtGraphicsProviderFeatureFlags
+_srt_graphics_provider_get_features (SrtGraphicsProvider *self)
+{
+  g_return_val_if_fail (SRT_IS_GRAPHICS_PROVIDER (self),
+                        SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_NONE);
+  return self->features;
 }
 
 /*
@@ -444,8 +549,10 @@ _srt_graphics_provider_new_for_directory (SrtSysroot *root,
                                           size_t n_tuple_quarks)
 {
   g_autoptr(GArray) archs = NULL;
+  SrtGraphicsProviderFeatureFlags features = SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_DEFAULT;
 
   archs = _srt_graphics_provider_architecture_array_new (tuple_quarks,
-                                                         n_tuple_quarks);
-  return _srt_graphics_provider_new (archs, NULL, root);
+                                                         n_tuple_quarks,
+                                                         features);
+  return _srt_graphics_provider_new (archs, features, NULL, root);
 }

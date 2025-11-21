@@ -644,6 +644,11 @@ typedef struct
   const SrtKnownArchitecture *known_arch;
   /* Graphics stack provider to use */
   PvGraphicsProvider *provider;
+  /* Details from provider manifest */
+  SrtGraphicsProvider *provider_details;
+  /* Per-architecture details from provider manifest.
+   * Owned by @provider_details */
+  const SrtGraphicsProviderArchitecture *provider_arch_details;
   /* Graphics stack provider's SrtSystemInfo for this architecture */
   SrtSystemInfo *system_info;
   /* Graphics stack provider's SrtSystemInfo's subprocess runner */
@@ -666,6 +671,7 @@ typedef struct
   gchar *ld_so;
   /* Architecture tuple as a quark */
   GQuark tuple_quark;
+  SrtGraphicsProviderFeatureFlags provider_features;
 } RuntimeArchitecture;
 
 static PvGraphicsProvider *
@@ -712,6 +718,11 @@ runtime_architecture_init (RuntimeArchitecture *self,
   provider = pv_runtime_get_graphics_provider (runtime, self->tuple_quark);
   g_return_val_if_fail (PV_IS_GRAPHICS_PROVIDER (provider), FALSE);
   self->provider = g_object_ref (provider);
+
+  self->provider_details = g_object_ref (provider->details);
+  self->provider_arch_details = _srt_graphics_provider_get_architecture (self->provider_details,
+                                                                         tuple);
+  self->provider_features = _srt_graphics_provider_architecture_get_features (self->provider_arch_details);
 
   arch_system_info = pv_graphics_provider_get_system_info (self->provider,
                                                            self->tuple_quark);
@@ -784,6 +795,7 @@ runtime_architecture_clear (RuntimeArchitecture *self)
   self->tuple = NULL;
   self->tuple_quark = SRT_ARCHITECTURE_QUARK_NONE;
   g_clear_object (&self->provider);
+  g_clear_object (&self->provider_details);
   g_clear_object (&self->system_info);
   g_clear_object (&self->runner);
   g_clear_pointer (&self->capsule_capture_libs, g_ptr_array_unref);
@@ -6006,6 +6018,7 @@ pv_runtime_collect_libc_family (PvRuntime *self,
   g_autoptr(GError) local_error = NULL;
   g_autofree char *libc_target = NULL;
   g_autofree char *libdl_lib = NULL;
+  const char *gconv_path;
 
   g_return_val_if_fail (arch->provider != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
@@ -6014,6 +6027,34 @@ pv_runtime_collect_libc_family (PvRuntime *self,
                                             ld_so_in_runtime,
                                             bwrap, error))
     return FALSE;
+
+  gconv_path =
+    _srt_graphics_provider_architecture_get_gconv_path (arch->provider_arch_details);
+
+  if (gconv_path != NULL)
+    {
+      /* The graphics provider directly told us what directory to use,
+       * so we don't need to spend time figuring it out automatically. */
+
+      /* In practice this always starts with a slash, but
+       * pv_runtime_library_data_try() wants paths with no slash */
+      if (G_LIKELY (gconv_path[0] == '/'))
+        gconv_path++;
+
+      if (!pv_runtime_library_data_try (gconv_in_provider,
+                                        gconv_path,
+                                        arch->provider,
+                                        "graphics provider manifest",
+                                        _srt_graphics_provider_describe (arch->provider_details),
+                                        NULL))
+        g_warning ("Graphics provider %s declared gconv directory %s "
+                   "but it was not found",
+                   _srt_graphics_provider_describe (arch->provider_details),
+                   gconv_path);
+
+      /* Don't second-guess what we were told, even if it was wrong */
+      return TRUE;
+    }
 
   libdl_lib = srt_system_info_dup_libdl_lib (arch->system_info,
                                              arch->tuple,
@@ -7295,11 +7336,12 @@ collect_dri_drivers (PvRuntime *self,
                                                       SRT_DRIVER_FLAGS_NONE);
     }
 
-  g_debug ("Enumerating %s VA-API drivers on provider...", arch->tuple);
+  if (arch->provider_features & SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VA_API)
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) enum_timer =
         _srt_profiling_start ("Enumerating VA-API drivers");
 
+      g_debug ("Enumerating %s VA-API drivers on provider...", arch->tuple);
       va_api_drivers = srt_system_info_list_va_api_drivers (arch->system_info,
                                                             arch->tuple,
                                                             SRT_DRIVER_FLAGS_NONE);
@@ -7687,8 +7729,11 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                             patterns, error))
             return FALSE;
 
-          if (!collect_vdpau_drivers (self, arch, patterns, error))
-            return FALSE;
+          if (arch->provider_features & SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VDPAU)
+            {
+              if (!collect_vdpau_drivers (self, arch, patterns, error))
+                return FALSE;
+            }
 
           if (!collect_dri_drivers (self, arch, patterns, dri_path, error))
             return FALSE;

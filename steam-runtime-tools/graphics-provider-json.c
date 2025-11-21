@@ -8,6 +8,32 @@
 #include "steam-runtime-tools/json-glib-backports-internal.h"
 #include "steam-runtime-tools/json-utils-internal.h"
 
+static gboolean
+manifest_copy_optional_string (JsonObject *object,
+                               const char *member_name,
+                               char **value_out,
+                               GError **error)
+{
+  const char *value;
+  JsonNode *member;
+
+  g_return_val_if_fail (value_out != NULL, FALSE);
+  g_return_val_if_fail (*value_out == NULL, FALSE);
+
+  member = json_object_get_member (object, member_name);
+
+  if (member == NULL)
+    return TRUE;
+
+  value = json_node_get_string (member);
+
+  if (value == NULL)
+    return glnx_throw (error, "Value of \"%s\" must be a string", member_name);
+
+  *value_out = g_strdup (value);
+  return TRUE;
+}
+
 static SrtSysroot *
 manifest_read_root (JsonObject *object,
                     const char *member_name,
@@ -55,11 +81,57 @@ manifest_read_root (JsonObject *object,
     }
 }
 
+static gboolean
+manifest_read_features (JsonObject *object,
+                        SrtGraphicsProviderFeatureFlags *features_p,
+                        GError **error)
+{
+  static const struct
+    {
+      const char *name;
+      SrtGraphicsProviderFeatureFlags value;
+    }
+  feature_mappings[] =
+    {
+        { "va_api", SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VA_API },
+        { "vdpau", SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VDPAU },
+    };
+
+  for (size_t i = 0; i < G_N_ELEMENTS (feature_mappings); i++)
+    {
+      const char *member_name = feature_mappings[i].name;
+      SrtGraphicsProviderFeatureFlags value = feature_mappings[i].value;
+
+      switch (_srt_json_object_get_boolean_strict (object, member_name, error))
+        {
+          case SRT_JSON_GET_BOOLEAN_RESULT_ERROR:
+            return FALSE;
+
+          case SRT_JSON_GET_BOOLEAN_RESULT_FALSE:
+            *features_p &= ~value;
+            break;
+
+          case SRT_JSON_GET_BOOLEAN_RESULT_TRUE:
+            *features_p |= value;
+            break;
+
+          case SRT_JSON_GET_BOOLEAN_RESULT_UNSPECIFIED:
+            break;
+
+          default:
+            g_warn_if_reached ();
+        }
+    }
+
+  return TRUE;
+}
+
 typedef struct
 {
   const char *object_name;
   GArray *archs;
   GError **error;
+  SrtGraphicsProviderFeatureFlags default_features;
   gboolean ok;
 } ManifestReadArchitecturesData;
 
@@ -75,6 +147,8 @@ foreach_arch_array_cb (JsonArray *archs_arr,
 
   if (!data->ok)
     return;
+
+  arch.features = data->default_features;
 
   s = json_node_get_string (value);
 
@@ -105,9 +179,12 @@ foreach_arch_object_cb (JsonObject *archs_object,
   const SrtGraphicsProviderArchitecture blank = SRT_GRAPHICS_PROVIDER_ARCHITECTURE_INIT;
   g_auto(SrtGraphicsProviderArchitecture) arch = SRT_GRAPHICS_PROVIDER_ARCHITECTURE_INIT;
   ManifestReadArchitecturesData *data = user_data;
+  JsonObject *object;
 
   if (!data->ok)
     return;
+
+  arch.features = data->default_features;
 
   if (!_srt_architecture_check_plausible_tuple (name, data->error))
     goto fail;
@@ -121,6 +198,31 @@ foreach_arch_object_cb (JsonObject *archs_object,
       goto fail;
     }
 
+  object = json_node_get_object (value);
+
+  if (!manifest_copy_optional_string (object, "dri",
+                                      &arch.dri_path, data->error))
+    goto fail;
+
+  if (arch.dri_path != NULL && arch.dri_path[0] != '/')
+    {
+      glnx_throw (data->error, "\"dri\" value must be an absolute path");
+      goto fail;
+    }
+
+  if (!manifest_copy_optional_string (object, "gconv",
+                                      &arch.gconv_path, data->error))
+    goto fail;
+
+  if (arch.gconv_path != NULL && arch.gconv_path[0] != '/')
+    {
+      glnx_throw (data->error, "\"gconv\" value must be an absolute path");
+      goto fail;
+    }
+
+  if (!manifest_read_features (object, &arch.features, data->error))
+    goto fail;
+
   g_array_append_vals (data->archs, &arch, 1);
   /* Ownership of members was moved into the array, do not free them */
   arch = blank;
@@ -133,6 +235,7 @@ fail:
 static gboolean
 manifest_read_architectures (JsonObject *object,
                              const char *member_name,
+                             SrtGraphicsProviderFeatureFlags features,
                              GArray *archs,
                              GError **error)
 {
@@ -140,6 +243,7 @@ manifest_read_architectures (JsonObject *object,
     {
       .object_name = member_name,
       .archs = archs,
+      .default_features = features,
       .error = error,
       .ok = TRUE,
     };
@@ -191,6 +295,7 @@ _srt_graphics_provider_new_from_manifest (const char *path,
   g_autoptr(JsonParser) parser = json_parser_new ();
   g_autoptr(SrtSysroot) sysroot = NULL;
   g_autofree char *real_manifest = NULL;
+  SrtGraphicsProviderFeatureFlags features = SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_DEFAULT;
   JsonNode *member;
   JsonNode *root;
   JsonObject *object;
@@ -224,16 +329,21 @@ _srt_graphics_provider_new_from_manifest (const char *path,
   if (sysroot == NULL)
     return NULL;
 
-  archs = _srt_graphics_provider_architecture_array_new (NULL, 0);
+  if (!manifest_read_features (object, &features, error))
+    return NULL;
 
-  if (!manifest_read_architectures (object, "architectures", archs, error))
+  archs = _srt_graphics_provider_architecture_array_new (NULL, 0,
+                                                         SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_NONE);
+
+  if (!manifest_read_architectures (object, "architectures", features,
+                                    archs, error))
     return NULL;
 
   if (archs->len == 0)
     return glnx_null_throw (error,
                             "architectures object or array must be non-empty");
 
-  return _srt_graphics_provider_new (archs, real_manifest, sysroot);
+  return _srt_graphics_provider_new (archs, features, real_manifest, sysroot);
 }
 
 /*

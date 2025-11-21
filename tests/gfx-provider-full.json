@@ -1,12 +1,20 @@
 {
   "graphics_provider_v0": {
     "root": "./",
+    "va_api": false,
+    "vdpau": true,
     "hypothetical future member": 42,
     "architectures": {
       "x86_64-linux-gnu": {
+        "dri": "/usr/lib/dri",
+        "gconv": "/usr/lib/gconv",
+        "va_api": true,
         "hypothetical future member": 86.64
       },
       "i386-linux-gnu": {
+        "dri": "/usr/lib32/dri",
+        "gconv": "/usr/lib32/gconv",
+        "vdpau": false,
         "hypothetical future member": 386
       }
     }

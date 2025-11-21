@@ -1158,6 +1158,8 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
  * _srt_get_modules_full:
  * @sysroot: (not nullable): The root directory, usually `/`
  * @runner: The execution environment
+ * @provider: (nullable): If not %NULL, the @sysroot belongs to this
+ *  graphics provider
  * @multiarch_tuple: (not nullable) (type filename): A Debian-style multiarch tuple
  *  such as %SRT_ABI_X86_64
  * @known_arch: Details of @arch_quark if known
@@ -1176,6 +1178,7 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
 static void
 _srt_get_modules_full (SrtSysroot *sysroot,
                        SrtSubprocessRunner *runner,
+                       SrtGraphicsProvider *provider,
                        GQuark arch_quark,
                        const SrtKnownArchitecture *known_arch,
                        SrtCheckFlags check_flags,
@@ -1193,6 +1196,8 @@ _srt_get_modules_full (SrtSysroot *sysroot,
   const gchar *ld_library_path = NULL;
   const char *multiarch_tuple;
   g_autoptr(GHashTable) drivers_set = NULL;
+  gboolean colon_separated_drivers_path;
+  gboolean is_dri;
   gboolean is_extra = FALSE;
   g_autoptr(GPtrArray) vdpau_argv = NULL;
   g_autoptr(GError) error = NULL;
@@ -1212,16 +1217,22 @@ _srt_get_modules_full (SrtSysroot *sysroot,
       case SRT_GRAPHICS_DRI_MODULE:
         loader_libraries = dri_loaders;
         env_override = "LIBGL_DRIVERS_PATH";
+        colon_separated_drivers_path = TRUE;
+        is_dri = TRUE;
         break;
 
       case SRT_GRAPHICS_VAAPI_MODULE:
         loader_libraries = va_api_loaders;
         env_override = "LIBVA_DRIVERS_PATH";
+        colon_separated_drivers_path = TRUE;
+        is_dri = TRUE;
         break;
 
       case SRT_GRAPHICS_VDPAU_MODULE:
         loader_libraries = vdpau_loaders;
         env_override = "VDPAU_DRIVER_PATH";
+        colon_separated_drivers_path = FALSE;
+        is_dri = FALSE;
         break;
 
       case SRT_GRAPHICS_GLX_MODULE:
@@ -1236,7 +1247,27 @@ _srt_get_modules_full (SrtSysroot *sysroot,
 
   drivers_set = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
 
-  if (drivers_path)
+  if (drivers_path != NULL)
+    {
+      g_debug ("A driver path environment is available: %s", drivers_path);
+    }
+  else if (provider != NULL && is_dri)
+    {
+      const SrtGraphicsProviderArchitecture *arch;
+
+      arch = _srt_graphics_provider_get_architecture (provider, arch_quark);
+
+      if (arch != NULL)
+        drivers_path = _srt_graphics_provider_architecture_get_dri_path (arch);
+
+      if (drivers_path != NULL)
+        g_debug ("Using DRI path from %s: %s",
+                 _srt_graphics_provider_describe (provider), drivers_path);
+
+      colon_separated_drivers_path = FALSE;
+    }
+
+  if (drivers_path != NULL)
     {
       /* If the graphics environment variable for this module is set, we make
        * the assumption that it is intended to be interpreted as if the
@@ -1246,11 +1277,12 @@ _srt_get_modules_full (SrtSysroot *sysroot,
       g_auto(GStrv) entries = NULL;
       char **entry;
 
-      g_debug ("A driver path environment is available: %s", drivers_path);
       /* VDPAU_DRIVER_PATH holds just a single path and not a colon separeted
        * list of paths. Because of that we handle the VDPAU case separately to
-       * avoid splitting a theoretically valid path like "/usr/lib/custom_d:r/" */
-      if (module == SRT_GRAPHICS_VDPAU_MODULE)
+       * avoid splitting a theoretically valid path like "/usr/lib/custom_d:r/".
+       * Similarly a DRI path from a graphics provider manifest is a single
+       * literal directory name, not a search path. */
+      if (!colon_separated_drivers_path)
         {
           entries = g_new (gchar*, 2);
           entries[0] = g_strdup (drivers_path);
@@ -1610,6 +1642,8 @@ _srt_get_modules_full (SrtSysroot *sysroot,
  * _srt_list_graphics_modules:
  * @sysroot: (not nullable): The root directory, usually `/`
  * @runner: The execution environment
+ * @provider: (nullable): If not %NULL, the @sysroot belongs to this
+ *  graphics provider
  * @multiarch_tuple: (not nullable) (type filename): A Debian-style multiarch tuple
  *  such as %SRT_ABI_X86_64
  * @known_arch: Details of @arch_quark if known
@@ -1632,6 +1666,7 @@ _srt_get_modules_full (SrtSysroot *sysroot,
 GList *
 _srt_list_graphics_modules (SrtSysroot *sysroot,
                             SrtSubprocessRunner *runner,
+                            SrtGraphicsProvider *provider,
                             GQuark arch_quark,
                             const SrtKnownArchitecture *known_arch,
                             SrtCheckFlags check_flags,
@@ -1645,7 +1680,7 @@ _srt_list_graphics_modules (SrtSysroot *sysroot,
   if (which == SRT_GRAPHICS_GLX_MODULE)
     _srt_list_glx_icds (sysroot, runner, arch_quark, known_arch, &drivers);
   else
-    _srt_get_modules_full (sysroot, runner, arch_quark, known_arch,
+    _srt_get_modules_full (sysroot, runner, provider, arch_quark, known_arch,
                            check_flags, which, &drivers);
 
   return g_list_reverse (drivers);

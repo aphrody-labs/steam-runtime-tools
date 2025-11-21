@@ -107,9 +107,66 @@ For example,
 the `bin` compatibility symlink should point to `usr/bin`,
 not `/usr/bin`.
 
+### `va_api` (boolean)
+
+If `false`,
+compatibility tools may assume that VA-API is not useful on this system
+and therefore the necessary setup steps for VA-API drivers can be skipped.
+The default is `true`.
+
+### `vdpau` (boolean)
+
+If `false`,
+compatibility tools may assume that VDPAU is not useful on this system
+and therefore the necessary setup steps for VDPAU drivers can be skipped.
+The default is `true`.
+
 ## PER-ARCHITECTURE FIELDS
 
-Currently no per-architecture fields are defined.
+Known fields in the per-architecture objects are:
+
+### `dri` (string)
+
+An absolute path (starting with `/`).
+If present,
+compatibility tools may assume that Mesa DRI drivers in this graphics provider
+are files named `*_dri.so` in the given directory inside the `root`,
+and VA-API drivers are files named `*_drv_video.so` in the same directory.
+
+Relative paths as values for this field are not allowed
+(they are reserved for possible future use).
+
+If not specified,
+the default is to auto-detect it,
+which may incur a startup time cost
+(especially when running under CPU emulation).
+
+### `gconv` (string)
+
+An absolute path (starting with `/`).
+If present,
+compatibility tools may assume that glibc character set conversion modules
+in this graphics provider are found in the given directory inside the `root`.
+
+Relative paths as values for this field are not allowed
+(they are reserved for possible future use).
+
+If not specified,
+the default is to auto-detect it,
+which may incur a startup time cost
+(especially when running under CPU emulation).
+
+### `va_api` (boolean)
+
+If present,
+this overrides the field of the same name in the `emulator_v0` object,
+but only for this architecture.
+
+### `vdpau` (boolean)
+
+If present,
+this overrides the field of the same name in the `emulator_v0` object,
+but only for this architecture.
 
 ## COMPATIBILITY
 

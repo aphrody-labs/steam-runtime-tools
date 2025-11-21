@@ -119,6 +119,8 @@ struct _SrtSystemInfo
   SrtSysroot *sysroot;
   /* Execution environment for helpers */
   SrtSubprocessRunner *runner;
+  /* Graphics provider assumed to provide @sysroot */
+  SrtGraphicsProvider *graphics_provider;
   /* Multiarch tuples that are used for helper executables in cases where it
    * shouldn't matter. The first element is considered the primary multiarch. */
   GArray *multiarch_tuples;
@@ -572,6 +574,7 @@ srt_system_info_dispose (GObject *object)
   g_ptr_array_set_size (self->abis, 0);
   g_clear_object (&self->runner);
   g_clear_object (&self->virtualization_info);
+  g_clear_object (&self->graphics_provider);
   g_clear_object (&self->sysroot);
 
   G_OBJECT_CLASS (srt_system_info_parent_class)->dispose (object);
@@ -2380,6 +2383,37 @@ _srt_system_info_set_sysroot (SrtSystemInfo *self,
   g_return_if_fail (self->sysroot == sysroot);
 }
 
+/*
+ * _srt_system_info_set_graphics_provider:
+ * @self: The #SrtSystemInfo
+ * @provider: (nullable): The graphics provider
+ *
+ * Use the sysroot from @provider.
+ * Instead of discovering everything from first principles,
+ * optimize by assuming that information provided
+ * in its JSON manifest (if any) is correct.
+ */
+void
+_srt_system_info_set_graphics_provider (SrtSystemInfo *self,
+                                        SrtGraphicsProvider *provider)
+{
+  g_return_if_fail (SRT_IS_SYSTEM_INFO (self));
+  g_return_if_fail (SRT_IS_GRAPHICS_PROVIDER (provider));
+  g_return_if_fail (self->from_report == NULL);
+
+  if (g_set_object (&self->graphics_provider, provider))
+    {
+      SrtSysroot *root;
+
+      forget_graphics_modules (self);
+
+      root = _srt_graphics_provider_get_root (provider);
+
+      if (root != self->sysroot)
+        _srt_system_info_set_sysroot (self, root);
+    }
+}
+
 static void
 ensure_steam_cached (SrtSystemInfo *self)
 {
@@ -3854,6 +3888,7 @@ _srt_system_info_list_graphics_modules (SrtSystemInfo *self,
     {
       abi->graphics_modules[which].modules = _srt_list_graphics_modules (self->sysroot,
                                                                          self->runner,
+                                                                         self->graphics_provider,
                                                                          arch_quark,
                                                                          abi->known_architecture,
                                                                          self->check_flags,

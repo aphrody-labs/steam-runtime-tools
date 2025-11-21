@@ -11,6 +11,17 @@
 
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
 
+typedef enum
+{
+  SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VA_API = (1 << 0),
+  SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VDPAU = (1 << 1),
+  SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_NONE = 0
+} SrtGraphicsProviderFeatureFlags;
+
+#define SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_DEFAULT \
+  (SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VA_API \
+   | SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VDPAU)
+
 typedef struct _SrtGraphicsProviderArchitecture SrtGraphicsProviderArchitecture;
 
 typedef struct _SrtGraphicsProvider SrtGraphicsProvider;
@@ -30,6 +41,7 @@ const char *_srt_graphics_provider_describe (SrtGraphicsProvider *self);
 const char *_srt_graphics_provider_get_manifest_path (SrtGraphicsProvider *self);
 const char *_srt_graphics_provider_get_root_path (SrtGraphicsProvider *self);
 SrtSysroot *_srt_graphics_provider_get_root (SrtGraphicsProvider *self);
+SrtGraphicsProviderFeatureFlags _srt_graphics_provider_get_features (SrtGraphicsProvider *self);
 const GQuark *_srt_graphics_provider_get_architectures (SrtGraphicsProvider *self,
                                                         size_t *n_out);
 
@@ -37,7 +49,10 @@ const SrtGraphicsProviderArchitecture *_srt_graphics_provider_get_nth_architectu
                                                                                     size_t n);
 const SrtGraphicsProviderArchitecture *_srt_graphics_provider_get_architecture (SrtGraphicsProvider *self,
                                                                                 GQuark tuple_quark);
+SrtGraphicsProviderFeatureFlags _srt_graphics_provider_architecture_get_features (const SrtGraphicsProviderArchitecture *self);
 GQuark _srt_graphics_provider_architecture_get_tuple (const SrtGraphicsProviderArchitecture *self);
+const char *_srt_graphics_provider_architecture_get_dri_path (const SrtGraphicsProviderArchitecture *self);
+const char *_srt_graphics_provider_architecture_get_gconv_path (const SrtGraphicsProviderArchitecture *self);
 
 SrtGraphicsProvider *_srt_graphics_provider_new_from_manifest (const char *path,
                                                                GError **error);

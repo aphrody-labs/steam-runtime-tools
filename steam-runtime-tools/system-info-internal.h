@@ -28,6 +28,7 @@
 
 #include "steam-runtime-tools/steam-runtime-tools.h"
 
+#include "steam-runtime-tools/graphics-provider-internal.h"
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
 #include "steam-runtime-tools/subprocess-internal.h"
 
@@ -71,3 +72,5 @@ void _srt_system_info_set_sysroot (SrtSystemInfo *self,
 SrtSubprocessRunner *_srt_system_info_get_subprocess_runner (SrtSystemInfo *self);
 void _srt_system_info_set_subprocess_runner (SrtSystemInfo *self,
                                              SrtSubprocessRunner *runner);
+void _srt_system_info_set_graphics_provider (SrtSystemInfo *self,
+                                             SrtGraphicsProvider *provider);

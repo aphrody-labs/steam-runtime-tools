@@ -234,6 +234,31 @@ _srt_json_object_get_string_member (JsonObject *object,
   return json_node_get_string (node);
 }
 
+SrtJsonGetBooleanResult
+_srt_json_object_get_boolean_strict (JsonObject *object,
+                                     const char *member_name,
+                                     GError **error)
+{
+  JsonNode *node = json_object_get_member (object, member_name);
+
+  if (node == NULL)
+    return SRT_JSON_GET_BOOLEAN_RESULT_UNSPECIFIED;
+
+  if (!JSON_NODE_HOLDS_VALUE (node)
+      || json_node_get_value_type (node) != G_TYPE_BOOLEAN)
+    {
+      g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                   "\"%s\" member must have a boolean value",
+                   member_name);
+      return SRT_JSON_GET_BOOLEAN_RESULT_ERROR;
+    }
+
+  if (json_node_get_boolean (node))
+    return SRT_JSON_GET_BOOLEAN_RESULT_TRUE;
+
+  return SRT_JSON_GET_BOOLEAN_RESULT_FALSE;
+}
+
 /**
  * _srt_json_builder_add_array_of_lines:
  * @builder: (not nullable): A JSON builder to which the provided @value

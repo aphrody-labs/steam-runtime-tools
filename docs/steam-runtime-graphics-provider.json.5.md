@@ -52,6 +52,15 @@ the same multiarch tuples,
 and the values are all empty objects,
 `{}`.
 
+### `locales` (boolean)
+
+If `false`,
+compatibility tools may assume that glibc locale data in this graphics
+provider is missing or incomplete,
+and therefore locale data should be taken from elsewhere
+(for example the root directory).
+The default is `true`.
+
 ### `root` (string)
 
 Path to a directory to use as if it was the root filesystem.
@@ -156,6 +165,10 @@ the default is to auto-detect it,
 which may incur a startup time cost
 (especially when running under CPU emulation).
 
+### `locales` (not allowed)
+
+This field cannot be present at the per-architecture level.
+
 ### `va_api` (boolean)
 
 If present,
@@ -217,6 +230,7 @@ might look like this:
     {
       "graphics_provider_v0": {
         "root": "./",
+        "locales": false,
         "va_api": false,
         "vdpau": false,
         "architectures": {

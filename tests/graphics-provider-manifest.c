@@ -66,6 +66,9 @@ dump_feature_flags (const char *indent,
 {
   g_autoptr(GString) str = g_string_new ("");
 
+  if (features & SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_LOCALES)
+    append_flag (str, "LOCALES");
+
   if (features & SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VA_API)
     append_flag (str, "VA_API");
 
@@ -604,6 +607,11 @@ test_invalid (Fixture *f,
       "  \"architectures\": [\"i386-linux-gnu\"],\n"
       "  \"root\": \"/nonexistent\"\n"
       "}}\n" },
+    { "non-boolean locales",
+      "{\"graphics_provider_v0\": {\n"
+      "  \"architectures\": [\"i386-linux-gnu\"],\n"
+      "  \"locales\": []\n"
+      "}}\n" },
     { "non-boolean va_api",
       "{\"graphics_provider_v0\": {\n"
       "  \"architectures\": [\"i386-linux-gnu\"],\n"
@@ -647,6 +655,14 @@ test_invalid (Fixture *f,
       "  \"architectures\": {\n"
       "    \"i386-linux-gnu\": {\n"
       "      \"gconv\": \"lib32/gconv\"\n"
+      "    }\n"
+      "  }\n"
+      "}}\n" },
+    { "locales in architecture doesn't make sense",
+      "{\"graphics_provider_v0\": {\n"
+      "  \"architectures\": {\n"
+      "    \"i386-linux-gnu\": {\n"
+      "      \"locales\": true\n"
       "    }\n"
       "  }\n"
       "}}\n" },

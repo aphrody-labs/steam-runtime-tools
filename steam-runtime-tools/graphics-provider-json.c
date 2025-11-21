@@ -36,6 +36,51 @@ manifest_copy_optional_string (JsonObject *object,
   return TRUE;
 }
 
+static gboolean
+manifest_copy_optional_strv (JsonObject *object,
+                             const char *member_name,
+                             GStrv *value_out,
+                             GError **error)
+{
+  g_autoptr(GPtrArray) value = NULL;
+  JsonNode *member;
+  JsonArray *arr;
+  size_t len;
+
+  g_return_val_if_fail (value_out != NULL, FALSE);
+  g_return_val_if_fail (*value_out == NULL, FALSE);
+
+  member = json_object_get_member (object, member_name);
+
+  if (member == NULL)
+    return TRUE;
+
+  if (!JSON_NODE_HOLDS_ARRAY (member))
+    return glnx_throw (error, "Value of \"%s\" must be an array", member_name);
+
+  arr = json_node_get_array (member);
+  g_return_val_if_fail (arr != NULL, FALSE);
+  len = json_array_get_length (arr);
+  value = g_ptr_array_new_full (len + 1, g_free);
+
+  for (size_t i = 0; i < len; i++)
+    {
+      JsonNode *element = json_array_get_element (arr, i);
+      const char *s = json_node_get_string (element);
+
+      if (s == NULL)
+        return glnx_throw (error, "Elements of \"%s\" must be strings",
+                           member_name);
+
+      g_ptr_array_add (value, g_strdup (s));
+    }
+
+  g_ptr_array_add (value, NULL);
+  *value_out = (GStrv) g_ptr_array_free (g_steal_pointer (&value), FALSE);
+
+  return TRUE;
+}
+
 static SrtSysroot *
 manifest_read_root (JsonObject *object,
                     const char *member_name,
@@ -225,6 +270,23 @@ foreach_arch_object_cb (JsonObject *archs_object,
     {
       glnx_throw (data->error, "\"dri\" value must be an absolute path");
       goto fail;
+    }
+
+  if (!manifest_copy_optional_strv (object, "fallback_library_paths",
+                                    &arch.fallback_library_paths, data->error))
+    goto fail;
+
+  if (arch.fallback_library_paths != NULL)
+    {
+      for (size_t i = 0; arch.fallback_library_paths[i] != NULL; i++)
+        {
+          if (strchr (arch.fallback_library_paths[i], ':') != NULL)
+            {
+              glnx_throw (data->error,
+                          "\"fallback_library_paths\" entries must not contain ':'");
+              goto fail;
+            }
+        }
     }
 
   if (!manifest_copy_optional_string (object, "gconv",

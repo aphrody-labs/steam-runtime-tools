@@ -150,6 +150,20 @@ the default is to auto-detect it,
 which may incur a startup time cost
 (especially when running under CPU emulation).
 
+### `fallback_library_paths` (array of strings)
+
+If present,
+compatibility tools may assume that glibc will search these paths as a
+last resort if a library cannot be found in `/etc/ld.so.cache`,
+replacing any defaults known to the compatibility tool.
+
+For example,
+32-bit glibc on Arch Linux systems could use `["/usr/lib32"]`.
+
+If not specified,
+compatibility tools should assume a default value such as
+`["/lib", "/usr/lib"]`.
+
 ### `gconv` (string)
 
 An absolute path (starting with `/`).
@@ -240,6 +254,7 @@ might look like this:
           },
           "i386-linux-gnu": {
             "dri": "/usr/lib32/dri",
+            "fallback_library_paths": ["/usr/lib32"],
             "gconv": "/usr/lib32/gconv"
           }
         }

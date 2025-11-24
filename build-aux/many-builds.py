@@ -158,7 +158,6 @@ class Environment:
                 'registry.gitlab.steamos.cloud/steamrt/soldier/sdk:beta'
             ),
             'sniper': 'registry.gitlab.steamos.cloud/steamrt/sniper/sdk:beta',
-            'medic': '',
             'steamrt4': '',
             'steamrt5': '',
         }

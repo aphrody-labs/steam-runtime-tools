@@ -56,10 +56,6 @@ variables:
     SNIPER_DOCKER_REGISTRY: '${CI_REGISTRY}'
     SNIPER_DOCKER_IMAGE: steamrt/sniper/sdk:beta
     SNIPER_APT_SOURCES_FILE: ''
-    # There's no public Docker image for medic right now
-    MEDIC_DOCKER_REGISTRY: ''
-    MEDIC_DOCKER_IMAGE: ''
-    MEDIC_APT_SOURCES_FILE: ''
     # There's no public Docker image for SteamRT 4 right now
     STEAMRT4_DOCKER_REGISTRY: ''
     STEAMRT4_DOCKER_IMAGE: ''

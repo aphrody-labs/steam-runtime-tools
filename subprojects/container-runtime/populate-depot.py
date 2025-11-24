@@ -88,7 +88,6 @@ SUITES = {
     'scout': 1,
     'soldier': 2,
     'sniper': 3,
-    'medic': 4,
 }
 
 

@@ -323,7 +323,6 @@ class ContainerRuntime(Runtime):
             'scout': 1,
             'soldier': 2,
             'sniper': 3,
-            'medic': 4,
         }.get(self.provides, 0)
 
 

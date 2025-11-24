@@ -1,6 +1,7 @@
 {
   "graphics_provider_v0": {
     "root": "./",
+    "locales": false,
     "va_api": false,
     "vdpau": true,
     "hypothetical future member": 42,

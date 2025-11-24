@@ -8,6 +8,8 @@
 #include "steam-runtime-tools/json-glib-backports-internal.h"
 #include "steam-runtime-tools/json-utils-internal.h"
 
+#include <stdbool.h>
+
 static gboolean
 manifest_copy_optional_string (JsonObject *object,
                                const char *member_name,
@@ -83,6 +85,7 @@ manifest_read_root (JsonObject *object,
 
 static gboolean
 manifest_read_features (JsonObject *object,
+                        GQuark architecture,
                         SrtGraphicsProviderFeatureFlags *features_p,
                         GError **error)
 {
@@ -90,9 +93,12 @@ manifest_read_features (JsonObject *object,
     {
       const char *name;
       SrtGraphicsProviderFeatureFlags value;
+      bool cross_architecture : 1;
     }
   feature_mappings[] =
     {
+        { "locales", SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_LOCALES,
+          .cross_architecture = true },
         { "va_api", SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VA_API },
         { "vdpau", SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VDPAU },
     };
@@ -101,18 +107,29 @@ manifest_read_features (JsonObject *object,
     {
       const char *member_name = feature_mappings[i].name;
       SrtGraphicsProviderFeatureFlags value = feature_mappings[i].value;
+      SrtJsonGetBooleanResult ret;
 
-      switch (_srt_json_object_get_boolean_strict (object, member_name, error))
+      ret = _srt_json_object_get_boolean_strict (object, member_name, error);
+
+      switch (ret)
         {
           case SRT_JSON_GET_BOOLEAN_RESULT_ERROR:
             return FALSE;
 
           case SRT_JSON_GET_BOOLEAN_RESULT_FALSE:
-            *features_p &= ~value;
-            break;
-
           case SRT_JSON_GET_BOOLEAN_RESULT_TRUE:
-            *features_p |= value;
+            if (feature_mappings[i].cross_architecture
+                && architecture != SRT_ARCHITECTURE_QUARK_NONE)
+              return glnx_throw (error,
+                                 "\"%s\" is not meaningful to set on a "
+                                 "per-architecture basis",
+                                 member_name);
+
+            if (ret == SRT_JSON_GET_BOOLEAN_RESULT_FALSE)
+              *features_p &= ~value;
+            else
+              *features_p |= value;
+
             break;
 
           case SRT_JSON_GET_BOOLEAN_RESULT_UNSPECIFIED:
@@ -220,7 +237,8 @@ foreach_arch_object_cb (JsonObject *archs_object,
       goto fail;
     }
 
-  if (!manifest_read_features (object, &arch.features, data->error))
+  if (!manifest_read_features (object, arch.tuple_quark,
+                               &arch.features, data->error))
     goto fail;
 
   g_array_append_vals (data->archs, &arch, 1);
@@ -329,7 +347,8 @@ _srt_graphics_provider_new_from_manifest (const char *path,
   if (sysroot == NULL)
     return NULL;
 
-  if (!manifest_read_features (object, &features, error))
+  if (!manifest_read_features (object, SRT_ARCHITECTURE_QUARK_NONE,
+                               &features, error))
     return NULL;
 
   archs = _srt_graphics_provider_architecture_array_new (NULL, 0,

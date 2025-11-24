@@ -129,7 +129,7 @@ package:source:
     stage: prepare
     # Any SDK image is fine here, but preferably one with dpkg-dev
     # and deb-build-snapshot preinstalled
-    image: '${SNIPER_DOCKER_REGISTRY}/${SNIPER_DOCKER_IMAGE}'
+    image: '${STEAMRT4_DOCKER_REGISTRY}/${STEAMRT4_DOCKER_IMAGE}'
     before_script:
         - *common_before_script
         - ./ci/prepare-deb.sh
@@ -549,7 +549,7 @@ deploy:
         # To debug changes to this CI step, change this to when: on_success
         # or when: manual, and push to a protected branch
         - when: never
-    image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian/eol:bullseye-slim
+    image: '${STEAMRT4_DOCKER_REGISTRY}/${STEAMRT4_DOCKER_IMAGE}'
     before_script:
         - *common_before_script
         - ./ci/prepare-deb.sh devscripts openssh-client rsync

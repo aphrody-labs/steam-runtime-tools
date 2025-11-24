@@ -53,7 +53,7 @@ log_oom (void)
 static bool
 want_launcher_service (const char *tool_names)
 {
-  const char *requested = getenv ("STEAM_COMPAT_LAUNCHER_SERVICE");
+  const char *requested = getenv (STEAM_COMPAT_LAUNCHER_SERVICE_ENVVAR);
   autofree char *needle = NULL;
   autofree char *haystack = NULL;
 
@@ -65,8 +65,8 @@ want_launcher_service (const char *tool_names)
   if (strchr (requested, ':') != NULL)
     {
       fprintf (stderr,
-               "%s: Expected a single entry in $STEAM_COMPAT_LAUNCHER_SERVICE\n",
-               NAME);
+               "%s: Expected a single entry in $%s\n",
+               NAME, STEAM_COMPAT_LAUNCHER_SERVICE_ENVVAR);
       return false;
     }
 
@@ -273,7 +273,7 @@ main (int argc, char **argv)
           goto fallback;
         }
 
-      unsetenv ("STEAM_COMPAT_LAUNCHER_SERVICE");
+      unsetenv (STEAM_COMPAT_LAUNCHER_SERVICE_ENVVAR);
       argz_extract (argz, argz_len, launcher_service_argv);
       execvp (launcher_service, launcher_service_argv);
       fprintf (stderr, "%s: execvp %s: %s\n",

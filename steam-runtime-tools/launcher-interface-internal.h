@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include <stddef.h>
+
 #define DBUS_NAME_DBUS "org.freedesktop.DBus"
 #define DBUS_INTERFACE_DBUS DBUS_NAME_DBUS
 #define DBUS_INTERFACE_PEER DBUS_INTERFACE_DBUS ".Peer"
@@ -46,3 +48,5 @@ enum
 #define STEAM_COMPAT_LAUNCHER_SERVICE_LAYER_CONTAINER_RUNTIME "container-runtime"
 #define STEAM_COMPAT_LAUNCHER_SERVICE_LAYER_PROTON "proton"
 #define STEAM_COMPAT_LAUNCHER_SERVICE_LAYER_SCOUT_IN_CONTAINER "scout-in-container"
+
+const char * const *_srt_launcher_interface_get_options (size_t *argc_out);

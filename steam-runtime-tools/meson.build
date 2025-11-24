@@ -25,6 +25,8 @@ srt_c_args = ['-include', 'steam-runtime-tools/_srt-config.h']
 
 libsteamrt_libc_utils = static_library(
   'steam-runtime-tools-libc',
+  'launcher-interface-internal.h',
+  'launcher-interface.c',
   'libc-utils.c',
   c_args : srt_c_args,
   include_directories : project_include_dirs,

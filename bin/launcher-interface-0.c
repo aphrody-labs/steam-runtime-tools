@@ -236,20 +236,31 @@ main (int argc, char **argv)
   if (want_launcher_service (tool_names)
       && (launcher_service = find_launcher_service ()) != NULL)
     {
+      const char * const *options;
       autofree char *argz = NULL;
       size_t argz_len = 0;
       autofree char **launcher_service_argv = NULL;
 
       trace ("Trying to run launcher service: %s", launcher_service);
 
-      if (argz_add (&argz, &argz_len, launcher_service) != 0
-          || argz_add (&argz, &argz_len, "--exec-fallback")
-          || argz_add (&argz, &argz_len, "--hint")
-          || argz_add (&argz, &argz_len, "--inside-app")
-          || argz_add (&argz, &argz_len, "--no-stop-on-name-loss")
-          || argz_add (&argz, &argz_len, "--replace")
-          || argz_add (&argz, &argz_len, "--session")
-          || argz_add (&argz, &argz_len, "--"))
+      if (argz_add (&argz, &argz_len, launcher_service) != 0)
+        {
+          log_oom ();
+          goto fallback;
+        }
+
+      options = _srt_launcher_interface_get_options (NULL);
+
+      for (i = 0; options[i] != NULL; i++)
+        {
+          if (argz_add (&argz, &argz_len, options[i]) != 0)
+            {
+              log_oom ();
+              goto fallback;
+            }
+        }
+
+      if (argz_add (&argz, &argz_len, "--") != 0)
         {
           log_oom ();
           goto fallback;

@@ -94,7 +94,6 @@ def setup(args):
         args,
         'scout-i386',
         common_options + [
-            '-Dbin=false',
             '-Dmultiarch_tuple=i386-linux-gnu',
             '-Dpressure_vessel=false',
             '--cross-file=build-aux/meson/scout-i386.txt',

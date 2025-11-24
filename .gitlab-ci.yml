@@ -202,6 +202,12 @@ package:sniper:amd64:
         BUILD_IMAGE: '${SNIPER_DOCKER_REGISTRY}/${SNIPER_DOCKER_IMAGE}'
         STEAM_CI_DEB_BUILD: binary
 
+package:steamrt4:amd64:
+    extends: .build_deb
+    variables:
+        BUILD_IMAGE: '${STEAMRT4_DOCKER_REGISTRY}/${STEAMRT4_DOCKER_IMAGE}'
+        STEAM_CI_DEB_BUILD: binary
+
 build:devel:
     stage: build
     needs: []

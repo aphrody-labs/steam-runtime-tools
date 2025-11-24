@@ -21,17 +21,9 @@
 
 #include "steam-runtime-tools/libc-utils-internal.h"
 
-#define NAME "steam-runtime-launcher-interface-0"
+#include "steam-runtime-tools/launcher-interface-internal.h"
 
-/* Chosen to be similar to env(1) */
-enum
-{
-  LAUNCH_EX_USAGE = 125,
-  LAUNCH_EX_FAILED = 125,
-  LAUNCH_EX_CANNOT_INVOKE = 126,
-  LAUNCH_EX_NOT_FOUND = 127,
-  LAUNCH_EX_CANNOT_REPORT = 255
-};
+#define NAME "steam-runtime-launcher-interface-0"
 
 #if 0
 #define trace(...) do { \

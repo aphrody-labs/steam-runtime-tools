@@ -31,27 +31,8 @@
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "libglnx.h"
 
+#include "steam-runtime-tools/launcher-interface-internal.h"
 #include "steam-runtime-tools/launcher1.h"
-
-#define DBUS_NAME_DBUS "org.freedesktop.DBus"
-#define DBUS_INTERFACE_DBUS DBUS_NAME_DBUS
-#define DBUS_INTERFACE_PEER DBUS_INTERFACE_DBUS ".Peer"
-#define DBUS_PATH_DBUS "/org/freedesktop/DBus"
-
-#define LAUNCHER_INSIDE_APP_PREFIX "com.steampowered.App"
-#define LAUNCHER_NAME_ALONGSIDE_STEAM "com.steampowered.PressureVessel.LaunchAlongsideSteam"
-#define LAUNCHER_IFACE "com.steampowered.PressureVessel.Launcher1"
-#define LAUNCHER_PATH "/com/steampowered/PressureVessel/Launcher1"
-
-typedef enum
-{
-  PV_LAUNCH_FLAGS_CLEAR_ENV = (1 << 0),
-  PV_LAUNCH_FLAGS_NONE = 0,
-  PV_LAUNCH_FLAGS_MASK = (
-    PV_LAUNCH_FLAGS_CLEAR_ENV |
-    PV_LAUNCH_FLAGS_NONE
-  ),
-} PvLaunchFlags;
 
 /* Format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx */
 #define PV_UUID_STRLEN 36
@@ -66,13 +47,3 @@ G_STATIC_ASSERT (sizeof (struct sockaddr_un) >=
                   PV_MAX_SOCKET_DIRECTORY_LEN +
                   PV_UUID_STRLEN +
                   2));
-
-/* Chosen to be similar to env(1) */
-enum
-{
-  LAUNCH_EX_USAGE = 125,
-  LAUNCH_EX_FAILED = 125,
-  LAUNCH_EX_CANNOT_INVOKE = 126,
-  LAUNCH_EX_NOT_FOUND = 127,
-  LAUNCH_EX_CANNOT_REPORT = 255
-};

@@ -1,11 +1,11 @@
-steam-runtime-tools (0.20251121.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251124.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
     - Improve container startup time when using CPU emulation
-      (steamrt/tasks#851)
+      (steamrt/tasks#851, steamrt/tasks#865)
   * Documentation updates
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 21 Nov 2025 16:47:15 +0000
+ -- Simon McVittie <smcv@collabora.com>  Mon, 24 Nov 2025 13:57:08 +0000
 
 steam-runtime-tools (0.20251120.0) steamrt; urgency=medium
 

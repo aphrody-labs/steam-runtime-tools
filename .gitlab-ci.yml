@@ -22,7 +22,6 @@ variables:
         libglib2.0-dev
         libglib2.0-doc
         libjson-glib-dev
-        libsdl2-dev
         libsdl2-ttf-dev
         libtheora-dev
         libva-dev

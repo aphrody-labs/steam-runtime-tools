@@ -19,7 +19,7 @@ Build-Depends:
  libgl1-mesa-dev | libgl-dev,
  libglib2.0-dev (>= 2.58),
  libjson-glib-dev (>= 1.0),
- libsdl2-dev,
+ libsdl2-dev | libsdl2-compat-dev,
  libsdl2-ttf-dev,
  libudev1 <!nocheck> | libudev0 <!nocheck>,
  libva-dev,

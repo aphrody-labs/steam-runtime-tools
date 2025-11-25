@@ -22,7 +22,6 @@ variables:
         libglib2.0-dev
         libglib2.0-doc
         libjson-glib-dev
-        libsdl2-dev
         libsdl2-ttf-dev
         libtheora-dev
         libva-dev
@@ -56,13 +55,12 @@ variables:
     SNIPER_DOCKER_REGISTRY: '${CI_REGISTRY}'
     SNIPER_DOCKER_IMAGE: steamrt/sniper/sdk:beta
     SNIPER_APT_SOURCES_FILE: ''
-    # There's no public Docker image for medic right now
-    MEDIC_DOCKER_REGISTRY: ''
-    MEDIC_DOCKER_IMAGE: ''
-    MEDIC_APT_SOURCES_FILE: ''
-    # There's no public Docker image for SteamRT 4 right now
-    STEAMRT4_DOCKER_REGISTRY: ''
-    STEAMRT4_DOCKER_IMAGE: ''
+    STEAMRT3C_DOCKER_REGISTRY: '${CI_REGISTRY}'
+    STEAMRT3C_DOCKER_IMAGE: 'steamrt/steamrt3c/sdk:beta'
+    STEAMRT3C_DOCKER_IMAGE_ARM64: 'steamrt/steamrt3c/sdk/arm64:beta'
+    STEAMRT3C_APT_SOURCES_FILE: ''
+    STEAMRT4_DOCKER_REGISTRY: '${CI_REGISTRY}'
+    STEAMRT4_DOCKER_IMAGE: 'steamrt/steamrt4/sdk:beta'
     STEAMRT4_APT_SOURCES_FILE: ''
     # There's no public Docker image for SteamRT 5 right now
     STEAMRT5_DOCKER_REGISTRY: ''
@@ -135,7 +133,7 @@ package:source:
     stage: prepare
     # Any SDK image is fine here, but preferably one with dpkg-dev
     # and deb-build-snapshot preinstalled
-    image: '${SNIPER_DOCKER_REGISTRY}/${SNIPER_DOCKER_IMAGE}'
+    image: '${STEAMRT4_DOCKER_REGISTRY}/${STEAMRT4_DOCKER_IMAGE}'
     before_script:
         - *common_before_script
         - ./ci/prepare-deb.sh
@@ -174,26 +172,26 @@ package:scout:i386:
         BUILD_IMAGE: '${SCOUT_DOCKER_REGISTRY}/${SCOUT_I386_DOCKER_IMAGE}'
         STEAM_CI_DEB_BUILD: any     # debuild --build=any, aka -B
 
-package:bullseye:amd64:
+package:steamrt3c:amd64:
     extends: .build_deb
     variables:
-        BUILD_IMAGE: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian/eol:bullseye-slim
+        BUILD_IMAGE: '${STEAMRT3C_DOCKER_REGISTRY}/${STEAMRT3C_DOCKER_IMAGE}'
         STEAM_CI_DEB_BUILD: binary
 
-package:bullseye:arm64:
+package:steamrt3c:arm64:
     extends: .build_deb
     tags:
         - docker
         - linux
         - aarch64
     variables:
-        BUILD_IMAGE: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian/eol:bullseye-slim
+        BUILD_IMAGE: '${STEAMRT3C_DOCKER_REGISTRY}/${STEAMRT3C_DOCKER_IMAGE_ARM64}'
         STEAM_CI_DEB_BUILD: any
 
-package:bullseye:i386:
+package:steamrt3c:i386:
     extends: .build_deb
     variables:
-        BUILD_IMAGE: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian/eol:bullseye-slim
+        BUILD_IMAGE: '${STEAMRT3C_DOCKER_REGISTRY}/${STEAMRT3C_DOCKER_IMAGE}'
         STEAM_CI_DEB_BUILD: any
 
 package:soldier:amd64:
@@ -206,6 +204,12 @@ package:sniper:amd64:
     extends: .build_deb
     variables:
         BUILD_IMAGE: '${SNIPER_DOCKER_REGISTRY}/${SNIPER_DOCKER_IMAGE}'
+        STEAM_CI_DEB_BUILD: binary
+
+package:steamrt4:amd64:
+    extends: .build_deb
+    variables:
+        BUILD_IMAGE: '${STEAMRT4_DOCKER_REGISTRY}/${STEAMRT4_DOCKER_IMAGE}'
         STEAM_CI_DEB_BUILD: binary
 
 build:devel:
@@ -398,8 +402,8 @@ relocatable-install:arm64:
         - aarch64
     needs:
         - package:source
-        - package:bullseye:arm64
-    image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian/eol:bullseye-slim
+        - package:steamrt3c:arm64
+    image: '${STEAMRT3C_DOCKER_REGISTRY}/${STEAMRT3C_DOCKER_IMAGE_ARM64}'
     artifacts:
         paths:
             - _build/arm64/pressure-vessel-arm64.tar.gz
@@ -508,16 +512,16 @@ autopkgtest:scout:amd64:
         paths:
             - debian/tmp/artifacts/autopkgtest
 
-autopkgtest:bullseye:arm64:
+autopkgtest:steamrt3c:arm64:
     stage: test
     tags:
         - docker
         - linux
         - aarch64
-    image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian/eol:bullseye-slim
+    image: '${STEAMRT3C_DOCKER_REGISTRY}/${STEAMRT3C_DOCKER_IMAGE_ARM64}'
     needs:
         - package:source
-        - package:bullseye:arm64
+        - package:steamrt3c:arm64
     script:
         - ./ci/prepare-deb.sh
         - ./ci/autopkgtest.sh
@@ -532,7 +536,7 @@ deploy:
         - package:source
         - package:scout:amd64
         - package:scout:i386
-        - package:bullseye:arm64
+        - package:steamrt3c:arm64
         - relocatable-install
         - relocatable-install:arm64
     rules:
@@ -555,7 +559,7 @@ deploy:
         # To debug changes to this CI step, change this to when: on_success
         # or when: manual, and push to a protected branch
         - when: never
-    image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian/eol:bullseye-slim
+    image: '${STEAMRT4_DOCKER_REGISTRY}/${STEAMRT4_DOCKER_IMAGE}'
     before_script:
         - *common_before_script
         - ./ci/prepare-deb.sh devscripts openssh-client rsync

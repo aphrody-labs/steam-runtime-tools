@@ -50,11 +50,12 @@ case "$(. /usr/lib/os-release; echo "${VERSION_CODENAME-${VERSION}}")" in
         too_old_for_signed_by=1
         ;;
 
-    (medic)
-        if [ -n "${MEDIC_APT_SOURCES_FILE-}" ]; then
-            cp "${MEDIC_APT_SOURCES_FILE}" /etc/apt/sources.list
+    (steamrt3c)
+        if [ -n "${STEAMRT3C_APT_SOURCES_FILE-}" ]; then
+            cp "${STEAMRT3C_APT_SOURCES_FILE}" /etc/apt/sources.list
         fi
         need_apt_keys=1
+        too_old_for_signed_by=1
         ;;
 
     (steamrt4)

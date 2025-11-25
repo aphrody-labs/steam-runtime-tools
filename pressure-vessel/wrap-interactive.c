@@ -34,7 +34,7 @@ pv_bwrap_wrap_in_xterm (FlatpakBwrap *wrapped_command,
   g_return_if_fail (wrapped_command != NULL);
 
   flatpak_bwrap_add_args (wrapped_command,
-                          "xterm", "-e",
+                          "/usr/bin/env", "xterm", "-e",
                           /* Original command will go here and become
                            * the argv of xterm -e */
                           NULL);
@@ -42,7 +42,7 @@ pv_bwrap_wrap_in_xterm (FlatpakBwrap *wrapped_command,
   if (xcursor_path != NULL)
     {
       /* xterm unsets XCURSOR_PATH. Reinstate it for the contained shell. */
-      flatpak_bwrap_add_arg (wrapped_command, "env");
+      flatpak_bwrap_add_arg (wrapped_command, "/usr/bin/env");
       flatpak_bwrap_add_arg_printf (wrapped_command, "XCURSOR_PATH=%s", xcursor_path);
     }
 }
@@ -112,7 +112,7 @@ pv_bwrap_wrap_interactive (FlatpakBwrap *wrapped_command,
                              shell == PV_SHELL_NONE ? "" : start_shell);
 
   flatpak_bwrap_add_args (wrapped_command,
-                          "sh", "-euc",
+                          "/bin/sh", "-euc",
                           command,
                           "sh",   /* $0 for sh */
                           g_get_prgname (),   /* $1 = $prgname for sh */

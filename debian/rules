@@ -100,6 +100,12 @@ endif
 
 override_dh_auto_install:
 	DESTDIR=$(DESTDIR) ninja -C _build install
+ifeq ($(is_scout),true)
+	# meson in scout is too old for install_symlink()
+	ln -fnsv \
+		../libexec/steam-runtime-tools-0/$(DEB_HOST_MULTIARCH)-srt-launcher-service \
+		$(DESTDIR)/usr/bin/steam-runtime-launcher-service
+endif
 	set -e; for x in $(DESTDIR)/usr/libexec/installed-tests/steam-runtime-tools-0/*; do \
 		if [ -f "$$x" ] \
 		&& cmp -s "$$x" \

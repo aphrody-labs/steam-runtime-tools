@@ -121,9 +121,33 @@ srt_bin += executable(
   install_rpath : bin_rpath,
 )
 
-# Slightly different: needs threads and codegen
+# Slightly different: needs threads and codegen, and install in libexecdir
+# with an architecture prefix so we can use it during emulation
+if multiarch != ''
+  launcher_service_exe = multiarch + '-srt-launcher-service'
+  launcher_service_dir = pkglibexecdir
+  launcher_service_rpath = pkglibexec_rpath
+
+  # Note that this doesn't work in scout because its meson is too old:
+  # we fix that up in debian/rules
+  if meson.version().version_compare('>=0.61')
+    install_symlink(
+      'steam-runtime-launcher-service',
+      install_dir : get_option('bindir'),
+      # This assumes that bindir is a single path component and
+      # pkglibexecdir is a relative path, but we already make similar
+      # assumptions about RPATHs
+      pointing_to : '..' / pkglibexecdir / launcher_service_exe,
+    )
+  endif
+else
+  launcher_service_exe = 'steam-runtime-launcher-service'
+  launcher_service_dir = get_option('bindir')
+  launcher_service_rpath = bin_rpath
+endif
+
 srt_bin += executable(
-  'steam-runtime-launcher-service',
+  launcher_service_exe,
   sources: [
     'launcher-service.c',
   ],
@@ -136,8 +160,9 @@ srt_bin += executable(
     libsteamrt_static_dep,
   ],
   install : true,
-  build_rpath : bin_rpath,
-  install_rpath : bin_rpath,
+  install_dir: launcher_service_dir,
+  build_rpath : launcher_service_rpath,
+  install_rpath : launcher_service_rpath,
 )
 
 # Slightly different: different prefix (so that it's distinguished as an

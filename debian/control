@@ -224,6 +224,7 @@ Replaces:
  libsteam-runtime-tools-0-tests (<< 0.20190806.0~),
 Depends:
  libsteam-runtime-tools-0-0 (= ${binary:Version}),
+ libsteam-runtime-tools-0-helpers (= ${binary:Version}),
  steam-runtime-tools-minimal (= ${binary:Version}),
  ${misc:Depends},
  ${shlibs:Depends},

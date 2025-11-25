@@ -216,6 +216,7 @@ pressure_vessel_wrap_lib = static_library(
     xau,
     libglnx_dep,
     json_glib,
+    libsteamrt_libc_utils_dep,
   ],
   include_directories : pv_include_dirs,
 )

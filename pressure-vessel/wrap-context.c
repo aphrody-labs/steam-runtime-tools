@@ -8,6 +8,7 @@
 
 #include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
+#include "steam-runtime-tools/launcher-interface-internal.h"
 #include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
@@ -1534,6 +1535,83 @@ pv_wrap_context_export_if_allowed (PvWrapContext *self,
 }
 
 /*
+ * pv_wrap_context_maybe_wrap_in_launcher:
+ * @payload_command: The execution environment, possibly already including
+ *  wrappers such as an emulator
+ * @container_env: Alterations to environment variables inside the container
+ * @emulator: The emulator in use, or %NULL
+ * @layer: One of the possible values for `compatmanager_layer_name`
+ *  and `$STEAM_COMPAT_LAUNCHER_SERVICE`, as documented
+ *  in `docs/steam-compat-tool-interface.md`
+ *
+ * If the environment variables in @self indicate that @layer
+ * should be wrapped in `s-r-launcher-service(1)`, append arguments that
+ * will do so.
+ */
+static void
+pv_wrap_context_maybe_wrap_in_launcher (PvWrapContext *self,
+                                        FlatpakBwrap *payload_command,
+                                        SrtEnvOverlay *container_env,
+                                        SrtEmulator *emulator,
+                                        const char *layer)
+{
+  const char *helper_tuple;
+  const char * const *options;
+  size_t n_options = 0;
+  const char *value;
+
+  g_return_if_fail (PV_IS_WRAP_CONTEXT (self));
+  g_return_if_fail (payload_command != NULL);
+  g_return_if_fail (container_env != NULL);
+  g_return_if_fail (layer != NULL);
+
+  value = g_environ_getenv (self->original_environ,
+                            STEAM_COMPAT_LAUNCHER_SERVICE_ENVVAR);
+
+  if (value == NULL || !g_str_equal (value, layer))
+    return;
+
+  if (emulator != NULL)
+    {
+      const GQuark *emulated_archs;
+
+      emulated_archs = _srt_emulator_get_emulated_architectures (emulator, NULL);
+      g_return_if_fail (emulated_archs[0] != SRT_ARCHITECTURE_QUARK_NONE);
+      helper_tuple = g_quark_to_string (emulated_archs[0]);
+    }
+  else
+    {
+      const GQuark *supported_archs;
+
+      supported_archs = pv_wrap_options_get_architectures (&self->options, NULL);
+      g_return_if_fail (supported_archs[0] != SRT_ARCHITECTURE_QUARK_NONE);
+      helper_tuple = g_quark_to_string (supported_archs[0]);
+    }
+
+  options = _srt_launcher_interface_get_options (&n_options);
+  g_return_if_fail (n_options < INT_MAX);
+  g_return_if_fail (options[n_options] == NULL);
+
+  flatpak_bwrap_add_arg_printf (payload_command,
+                                "%s/%s-srt-launcher-service",
+                                pv_wrap_context_get_helpers_dir_in_container (self),
+                                helper_tuple);
+
+  if (_srt_util_is_debugging ())
+    flatpak_bwrap_add_arg (payload_command, "--verbose");
+
+  flatpak_bwrap_append_argsv (payload_command, (char **) options, (int) n_options);
+  flatpak_bwrap_add_arg (payload_command, "--");
+
+  /* If we run steam-runtime-launcher-interface-0 with the same @layer,
+   * or if we run this same function again further down the exec chain,
+   * don't set up the launcher-service for a second time */
+  _srt_env_overlay_set (container_env,
+                        STEAM_COMPAT_LAUNCHER_SERVICE_ENVVAR,
+                        NULL);
+}
+
+/*
  * pv_wrap_context_append_payload_command:
  * @self: The context
  * @argv: (array length=argc): Arbitrary arguments
@@ -1609,6 +1687,7 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
   else
     {
       SrtEmulator *emulator = pv_wrap_context_get_emulator_in_container (self);
+      size_t argc_after_emulator = 0;
 
       /* We don't actually know the architecture of the game we're launching
        * (which could be a chain of scripts and helper executables that
@@ -1623,13 +1702,36 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
 
           flatpak_bwrap_append_argsv (payload_command,
                                       (char **) emulator_argv, -1);
+          argc_after_emulator = payload_command->argv->len;
+        }
 
+      /* Similarly, if we want the launcher-service to be able to run a
+       * command from the runtime, such as `bash -i`, then we need it to be
+       * able to run emulated commands transparently - and that will only
+       * work if the launcher-service is, itself, an emulated command.
+       * So we stack this immediately after the emulator,
+       * and tell it to use the s-r-launcher-service that matches the
+       * container's primary architecture. */
+      pv_wrap_context_maybe_wrap_in_launcher (self,
+                                              payload_command,
+                                              container_env,
+                                              emulator,
+                                              STEAM_COMPAT_LAUNCHER_SERVICE_LAYER_CONTAINER_RUNTIME);
+
+      /* The emulator most likely won't search the PATH for the
+       * executable, so we need to give it an executable that is
+       * of an architecture that it emulates, but which *will* search
+       * the PATH.
+       *
+       * However, we only need to do this if we have *not* appended any of our
+       * other wrappers, such as s-r-launcher-service. If we did, then
+       * it will be one of those that decides what to exec next,
+       * and they all do search the path if necessary. */
+      if (emulator != NULL
+          && argc_after_emulator == payload_command->argv->len)
+        {
           if (argc > 0 && strchr (argv[0], '/') == NULL)
             {
-              /* The emulator most likely won't search the PATH for the
-               * executable, so we need to give it an executable that is
-               * of an architecture that it emulates, but which *will* search
-               * the PATH. */
               const GQuark *emulated_architectures;
 
               emulated_architectures =
@@ -1647,9 +1749,12 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
         }
 
       /* In non-"--launcher" mode, arguments after the "--" separator
-       * are the command to execute, passed to the adverb after "--".
-       * Because we always use the adverb, we don't need to worry about
-       * whether argv[1] starts with "-". */
+       * are the command to execute, passed to the adverb (or an intermediate
+       * command such as s-r-launcher-service) after its own "--" argument.
+       * Because we always use a wrapper that we control (and for example
+       * we don't pass the user-supplied command directly to a system copy
+       * of bwrap), we don't need to worry about whether argv[0]
+       * starts with "-". */
       flatpak_bwrap_append_argsv (payload_command, (char **) argv, argc);
     }
 

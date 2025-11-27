@@ -254,7 +254,7 @@ static void usage (int code)
   fprintf( fh, "--level-prefix\n"
                "\tAdd severity prefixes such as <3> to output\n" );
   fprintf( fh, "--library-knowledge=FILE\n"
-               "\tLoad information about known libraries from a"
+               "\tLoad information about known libraries from a\n"
                "\t.desktop-style file at FILE, overriding --compare-by.\n" );
   fprintf( fh, "--link-target=PATH\n"
                "\tAssume PROVIDER will be mounted at PATH when the\n"

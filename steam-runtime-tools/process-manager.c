@@ -1146,9 +1146,11 @@ _srt_process_manager_dump_parameters (SrtProcessManager *self,
           description = _srt_describe_fd (item->source);
 
           if (description != NULL)
-            g_debug ("\t%d>&%d (%s)", item->target, item->source, description);
+            g_debug ("\t%d: dup from %d (%s)",
+                     item->target, item->source, description);
           else
-            g_debug ("\t%d>&%d", item->target, item->source);
+            g_debug ("\t%d: dup from %d",
+                     item->target, item->source);
         }
     }
   else

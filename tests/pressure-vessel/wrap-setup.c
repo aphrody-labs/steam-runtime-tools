@@ -2219,6 +2219,7 @@ test_payload_command (Fixture *f,
   const PayloadCommandTest *test = config->payload_command_test;
   g_autoptr(GError) local_error = NULL;
   g_autoptr(FlatpakBwrap) argv_in_container = NULL;
+  g_autoptr(SrtEnvOverlay) container_env = _srt_env_overlay_new ();
   g_autofree char *expected_emulator = NULL;
   size_t argc;
   size_t i;
@@ -2288,11 +2289,13 @@ test_payload_command (Fixture *f,
                                                test->argv,
                                                (int) argc,
                                                argv_in_container,
+                                               container_env,
                                                &local_error);
   dump_bwrap (argv_in_container);
   g_assert_no_error (local_error);
   g_assert_true (ok);
   g_assert_false (pv_bwrap_was_finished (argv_in_container));
+  g_assert_true (_srt_env_overlay_is_empty (container_env));
 
   if (test->launcher_instead)
     {

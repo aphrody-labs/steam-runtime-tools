@@ -1511,11 +1511,12 @@ pv_wrap_context_export_if_allowed (PvWrapContext *self,
  * @self: The context
  * @argv: (array length=argc): Arbitrary arguments
  * @argc: Number of arguments
- * @argv_in_container: Argument vector to be used inside the container
+ * @payload_command: Argument vector to be used inside the container
+ * @container_env: Environment variables to be used inside the container
  * @error: Used to report error on failure
  *
- * Append arguments to @argv_in_container that will run the "payload"
- * command for the container.
+ * Append arguments to @payload_command that will run the "payload"
+ * command for the container, and edit @container_env appropriately.
  *
  * If `self->options.launcher` is set, then the arguments that are appended
  * are an invocation of `steam-runtime-launcher-service` with arbitrary
@@ -1527,7 +1528,7 @@ pv_wrap_context_export_if_allowed (PvWrapContext *self,
  * that wraps a game, but during debugging and development it might be
  * something else such as an interactive shell.
  *
- * On entry, @argv_in_container must either be empty, or contain an
+ * On entry, @payload_command must either be empty, or contain an
  * "adverb" command that wraps an arbitrary command inside the container.
  *
  * Returns: %TRUE if successful
@@ -1536,7 +1537,8 @@ gboolean
 pv_wrap_context_append_payload_command (PvWrapContext *self,
                                         const char * const *argv,
                                         int argc,
-                                        FlatpakBwrap *argv_in_container,
+                                        FlatpakBwrap *payload_command,
+                                        SrtEnvOverlay *container_env,
                                         GError **error)
 {
   const char *tools_dir;
@@ -1544,8 +1546,9 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
   g_return_val_if_fail (PV_IS_WRAP_CONTEXT (self), FALSE);
   g_return_val_if_fail (argc >= 0, FALSE);
   g_return_val_if_fail (argv != NULL, FALSE);
-  g_return_val_if_fail (argv_in_container != NULL, FALSE);
-  g_return_val_if_fail (!pv_bwrap_was_finished (argv_in_container), FALSE);
+  g_return_val_if_fail (payload_command != NULL, FALSE);
+  g_return_val_if_fail (!pv_bwrap_was_finished (payload_command), FALSE);
+  g_return_val_if_fail (container_env != NULL, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
   if (!(self->options.launcher || self->options.only_prepare))
@@ -1574,7 +1577,7 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
       flatpak_bwrap_append_argsv (launcher_argv, (char **) argv, argc);
 
       g_warn_if_fail (g_strv_length (launcher_argv->envp) == 0);
-      flatpak_bwrap_append_bwrap (argv_in_container, launcher_argv);
+      flatpak_bwrap_append_bwrap (payload_command, launcher_argv);
     }
   else
     {
@@ -1603,7 +1606,7 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
         {
           const char * const *emulator_argv = _srt_emulator_get_main_argv (emulator);
 
-          flatpak_bwrap_append_argsv (argv_in_container,
+          flatpak_bwrap_append_argsv (payload_command,
                                       (char **) emulator_argv, -1);
 
           if (argc > 0 && strchr (argv[0], '/') == NULL)
@@ -1621,10 +1624,10 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
                * choose the first one supported by the emulator. */
               g_return_val_if_fail (emulated_architectures[0] != SRT_ARCHITECTURE_QUARK_NONE,
                                     FALSE);
-              flatpak_bwrap_add_arg_printf (argv_in_container, "%s/%s-exec",
+              flatpak_bwrap_add_arg_printf (payload_command, "%s/%s-exec",
                                             helpers_dir,
                                             g_quark_to_string (emulated_architectures[0]));
-              flatpak_bwrap_add_arg_printf (argv_in_container, "--");
+              flatpak_bwrap_add_arg_printf (payload_command, "--");
             }
         }
 
@@ -1632,7 +1635,7 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
        * are the command to execute, passed to the adverb after "--".
        * Because we always use the adverb, we don't need to worry about
        * whether argv[1] starts with "-". */
-      flatpak_bwrap_append_argsv (argv_in_container, (char **) argv, argc);
+      flatpak_bwrap_append_argsv (payload_command, (char **) argv, argc);
     }
 
   return TRUE;

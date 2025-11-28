@@ -86,6 +86,7 @@ main (int argc,
   g_autoptr(FlatpakBwrap) bwrap_filesystem_arguments = NULL;
   g_autoptr(FlatpakBwrap) bwrap_home_arguments = NULL;
   g_autoptr(FlatpakBwrap) argv_in_container = NULL;
+  g_autoptr(FlatpakBwrap) payload_command = NULL;
   g_autoptr(FlatpakBwrap) final_argv = NULL;
   g_autoptr(SrtSysroot) real_root = NULL;
   g_autoptr(SrtSysroot) interpreter_root = NULL;
@@ -997,6 +998,18 @@ main (int argc,
         goto out;
     }
 
+  payload_command = flatpak_bwrap_new (flatpak_bwrap_empty_env);
+
+  /* We build the "payload" command earlier than the obvious point,
+   * in order to be early enough that we can still edit container_env. */
+  if (!pv_wrap_context_append_payload_command (self,
+                                               (const char * const *) &argv[1],
+                                               argc - 1,
+                                               payload_command,
+                                               container_env,
+                                               error))
+    goto out;
+
   if (self->is_flatpak_env)
     {
       /* Let these inherit from the sub-sandbox environment */
@@ -1212,12 +1225,8 @@ main (int argc,
       flatpak_bwrap_append_bwrap (argv_in_container, adverb_argv);
     }
 
-  if (!pv_wrap_context_append_payload_command (self,
-                                               (const char * const *) &argv[1],
-                                               argc - 1,
-                                               argv_in_container,
-                                               error))
-    goto out;
+  g_warn_if_fail (g_strv_length (payload_command->envp) == 0);
+  flatpak_bwrap_append_bwrap (argv_in_container, payload_command);
 
   if (flatpak_subsandbox != NULL)
     {

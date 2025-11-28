@@ -1333,7 +1333,12 @@ main (int argc,
 
 out:
   if (local_error != NULL)
-    _srt_log_failure ("%s", local_error->message);
+    {
+      _srt_log_failure ("%s", local_error->message);
+
+      if (local_error->domain == G_OPTION_ERROR)
+        ret = 2;
+    }
 
   g_clear_pointer (&adverb_preload_argv, g_ptr_array_unref);
 

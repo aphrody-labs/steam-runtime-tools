@@ -1294,6 +1294,9 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
   return TRUE;
 }
 
+#define usage_error(error, ...) \
+  g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED, __VA_ARGS__)
+
 gboolean
 pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
                                          GError **error)
@@ -1301,6 +1304,21 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
   g_autofree char *bindir = NULL;
   const char *prefix;
   const char *pkglibexecdir = NULL;
+
+  if (self->options.terminal == PV_TERMINAL_AUTO)
+    {
+      if (self->options.shell != PV_SHELL_NONE)
+        self->options.terminal = PV_TERMINAL_XTERM;
+      else
+        self->options.terminal = PV_TERMINAL_NONE;
+    }
+
+  if (self->options.terminal == PV_TERMINAL_NONE
+      && self->options.shell != PV_SHELL_NONE)
+    {
+      usage_error (error, "--terminal=none is incompatible with --shell");
+      return FALSE;
+    }
 
   bindir = _srt_find_executable_dir (error);
 

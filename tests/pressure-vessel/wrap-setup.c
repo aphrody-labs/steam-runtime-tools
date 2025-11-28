@@ -888,6 +888,31 @@ assert_bwrap_does_not_contain (FlatpakBwrap *bwrap,
 }
 
 static void
+dump_env_overlay (const SrtEnvOverlay *overlay)
+{
+  g_autoptr(GList) vars = _srt_env_overlay_get_vars (overlay);
+  const GList *iter;
+
+  g_test_message ("SrtEnvOverlay object:");
+
+  for (iter = vars; iter != NULL; iter = iter->next)
+    {
+      const char *var = iter->data;
+      const char *value = _srt_env_overlay_get (overlay, var);
+
+      if (value == NULL)
+        g_test_message ("\tunset %s", var);
+      else
+        g_test_message ("\texport %s=%s", var, value);
+    }
+
+  if (_srt_env_overlay_is_empty (overlay))
+    g_test_message ("\tinherit everything");
+  else
+    g_test_message ("\tinherit everything else");
+}
+
+static void
 test_bind_into_container (Fixture *f,
                           gconstpointer context)
 {
@@ -2781,6 +2806,7 @@ test_use_home_shared (Fixture *f,
   flatpak_exports_append_bwrap_args (exports, f->bwrap);
 
   dump_bwrap (f->bwrap);
+  dump_env_overlay (container_env);
 
   /* /usr and friends are out of scope here */
   assert_bwrap_does_not_contain (f->bwrap, "/bin");
@@ -2855,6 +2881,7 @@ test_use_home_shared (Fixture *f,
 
   flatpak_exports_append_bwrap_args (env_exports, env_bwrap);
   dump_bwrap (env_bwrap);
+  dump_env_overlay (container_env);
   assert_bwrap_contains (env_bwrap, "--ro-bind", "/ro", "/ro");
   assert_bwrap_contains (env_bwrap, "--bind", "/rw", "/rw");
   assert_bwrap_contains (env_bwrap, "--symlink", "offload/rw2", "/rw2");

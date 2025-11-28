@@ -291,6 +291,33 @@ pv_wrap_context_new (SrtSysroot *current_root,
                        NULL);
 }
 
+/*
+ * Returns: (transfer none): The emulator in use, if any,
+ *  at the path that will be seen inside the resulting container.
+ */
+static SrtEmulator *
+pv_wrap_context_get_emulator_in_container (PvWrapContext *self)
+{
+  if (self->runtime != NULL)
+    return pv_runtime_get_emulator_in_container (self->runtime);
+  else
+    return _srt_subprocess_runner_get_emulator (self->run_in_current_context);
+}
+
+/*
+ * Returns: (transfer none): The `libexec/steam-runtime-tools-0` directory
+ *  from the relocatable pressure-vessel build in use, at the path that will
+ *  be seen inside the resulting container.
+ */
+static const char *
+pv_wrap_context_get_helpers_dir_in_container (PvWrapContext *self)
+{
+  if (self->runtime != NULL)
+    return pv_runtime_get_helpers_dir_in_container (self->runtime);
+  else
+    return _srt_subprocess_runner_get_helpers_path (self->run_in_current_context);
+}
+
 static gboolean
 opt_copy_runtime_into_cb (const gchar *option_name,
                           const gchar *value,
@@ -1581,19 +1608,7 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
     }
   else
     {
-      const char *helpers_dir;
-      SrtEmulator *emulator;
-
-      if (self->runtime != NULL)
-        {
-          emulator = pv_runtime_get_emulator_in_container (self->runtime);
-          helpers_dir = pv_runtime_get_helpers_dir_in_container (self->runtime);
-        }
-      else
-        {
-          emulator = _srt_subprocess_runner_get_emulator (self->run_in_current_context);
-          helpers_dir = _srt_subprocess_runner_get_helpers_path (self->run_in_current_context);
-        }
+      SrtEmulator *emulator = pv_wrap_context_get_emulator_in_container (self);
 
       /* We don't actually know the architecture of the game we're launching
        * (which could be a chain of scripts and helper executables that
@@ -1625,7 +1640,7 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
               g_return_val_if_fail (emulated_architectures[0] != SRT_ARCHITECTURE_QUARK_NONE,
                                     FALSE);
               flatpak_bwrap_add_arg_printf (payload_command, "%s/%s-exec",
-                                            helpers_dir,
+                                            pv_wrap_context_get_helpers_dir_in_container (self),
                                             g_quark_to_string (emulated_architectures[0]));
               flatpak_bwrap_add_arg_printf (payload_command, "--");
             }

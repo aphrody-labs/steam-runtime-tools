@@ -69,7 +69,7 @@ pv_bwrap_wrap_interactive (FlatpakBwrap *wrapped_command,
       "echo\n"
       "exec bash -i -s \"$@\"\n"
     };
-  gchar *command;
+  g_autofree char *command = NULL;
 
   g_return_if_fail (wrapped_command != NULL);
 

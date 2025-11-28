@@ -46,6 +46,7 @@
 #include "graphics-provider.h"
 #include "runtime.h"
 #include "utils.h"
+#include "wrap-adverb.h"
 #include "wrap-context.h"
 #include "wrap-flatpak.h"
 #include "wrap-home.h"
@@ -98,6 +99,8 @@ main (int argc,
   g_autofree gchar *private_home = NULL;
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
+  glnx_autofd int tty_stdin = -1;
+  glnx_autofd int tty_stdout = -1;
   const char *pkglibexecdir;
   const char *steam_app_id;
   const char *tools_dir;
@@ -1154,12 +1157,15 @@ main (int argc,
                               "--subreaper",
                               NULL);
 
-      g_array_append_val (inherit_fds, original_stdout);
-      flatpak_bwrap_add_arg_printf (adverb_argv, "--assign-fd=%d=%d",
-                                    STDOUT_FILENO, original_stdout);
-      g_array_append_val (inherit_fds, original_stderr);
-      flatpak_bwrap_add_arg_printf (adverb_argv, "--assign-fd=%d=%d",
-                                    STDERR_FILENO, original_stderr);
+      if (!pv_wrap_adverb_assign_stdio (adverb_argv,
+                                        self->options.terminal,
+                                        inherit_fds,
+                                        original_stdout,
+                                        original_stderr,
+                                        &tty_stdin,
+                                        &tty_stdout,
+                                        error))
+          return FALSE;
 
       for (i = 0; i < self->options.pass_fds->len; i++)
         {
@@ -1167,51 +1173,6 @@ main (int argc,
 
           g_array_append_val (inherit_fds, fd);
           flatpak_bwrap_add_arg_printf (adverb_argv, "--pass-fd=%d", fd);
-        }
-
-      switch (self->options.shell)
-        {
-          case PV_SHELL_AFTER:
-            flatpak_bwrap_add_arg (adverb_argv, "--shell=after");
-            break;
-
-          case PV_SHELL_FAIL:
-            flatpak_bwrap_add_arg (adverb_argv, "--shell=fail");
-            break;
-
-          case PV_SHELL_INSTEAD:
-            flatpak_bwrap_add_arg (adverb_argv, "--shell=instead");
-            break;
-
-          case PV_SHELL_NONE:
-            flatpak_bwrap_add_arg (adverb_argv, "--shell=none");
-            break;
-
-          default:
-            g_warn_if_reached ();
-        }
-
-      switch (self->options.terminal)
-        {
-          case PV_TERMINAL_AUTO:
-            flatpak_bwrap_add_arg (adverb_argv, "--terminal=auto");
-            break;
-
-          case PV_TERMINAL_NONE:
-            flatpak_bwrap_add_arg (adverb_argv, "--terminal=none");
-            break;
-
-          case PV_TERMINAL_TTY:
-            flatpak_bwrap_add_arg (adverb_argv, "--terminal=tty");
-            break;
-
-          case PV_TERMINAL_XTERM:
-            flatpak_bwrap_add_arg (adverb_argv, "--terminal=xterm");
-            break;
-
-          default:
-            g_warn_if_reached ();
-            break;
         }
 
       flatpak_bwrap_append_args (adverb_argv, adverb_preload_argv);

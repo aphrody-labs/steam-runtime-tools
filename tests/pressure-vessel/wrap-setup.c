@@ -2233,6 +2233,13 @@ const PayloadCommandTest payload_command_tests[] =
       .expect_terminal = PV_TERMINAL_XTERM,
     },
     {
+      .name = "terminal/no-shell",
+      .argv = { "/bin/bash", NULL },
+      .shell = PV_SHELL_NONE,
+      .terminal = PV_TERMINAL_XTERM,
+      .expect_terminal = PV_TERMINAL_XTERM,
+    },
+    {
       .name = "everything",
       .argv = { "bash", "-i", NULL },
       .emulated = true,
@@ -2440,6 +2447,80 @@ test_payload_command (Fixture *f,
           g_assert_cmpstr (arg, ==, expected_options[j]);
           offset++;
         }
+    }
+
+  switch (test->expect_terminal)
+    {
+      case PV_TERMINAL_NONE:
+      case PV_TERMINAL_TTY:
+        break;
+
+      case PV_TERMINAL_XTERM:
+        /* We implement --terminal=xterm as: /usr/bin/env xterm -e COMMAND */
+          {
+            const char *arg;
+
+            arg = g_ptr_array_index (argv_in_container->argv, offset);
+            g_assert_cmpstr (arg, ==, "/usr/bin/env");
+            offset++;
+
+            arg = g_ptr_array_index (argv_in_container->argv, offset);
+            g_assert_cmpstr (arg, ==, "xterm");
+            offset++;
+
+            arg = g_ptr_array_index (argv_in_container->argv, offset);
+            g_assert_cmpstr (arg, ==, "-e");
+            offset++;
+          }
+        break;
+
+      case PV_TERMINAL_AUTO:
+      default:
+        g_assert_not_reached ();
+    }
+
+  switch (test->shell)
+    {
+      case PV_SHELL_NONE:
+        if (test->expect_terminal == PV_TERMINAL_NONE)
+          break;
+        /* else fall through */
+
+      case PV_SHELL_AFTER:
+      case PV_SHELL_FAIL:
+      case PV_SHELL_INSTEAD:
+        /* We implement all --shell as:
+         * /bin/sh -euc [something] sh test-wrap-setup COMMAND
+         * We don't make a particularly specific assertion about what the shell
+         * one-liner is, because if we did, we'd just be reimplementing
+         * wrap-interactive.c here. */
+          {
+            const char *arg;
+
+            arg = g_ptr_array_index (argv_in_container->argv, offset);
+            g_assert_cmpstr (arg, ==, "/bin/sh");
+            offset++;
+
+            arg = g_ptr_array_index (argv_in_container->argv, offset);
+            g_assert_cmpstr (arg, ==, "-euc");
+            offset++;
+
+            arg = g_ptr_array_index (argv_in_container->argv, offset);
+            g_assert_true (g_str_has_prefix (arg, "prgname=\"$1\"\nshift\n"));
+            offset++;
+
+            arg = g_ptr_array_index (argv_in_container->argv, offset);
+            g_assert_cmpstr (arg, ==, "sh");
+            offset++;
+
+            arg = g_ptr_array_index (argv_in_container->argv, offset);
+            g_assert_cmpstr (arg, !=, "");    /* it's the path to this test */
+            offset++;
+          }
+        break;
+
+      default:
+        g_assert_not_reached ();
     }
 
   if (test->expect_exec_helper)

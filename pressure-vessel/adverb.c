@@ -57,7 +57,6 @@
 static const char * const *global_envp = NULL;
 static GPtrArray *global_ld_so_conf_entries = NULL;
 static SrtProcessManagerOptions *global_options = NULL;
-static gboolean opt_batch = FALSE;
 static gboolean opt_clear_env = FALSE;
 static gboolean opt_create = FALSE;
 static SrtEmulator *opt_emulator = NULL;
@@ -68,9 +67,7 @@ static gchar *opt_overrides = NULL;
 static gchar *opt_prefix = NULL;
 static gchar *opt_regenerate_ld_so_cache = NULL;
 static gchar *opt_set_ld_library_path = NULL;
-static PvShell opt_shell = PV_SHELL_NONE;
 static gboolean opt_subreaper = FALSE;
-static PvTerminal opt_terminal = PV_TERMINAL_AUTO;
 static double opt_terminate_idle_timeout = 0.0;
 static double opt_terminate_timeout = -1.0;
 static gboolean opt_verbose = FALSE;
@@ -212,118 +209,6 @@ opt_pass_fd_cb (const char *name,
 {
   return _srt_process_manager_options_pass_fd_cli (global_options,
                                                    name, value, error);
-}
-
-static gboolean
-opt_shell_cb (const gchar *option_name,
-              const gchar *value,
-              gpointer data,
-              GError **error)
-{
-  if (value == NULL || *value == '\0')
-    {
-      opt_shell = PV_SHELL_NONE;
-      return TRUE;
-    }
-
-  switch (value[0])
-    {
-      case 'a':
-        if (g_strcmp0 (value, "after") == 0)
-          {
-            opt_shell = PV_SHELL_AFTER;
-            return TRUE;
-          }
-        break;
-
-      case 'f':
-        if (g_strcmp0 (value, "fail") == 0)
-          {
-            opt_shell = PV_SHELL_FAIL;
-            return TRUE;
-          }
-        break;
-
-      case 'i':
-        if (g_strcmp0 (value, "instead") == 0)
-          {
-            opt_shell = PV_SHELL_INSTEAD;
-            return TRUE;
-          }
-        break;
-
-      case 'n':
-        if (g_strcmp0 (value, "none") == 0 || g_strcmp0 (value, "no") == 0)
-          {
-            opt_shell = PV_SHELL_NONE;
-            return TRUE;
-          }
-        break;
-
-      default:
-        /* fall through to error */
-        break;
-    }
-
-  g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,
-               "Unknown choice \"%s\" for %s", value, option_name);
-  return FALSE;
-}
-
-static gboolean
-opt_terminal_cb (const gchar *option_name,
-                 const gchar *value,
-                 gpointer data,
-                 GError **error)
-{
-  if (value == NULL || *value == '\0')
-    {
-      opt_terminal = PV_TERMINAL_AUTO;
-      return TRUE;
-    }
-
-  switch (value[0])
-    {
-      case 'a':
-        if (g_strcmp0 (value, "auto") == 0)
-          {
-            opt_terminal = PV_TERMINAL_AUTO;
-            return TRUE;
-          }
-        break;
-
-      case 'n':
-        if (g_strcmp0 (value, "none") == 0 || g_strcmp0 (value, "no") == 0)
-          {
-            opt_terminal = PV_TERMINAL_NONE;
-            return TRUE;
-          }
-        break;
-
-      case 't':
-        if (g_strcmp0 (value, "tty") == 0)
-          {
-            opt_terminal = PV_TERMINAL_TTY;
-            return TRUE;
-          }
-        break;
-
-      case 'x':
-        if (g_strcmp0 (value, "xterm") == 0)
-          {
-            opt_terminal = PV_TERMINAL_XTERM;
-            return TRUE;
-          }
-        break;
-
-      default:
-        /* fall through to error */
-        break;
-    }
-
-  g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,
-               "Unknown choice \"%s\" for %s", value, option_name);
-  return FALSE;
 }
 
 static gboolean
@@ -644,11 +529,6 @@ static GOptionEntry options[] =
     "Make fd TARGET a copy of SOURCE, like TARGET>&SOURCE in shell.",
     "TARGET=SOURCE" },
 
-  { "batch", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_batch,
-    "Disable all interactivity and redirection: ignore --shell*, "
-    "--terminal. [Default: if $PRESSURE_VESSEL_BATCH]", NULL },
-
   { "clear-env", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_clear_env,
     "Run with clean environment.", NULL },
@@ -762,13 +642,6 @@ static GOptionEntry options[] =
     "pressure-vessel can be found in PATH/bin and PATH/libexec.",
     "PATH" },
 
-  { "shell", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, opt_shell_cb,
-    "Run an interactive shell: never, after COMMAND, "
-    "after COMMAND if it fails, or instead of COMMAND. "
-    "[Default: none]",
-    "{none|after|fail|instead}" },
-
   { "subreaper", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_subreaper,
     "Do not exit until all descendant processes have exited.",
@@ -777,16 +650,6 @@ static GOptionEntry options[] =
     G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &opt_subreaper,
     "Only wait for a direct child process [default].",
     NULL },
-
-  { "terminal", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, opt_terminal_cb,
-    "none: disable features that would use a terminal; "
-    "auto: equivalent to xterm if a --shell option is used, or none; "
-    "xterm: put game output (and --shell if used) in an xterm; "
-    "tty: put game output (and --shell if used) on Steam's "
-    "controlling tty. "
-    "[Default: auto]",
-    "{none|auto|xterm|tty}" },
 
   { "terminate-idle-timeout", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_DOUBLE, &opt_terminate_idle_timeout,
@@ -874,7 +737,6 @@ main (int argc,
   g_option_context_add_group (context,
                               _srt_env_overlay_create_option_group (env_overlay));
 
-  opt_batch = _srt_boolean_environment ("PRESSURE_VESSEL_BATCH", FALSE);
   opt_verbose = _srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE", FALSE);
 
   if (!g_option_context_parse (context, &argc, &argv, error))
@@ -995,59 +857,6 @@ main (int argc,
     }
 
   g_clear_pointer (&env_overlay, _srt_env_overlay_unref);
-
-  if (opt_terminal == PV_TERMINAL_AUTO)
-    {
-      if (opt_shell != PV_SHELL_NONE)
-        opt_terminal = PV_TERMINAL_XTERM;
-      else
-        opt_terminal = PV_TERMINAL_NONE;
-    }
-
-  if (opt_terminal == PV_TERMINAL_NONE && opt_shell != PV_SHELL_NONE)
-    {
-      g_printerr ("%s: --terminal=none is incompatible with --shell\n",
-                  g_get_prgname ());
-      goto out;
-    }
-
-  if (opt_batch)
-    {
-      opt_shell = PV_SHELL_NONE;
-      opt_terminal = PV_TERMINAL_NONE;
-    }
-
-  switch (opt_terminal)
-    {
-      case PV_TERMINAL_TTY:
-        g_debug ("Wrapping command to use tty");
-
-        if (!pv_bwrap_wrap_tty (wrapped_command, error))
-          goto out;
-
-        break;
-
-      case PV_TERMINAL_XTERM:
-        g_debug ("Wrapping command with xterm");
-        pv_bwrap_wrap_in_xterm (wrapped_command, g_getenv ("XCURSOR_PATH"));
-        break;
-
-      case PV_TERMINAL_AUTO:
-          g_warn_if_reached ();
-          break;
-
-      case PV_TERMINAL_NONE:
-      default:
-        /* do nothing */
-        break;
-    }
-
-  if (opt_shell != PV_SHELL_NONE || opt_terminal == PV_TERMINAL_XTERM)
-    {
-      /* In the (PV_SHELL_NONE, PV_TERMINAL_XTERM) case, just don't let the
-       * xterm close before the user has had a chance to see the output */
-      pv_bwrap_wrap_interactive (wrapped_command, opt_shell);
-    }
 
   flatpak_bwrap_append_argsv (wrapped_command, &argv[1], argc - 1);
   flatpak_bwrap_finish (wrapped_command);

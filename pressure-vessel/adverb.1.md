@@ -30,9 +30,7 @@ pv-adverb - wrap processes in various ways
 [[**--add-ld.so-path** *PATH*...]
 **--regenerate-ld.so-cache** *PATH*]
 [**--set-ld-library-path** *VALUE*]
-[**--shell** **none**|**after**|**fail**|**instead**]
 [**--subreaper**]
-[**--terminal** **none**|**auto**|**tty**|**xterm**]
 [**--terminate-timeout** *SECONDS* [**--terminate-idle-timeout** *SECONDS*]]
 [**--unset-env** *VAR*]
 [[**--[no-]create**]
@@ -290,44 +288,6 @@ but before executing *COMMAND*.
 </dd>
 <dt>
 
-**--shell=after**
-
-</dt><dd>
-
-Run an interactive shell after *COMMAND* exits.
-In that shell, running **"$@"** will re-run *COMMAND*.
-
-</dd>
-<dt>
-
-**--shell=fail**
-
-</dt><dd>
-
-The same as **--shell=after**, but do not run the shell if *COMMAND*
-exits with status 0.
-
-</dd>
-<dt>
-
-**--shell=instead**
-
-</dt><dd>
-
-The same as **--shell=after**, but do not run *COMMAND* at all.
-
-</dd>
-<dt>
-
-**--shell=none**
-
-</dt><dd>
-
-Don't run an interactive shell. This is the default.
-
-</dd>
-<dt>
-
 **--subreaper**
 
 </dt><dd>
@@ -337,46 +297,6 @@ be reparented to **pv-adverb** instead of to **init**
 when their parent process exits, and do not exit until all such
 descendant processes have exited.
 A non-negative **--terminate-timeout** implies this option.
-
-</dd>
-<dt>
-
-**--terminal=auto**
-
-</dt><dd>
-
-Equivalent to **--terminal=xterm** if a **--shell** option other
-than **none** is used, or **--terminal=none** otherwise.
-This is the default.
-
-</dd>
-<dt>
-
-**--terminal=none**
-
-</dt><dd>
-
-Disable features that would ordinarily use a terminal.
-
-</dd>
-<dt>
-
-**--terminal=tty**
-
-</dt><dd>
-
-Use the current execution environment's controlling tty for
-the **--shell** options.
-
-</dd>
-<dt>
-
-**--terminal=xterm**
-
-</dt><dd>
-
-Start an **xterm**(1), and run *COMMAND* and/or an interactive
-shell in that environment.
 
 </dd>
 <dt>

@@ -1718,6 +1718,39 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
                                               emulator,
                                               STEAM_COMPAT_LAUNCHER_SERVICE_LAYER_CONTAINER_RUNTIME);
 
+      /* If we're using PRESSURE_VESSEL_SHELL=instead or similar,
+       * we stack that after the launcher-service, so that the
+       * launcher-service will already be running before the user
+       * types `"$@"` at the prompt. */
+      switch (self->options.terminal)
+        {
+          case PV_TERMINAL_XTERM:
+            g_debug ("Wrapping command with xterm");
+            pv_bwrap_wrap_in_xterm (payload_command,
+                                    g_environ_getenv (self->original_environ,
+                                                      "XCURSOR_PATH"));
+            break;
+
+          /* TTY was already handled by pv_wrap_adverb_assign_stdio() */
+          case PV_TERMINAL_TTY:
+          case PV_TERMINAL_NONE:
+            break;
+
+          /* main() should have replaced AUTO with something else already */
+          case PV_TERMINAL_AUTO:
+          default:
+            g_warn_if_reached ();
+            break;
+        }
+
+      if (self->options.shell != PV_SHELL_NONE
+          || self->options.terminal == PV_TERMINAL_XTERM)
+        {
+          /* In the (PV_SHELL_NONE, PV_TERMINAL_XTERM) case, just don't let the
+           * xterm close before the user has had a chance to see the output */
+          pv_bwrap_wrap_interactive (payload_command, self->options.shell);
+        }
+
       /* The emulator most likely won't search the PATH for the
        * executable, so we need to give it an executable that is
        * of an architecture that it emulates, but which *will* search

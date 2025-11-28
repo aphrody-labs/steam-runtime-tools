@@ -42,6 +42,7 @@
 #include "supported-architectures.h"
 #include "wrap-context.h"
 #include "wrap-home.h"
+#include "wrap-interactive.h"
 #include "wrap-preload.h"
 #include "wrap-setup.h"
 #include "utils.h"
@@ -2149,6 +2150,14 @@ struct PayloadCommandTest
   const char * const argv[5];
   /* 0 means argv is NULL-terminated */
   size_t argc;
+  PvShell shell;
+  PvTerminal terminal;
+  PvTerminal expect_terminal;
+  enum
+    {
+      PAYLOAD_COMMAND_TEST_ERROR_NONE,
+      PAYLOAD_COMMAND_TEST_ERROR_OPTIONS_AFTER_PARSING,
+    } expect_error;
   bool emulated : 1;
   bool expect_exec_helper : 1;
   bool launcher_instead : 1;
@@ -2179,6 +2188,27 @@ const PayloadCommandTest payload_command_tests[] =
       .argc = 4,
       .launcher_instead = true,
     },
+    {
+      .name = "terminal/invalid-combination",
+      .argv = { "/bin/bash", NULL },
+      .shell = PV_SHELL_INSTEAD,
+      .terminal = PV_TERMINAL_NONE,
+      .expect_error = PAYLOAD_COMMAND_TEST_ERROR_OPTIONS_AFTER_PARSING,
+    },
+    {
+      .name = "terminal/auto/no",
+      .argv = { "/bin/bash", NULL },
+      .shell = PV_SHELL_NONE,
+      .terminal = PV_TERMINAL_AUTO,
+      .expect_terminal = PV_TERMINAL_NONE,
+    },
+    {
+      .name = "terminal/auto/yes",
+      .argv = { "/bin/bash", NULL },
+      .shell = PV_SHELL_INSTEAD,
+      .terminal = PV_TERMINAL_AUTO,
+      .expect_terminal = PV_TERMINAL_XTERM,
+    },
 };
 
 static void
@@ -2200,6 +2230,9 @@ test_payload_command (Fixture *f,
   g_assert_null (f->context->options.emulator);
   g_assert_null (f->context->options.emulator_manifest);
   g_assert_false (f->context->options.launcher);
+
+  f->context->options.shell = test->shell;
+  f->context->options.terminal = test->terminal;
 
   if (test->launcher_instead)
     f->context->options.launcher = TRUE;
@@ -2224,8 +2257,25 @@ test_payload_command (Fixture *f,
   /* Pretend we had finished parsing arguments, because we need this
    * in order to have f->context->run_in_current_context */
   ok = pv_wrap_context_after_parsing_arguments (f->context, &local_error);
+
+  if (test->expect_error == PAYLOAD_COMMAND_TEST_ERROR_OPTIONS_AFTER_PARSING)
+    {
+      g_assert_nonnull (local_error);
+      g_test_message ("Expected GOptionError after parsing, got: %s %d: %s",
+                      g_quark_to_string (local_error->domain),
+                      local_error->code,
+                      local_error->message);
+      g_assert_cmpstr (g_quark_to_string (local_error->domain),
+                       ==, g_quark_to_string (G_OPTION_ERROR));
+      g_assert_false (ok);
+      return;
+    }
+
   g_assert_no_error (local_error);
   g_assert_true (ok);
+
+  g_assert_cmpint (f->context->options.shell, ==, test->shell);
+  g_assert_cmpint (f->context->options.terminal, ==, test->expect_terminal);
 
   argv_in_container = flatpak_bwrap_new (flatpak_bwrap_empty_env);
 

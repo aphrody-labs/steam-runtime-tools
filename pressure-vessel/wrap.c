@@ -66,7 +66,8 @@ static const GDebugKey pv_debug_keys[] =
   { "container", PV_WRAP_LOG_FLAGS_CONTAINER },
 };
 
-#define usage_error(...) _srt_log_failure (__VA_ARGS__)
+#define usage_error(error, ...) \
+  g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED, __VA_ARGS__)
 
 int
 main (int argc,
@@ -122,9 +123,9 @@ main (int argc,
 
   if (g_getenv ("STEAM_RUNTIME") != NULL)
     {
-      usage_error ("This program should not be run in the Steam Runtime. "
+      usage_error (error,
+                   "This program should not be run in the Steam Runtime. "
                    "Use pressure-vessel-unruntime instead.");
-      ret = 2;
       goto out;
     }
 
@@ -208,7 +209,7 @@ main (int argc,
 
   if (argc < 2 && !self->options.test && !self->options.only_prepare)
     {
-      usage_error ("An executable to run is required");
+      usage_error (error, "An executable to run is required");
       goto out;
     }
 
@@ -223,7 +224,7 @@ main (int argc,
   if (self->options.terminal == PV_TERMINAL_NONE
       && self->options.shell != PV_SHELL_NONE)
     {
-      usage_error ("--terminal=none is incompatible with --shell");
+      usage_error (error, "--terminal=none is incompatible with --shell");
       goto out;
     }
 
@@ -287,7 +288,8 @@ main (int argc,
     }
   else
     {
-      usage_error ("Either --home, --freedesktop-app-id, --steam-app-id "
+      usage_error (error,
+                   "Either --home, --freedesktop-app-id, --steam-app-id "
                    "or $SteamAppId is required");
       goto out;
     }
@@ -305,7 +307,8 @@ main (int argc,
 
           if (equals == NULL)
             {
-              usage_error ("--env-if-host argument must be of the form "
+              usage_error (error,
+                           "--env-if-host argument must be of the form "
                            "NAME=VALUE, not \"%s\"",
                            self->options.env_if_host[i]);
               goto out;
@@ -315,7 +318,7 @@ main (int argc,
 
   if (self->options.only_prepare && self->options.test)
     {
-      usage_error ("--only-prepare and --test are mutually exclusive");
+      usage_error (error, "--only-prepare and --test are mutually exclusive");
       goto out;
     }
 
@@ -326,13 +329,15 @@ main (int argc,
           if (strchr (self->options.filesystems[i], ':') != NULL ||
               strchr (self->options.filesystems[i], '\\') != NULL)
             {
-              usage_error ("':' and '\\' in --filesystem argument "
+              usage_error (error,
+                           "':' and '\\' in --filesystem argument "
                            "not handled yet");
               goto out;
             }
           else if (!g_path_is_absolute (self->options.filesystems[i]))
             {
-              usage_error ("--filesystem argument must be an absolute "
+              usage_error (error,
+                           "--filesystem argument must be an absolute "
                            "path, not \"%s\"", self->options.filesystems[i]);
               goto out;
             }
@@ -341,7 +346,7 @@ main (int argc,
 
   if (self->options.copy_runtime && self->options.variable_dir == NULL)
     {
-      usage_error ("--copy-runtime requires --variable-dir");
+      usage_error (error, "--copy-runtime requires --variable-dir");
       goto out;
     }
 

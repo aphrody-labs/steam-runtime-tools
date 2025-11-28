@@ -32,6 +32,7 @@
 
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/architecture-internal.h"
+#include "steam-runtime-tools/launcher-interface-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 #include "libglnx.h"
 
@@ -2160,6 +2161,7 @@ struct PayloadCommandTest
     } expect_error;
   bool emulated : 1;
   bool expect_exec_helper : 1;
+  bool launcher_added : 1;
   bool launcher_instead : 1;
 };
 
@@ -2180,6 +2182,27 @@ const PayloadCommandTest payload_command_tests[] =
       .name = "emulated/absolute",
       .argv = { "/bin/bash", NULL },
       .emulated = true,
+    },
+    {
+      .name = "emulated/launcher/basename",
+      .argv = { "bash", "-i", NULL },
+      .emulated = true,
+      /* Unlike emulated/basename, if we are adding s-r-launcher-service
+       * to the command-line then there is no need to add the -exec helper
+       * as well. */
+      .expect_exec_helper = false,
+      .launcher_added = true,
+    },
+    {
+      .name = "emulated/launcher/absolute",
+      .argv = { "/bin/bash", NULL },
+      .emulated = true,
+      .launcher_added = true,
+    },
+    {
+      .name = "launcher-added",
+      .argv = { "bash", "-i", NULL },
+      .launcher_added = true,
     },
     {
       .name = "launcher-instead",
@@ -2205,6 +2228,16 @@ const PayloadCommandTest payload_command_tests[] =
     {
       .name = "terminal/auto/yes",
       .argv = { "/bin/bash", NULL },
+      .shell = PV_SHELL_INSTEAD,
+      .terminal = PV_TERMINAL_AUTO,
+      .expect_terminal = PV_TERMINAL_XTERM,
+    },
+    {
+      .name = "everything",
+      .argv = { "bash", "-i", NULL },
+      .emulated = true,
+      .expect_exec_helper = false,
+      .launcher_added = true,
       .shell = PV_SHELL_INSTEAD,
       .terminal = PV_TERMINAL_AUTO,
       .expect_terminal = PV_TERMINAL_XTERM,
@@ -2237,6 +2270,14 @@ test_payload_command (Fixture *f,
 
   if (test->launcher_instead)
     f->context->options.launcher = TRUE;
+
+  /* If appropriate, pretend the user had set
+   * STEAM_COMPAT_LAUNCHER_SERVICE=container-runtime */
+  if (test->launcher_added)
+    f->context->original_environ = g_environ_setenv (f->context->original_environ,
+                                                     STEAM_COMPAT_LAUNCHER_SERVICE_ENVVAR,
+                                                     STEAM_COMPAT_LAUNCHER_SERVICE_LAYER_CONTAINER_RUNTIME,
+                                                     TRUE);
 
   if (test->emulated)
     {
@@ -2295,6 +2336,19 @@ test_payload_command (Fixture *f,
   g_assert_no_error (local_error);
   g_assert_true (ok);
   g_assert_false (pv_bwrap_was_finished (argv_in_container));
+
+  if (test->launcher_added)
+    {
+      const char *var = STEAM_COMPAT_LAUNCHER_SERVICE_ENVVAR;
+      const char *override = _srt_env_overlay_get (container_env, var);
+
+      g_assert_true (_srt_env_overlay_contains (container_env, var));
+      g_assert_null (override);
+      /* Forget about it now that it's been accounted for */
+      _srt_env_overlay_inherit (container_env, var);
+    }
+
+  /* Nothing is set or unset, except for what we already removed */
   g_assert_true (_srt_env_overlay_is_empty (container_env));
 
   if (test->launcher_instead)
@@ -2334,6 +2388,58 @@ test_payload_command (Fixture *f,
       arg = g_ptr_array_index (argv_in_container->argv, offset);
       g_assert_cmpstr (arg, ==, "--");
       offset++;
+    }
+
+  if (test->launcher_added)
+    {
+      static const char * const expected_options[] =
+        {
+          "--exec-fallback",
+          "--hint",
+          "--inside-app",
+          "--no-stop-on-name-loss",
+          "--replace",
+          "--session",
+          "--",
+        };
+      g_autofree char *expected_helper = NULL;
+      const char *expected_launcher_tuple;
+      const char *helpers_dir;
+      const char *arg;
+
+      g_assert_false (test->launcher_instead);
+      g_assert_cmpuint (argv_in_container->argv->len,
+                        >=,
+                        offset + G_N_ELEMENTS (expected_options) + 1);
+
+      if (test->emulated)
+        /* The mock emulator in sh.json is hard-coded to pretend to be an
+         * emulator for the i386 architecture (only) */
+        expected_launcher_tuple = SRT_ABI_I386;
+      else
+        /* We use x86_config and therefore x86_archs for all of these tests,
+         * so the runtime's primary architecture is assumed to be x86_64 */
+        expected_launcher_tuple = SRT_ABI_X86_64;
+
+      helpers_dir =
+        _srt_subprocess_runner_get_helpers_path (f->context->run_in_current_context);
+      expected_helper = g_strdup_printf ("%s/%s-srt-launcher-service",
+                                         helpers_dir, expected_launcher_tuple);
+      arg = g_ptr_array_index (argv_in_container->argv, offset);
+      g_assert_cmpstr (arg, ==, expected_helper);
+      offset++;
+
+      arg = g_ptr_array_index (argv_in_container->argv, offset);
+
+      if (g_str_equal (arg, "--verbose"))
+        offset++;
+
+      for (size_t j = 0; j < G_N_ELEMENTS (expected_options); j++)
+        {
+          arg = g_ptr_array_index (argv_in_container->argv, offset);
+          g_assert_cmpstr (arg, ==, expected_options[j]);
+          offset++;
+        }
     }
 
   if (test->expect_exec_helper)
@@ -3062,7 +3168,7 @@ main (int argc,
       g_autofree char *name = g_strdup_printf ("/payload-command/%s",
                                                test->name);
 
-      *config = default_config;
+      *config = x86_config;
       config->payload_command_test = test;
       g_test_add (name, Fixture, config,
                   setup, test_payload_command, teardown);

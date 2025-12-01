@@ -20,6 +20,8 @@ steam-runtime-tools (0.20251201.0) UNRELEASED; urgency=medium
     - pv-adverb no longer provides --shell or --terminal options:
       equivalent functionality has moved back into pv-wrap
       (steamrt/tasks#868)
+    - Build an experimental pressure-vessel-arm64+amd64+i386.tar.gz suitable
+      for use with CPU emulation (steamrt/tasks#845)
   * Subprojects:
     - Update libcapsule to 0.20251201.0
       + Search /usr/lib/i386-linux-gnu, /usr/lib64, etc. for libraries
@@ -40,7 +42,7 @@ steam-runtime-tools (0.20251201.0) UNRELEASED; urgency=medium
     - CI updates
   * Documentation updates
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 01 Dec 2025 16:16:27 +0000
+ -- Simon McVittie <smcv@collabora.com>  Mon, 01 Dec 2025 20:17:45 +0000
 
 steam-runtime-tools (0.20251120.0) steamrt; urgency=medium
 

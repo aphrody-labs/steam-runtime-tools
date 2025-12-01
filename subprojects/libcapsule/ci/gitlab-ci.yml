@@ -116,12 +116,12 @@ build:asan:
 build:buster:
     extends: .deb-build-snapshot
     variables:
-        BUILD_IMAGE: 'debian:buster-slim'
+        BUILD_IMAGE: 'debian/eol:buster-slim'
 
 build:bullseye:
     extends: .deb-build-snapshot
     variables:
-        BUILD_IMAGE: 'debian:bullseye-slim'
+        BUILD_IMAGE: 'debian/eol:bullseye-slim'
 
 build:bionic:
     extends: .deb-build-snapshot

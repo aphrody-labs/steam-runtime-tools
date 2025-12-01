@@ -25,6 +25,7 @@ _srt_graphics_provider_architecture_clear (void *p)
   SrtGraphicsProviderArchitecture *self = p;
 
   g_clear_pointer (&self->dri_path, g_free);
+  g_clear_pointer (&self->fallback_library_paths, g_strfreev);
   g_clear_pointer (&self->gconv_path, g_free);
   *self = blank;
 }
@@ -35,6 +36,7 @@ arch_copy (SrtGraphicsProviderArchitecture *dest,
 {
   _srt_graphics_provider_architecture_clear (dest);
   dest->dri_path = g_strdup (src->dri_path);
+  dest->fallback_library_paths = g_strdupv (src->fallback_library_paths);
   dest->gconv_path = g_strdup (src->gconv_path);
   dest->tuple_quark = src->tuple_quark;
   dest->features = src->features;
@@ -149,6 +151,28 @@ const char *
 _srt_graphics_provider_architecture_get_dri_path (const SrtGraphicsProviderArchitecture *self)
 {
   return self->dri_path;
+}
+
+/*
+ * _srt_graphics_provider_architecture_get_fallback_library_paths:
+ * @self: An architecture
+ *
+ * Return the list of last-resort directories that glibc will search if
+ * a library is not found in `/etc/ld.so.cache`, or %NULL if unknown.
+ *
+ * The returned paths should be looked up inside the sysroot returned by
+ * _srt_graphics_provider_get_root(), not the real root.
+ *
+ * The returned array and strings are only valid as long as a reference to
+ * the #SrtGraphicsProvider is held.
+ *
+ * Returns: (nullable) (array zero-terminated=1) (element-type filename): Paths
+ *  such as `{ "/lib", "/usr/lib", NULL }`, or %NULL if unknown
+ */
+const char * const *
+_srt_graphics_provider_architecture_get_fallback_library_paths (const SrtGraphicsProviderArchitecture *self)
+{
+  return _srt_const_strv (self->fallback_library_paths);
 }
 
 /*

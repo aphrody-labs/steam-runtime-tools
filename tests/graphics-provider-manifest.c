@@ -86,6 +86,7 @@ dump_architecture (const SrtGraphicsProviderArchitecture *arch)
 {
   GQuark q;
   const char *s;
+  const char * const *strv;
 
   q = _srt_graphics_provider_architecture_get_tuple (arch);
   g_test_message ("\tarchitecture: %s", g_quark_to_string (q));
@@ -98,6 +99,23 @@ dump_architecture (const SrtGraphicsProviderArchitecture *arch)
     g_test_message ("\t\tDRI path unknown");
 
   dump_feature_flags ("\t\t", _srt_graphics_provider_architecture_get_features (arch));
+
+  strv = _srt_graphics_provider_architecture_get_fallback_library_paths (arch);
+
+  if (strv != NULL)
+    {
+      g_test_message ("\t\tFallback library paths in sysroot:");
+
+      for (size_t i = 0; strv[i] != NULL; i++)
+        g_test_message ("\t\t\t%zu. %s", i, strv[i]);
+
+      if (strv[0] == NULL)
+        g_test_message ("\t\t\t(none)");
+    }
+  else
+    {
+      g_test_message ("\t\tFallback library paths in sysroot unknown");
+    }
 
   s = _srt_graphics_provider_architecture_get_gconv_path (arch);
 
@@ -139,12 +157,29 @@ static void
 assert_arch_equivalent (const SrtGraphicsProviderArchitecture *a,
                         const SrtGraphicsProviderArchitecture *b)
 {
+  const char * const *strv_a;
+  const char * const *strv_b;
+
   g_assert_cmpstr (g_quark_to_string (_srt_graphics_provider_architecture_get_tuple (a)),
                    ==,
                    g_quark_to_string (_srt_graphics_provider_architecture_get_tuple (b)));
   g_assert_cmpstr (_srt_graphics_provider_architecture_get_dri_path (a),
                    ==,
                    _srt_graphics_provider_architecture_get_dri_path (b));
+
+  strv_a = _srt_graphics_provider_architecture_get_fallback_library_paths (a);
+  strv_b = _srt_graphics_provider_architecture_get_fallback_library_paths (b);
+
+  if (strv_a == NULL)
+    {
+      g_assert_null (strv_b);
+    }
+  else
+    {
+      g_assert_nonnull (strv_b);
+      g_assert_cmpstrv (strv_a, strv_b);
+    }
+
   g_assert_cmpuint (_srt_graphics_provider_architecture_get_features (a),
                     ==,
                     _srt_graphics_provider_architecture_get_features (b));
@@ -275,6 +310,7 @@ test_basic (Fixture *f,
                        ==, g_quark_to_string (glados));
       s = _srt_graphics_provider_architecture_get_dri_path (arch);
       g_assert_cmpstr (s, ==, NULL);
+      g_assert_null (_srt_graphics_provider_architecture_get_fallback_library_paths (arch));
       features = _srt_graphics_provider_architecture_get_features (arch);
       g_assert_cmpuint (features,
                         ==,
@@ -348,6 +384,8 @@ static void
 test_full (Fixture *f,
            gconstpointer context)
 {
+  static const char * const x86_64_fallbacks[] = { "/usr/lib", "/usr/lib64", NULL };
+  static const char * const i386_fallbacks[] = { "/usr/lib32", NULL };
   g_autofree char *json = NULL;
   GQuark x86_64_quark, i386_quark;
 
@@ -370,6 +408,7 @@ test_full (Fixture *f,
       size_t x86_64_index = SIZE_MAX;
       size_t i386_index = SIZE_MAX;
       const char *s;
+      const char * const *strv;
       const GQuark *quarks;
       GQuark q;
 
@@ -497,6 +536,9 @@ test_full (Fixture *f,
       g_assert_cmpstr (g_quark_to_string (q), ==, SRT_ABI_X86_64);
       s = _srt_graphics_provider_architecture_get_dri_path (x86_64);
       g_assert_cmpstr (s, ==, "/usr/lib/dri");
+      strv = _srt_graphics_provider_architecture_get_fallback_library_paths (x86_64);
+      g_assert_nonnull (strv);
+      g_assert_cmpstrv (strv, x86_64_fallbacks);
       /* In the example file, x86_64 explicitly turns on VA-API */
       features = _srt_graphics_provider_architecture_get_features (x86_64);
       g_assert_cmpuint (features,
@@ -513,6 +555,9 @@ test_full (Fixture *f,
       g_assert_cmpstr (g_quark_to_string (q), ==, SRT_ABI_I386);
       s = _srt_graphics_provider_architecture_get_dri_path (i386);
       g_assert_cmpstr (s, ==, "/usr/lib32/dri");
+      strv = _srt_graphics_provider_architecture_get_fallback_library_paths (i386);
+      g_assert_nonnull (strv);
+      g_assert_cmpstrv (strv, i386_fallbacks);
       /* In the example file, i386 explicitly turns off VA-API */
       features = _srt_graphics_provider_architecture_get_features (i386);
       g_assert_cmpuint (features, ==, SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_NONE);
@@ -638,6 +683,30 @@ test_invalid (Fixture *f,
       "  \"architectures\": {\n"
       "    \"i386-linux-gnu\": {\n"
       "      \"dri\": \"./dri\"\n"
+      "    }\n"
+      "  }\n"
+      "}}\n" },
+    { "non-array fallback paths",
+      "{\"graphics_provider_v0\": {\n"
+      "  \"architectures\": {\n"
+      "    \"i386-linux-gnu\": {\n"
+      "      \"fallback_library_paths\": {}\n"
+      "    }\n"
+      "  }\n"
+      "}}\n" },
+    { "non-string in fallback paths",
+      "{\"graphics_provider_v0\": {\n"
+      "  \"architectures\": {\n"
+      "    \"i386-linux-gnu\": {\n"
+      "      \"fallback_library_paths\": [32]\n"
+      "    }\n"
+      "  }\n"
+      "}}\n" },
+    { "colon in fallback paths",
+      "{\"graphics_provider_v0\": {\n"
+      "  \"architectures\": {\n"
+      "    \"i386-linux-gnu\": {\n"
+      "      \"fallback_library_paths\": [\"/lib:/usr/lib\"]\n"
       "    }\n"
       "  }\n"
       "}}\n" },

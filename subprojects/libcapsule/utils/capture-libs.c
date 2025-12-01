@@ -111,6 +111,7 @@ enum
   OPTION_COMPARE_BY,
   OPTION_CONTAINER,
   OPTION_DEST,
+  OPTION_FALLBACK_PATHS,
   OPTION_LEVEL_PREFIX,
   OPTION_LIBRARY_KNOWLEDGE,
   OPTION_LINK_TARGET,
@@ -140,6 +141,7 @@ static struct option long_options[] =
     { "compare-by", required_argument, NULL, OPTION_COMPARE_BY },
     { "container", required_argument, NULL, OPTION_CONTAINER },
     { "dest", required_argument, NULL, OPTION_DEST },
+    { "fallback-paths", required_argument, NULL, OPTION_FALLBACK_PATHS },
     { "help", no_argument, NULL, 'h' },
     { "level-prefix", no_argument, NULL, OPTION_LEVEL_PREFIX },
     { "library-knowledge", required_argument, NULL, OPTION_LIBRARY_KNOWLEDGE },
@@ -251,10 +253,14 @@ static void usage (int code)
                "\tdeciding which libraries are needed [default: /]\n" );
   fprintf( fh, "--dest=LIBDIR\n"
                "\tCreate symlinks in LIBDIR [default: .]\n" );
+  fprintf( fh, "--fallback-paths=DIR[:DIR...]\n"
+               "\tAssume that each DIR will be searched for any libraries\n"
+               "\tnot found in ld.so.cache [default: %s]\n",
+               ld_libs_get_fallback_paths( NULL ) );
   fprintf( fh, "--level-prefix\n"
                "\tAdd severity prefixes such as <3> to output\n" );
   fprintf( fh, "--library-knowledge=FILE\n"
-               "\tLoad information about known libraries from a"
+               "\tLoad information about known libraries from a\n"
                "\t.desktop-style file at FILE, overriding --compare-by.\n" );
   fprintf( fh, "--link-target=PATH\n"
                "\tAssume PROVIDER will be mounted at PATH when the\n"
@@ -359,6 +365,7 @@ maybe_warn( capture_flags flags, const char *fmt, ... )
 
 typedef struct
 {
+    const char *fallback_paths;
     capture_flags flags;
     library_cmp_function *comparators;
     library_knowledge knowledge;
@@ -366,12 +373,15 @@ typedef struct
 
 static bool
 init_with_target( ld_libs *ldlibs, const char *tree, const char *target,
+                  const char *fallback_paths,
                   int *code, char **message )
 {
     if( !ld_libs_init( ldlibs, NULL, tree, debug_flags, code, message ) )
     {
         goto fail;
     }
+
+    ld_libs_set_fallback_paths( ldlibs, fallback_paths );
 
     if( !ld_libs_load_cache( ldlibs, code, message ) )
     {
@@ -428,6 +438,7 @@ capture_one( const char *soname, const capture_options *options,
     _capsule_autofree char *local_message = NULL;
 
     if( !init_with_target( provider, option_provider, soname,
+                           options->fallback_paths,
                            &local_code, &local_message ) )
     {
         if( ( options->flags & CAPTURE_FLAG_IF_EXISTS ) && local_code == ENOENT )
@@ -622,6 +633,7 @@ capture_one( const char *soname, const capture_options *options,
 
             if( init_with_target( container, option_container,
                                   needed_name,
+                                  options->fallback_paths,
                                   &local_code, &local_message ) )
             {
                 const char *needed_path_in_container = container->needed[0].path;
@@ -1338,6 +1350,7 @@ main (int argc, char **argv)
 {
     capture_options options = {
         .comparators = NULL,
+        .fallback_paths = NULL,
         .flags = (CAPTURE_FLAG_LIBRARY_ITSELF |
                   CAPTURE_FLAG_DEPENDENCIES ),
         .knowledge = LIBRARY_KNOWLEDGE_INIT,
@@ -1381,6 +1394,10 @@ main (int argc, char **argv)
 
             case OPTION_DEST:
                 option_dest = optarg;
+                break;
+
+            case OPTION_FALLBACK_PATHS:
+                options.fallback_paths = optarg;
                 break;
 
             case OPTION_LIBRARY_KNOWLEDGE:

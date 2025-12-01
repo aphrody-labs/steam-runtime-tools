@@ -4,20 +4,27 @@
 
 set -eux
 
-primary_arch="$(dpkg --print-architecture)"
-multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
-
-case "$primary_arch" in
-    (amd64)
-        dir="_build"
-        secondary_archs=i386
+case "$RELOCATABLE_INSTALL_ARCHS" in
+    (*,*)
+        primary_arch="${RELOCATABLE_INSTALL_ARCHS%%,*}"
+        secondary_archs="${RELOCATABLE_INSTALL_ARCHS#*,}"
         ;;
 
     (*)
-        dir="_build/$primary_arch"
+        primary_arch="${RELOCATABLE_INSTALL_ARCHS}"
         secondary_archs=
         ;;
 esac
+
+dir="_build"
+
+tuples="$(dpkg-architecture -a"$primary_arch" -qDEB_HOST_MULTIARCH)"
+oldIFS="$IFS"
+IFS=,
+for arch in $secondary_archs; do
+    tuples="$tuples,$(dpkg-architecture -a"$arch" -qDEB_HOST_MULTIARCH)"
+done
+IFS="$oldIFS"
 
 # We need up-to-date packages for the relocatable install to
 # be able to get its source code
@@ -44,14 +51,36 @@ dcmd cp -al debian/tmp/artifacts/source/*.dsc _build/cache
 
 set -- meson
 
+oldIFS="$IFS"
+IFS=,
 for arch in "$primary_arch" $secondary_archs; do
+    set -- "$@" "libelf-dev:$arch"
     set -- "$@" "libglib2.0-dev:$arch"
+    set -- "$@" "libjson-glib-dev:$arch"
+    set -- "$@" "libva-dev:$arch"
+    set -- "$@" "libvdpau-dev:$arch"
+    set -- "$@" "libvulkan-dev:$arch"
+    set -- "$@" "libwaffle-dev:$arch"
+    set -- "$@" "libx11-dev:$arch"
     set -- "$@" "libxau-dev:$arch"
+    set -- "$@" "libxrandr-dev:$arch"
+
+    case "$suite" in
+        (scout)
+            set -- "$@" "libgl1-mesa-dev:$arch"
+            ;;
+        (*)
+            set -- "$@" "libgl-dev:$arch"
+            ;;
+    esac
 done
+IFS="$oldIFS"
 
 apt-get -y --no-install-recommends install "$@"
 
 set -- debian/tmp/artifacts/build/*_"$primary_arch".*deb
+oldIFS="$IFS"
+IFS=,
 for arch in $secondary_archs; do
     set -- \
         debian/tmp/artifacts/build/libsteam-runtime-tools-0-0-dbgsym_*_"$arch".*deb \
@@ -71,6 +100,7 @@ for arch in $secondary_archs; do
             ;;
     esac
 done
+IFS="$oldIFS"
 
 dpkg -i "$@"
 
@@ -78,15 +108,17 @@ rm -fr "$dir"/pressure-vessel-*.tar.gz
 rm -fr "$dir/relocatable-install"
 mkdir -p "$dir"
 
-set --
-
-case "$primary_arch" in
-    (amd64)
+case "$RELOCATABLE_INSTALL_ARCHS" in
+    (amd64,i386)
+        # Defaults => pressure-vessel-bin.tar.gz
+        set --
         ;;
 
     (*)
-        set -- "$@" --architecture-name "$primary_arch"
-        set -- "$@" --architecture-multiarch "$multiarch"
+        set -- \
+        --architecture-name="$primary_arch${secondary_archs:+",$secondary_archs"}" \
+        --architecture-multiarch="$tuples" \
+        ${NULL+}
         ;;
 esac
 
@@ -105,7 +137,7 @@ case "$primary_arch" in
         ;;
 
     (*)
-        set -- "$@" --multiarch-tuple="$multiarch"
+        set -- "$@" --multiarch-tuple="${tuples%%,*}"
         ;;
 esac
 

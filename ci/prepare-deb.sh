@@ -4,6 +4,17 @@
 
 set -eux
 
+if [ -n "${RELOCATABLE_INSTALL_ARCHS-}" ]; then
+    oldIFS="$IFS"
+    IFS=,
+    for arch in $RELOCATABLE_INSTALL_ARCHS; do
+        if [ "$(dpkg --print-architecture)" != "$arch" ]; then
+            dpkg --add-architecture "$arch"
+        fi
+    done
+    IFS="$oldIFS"
+fi
+
 echo "#!/bin/sh" > /usr/sbin/policy-rc.d
 echo "exit 101" >> /usr/sbin/policy-rc.d
 chmod +x /usr/sbin/policy-rc.d

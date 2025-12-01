@@ -345,12 +345,17 @@ def main():
                      '--architecture-name is required')
 
     if args.architecture_name:
-        architectures.append(
-            Architecture(
-                name=args.architecture_name,
-                multiarch=args.architecture_multiarch,
-            ),
-        )
+        archs = args.architecture_name.split(',')
+        tuples = args.architecture_multiarch.split(',')
+
+        if len(archs) != len(tuples):
+            parser.error(
+                '--architecture-name and --architecture-multiarch '
+                'must have the same number of comma-separated items'
+            )
+
+        for a, t in zip(archs, tuples):
+            architectures.append(Architecture(name=a, multiarch=t))
     else:
         architectures += X86_ARCHS
 
@@ -839,7 +844,7 @@ def main():
             if args.architecture_name is None:
                 bin_arch = 'bin'
             else:
-                bin_arch = args.architecture_name
+                bin_arch = args.architecture_name.replace(',', '+')
 
             bin_tar = os.path.join(
                 args.archive,

@@ -59,6 +59,17 @@ class Architecture:
         self.name = name
         self.multiarch = multiarch
 
+    @property
+    def qemu_name(self):
+        return {
+            # Debian architecture => qemu-ARCH suffix
+            'arm64': 'aarch64',
+            'armel': 'arm',
+            'armhf': 'arm',
+            'amd64': 'x86_64',
+            'powerpc': 'ppc',
+        }.get(self.name, self.name)
+
 
 # Debian architecture => Debian multiarch tuple
 X86_ARCHS = [
@@ -404,6 +415,12 @@ def main():
 
             install_exe(path, os.path.join(installation, 'bin'))
 
+        # Primary architecture of the machine or container
+        machine_architecture = subprocess.check_output([
+            'dpkg', '--print-architecture',
+        ]).decode('utf-8').strip()
+        # Primary architecture of the resulting pressure-vessel,
+        # which might be different
         primary_architecture = architectures[0].name
 
         # Normally bin/steam-runtime-launcher-service would be a symlink
@@ -576,9 +593,18 @@ def main():
                         'only-dependencies:path:' + os.path.abspath(path)
                     )
 
-            v_check_call([
+            argv = [
                 'env',
                 'CAPSULE_DEBUG=tool',
+            ]
+
+            if (
+                arch.name != machine_architecture
+                and (arch.name != 'i386' or machine_architecture != 'amd64')
+            ):
+                argv.append('qemu-' + arch.qemu_name)
+
+            argv.extend([
                 '{}/{}-capsule-capture-libs'.format(
                     inst_pkglibexecdir,
                     arch.multiarch,
@@ -588,12 +614,16 @@ def main():
                     arch.name,
                 ),
                 '--no-glibc',
-            ] + expressions + [
+            ])
+            argv.extend(expressions)
+            argv.extend([
                 # We take libwaffle-1.so.0 itself but not its dependencies,
                 # because its dependencies include libGL which we don't
                 # want to bundle
                 'no-dependencies:soname:libwaffle-1.so.0',
             ])
+
+            v_check_call(argv)
 
             for so in glob.glob(
                 os.path.join(

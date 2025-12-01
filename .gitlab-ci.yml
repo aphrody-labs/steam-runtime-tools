@@ -146,6 +146,8 @@ package:source:
 
 .build_deb:
     stage: build
+    variables:
+        HOST_ARCH: ''
     needs:
         - package:source
     image: ${BUILD_IMAGE}
@@ -192,6 +194,7 @@ package:steamrt3c:i386:
     extends: .build_deb
     variables:
         BUILD_IMAGE: '${STEAMRT3C_DOCKER_REGISTRY}/${STEAMRT3C_DOCKER_IMAGE}'
+        HOST_ARCH: i386
         STEAM_CI_DEB_BUILD: any
 
 package:soldier:amd64:

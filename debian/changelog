@@ -1,4 +1,4 @@
-libcapsule (0.20251201.0-0co1) UNRELEASED; urgency=medium
+libcapsule (0.20251201.0-0co1) upstream; urgency=medium
 
   * Make the glibc fallback library path runtime-configurable
     (steamrt/tasks#866, steam-runtime#704)
@@ -10,7 +10,7 @@ libcapsule (0.20251201.0-0co1) UNRELEASED; urgency=medium
     - Make more use of automatic memory management
     - CI fixes
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 01 Dec 2025 14:15:09 +0000
+ -- Simon McVittie <smcv@collabora.com>  Mon, 01 Dec 2025 14:18:30 +0000
 
 libcapsule (0.20240916.0-0co1) upstream; urgency=medium
 

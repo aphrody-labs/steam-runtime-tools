@@ -34,7 +34,7 @@ pv_bwrap_wrap_in_xterm (FlatpakBwrap *wrapped_command,
   g_return_if_fail (wrapped_command != NULL);
 
   flatpak_bwrap_add_args (wrapped_command,
-                          "xterm", "-e",
+                          "/usr/bin/env", "xterm", "-e",
                           /* Original command will go here and become
                            * the argv of xterm -e */
                           NULL);
@@ -42,7 +42,7 @@ pv_bwrap_wrap_in_xterm (FlatpakBwrap *wrapped_command,
   if (xcursor_path != NULL)
     {
       /* xterm unsets XCURSOR_PATH. Reinstate it for the contained shell. */
-      flatpak_bwrap_add_arg (wrapped_command, "env");
+      flatpak_bwrap_add_arg (wrapped_command, "/usr/bin/env");
       flatpak_bwrap_add_arg_printf (wrapped_command, "XCURSOR_PATH=%s", xcursor_path);
     }
 }
@@ -69,7 +69,7 @@ pv_bwrap_wrap_interactive (FlatpakBwrap *wrapped_command,
       "echo\n"
       "exec bash -i -s \"$@\"\n"
     };
-  gchar *command;
+  g_autofree char *command = NULL;
 
   g_return_if_fail (wrapped_command != NULL);
 
@@ -112,7 +112,7 @@ pv_bwrap_wrap_interactive (FlatpakBwrap *wrapped_command,
                              shell == PV_SHELL_NONE ? "" : start_shell);
 
   flatpak_bwrap_add_args (wrapped_command,
-                          "sh", "-euc",
+                          "/bin/sh", "-euc",
                           command,
                           "sh",   /* $0 for sh */
                           g_get_prgname (),   /* $1 = $prgname for sh */
@@ -120,42 +120,4 @@ pv_bwrap_wrap_interactive (FlatpakBwrap *wrapped_command,
                            * the rest of the argv of command, and eventually
                            * the argv of bash -i -s */
                           NULL);
-}
-
-gboolean
-pv_bwrap_wrap_tty (FlatpakBwrap *wrapped_command,
-                   GError **error)
-{
-  int fd;
-
-  g_return_val_if_fail (wrapped_command != NULL, FALSE);
-  g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
-
-  fflush (stdout);
-  fflush (stderr);
-
-  fd = open ("/dev/tty", O_RDONLY);
-
-  if (fd < 0)
-    return glnx_throw_errno_prefix (error,
-                                    "Cannot open /dev/tty for reading");
-
-  if (dup2 (fd, 0) < 0)
-    return glnx_throw_errno_prefix (error, "Cannot use /dev/tty as stdin");
-
-  g_close (fd, NULL);
-
-  fd = open ("/dev/tty", O_WRONLY);
-
-  if (fd < 0)
-    return glnx_throw_errno_prefix (error, "Cannot open /dev/tty for writing");
-
-  if (dup2 (fd, 1) < 0)
-    return glnx_throw_errno_prefix (error, "Cannot use /dev/tty as stdout");
-
-  if (dup2 (fd, 2) < 0)
-    return glnx_throw_errno_prefix (error, "Cannot use /dev/tty as stderr");
-
-  g_close (fd, NULL);
-  return TRUE;
 }

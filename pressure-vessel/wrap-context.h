@@ -184,4 +184,5 @@ gboolean pv_wrap_context_append_payload_command (PvWrapContext *self,
                                                  const char * const *argv,
                                                  int argc,
                                                  FlatpakBwrap *argv_in_container,
+                                                 SrtEnvOverlay *container_env,
                                                  GError **error);

@@ -85,7 +85,6 @@ EXECUTABLES = [
     'pv-verify',
     'steam-runtime-launch-client',
     'steam-runtime-launcher-interface-0',
-    'steam-runtime-launcher-service',
     'steam-runtime-system-info',
 ]
 LIBEXEC_EXECUTABLES = [
@@ -400,6 +399,44 @@ def main():
 
             install_exe(path, os.path.join(installation, 'bin'))
 
+        primary_architecture = subprocess.check_output([
+            'dpkg', '--print-architecture',
+        ]).decode('utf-8').strip()
+
+        # Normally bin/steam-runtime-launcher-service would be a symlink
+        # to ../libexec/steam-runtime-tools/TUPLE-srt-launcher-service,
+        # but for the relocatable installation we don't want to rely on
+        # Steampipe handling symlinks gracefully, so we just duplicate it.
+        # It isn't very large.
+        for arch in architectures:
+            if arch.name == primary_architecture:
+                for exe in [
+                    'launcher-service',
+                ]:
+                    rel = (
+                        'libexec/steam-runtime-tools-0/'
+                        + arch.multiarch
+                        + '-srt-'
+                        + exe
+                    )
+
+                    path = os.path.join(args.pv_dir, rel)
+
+                    if not os.path.exists(path):
+                        path = os.path.join(args.prefix, rel)
+
+                    if not os.path.exists(path):
+                        path = '/usr/{}'.format(rel)
+
+                    install_exe(
+                        path,
+                        os.path.join(
+                            installation,
+                            'bin',
+                            'steam-runtime-' + exe,
+                        ),
+                    )
+
         install(
             os.path.join(srcdir, 'pressure-vessel', 'THIRD-PARTY.md'),
             os.path.join(installation, 'metadata', 'README.txt'),
@@ -470,10 +507,6 @@ def main():
                 os.path.join(inst_pkglibexecdir, arch.multiarch),
             )
 
-        primary_architecture = subprocess.check_output([
-            'dpkg', '--print-architecture',
-        ]).decode('utf-8').strip()
-
         # Set of (binary package, source package) pairs
         get_source = set()      # type: typing.Set[typing.Tuple[str, str]]
 
@@ -485,7 +518,7 @@ def main():
 
             expressions = []    # type: typing.List[str]
 
-            for exe in (
+            get_deps_of = [
                 # We intentionally don't take the dependencies of all the
                 # check-* executables, because some of those are basic
                 # libraries like libX11 and libGL which we would prefer to
@@ -495,7 +528,10 @@ def main():
                 arch.multiarch + '-detect-platform',
                 arch.multiarch + '-inspect-library',
                 arch.multiarch + '-inspect-library-libelf',
-            ):
+                arch.multiarch + '-srt-launcher-service',
+            ]
+
+            for exe in get_deps_of:
                 expressions.append(
                     'only-dependencies:path:' + os.path.abspath(
                         os.path.join(inst_pkglibexecdir, exe),

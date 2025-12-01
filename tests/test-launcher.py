@@ -76,13 +76,26 @@ class TestLauncher(BaseTest):
         ]
 
         if 'SRT_TEST_UNINSTALLED' in os.environ:
-            self.launcher = self.command_prefix + [
-                os.path.join(
-                    self.top_builddir,
-                    'bin',
-                    'steam-runtime-launcher-service'
-                ),
-            ]
+            if 'SRT_TEST_MULTIARCH' in os.environ:
+                self.launcher = self.command_prefix + [
+                    os.path.join(
+                        self.top_builddir,
+                        'bin',
+                        (
+                            os.environ['SRT_TEST_MULTIARCH']
+                            + '-srt-launcher-service'
+                        ),
+                    ),
+                ]
+            else:
+                self.launcher = self.command_prefix + [
+                    os.path.join(
+                        self.top_builddir,
+                        'bin',
+                        'steam-runtime-launcher-service'
+                    ),
+                ]
+
             self.launch = self.command_prefix + [
                 os.path.join(
                     self.top_builddir,

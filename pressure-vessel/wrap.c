@@ -46,6 +46,7 @@
 #include "graphics-provider.h"
 #include "runtime.h"
 #include "utils.h"
+#include "wrap-adverb.h"
 #include "wrap-context.h"
 #include "wrap-flatpak.h"
 #include "wrap-home.h"
@@ -66,7 +67,8 @@ static const GDebugKey pv_debug_keys[] =
   { "container", PV_WRAP_LOG_FLAGS_CONTAINER },
 };
 
-#define usage_error(...) _srt_log_failure (__VA_ARGS__)
+#define usage_error(error, ...) \
+  g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED, __VA_ARGS__)
 
 int
 main (int argc,
@@ -85,6 +87,7 @@ main (int argc,
   g_autoptr(FlatpakBwrap) bwrap_filesystem_arguments = NULL;
   g_autoptr(FlatpakBwrap) bwrap_home_arguments = NULL;
   g_autoptr(FlatpakBwrap) argv_in_container = NULL;
+  g_autoptr(FlatpakBwrap) payload_command = NULL;
   g_autoptr(FlatpakBwrap) final_argv = NULL;
   g_autoptr(SrtSysroot) real_root = NULL;
   g_autoptr(SrtSysroot) interpreter_root = NULL;
@@ -96,6 +99,8 @@ main (int argc,
   g_autofree gchar *private_home = NULL;
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
+  glnx_autofd int tty_stdin = -1;
+  glnx_autofd int tty_stdout = -1;
   const char *pkglibexecdir;
   const char *steam_app_id;
   const char *tools_dir;
@@ -122,9 +127,9 @@ main (int argc,
 
   if (g_getenv ("STEAM_RUNTIME") != NULL)
     {
-      usage_error ("This program should not be run in the Steam Runtime. "
+      usage_error (error,
+                   "This program should not be run in the Steam Runtime. "
                    "Use pressure-vessel-unruntime instead.");
-      ret = 2;
       goto out;
     }
 
@@ -208,7 +213,7 @@ main (int argc,
 
   if (argc < 2 && !self->options.test && !self->options.only_prepare)
     {
-      usage_error ("An executable to run is required");
+      usage_error (error, "An executable to run is required");
       goto out;
     }
 
@@ -223,7 +228,7 @@ main (int argc,
   if (self->options.terminal == PV_TERMINAL_NONE
       && self->options.shell != PV_SHELL_NONE)
     {
-      usage_error ("--terminal=none is incompatible with --shell");
+      usage_error (error, "--terminal=none is incompatible with --shell");
       goto out;
     }
 
@@ -287,7 +292,8 @@ main (int argc,
     }
   else
     {
-      usage_error ("Either --home, --freedesktop-app-id, --steam-app-id "
+      usage_error (error,
+                   "Either --home, --freedesktop-app-id, --steam-app-id "
                    "or $SteamAppId is required");
       goto out;
     }
@@ -305,7 +311,8 @@ main (int argc,
 
           if (equals == NULL)
             {
-              usage_error ("--env-if-host argument must be of the form "
+              usage_error (error,
+                           "--env-if-host argument must be of the form "
                            "NAME=VALUE, not \"%s\"",
                            self->options.env_if_host[i]);
               goto out;
@@ -315,7 +322,7 @@ main (int argc,
 
   if (self->options.only_prepare && self->options.test)
     {
-      usage_error ("--only-prepare and --test are mutually exclusive");
+      usage_error (error, "--only-prepare and --test are mutually exclusive");
       goto out;
     }
 
@@ -326,13 +333,15 @@ main (int argc,
           if (strchr (self->options.filesystems[i], ':') != NULL ||
               strchr (self->options.filesystems[i], '\\') != NULL)
             {
-              usage_error ("':' and '\\' in --filesystem argument "
+              usage_error (error,
+                           "':' and '\\' in --filesystem argument "
                            "not handled yet");
               goto out;
             }
           else if (!g_path_is_absolute (self->options.filesystems[i]))
             {
-              usage_error ("--filesystem argument must be an absolute "
+              usage_error (error,
+                           "--filesystem argument must be an absolute "
                            "path, not \"%s\"", self->options.filesystems[i]);
               goto out;
             }
@@ -341,7 +350,7 @@ main (int argc,
 
   if (self->options.copy_runtime && self->options.variable_dir == NULL)
     {
-      usage_error ("--copy-runtime requires --variable-dir");
+      usage_error (error, "--copy-runtime requires --variable-dir");
       goto out;
     }
 
@@ -992,6 +1001,18 @@ main (int argc,
         goto out;
     }
 
+  payload_command = flatpak_bwrap_new (flatpak_bwrap_empty_env);
+
+  /* We build the "payload" command earlier than the obvious point,
+   * in order to be early enough that we can still edit container_env. */
+  if (!pv_wrap_context_append_payload_command (self,
+                                               (const char * const *) &argv[1],
+                                               argc - 1,
+                                               payload_command,
+                                               container_env,
+                                               error))
+    goto out;
+
   if (self->is_flatpak_env)
     {
       /* Let these inherit from the sub-sandbox environment */
@@ -1136,12 +1157,15 @@ main (int argc,
                               "--subreaper",
                               NULL);
 
-      g_array_append_val (inherit_fds, original_stdout);
-      flatpak_bwrap_add_arg_printf (adverb_argv, "--assign-fd=%d=%d",
-                                    STDOUT_FILENO, original_stdout);
-      g_array_append_val (inherit_fds, original_stderr);
-      flatpak_bwrap_add_arg_printf (adverb_argv, "--assign-fd=%d=%d",
-                                    STDERR_FILENO, original_stderr);
+      if (!pv_wrap_adverb_assign_stdio (adverb_argv,
+                                        self->options.terminal,
+                                        inherit_fds,
+                                        original_stdout,
+                                        original_stderr,
+                                        &tty_stdin,
+                                        &tty_stdout,
+                                        error))
+          return FALSE;
 
       for (i = 0; i < self->options.pass_fds->len; i++)
         {
@@ -1149,51 +1173,6 @@ main (int argc,
 
           g_array_append_val (inherit_fds, fd);
           flatpak_bwrap_add_arg_printf (adverb_argv, "--pass-fd=%d", fd);
-        }
-
-      switch (self->options.shell)
-        {
-          case PV_SHELL_AFTER:
-            flatpak_bwrap_add_arg (adverb_argv, "--shell=after");
-            break;
-
-          case PV_SHELL_FAIL:
-            flatpak_bwrap_add_arg (adverb_argv, "--shell=fail");
-            break;
-
-          case PV_SHELL_INSTEAD:
-            flatpak_bwrap_add_arg (adverb_argv, "--shell=instead");
-            break;
-
-          case PV_SHELL_NONE:
-            flatpak_bwrap_add_arg (adverb_argv, "--shell=none");
-            break;
-
-          default:
-            g_warn_if_reached ();
-        }
-
-      switch (self->options.terminal)
-        {
-          case PV_TERMINAL_AUTO:
-            flatpak_bwrap_add_arg (adverb_argv, "--terminal=auto");
-            break;
-
-          case PV_TERMINAL_NONE:
-            flatpak_bwrap_add_arg (adverb_argv, "--terminal=none");
-            break;
-
-          case PV_TERMINAL_TTY:
-            flatpak_bwrap_add_arg (adverb_argv, "--terminal=tty");
-            break;
-
-          case PV_TERMINAL_XTERM:
-            flatpak_bwrap_add_arg (adverb_argv, "--terminal=xterm");
-            break;
-
-          default:
-            g_warn_if_reached ();
-            break;
         }
 
       flatpak_bwrap_append_args (adverb_argv, adverb_preload_argv);
@@ -1207,12 +1186,8 @@ main (int argc,
       flatpak_bwrap_append_bwrap (argv_in_container, adverb_argv);
     }
 
-  if (!pv_wrap_context_append_payload_command (self,
-                                               (const char * const *) &argv[1],
-                                               argc - 1,
-                                               argv_in_container,
-                                               error))
-    goto out;
+  g_warn_if_fail (g_strv_length (payload_command->envp) == 0);
+  flatpak_bwrap_append_bwrap (argv_in_container, payload_command);
 
   if (flatpak_subsandbox != NULL)
     {
@@ -1333,7 +1308,12 @@ main (int argc,
 
 out:
   if (local_error != NULL)
-    _srt_log_failure ("%s", local_error->message);
+    {
+      _srt_log_failure ("%s", local_error->message);
+
+      if (local_error->domain == G_OPTION_ERROR)
+        ret = 2;
+    }
 
   g_clear_pointer (&adverb_preload_argv, g_ptr_array_unref);
 

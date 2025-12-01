@@ -21,17 +21,9 @@
 
 #include "steam-runtime-tools/libc-utils-internal.h"
 
-#define NAME "steam-runtime-launcher-interface-0"
+#include "steam-runtime-tools/launcher-interface-internal.h"
 
-/* Chosen to be similar to env(1) */
-enum
-{
-  LAUNCH_EX_USAGE = 125,
-  LAUNCH_EX_FAILED = 125,
-  LAUNCH_EX_CANNOT_INVOKE = 126,
-  LAUNCH_EX_NOT_FOUND = 127,
-  LAUNCH_EX_CANNOT_REPORT = 255
-};
+#define NAME "steam-runtime-launcher-interface-0"
 
 #if 0
 #define trace(...) do { \
@@ -61,7 +53,7 @@ log_oom (void)
 static bool
 want_launcher_service (const char *tool_names)
 {
-  const char *requested = getenv ("STEAM_COMPAT_LAUNCHER_SERVICE");
+  const char *requested = getenv (STEAM_COMPAT_LAUNCHER_SERVICE_ENVVAR);
   autofree char *needle = NULL;
   autofree char *haystack = NULL;
 
@@ -73,8 +65,8 @@ want_launcher_service (const char *tool_names)
   if (strchr (requested, ':') != NULL)
     {
       fprintf (stderr,
-               "%s: Expected a single entry in $STEAM_COMPAT_LAUNCHER_SERVICE\n",
-               NAME);
+               "%s: Expected a single entry in $%s\n",
+               NAME, STEAM_COMPAT_LAUNCHER_SERVICE_ENVVAR);
       return false;
     }
 
@@ -244,20 +236,31 @@ main (int argc, char **argv)
   if (want_launcher_service (tool_names)
       && (launcher_service = find_launcher_service ()) != NULL)
     {
+      const char * const *options;
       autofree char *argz = NULL;
       size_t argz_len = 0;
       autofree char **launcher_service_argv = NULL;
 
       trace ("Trying to run launcher service: %s", launcher_service);
 
-      if (argz_add (&argz, &argz_len, launcher_service) != 0
-          || argz_add (&argz, &argz_len, "--exec-fallback")
-          || argz_add (&argz, &argz_len, "--hint")
-          || argz_add (&argz, &argz_len, "--inside-app")
-          || argz_add (&argz, &argz_len, "--no-stop-on-name-loss")
-          || argz_add (&argz, &argz_len, "--replace")
-          || argz_add (&argz, &argz_len, "--session")
-          || argz_add (&argz, &argz_len, "--"))
+      if (argz_add (&argz, &argz_len, launcher_service) != 0)
+        {
+          log_oom ();
+          goto fallback;
+        }
+
+      options = _srt_launcher_interface_get_options (NULL);
+
+      for (i = 0; options[i] != NULL; i++)
+        {
+          if (argz_add (&argz, &argz_len, options[i]) != 0)
+            {
+              log_oom ();
+              goto fallback;
+            }
+        }
+
+      if (argz_add (&argz, &argz_len, "--") != 0)
         {
           log_oom ();
           goto fallback;
@@ -281,7 +284,7 @@ main (int argc, char **argv)
           goto fallback;
         }
 
-      unsetenv ("STEAM_COMPAT_LAUNCHER_SERVICE");
+      unsetenv (STEAM_COMPAT_LAUNCHER_SERVICE_ENVVAR);
       argz_extract (argz, argz_len, launcher_service_argv);
       execvp (launcher_service, launcher_service_argv);
       fprintf (stderr, "%s: execvp %s: %s\n",

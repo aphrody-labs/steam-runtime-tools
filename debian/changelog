@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20251201.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251201.0) steamrt; urgency=medium
 
   * pressure-vessel:
     - Fix CPU emulation when steam-runtime-launcher-interface-0
@@ -42,7 +42,7 @@ steam-runtime-tools (0.20251201.0) UNRELEASED; urgency=medium
     - CI updates
   * Documentation updates
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 01 Dec 2025 20:17:45 +0000
+ -- Simon McVittie <smcv@collabora.com>  Mon, 01 Dec 2025 20:20:15 +0000
 
 steam-runtime-tools (0.20251120.0) steamrt; urgency=medium
 

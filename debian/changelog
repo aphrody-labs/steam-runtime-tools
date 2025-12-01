@@ -1,11 +1,46 @@
-steam-runtime-tools (0.20251124.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251201.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
+    - Fix CPU emulation when steam-runtime-launcher-interface-0
+      is of the native architecture
+      (steamrt/tasks#868)
+    - Fix CPU emulation when combined with
+      STEAM_COMPAT_LAUNCHER_SERVICE=container-runtime,
+      PRESSURE_VESSEL_SHELL=instead and similar debugging features
+      (steamrt/tasks#868)
     - Improve container startup time when using CPU emulation
-      (steamrt/tasks#851, steamrt/tasks#865)
+      (steamrt/tasks#851, steamrt/tasks#865, steamrt/tasks#868)
+    - Graphics providers specified as a JSON manifest can tell
+      pressure-vessel their own fallback library search path
+      (steamrt/tasks#866)
+    - Fix a minor memory leak with --shell or --terminal
+      (steamrt/tasks#868)
+    - Implement the equivalent of s-r-launcher-interface-0 internally,
+      saving a subprocess (steamrt/tasks#868)
+    - pv-adverb no longer provides --shell or --terminal options:
+      equivalent functionality has moved back into pv-wrap
+      (steamrt/tasks#868)
+  * Subprojects:
+    - Update libcapsule to 0.20251201.0
+      + Search /usr/lib/i386-linux-gnu, /usr/lib64, etc. for libraries
+        if not found in /etc/ld.so.cache
+        (steamrt/tasks#866, steam-runtime#704)
+  * Packaging:
+    - Ensure packages from this source are upgraded in lockstep
+  * build-aux:
+    - Build s-r-launcher-service, etc. for scout i386.
+      Developers with an existing build tree will need to re-run
+      `build-aux/many-builds.py setup` after this change.
+      (steamrt/tasks#868)
+  * Tests:
+    - Improve pv-wrap test coverage
+    - Do a CI build against steamrt4
+    - Do the aarch64 relocatable build against steamrt3c in preference to
+      Debian 11
+    - CI updates
   * Documentation updates
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 24 Nov 2025 13:57:08 +0000
+ -- Simon McVittie <smcv@collabora.com>  Mon, 01 Dec 2025 16:16:27 +0000
 
 steam-runtime-tools (0.20251120.0) steamrt; urgency=medium
 

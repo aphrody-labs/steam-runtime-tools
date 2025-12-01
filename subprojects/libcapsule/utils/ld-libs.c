@@ -1,4 +1,4 @@
-// Copyright © 2017-2020 Collabora Ltd
+// Copyright © 2017-2025 Collabora Ltd
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 // This file is part of libcapsule.
@@ -17,6 +17,7 @@
 // License along with libcapsule.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <assert.h>
+#include <endian.h>
 #include <string.h>
 #include <dlfcn.h>
 #include <link.h>
@@ -646,19 +647,19 @@ dso_find (const char *name, ld_libs *ldlibs, int i, const char *runpaths, int *c
     if( (found = search_ldcache( name, ldlibs, i )) )
         return found;
 
-    if( (found = search_ldpath( name, "/lib:/usr/lib", ldlibs, i )) )
+    if( (found = search_ldpath( name, ld_libs_get_fallback_paths( ldlibs ), ldlibs, i )) )
         return found;
 
-    non_ldlp_paths = "ld.so.cache, DT_RUNPATH or fallback /lib:/usr/lib";
+    non_ldlp_paths = "ld.so.cache, DT_RUNPATH or fallback ";
 
     if (ldpath)
         _capsule_set_error( code, message, ENOENT,
-                            "Could not find \"%s\" in LD_LIBRARY_PATH \"%s\", %s",
-                            name, ldpath, non_ldlp_paths );
+                            "Could not find \"%s\" in LD_LIBRARY_PATH \"%s\", %s%s",
+                            name, ldpath, non_ldlp_paths, ld_libs_get_fallback_paths( ldlibs ));
     else
         _capsule_set_error( code, message, ENOENT,
-                            "Could not find \"%s\" in LD_LIBRARY_PATH (unset), %s",
-                            name, non_ldlp_paths );
+                            "Could not find \"%s\" in LD_LIBRARY_PATH (unset), %s%s",
+                            name, non_ldlp_paths, ld_libs_get_fallback_paths( ldlibs ));
 
     return 0;
 }
@@ -971,6 +972,47 @@ ld_libs_init (ld_libs *ldlibs,
     return 1;
 }
 
+/*
+ * Returns: (transfer none): A colon-separated list of search paths
+ */
+const char *
+ld_libs_get_fallback_paths (ld_libs *ldlibs)
+{
+    if( ldlibs && ldlibs->fallback )
+        return ldlibs->fallback;
+
+    return
+#ifdef __LP64__
+#ifdef __x86_64__
+      "/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:"    /* Debian family */
+      "/usr/x86_64-pc-linux-gnu/lib:"                       /* Exherbo */
+#elif defined(__aarch64__) && __BYTE_ORDER == __LITTLE_ENDIAN
+      "/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu:"  /* Debian family */
+      "/usr/aarch64-unknown-linux-gnueabi/lib:"             /* Exherbo */
+#endif
+      "/lib64:/usr/lib64:"                                  /* Red Hat family */
+#endif
+#ifdef __i386__
+      "/lib/i386-linux-gnu:/usr/lib/i386-linux-gnu:"        /* Debian family */
+      "/usr/i686-pc-linux-gnu/lib:"                         /* Exherbo */
+      "/lib32:/usr/lib32:"                                  /* Arch family */
+#endif
+      "/lib:/usr/lib";
+}
+
+/*
+ * @paths: (transfer none): A colon-separated list of search paths
+ */
+void
+ld_libs_set_fallback_paths (ld_libs *ldlibs, const char *paths)
+{
+    _capsule_clear( &ldlibs->fallback );
+
+    if( paths )
+        ldlibs->fallback = xstrdup( paths );
+    // else leave it NULL, which we handle specially in the accessor
+}
+
 // set up the starting point for our capsule load
 // (ie the DSO we actually want):
 // returns false on error:
@@ -1112,6 +1154,7 @@ ld_libs_finish (ld_libs *ldlibs)
 
     ldlibs->prefix.len = 0;
     ldlibs->prefix.path[0] = '\0';
+    _capsule_clear( &ldlibs->fallback );
 }
 
 // this walks backwards along (up? down?) the stack until it finds

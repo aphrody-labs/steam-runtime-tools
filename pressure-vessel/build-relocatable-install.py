@@ -404,9 +404,7 @@ def main():
 
             install_exe(path, os.path.join(installation, 'bin'))
 
-        primary_architecture = subprocess.check_output([
-            'dpkg', '--print-architecture',
-        ]).decode('utf-8').strip()
+        primary_architecture = architectures[0].name
 
         # Normally bin/steam-runtime-launcher-service would be a symlink
         # to ../libexec/steam-runtime-tools/TUPLE-srt-launcher-service,

@@ -59,6 +59,17 @@ class Architecture:
         self.name = name
         self.multiarch = multiarch
 
+    @property
+    def qemu_name(self):
+        return {
+            # Debian architecture => qemu-ARCH suffix
+            'arm64': 'aarch64',
+            'armel': 'arm',
+            'armhf': 'arm',
+            'amd64': 'x86_64',
+            'powerpc': 'ppc',
+        }.get(self.name, self.name)
+
 
 # Debian architecture => Debian multiarch tuple
 X86_ARCHS = [
@@ -345,12 +356,17 @@ def main():
                      '--architecture-name is required')
 
     if args.architecture_name:
-        architectures.append(
-            Architecture(
-                name=args.architecture_name,
-                multiarch=args.architecture_multiarch,
-            ),
-        )
+        archs = args.architecture_name.split(',')
+        tuples = args.architecture_multiarch.split(',')
+
+        if len(archs) != len(tuples):
+            parser.error(
+                '--architecture-name and --architecture-multiarch '
+                'must have the same number of comma-separated items'
+            )
+
+        for a, t in zip(archs, tuples):
+            architectures.append(Architecture(name=a, multiarch=t))
     else:
         architectures += X86_ARCHS
 
@@ -399,9 +415,13 @@ def main():
 
             install_exe(path, os.path.join(installation, 'bin'))
 
-        primary_architecture = subprocess.check_output([
+        # Primary architecture of the machine or container
+        machine_architecture = subprocess.check_output([
             'dpkg', '--print-architecture',
         ]).decode('utf-8').strip()
+        # Primary architecture of the resulting pressure-vessel,
+        # which might be different
+        primary_architecture = architectures[0].name
 
         # Normally bin/steam-runtime-launcher-service would be a symlink
         # to ../libexec/steam-runtime-tools/TUPLE-srt-launcher-service,
@@ -488,6 +508,16 @@ def main():
                 path = '{}/build-relocatable/{}'.format(tmpdir, path)
 
             for tool in glob.glob(os.path.join(path, arch.multiarch + '-*')):
+                # As a special case, we assume that i386 containers and i386
+                # emulators will always be for (x86_64,i386), which means we
+                # can save ~ 3 MiB by not having i386 srt-launcher-service,
+                # which in turn means we won't need i386 GLib.
+                if arch.name != primary_architecture and arch.name == 'i386':
+                    if os.path.basename(tool).endswith((
+                        '-srt-launcher-service',
+                    )):
+                        continue
+
                 install_exe(
                     tool,
                     os.path.join(inst_pkglibexecdir, os.path.basename(tool)),
@@ -528,8 +558,12 @@ def main():
                 arch.multiarch + '-detect-platform',
                 arch.multiarch + '-inspect-library',
                 arch.multiarch + '-inspect-library-libelf',
-                arch.multiarch + '-srt-launcher-service',
             ]
+
+            if arch.name == primary_architecture or arch.name != 'i386':
+                get_deps_of.append(
+                    arch.multiarch + '-srt-launcher-service',
+                )
 
             for exe in get_deps_of:
                 expressions.append(
@@ -559,9 +593,18 @@ def main():
                         'only-dependencies:path:' + os.path.abspath(path)
                     )
 
-            v_check_call([
+            argv = [
                 'env',
                 'CAPSULE_DEBUG=tool',
+            ]
+
+            if (
+                arch.name != machine_architecture
+                and (arch.name != 'i386' or machine_architecture != 'amd64')
+            ):
+                argv.append('qemu-' + arch.qemu_name)
+
+            argv.extend([
                 '{}/{}-capsule-capture-libs'.format(
                     inst_pkglibexecdir,
                     arch.multiarch,
@@ -571,12 +614,16 @@ def main():
                     arch.name,
                 ),
                 '--no-glibc',
-            ] + expressions + [
+            ])
+            argv.extend(expressions)
+            argv.extend([
                 # We take libwaffle-1.so.0 itself but not its dependencies,
                 # because its dependencies include libGL which we don't
                 # want to bundle
                 'no-dependencies:soname:libwaffle-1.so.0',
             ])
+
+            v_check_call(argv)
 
             for so in glob.glob(
                 os.path.join(
@@ -825,7 +872,7 @@ def main():
             if args.architecture_name is None:
                 bin_arch = 'bin'
             else:
-                bin_arch = args.architecture_name
+                bin_arch = args.architecture_name.replace(',', '+')
 
             bin_tar = os.path.join(
                 args.archive,

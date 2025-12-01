@@ -2421,12 +2421,12 @@ test_payload_command (Fixture *f,
 
       if (test->emulated)
         /* The mock emulator in sh.json is hard-coded to pretend to be an
-         * emulator for the i386 architecture (only) */
-        expected_launcher_tuple = SRT_ABI_I386;
-      else
-        /* We use x86_config and therefore x86_archs for all of these tests,
-         * so the runtime's primary architecture is assumed to be x86_64 */
+         * emulator for the x86_64 architecture (only) */
         expected_launcher_tuple = SRT_ABI_X86_64;
+      else
+        /* We use aarch64_config and therefore aarch64_archs for all of these tests,
+         * so the runtime's primary architecture is assumed to be aarch64 */
+        expected_launcher_tuple = SRT_ABI_AARCH64;
 
       helpers_dir =
         _srt_subprocess_runner_get_helpers_path (f->context->run_in_current_context);
@@ -2537,8 +2537,8 @@ test_payload_command (Fixture *f,
       helpers_dir =
         _srt_subprocess_runner_get_helpers_path (f->context->run_in_current_context);
       /* The mock emulator in sh.json is hard-coded to pretend to be an
-       * emulator for the i386 architecture (only) */
-      expected_helper = g_strdup_printf ("%s/%s-exec", helpers_dir, SRT_ABI_I386);
+       * emulator for the x86_64 architecture (only) */
+      expected_helper = g_strdup_printf ("%s/%s-exec", helpers_dir, SRT_ABI_X86_64);
       arg = g_ptr_array_index (argv_in_container->argv, offset);
       g_assert_cmpstr (arg, ==, expected_helper);
       offset++;
@@ -3249,7 +3249,7 @@ main (int argc,
       g_autofree char *name = g_strdup_printf ("/payload-command/%s",
                                                test->name);
 
-      *config = x86_config;
+      *config = aarch64_config;
       config->payload_command_test = test;
       g_test_add (name, Fixture, config,
                   setup, test_payload_command, teardown);

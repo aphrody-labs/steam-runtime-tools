@@ -255,7 +255,8 @@ class Uploader:
 
         for a in (
             Path('_build', 'pressure-vessel-bin.tar.gz'),
-            Path('_build', 'arm64', 'pressure-vessel-arm64.tar.gz'),
+            Path('_build', 'pressure-vessel-arm64.tar.gz'),
+            Path('_build', 'pressure-vessel-arm64+amd64+i386.tar.gz'),
         ):
             os.link(str(a), upload / a.name)
 
@@ -266,7 +267,8 @@ class Uploader:
 
         for a in (
             Path('_build', 'pressure-vessel-bin+src.tar.gz'),
-            Path('_build', 'arm64', 'pressure-vessel-arm64+src.tar.gz'),
+            Path('_build', 'pressure-vessel-arm64+src.tar.gz'),
+            Path('_build', 'pressure-vessel-arm64+amd64+i386+src.tar.gz'),
         ):
             logger.debug('Extracting source code from %s...', a)
 

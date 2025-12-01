@@ -39,6 +39,7 @@ variables:
         python3
         rsync
         zlib1g
+    JOB_BUILD_DEPENDENCIES: ''
 
     IMAGES_DOWNLOAD_URL: ''
     IMAGES_DOWNLOAD_CREDENTIAL: ''
@@ -146,6 +147,8 @@ package:source:
 
 .build_deb:
     stage: build
+    variables:
+        HOST_ARCH: ''
     needs:
         - package:source
     image: ${BUILD_IMAGE}
@@ -192,6 +195,7 @@ package:steamrt3c:i386:
     extends: .build_deb
     variables:
         BUILD_IMAGE: '${STEAMRT3C_DOCKER_REGISTRY}/${STEAMRT3C_DOCKER_IMAGE}'
+        HOST_ARCH: i386
         STEAM_CI_DEB_BUILD: any
 
 package:soldier:amd64:
@@ -376,7 +380,7 @@ build:clang:
 .relocatable_install:
     stage: relocatable-install
     before_script:
-        - ./ci/prepare-deb.sh $BUILD_DEPENDENCIES
+        - ./ci/prepare-deb.sh $BUILD_DEPENDENCIES $JOB_BUILD_DEPENDENCIES
         - ./ci/make-deb-src-available.sh
     script:
         - ci/relocatable-install.sh
@@ -387,11 +391,13 @@ relocatable-install:i386:
         - package:source
         - package:scout:i386
     image: "${SCOUT_DOCKER_REGISTRY}/${SCOUT_I386_DOCKER_IMAGE}"
+    variables:
+        RELOCATABLE_INSTALL_ARCHS: i386
     artifacts:
         paths:
             # We don't need to save the source code, it'll be the same as
             # for the amd64+i386 relocatable install
-            - _build/i386/pressure-vessel-i386.tar.gz
+            - _build/pressure-vessel-i386.tar.gz
         when: on_success
 
 relocatable-install:arm64:
@@ -404,12 +410,33 @@ relocatable-install:arm64:
         - package:source
         - package:steamrt3c:arm64
     image: '${STEAMRT3C_DOCKER_REGISTRY}/${STEAMRT3C_DOCKER_IMAGE_ARM64}'
+    variables:
+        RELOCATABLE_INSTALL_ARCHS: arm64
     artifacts:
         paths:
-            - _build/arm64/pressure-vessel-arm64.tar.gz
-            # Some of the source code will differ from the version
-            # built in scout
-            - _build/arm64/pressure-vessel-arm64+src.tar.gz
+            - _build/pressure-vessel-arm64.tar.gz
+            - _build/pressure-vessel-arm64+src.tar.gz
+        when: on_success
+
+relocatable-install:arm64,amd64,i386:
+    extends: .relocatable_install
+    tags:
+        - docker
+        - linux
+        - aarch64
+    needs:
+        - package:source
+        - package:steamrt3c:arm64
+        - package:steamrt3c:amd64
+        - package:steamrt3c:i386
+    image: '${STEAMRT3C_DOCKER_REGISTRY}/${STEAMRT3C_DOCKER_IMAGE_ARM64}'
+    variables:
+        RELOCATABLE_INSTALL_ARCHS: arm64,amd64,i386
+        JOB_BUILD_DEPENDENCIES: qemu-user
+    artifacts:
+        paths:
+            - _build/pressure-vessel-arm64+amd64+i386.tar.gz
+            - _build/pressure-vessel-arm64+amd64+i386+src.tar.gz
         when: on_success
 
 relocatable-install:
@@ -419,6 +446,29 @@ relocatable-install:
         - package:scout:amd64
         - package:scout:i386
     image: "${SCOUT_DOCKER_REGISTRY}/${SCOUT_DOCKER_IMAGE}"
+    variables:
+        RELOCATABLE_INSTALL_ARCHS: amd64,i386
+    artifacts:
+        paths:
+            - _build/pressure-vessel-bin.tar.gz
+            - _build/pressure-vessel-bin+src.tar.gz
+        when: on_success
+
+# This will replace the scout relocatable-install build (above)
+# when the Steam client starts depending on glibc 2.31, as announced in
+# <https://help.steampowered.com/en/faqs/view/107F-BB20-FB5A-1CE4>.
+# (We're temporarily still shipping the scout build even though Steam
+# officially already requires glibc 2.31, to give users of older distros
+# an even longer grace period to upgrade.)
+relocatable-install:x86-steamrt3c:
+    extends: .relocatable_install
+    needs:
+        - package:source
+        - package:steamrt3c:amd64
+        - package:steamrt3c:i386
+    image: '${STEAMRT3C_DOCKER_REGISTRY}/${STEAMRT3C_DOCKER_IMAGE}'
+    variables:
+        RELOCATABLE_INSTALL_ARCHS: amd64,i386
     artifacts:
         paths:
             - _build/pressure-vessel-bin.tar.gz
@@ -539,6 +589,7 @@ deploy:
         - package:steamrt3c:arm64
         - relocatable-install
         - relocatable-install:arm64
+        - relocatable-install:arm64,amd64,i386
     rules:
         - if: '$PRESSURE_VESSEL_CI_UPLOAD_HOST == ""'
           when: never

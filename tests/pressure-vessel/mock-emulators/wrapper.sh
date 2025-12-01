@@ -1,4 +1,7 @@
 #!/bin/sh
+# Copyright 2025 Collabora Ltd.
+# SPDX-License-Identifier: MIT
+
 # Yes the documentation for PRESSURE_VESSEL_EMULATOR says the emulator
 # can't be a script, but that doesn't apply when nothing is really being
 # emulated.
@@ -42,7 +45,7 @@ if [ -d /run/pressure-vessel ]; then
     case "$1" in
         # In the tests that use this mock emulator, we happen to know that
         # the command we are running is env(1), either wrapped in
-        # i386-linux-gnu-exec or directly.
+        # x86_64-linux-gnu-exec or directly.
         (*-exec | /usr/bin/env)
             if [ "$context" != '--main' ]; then
                 echo "did not expect $context when running main command" >&2
@@ -51,7 +54,7 @@ if [ -d /run/pressure-vessel ]; then
             ;;
 
         (*)
-            # e.g. i386-linux-gnu-detect-lib
+            # e.g. x86_64-linux-gnu-detect-lib
             if [ "$context" != '--container' ]; then
                 echo "did not expect $context when running setup command" >&2
                 exit 1

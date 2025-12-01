@@ -11,8 +11,8 @@
       "PV_TEST_SET_IN_CONTAINER": "set",
       "PV_TEST_UNSET_IN_CONTAINER": null
     },
-    "emulated_architectures": ["i386-linux-gnu"],
-    "required_architectures": ["x86_64-linux-gnu"],
+    "emulated_architectures": ["x86_64-linux-gnu"],
+    "required_architectures": ["i386-linux-gnu"],
     "required_libraries": ["libc.so.6", "libm.so.6"]
   }
 }

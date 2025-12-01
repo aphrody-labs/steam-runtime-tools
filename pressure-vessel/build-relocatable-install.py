@@ -488,6 +488,16 @@ def main():
                 path = '{}/build-relocatable/{}'.format(tmpdir, path)
 
             for tool in glob.glob(os.path.join(path, arch.multiarch + '-*')):
+                # As a special case, we assume that i386 containers and i386
+                # emulators will always be for (x86_64,i386), which means we
+                # can save ~ 3 MiB by not having i386 srt-launcher-service,
+                # which in turn means we won't need i386 GLib.
+                if arch.name != primary_architecture and arch.name == 'i386':
+                    if os.path.basename(tool).endswith((
+                        '-srt-launcher-service',
+                    )):
+                        continue
+
                 install_exe(
                     tool,
                     os.path.join(inst_pkglibexecdir, os.path.basename(tool)),
@@ -528,8 +538,12 @@ def main():
                 arch.multiarch + '-detect-platform',
                 arch.multiarch + '-inspect-library',
                 arch.multiarch + '-inspect-library-libelf',
-                arch.multiarch + '-srt-launcher-service',
             ]
+
+            if arch.name == primary_architecture or arch.name != 'i386':
+                get_deps_of.append(
+                    arch.multiarch + '-srt-launcher-service',
+                )
 
             for exe in get_deps_of:
                 expressions.append(

@@ -142,7 +142,7 @@ main (int argc,
   real_root = _srt_sysroot_new_real_root (error);
 
   if (real_root == NULL)
-    return FALSE;
+    goto out;
 
   self = pv_wrap_context_new (real_root, g_get_home_dir (), error);
 
@@ -1069,7 +1069,7 @@ main (int argc,
                                         "pressure-vessel\n", -1,
                                         "/run/host/container-manager",
                                         error))
-        return FALSE;
+        goto out;
 
 
       if (_srt_util_is_debugging ())
@@ -1165,7 +1165,7 @@ main (int argc,
                                         &tty_stdin,
                                         &tty_stdout,
                                         error))
-          return FALSE;
+          goto out;
 
       for (i = 0; i < self->options.pass_fds->len; i++)
         {

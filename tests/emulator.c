@@ -545,6 +545,8 @@ test_relative (Fixture *f,
   g_clear_pointer (&actual_realpath, g_free);
 
   argv = _srt_emulator_get_container_argv (emulator);
+  g_assert_nonnull (argv);
+  g_assert_nonnull (argv[0]);
   actual_realpath = realpath (argv[0], NULL);
   g_assert_cmpstr (expected_realpath, ==, actual_realpath);
   g_assert_cmpstr (argv[1], ==, "--in-container");
@@ -552,6 +554,8 @@ test_relative (Fixture *f,
   g_clear_pointer (&actual_realpath, g_free);
 
   argv = _srt_emulator_get_main_argv (emulator);
+  g_assert_nonnull (argv);
+  g_assert_nonnull (argv[0]);
   actual_realpath = realpath (argv[0], NULL);
   g_assert_cmpstr (expected_realpath, ==, actual_realpath);
   g_assert_cmpstr (argv[1], ==, "--main-game");

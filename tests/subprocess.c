@@ -111,6 +111,7 @@ test_basic (Fixture *f,
   gboolean timed_out = TRUE;
 
   runner = _srt_subprocess_runner_new_full (NULL,     /* emulator */
+                                            NULL,     /* emulator server */
                                             NULL,     /* envp */
                                             "/path/to/bin",
                                             "/path/to/libexec/steam-runtime-tools-0",
@@ -287,6 +288,7 @@ test_chdir (Fixture *f,
   const char * const argv[] = { "pwd", NULL };
 
   runner = _srt_subprocess_runner_new_full (NULL,     /* emulator */
+                                            NULL,     /* emulator server */
                                             NULL,     /* envp */
                                             NULL,     /* ./bin */
                                             NULL,     /* ./libexec/s-r-t-0 */
@@ -411,6 +413,7 @@ test_emulator (Fixture *f,
     };
 
   runner = _srt_subprocess_runner_new_full (f->emulator,
+                                            NULL,     /* emulator server */
                                             NULL,   /* envp */
                                             NULL,   /* bin_path */
                                             NULL,   /* helpers_path */
@@ -540,6 +543,7 @@ test_environ (Fixture *f,
   envp = g_environ_unsetenv (envp, "LIBGL_DEBUG");
 
   runner = _srt_subprocess_runner_new_full (NULL,    /* emulator */
+                                            NULL,     /* emulator server */
                                             _srt_const_strv (envp),
                                             NULL,    /* ./bin */
                                             NULL,    /* ./libexec/s-r-t-0 */
@@ -777,6 +781,7 @@ test_timeout (Fixture *f,
   gboolean timed_out = FALSE;
 
   runner = _srt_subprocess_runner_new_full (NULL,    /* emulator */
+                                            NULL,    /* emulator server */
                                             NULL,    /* envp */
                                             NULL,    /* ./bin */
                                             NULL,    /* ./libexec/s-r-t-0 */

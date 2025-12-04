@@ -835,7 +835,10 @@ main (int argc,
                                         NULL);
     }
 
+  /* If we were given an emulator, we assume that pv-wrap was responsible
+   * for starting its associated server already */
   runner = _srt_subprocess_runner_new_full (opt_emulator,
+                                            NULL,   /* server assumed ready */
                                             global_envp,
                                             bindir,
                                             pkglibexecdir,

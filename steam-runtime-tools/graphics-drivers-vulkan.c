@@ -1569,6 +1569,7 @@ _srt_load_vulkan_layers (const char *sysroot,
     }
 
   runner = _srt_subprocess_runner_new_full (NULL,   /* no emulator */
+                                            NULL,   /* no emulator */
                                             _srt_const_strv (envp),
                                             NULL,
                                             NULL,

@@ -1329,6 +1329,7 @@ gboolean
 pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
                                          GError **error)
 {
+  g_autoptr(SrtEmulatorServer) server = NULL;
   g_autofree char *bindir = NULL;
   const char *prefix;
   const char *pkglibexecdir = NULL;
@@ -1360,7 +1361,15 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
   if (prefix == NULL)
     return FALSE;
 
+  if (self->options.emulator != NULL
+      && !_srt_emulator_server_maybe_start (self->options.emulator,
+                                            NULL,   /* envp */
+                                            &server,
+                                            error))
+    return FALSE;
+
   self->run_in_current_context = _srt_subprocess_runner_new_full (self->options.emulator,
+                                                                  server,
                                                                   NULL,   /* envp */
                                                                   bindir,
                                                                   pkglibexecdir,

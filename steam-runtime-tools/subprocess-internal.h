@@ -11,6 +11,7 @@
 
 #include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/emulator-internal.h"
+#include "steam-runtime-tools/emulator-server-internal.h"
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
 #include "steam-runtime-tools/system-info.h"
 
@@ -62,6 +63,7 @@ _srt_subprocess_runner_new (void)
 
 static inline SrtSubprocessRunner *
 _srt_subprocess_runner_new_full (SrtEmulator *emulator,
+                                 SrtEmulatorServer *emulator_server,
                                  const char * const *envp,
                                  const char *bin_path,
                                  const char *helpers_path,
@@ -69,8 +71,11 @@ _srt_subprocess_runner_new_full (SrtEmulator *emulator,
                                  SrtTestFlags flags,
                                  const char *working_directory)
 {
+  g_return_val_if_fail (emulator != NULL || emulator_server == NULL, NULL);
+
   return g_object_new (SRT_TYPE_SUBPROCESS_RUNNER,
                        "emulator", emulator,
+                       "emulator-server", emulator_server,
                        "environ", envp,
                        "bin-path", bin_path,
                        "helpers-path", helpers_path,

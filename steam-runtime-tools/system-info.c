@@ -2360,6 +2360,7 @@ _srt_system_info_set_sysroot (SrtSystemInfo *self,
     {
       /* during initialization */
       runner = _srt_subprocess_runner_new_full (NULL,   /* emulator */
+                                                NULL,   /* emulator server */
                                                 NULL,   /* envp */
                                                 NULL,   /* bin */
                                                 NULL,   /* libexec/s-r-t-0 */

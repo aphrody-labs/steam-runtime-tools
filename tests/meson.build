@@ -613,6 +613,7 @@ endif
 if get_option('installed_tests')
   install_data(
     'emulator-mock.json',
+    'emulator-nonexistent.json',
     'emulator-qemu-arm.json',
     'gfx-provider-full.json',
     'gfx-provider-minimal.json',

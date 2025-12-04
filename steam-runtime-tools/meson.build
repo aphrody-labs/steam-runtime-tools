@@ -117,6 +117,8 @@ libsteamrt_internals = enums_internal_headers + [
     'emulator.c',
     'emulator-internal.h',
     'emulator-private.h',
+    'emulator-server.c',
+    'emulator-server-internal.h',
     'env-overlay.c',
     'env-overlay-internal.h',
     'glib-backports.c',

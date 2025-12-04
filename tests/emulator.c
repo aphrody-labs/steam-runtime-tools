@@ -8,6 +8,7 @@
 #include "steam-runtime-tools/glib-backports-internal.h"
 
 #include "steam-runtime-tools/architecture-internal.h"
+#include "steam-runtime-tools/emulator-server-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 #include "test-utils.h"
 
@@ -16,6 +17,7 @@ typedef struct
   GError *error;
   gchar *qemu_json;
   gchar *mock_json;
+  gchar *nonexistent_programs_json;
 } Fixture;
 
 typedef struct
@@ -30,6 +32,7 @@ setup (Fixture *f,
   G_GNUC_UNUSED const Config *config = context;
 
   f->mock_json = g_test_build_filename (G_TEST_DIST, "emulator-mock.json", NULL);
+  f->nonexistent_programs_json = g_test_build_filename (G_TEST_DIST, "emulator-nonexistent.json", NULL);
   f->qemu_json = g_test_build_filename (G_TEST_DIST, "emulator-qemu-arm.json", NULL);
 }
 
@@ -41,6 +44,7 @@ teardown (Fixture *f,
 
   g_clear_error (&f->error);
   g_free (f->mock_json);
+  g_free (f->nonexistent_programs_json);
   g_free (f->qemu_json);
 }
 
@@ -180,6 +184,7 @@ test_basic (Fixture *f,
   g_autoptr(GArray) archs_copy = NULL;
   g_autoptr(GArray) required_archs_copy = NULL;
   g_autoptr(GPtrArray) arch_strings = NULL;
+  g_autoptr(SrtEmulatorServer) server = NULL;
   g_autoptr(SrtEnvOverlay) env_copy = NULL;
   g_autoptr(SrtEnvOverlay) container_env_copy = NULL;
   g_auto(GStrv) argv_copy = NULL;
@@ -336,6 +341,15 @@ test_basic (Fixture *f,
   g_assert_nonnull (overlay);
   g_assert_nonnull (overlay->values);
   g_assert_cmpuint (g_hash_table_size (overlay->values), ==, 0);
+
+  /* An emulator with no server_argv doesn't start a server */
+  ok = _srt_emulator_server_maybe_start (emulator,
+                                         NULL,
+                                         &server,
+                                         &f->error);
+  g_assert_no_error (f->error);
+  g_assert_true (ok);
+  g_assert_null (server);
 }
 
 static void
@@ -516,6 +530,52 @@ test_invalid (Fixture *f,
       g_assert_null (emulator);
       g_clear_error (&f->error);
     }
+}
+
+/*
+ * Exercise the absence of an emulator
+ */
+static void
+test_none (Fixture *f,
+           gconstpointer context)
+{
+  g_autoptr(SrtEmulatorServer) server = NULL;
+  gboolean ok;
+
+  /* A NULL emulator certainly doesn't need a server */
+  ok = _srt_emulator_server_maybe_start (NULL, NULL, &server, &f->error);
+  g_assert_no_error (f->error);
+  g_assert_true (ok);
+  g_assert_null (server);
+}
+
+/*
+ * Exercise an emulator manifest with emulator and server that don't exist
+ */
+static void
+test_nonexistent (Fixture *f,
+                  gconstpointer context)
+{
+  g_autoptr(SrtEmulator) emulator = NULL;
+  g_autoptr(SrtEmulatorServer) server = NULL;
+  gboolean ok;
+
+  emulator = _srt_emulator_new_from_manifest (f->nonexistent_programs_json,
+                                              &f->error);
+  g_assert_no_error (f->error);
+  g_assert_nonnull (emulator);
+  dump_emulator (f->qemu_json, emulator);
+
+  ok = _srt_emulator_server_maybe_start (emulator,
+                                         NULL,
+                                         &server,
+                                         &f->error);
+  g_assert_nonnull (f->error);
+  g_test_message ("Starting nonexistent server -> %s #%d %s",
+                  g_quark_to_string (f->error->domain),
+                  f->error->code,
+                  f->error->message);
+  g_assert_false (ok);
 }
 
 /*
@@ -749,6 +809,101 @@ test_relative (Fixture *f,
   g_assert_cmpstrv (_srt_emulator_get_required_libraries (reread),
                     expected_libraries);
   g_assert_cmpstr (_srt_emulator_get_manifest (modified), ==, NULL);
+
+    {
+      g_autoptr(GTimer) timer = NULL;
+      g_auto(GStrv) envp = NULL;
+      g_autoptr(SrtEmulatorServer) server = NULL;
+      glnx_autofd int exit_fd = -1;
+      g_autofree char *flag = NULL;
+
+      flag = g_build_filename (tmpdir.path, "server-flag", NULL);
+
+      g_assert_false (g_file_test (flag, G_FILE_TEST_EXISTS));
+
+      envp = g_get_environ ();
+      envp = g_environ_setenv (envp, "MOCK_EMULATOR_SERVER_STATE",
+                               tmpdir.path, TRUE);
+
+      ok = _srt_emulator_server_maybe_start (emulator,
+                                             _srt_const_strv (envp),
+                                             &server,
+                                             &f->error);
+      g_assert_no_error (f->error);
+      g_assert_true (ok);
+      g_assert_true (SRT_IS_EMULATOR_SERVER (server));
+
+      ok = _srt_emulator_server_wait_for_ready (server, &f->error);
+      g_assert_no_error (f->error);
+      g_assert_true (ok);
+      /* After the server is ready, it creates this directory. */
+      g_assert_true (g_file_test (flag, G_FILE_TEST_IS_DIR));
+
+      exit_fd = _srt_emulator_server_steal_exit_fd (server);
+      g_assert_cmpint (exit_fd, >=, 0);
+
+      g_assert_true (g_file_test (flag, G_FILE_TEST_IS_DIR));
+      glnx_close_fd (&exit_fd);
+
+      /* Poll for up to 10 seconds until the server cleans up its
+       * flag directory and exits */
+      timer = g_timer_new ();
+
+      while (g_timer_elapsed (timer, NULL) < 10.0)
+        {
+          if (!g_file_test (flag, G_FILE_TEST_EXISTS))
+            break;
+
+          /* Sleep 10ms to avoid busy-looping */
+          g_usleep (10 * 1000);
+        }
+
+      g_assert_false (g_file_test (flag, G_FILE_TEST_EXISTS));
+
+      exit_fd = _srt_emulator_server_steal_exit_fd (server);
+      g_assert_cmpint (exit_fd, <, 0);
+    }
+}
+
+/*
+ * Exercise a server starting but failing to become ready
+ */
+static void
+test_server_not_ready (Fixture *f,
+                       gconstpointer context)
+{
+  g_autoptr(SrtEmulator) emulator = NULL;
+  g_autoptr(SrtEmulatorServer) server = NULL;
+  g_auto(GStrv) envp = NULL;
+  gboolean ok;
+
+  emulator = _srt_emulator_new_from_manifest (f->mock_json, &f->error);
+  g_assert_no_error (f->error);
+  g_assert_nonnull (emulator);
+  dump_emulator (f->qemu_json, emulator);
+
+  envp = g_get_environ ();
+  envp = g_environ_setenv (envp, "MOCK_EMULATOR_SERVER_STATE",
+                           g_test_get_filename (G_TEST_DIST, "nonexistent", NULL),
+                           TRUE);
+
+  ok = _srt_emulator_server_maybe_start (emulator,
+                                         _srt_const_strv (envp),
+                                         &server,
+                                         &f->error);
+  g_assert_no_error (f->error);
+  g_assert_true (ok);
+  g_assert_true (SRT_IS_EMULATOR_SERVER (server));
+
+  /* It can't create its flag file, so the output will not end with the
+   * READY=1 message, and waiting for it to be ready will fail. */
+  ok = _srt_emulator_server_wait_for_ready (server, &f->error);
+  g_assert_nonnull (f->error);
+  g_test_message ("Cannot become ready -> %s #%d %s",
+                  g_quark_to_string (f->error->domain),
+                  f->error->code,
+                  f->error->message);
+  g_assert_false (ok);
 }
 
 int
@@ -762,8 +917,14 @@ main (int argc,
               setup, test_basic, teardown);
   g_test_add ("/emulator/invalid", Fixture, NULL,
               setup, test_invalid, teardown);
+  g_test_add ("/emulator/none", Fixture, NULL,
+              setup, test_none, teardown);
+  g_test_add ("/emulator/nonexistent", Fixture, NULL,
+              setup, test_nonexistent, teardown);
   g_test_add ("/emulator/relative", Fixture, NULL,
               setup, test_relative, teardown);
+  g_test_add ("/emulator/server-not-ready", Fixture, NULL,
+              setup, test_server_not_ready, teardown);
 
   return g_test_run ();
 }

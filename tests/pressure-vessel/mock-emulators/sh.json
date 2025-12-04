@@ -3,6 +3,7 @@
     "argv": "./wrapper.sh --",
     "container_argv": "./wrapper.sh --container --",
     "main_argv": "./wrapper.sh --main --",
+    "server_argv": "./server.sh --argument",
     "environment": {
       "PV_TEST_SET_WHEN_EMULATING": "set",
       "PV_TEST_UNSET_WHEN_EMULATING": null

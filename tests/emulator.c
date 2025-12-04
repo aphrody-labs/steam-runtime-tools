@@ -130,6 +130,18 @@ dump_emulator (const char *label,
   for (size_t i = 0; strv != NULL && strv[i] != NULL; i++)
     g_test_message ("\tRequires library: %s", strv[i]);
 
+  strv = _srt_emulator_get_server_argv (emulator);
+
+  for (size_t i = 0; strv != NULL && strv[i] != NULL; i++)
+    {
+      g_autofree gchar *quoted = g_shell_quote (strv[i]);
+
+      g_string_append_printf (str, " %s", quoted);
+    }
+
+  g_test_message ("\tServer run for the duration of the game: %s", str->str);
+  g_string_truncate (str, 0);
+
   overlay = _srt_emulator_get_environment (emulator);
   dump_overlay ("\tEnvironment", overlay);
 
@@ -191,6 +203,7 @@ test_basic (Fixture *f,
   libraries = _srt_emulator_get_required_libraries (emulator);
   g_assert_nonnull (libraries);
   g_assert_null (libraries[0]);
+  g_assert_null (_srt_emulator_get_server_argv (emulator));
 
   arch_quarks = _srt_emulator_get_emulated_architectures (emulator, &n);
 
@@ -255,14 +268,15 @@ test_basic (Fixture *f,
 
   g_clear_object (&emulator);
   emulator = _srt_emulator_new (expected_argv,
-                                NULL,
-                                NULL,
+                                NULL,   /* container argv */
+                                NULL,   /* container environment */
                                 archs_copy,
-                                NULL,
-                                NULL,
-                                NULL,
-                                NULL,
-                                NULL);
+                                NULL,   /* environment */
+                                NULL,   /* main argv */
+                                NULL,   /* manifest */
+                                NULL,   /* required archs */
+                                NULL,   /* required libraries */
+                                NULL);  /* server argv */
   g_assert_cmpstrv (_srt_emulator_get_argv (emulator), expected_argv);
   g_assert_cmpstrv (_srt_emulator_get_container_argv (emulator), expected_argv);
   g_assert_cmpstrv (_srt_emulator_get_main_argv (emulator), expected_argv);
@@ -274,6 +288,7 @@ test_basic (Fixture *f,
   libraries = _srt_emulator_get_required_libraries (emulator);
   g_assert_nonnull (libraries);
   g_assert_null (libraries[0]);
+  g_assert_null (_srt_emulator_get_server_argv (emulator));
 
     {
       g_autofree char *content = _srt_emulator_serialize_manifest (emulator);
@@ -300,6 +315,7 @@ test_basic (Fixture *f,
                     _srt_emulator_get_container_argv (reread));
   g_assert_cmpstrv (_srt_emulator_get_main_argv (emulator),
                     _srt_emulator_get_main_argv (reread));
+  g_assert_null (_srt_emulator_get_server_argv (reread));
 
   arch_quarks = _srt_emulator_get_emulated_architectures (reread, &n);
   g_assert_cmpuint (n, ==, 3);
@@ -360,6 +376,11 @@ test_invalid (Fixture *f,
     { "empty argv array",
       ("{ \"emulator_v0\": {\n"
        "\"argv\": [],\n"
+       "\"emulated_architectures\": [\"x86_64-linux-gnu\", \"i386-linux-gnu\"]"
+       "}}\n") },
+    { "empty server_argv array",
+      ("{ \"emulator_v0\": {\n"
+       "\"server_argv\": [],\n"
        "\"emulated_architectures\": [\"x86_64-linux-gnu\", \"i386-linux-gnu\"]"
        "}}\n") },
     { "non-string in argv",
@@ -564,6 +585,24 @@ test_relative (Fixture *f,
       g_assert_cmpstrv (&argv[2], expected_args);
     }
 
+    {
+      g_autofree char *expected_path = NULL;
+      g_autofree char *expected_realpath = NULL;
+      g_autofree char *actual_realpath = NULL;
+
+      argv = _srt_emulator_get_server_argv (emulator);
+      g_assert_nonnull (argv);
+      g_assert_nonnull (argv[0]);
+      actual_realpath = realpath (argv[0], NULL);
+      expected_path = g_test_build_filename (G_TEST_DIST,
+                                             "mock-emulator-server.sh",
+                                             NULL);
+      expected_realpath = realpath (expected_path, NULL);
+      g_assert_cmpstr (expected_realpath, ==, actual_realpath);
+      g_assert_cmpstr (argv[1], ==, "--argument");
+      g_assert_cmpstr (argv[2], ==, NULL);
+    }
+
   arch_quarks = _srt_emulator_get_emulated_architectures (emulator, &n);
   g_assert_cmpuint (n, ==, 1);
   g_assert_cmpstr (g_quark_to_string (arch_quarks[0]), ==, "mock-emulated");
@@ -628,6 +667,10 @@ test_relative (Fixture *f,
   g_assert_cmpstr (argv[1], ==, "--main-game");
   g_assert_cmpstrv (&argv[2], expected_args);
 
+  argv = _srt_emulator_get_server_argv (modified);
+  g_assert_nonnull (argv);
+  g_assert_cmpstrv (argv, _srt_emulator_get_server_argv (emulator));
+
   arch_quarks = _srt_emulator_get_emulated_architectures (modified, &n);
   g_assert_cmpuint (n, ==, 1);
   g_assert_cmpstr (g_quark_to_string (arch_quarks[0]), ==, "mock-emulated");
@@ -689,6 +732,8 @@ test_relative (Fixture *f,
                     _srt_emulator_get_container_argv (reread));
   g_assert_cmpstrv (_srt_emulator_get_main_argv (modified),
                     _srt_emulator_get_main_argv (reread));
+  g_assert_cmpstrv (_srt_emulator_get_server_argv (modified),
+                    _srt_emulator_get_server_argv (reread));
 
   arch_quarks = _srt_emulator_get_emulated_architectures (reread, &n);
   g_assert_cmpuint (n, ==, 1);

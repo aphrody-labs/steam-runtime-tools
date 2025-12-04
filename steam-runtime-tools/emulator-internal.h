@@ -28,6 +28,7 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (SrtEmulator, g_object_unref)
 const char * const *_srt_emulator_get_argv (SrtEmulator *self);
 const char * const *_srt_emulator_get_container_argv (SrtEmulator *self);
 const char * const *_srt_emulator_get_main_argv (SrtEmulator *self);
+const char * const *_srt_emulator_get_server_argv (SrtEmulator *self);
 const GQuark *_srt_emulator_get_emulated_architectures (SrtEmulator *self,
                                                         size_t *n_out);
 const char * const *_srt_emulator_get_required_libraries (SrtEmulator *self);
@@ -46,7 +47,8 @@ _srt_emulator_new (const char * const *argv,
                    const char * const *main_argv,
                    const char *manifest,
                    GArray *required_architectures,
-                   const char * const *required_libraries)
+                   const char * const *required_libraries,
+                   const char * const *server_argv)
 {
   g_return_val_if_fail (argv != NULL, NULL);
   g_return_val_if_fail (argv[0] != NULL, NULL);
@@ -58,6 +60,7 @@ _srt_emulator_new (const char * const *argv,
   /* manifest may be NULL */
   /* required_architectures may be NULL */
   /* required_libraries may be NULL */
+  g_return_val_if_fail (server_argv == NULL || server_argv[0] != NULL, NULL);
 
   return g_object_new (SRT_TYPE_EMULATOR,
                        "argv", argv,
@@ -69,6 +72,7 @@ _srt_emulator_new (const char * const *argv,
                        "manifest", manifest,
                        "required-architectures", required_architectures,
                        "required-libraries", required_libraries,
+                       "server-argv", server_argv,
                        NULL);
 }
 

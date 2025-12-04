@@ -23,7 +23,8 @@ steam-runtime emulator.json - manifest describing a CPU emulator
         "container_environment": { "MY_EMULATOR_RUNNING_UNDER_SLR": "1" },
         "emulated_architectures": ["x86_64-linux-gnu", "i386-linux-gnu"],
         "required_architectures": ["aarch64-linux-gnu"],
-        "required_libraries": ["libc.so.6", "libstdc++.so.6"]
+        "required_libraries": ["libc.so.6", "libstdc++.so.6"],
+        "server_argv": ["./bin/emulator-server", "--poll-stdin"]
       }
     }
 
@@ -211,6 +212,52 @@ This field is optional.
 If not specified,
 the default is to assume that the emulator does not need any shared
 libraries (for example it might be statically-linked).
+
+### `server_argv` (string or array of strings)
+
+The `server_argv` are encoded in the same way as `argv`.
+Instead of being prepended to a command to execute,
+they are used to start a server associated with a particular game
+instance running under the emulator.
+For example,
+FEX-Emu uses `FEXServer` to cache translated code,
+amortizing the cost of translation across multiple processes,
+and centralize logging.
+
+This field is optional.
+If not specified,
+no server is started.
+
+The server will receive the write end of a pipe as its standard output.
+When it has carried out any setup that is necessary
+(for example listening on a socket)
+and is ready for the `argv`,
+`container_argv` and/or
+`main_argv`
+to be started,
+it should write "READY=1" followed by a newline (8 bytes) to the pipe,
+then close the pipe,
+causing end-of-file to be detected by the reader.
+Any other output lines before this string are reserved for future use,
+and output lines after this string are an error.
+The compatibility tool that launched the server should not run other
+emulator processes until after it detects end-of-file on the read end
+of this pipe.
+
+The server will receive the read end of a pipe as its standard input.
+It should poll the pipe's status
+using an event loop or a suitable syscall such as **poll**(2),
+read anything that becomes available,
+and exit gracefully when end-of-file is reached.
+The compatibility tool that launched the server should close the write
+end of the pipe when the server is no longer needed.
+
+The server may write unstructured human-readable diagnostic messages
+to standard error.
+The compatibility tool that launched the server should arrange for these
+messages to go to a reasonable destination:
+for example,
+this might be the same place that game output is sent.
 
 ## COMPATIBILITY
 

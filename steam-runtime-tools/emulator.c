@@ -34,6 +34,7 @@ enum {
   PROP_MANIFEST,
   PROP_REQUIRED_ARCHITECTURES,
   PROP_REQUIRED_LIBRARIES,
+  PROP_SERVER_ARGV,
   N_PROPERTIES
 };
 
@@ -60,6 +61,7 @@ _srt_emulator_finalize (GObject *object)
   g_free (self->manifest);
   g_free (self->required_architectures);
   g_strfreev (self->required_libraries);
+  g_strfreev (self->server_argv);
 
   G_OBJECT_CLASS (_srt_emulator_parent_class)->finalize (object);
 }
@@ -115,6 +117,10 @@ _srt_emulator_get_property (GObject *object,
         g_value_take_boxed (value,
                             _srt_architecture_array_new_from_quarks (self->required_architectures,
                                                                      self->n_required_architectures));
+        break;
+
+      case PROP_SERVER_ARGV:
+        g_value_set_boxed (value, self->server_argv);
         break;
 
       default:
@@ -214,6 +220,12 @@ _srt_emulator_set_property (GObject *object,
 
         break;
 
+      case PROP_SERVER_ARGV:
+        /* Construct-only */
+        g_return_if_fail (self->server_argv == NULL);
+        self->server_argv = g_value_dup_boxed (value);
+        break;
+
       default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
     }
@@ -236,6 +248,8 @@ _srt_emulator_constructed (GObject *object)
   /* manifest may be NULL */
   g_return_if_fail (self->required_architectures != NULL);
   /* n_required_architectures may be 0 */
+  g_return_if_fail (self->server_argv == NULL
+                    || self->server_argv[0] != NULL);
 
   if (self->required_libraries == NULL)
     {
@@ -475,6 +489,29 @@ _srt_emulator_get_required_libraries (SrtEmulator *self)
   return _srt_const_strv (self->required_libraries);
 }
 
+/*
+ * _srt_emulator_get_server_argv:
+ *
+ * Return the arguments to be used to start a server associated with the
+ * emulator,
+ * for example an instance of `FEXServer` or a wrapper around it.
+ * This may be %NULL,
+ * indicating that this particular emulator does not use a server:
+ * for example,
+ * qemu does not have such a thing.
+ * If non-%NULL,
+ * it is never empty.
+ *
+ * Returns: (transfer none) (array zero-terminated=1) (element-type filename):
+ */
+const char * const *
+_srt_emulator_get_server_argv (SrtEmulator *self)
+{
+  g_return_val_if_fail (SRT_IS_EMULATOR (self), NULL);
+
+  return _srt_const_strv (self->server_argv);
+}
+
 static void
 _srt_emulator_class_init (SrtEmulatorClass *cls)
 {
@@ -534,6 +571,12 @@ _srt_emulator_class_init (SrtEmulatorClass *cls)
 
   properties[PROP_REQUIRED_LIBRARIES] =
     g_param_spec_boxed ("required-libraries", NULL, NULL,
+                        G_TYPE_STRV,
+                        (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS));
+
+  properties[PROP_SERVER_ARGV] =
+    g_param_spec_boxed ("server-argv", NULL, NULL,
                         G_TYPE_STRV,
                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                          G_PARAM_STATIC_STRINGS));
@@ -640,5 +683,6 @@ _srt_emulator_new_for_container (SrtEmulator *self,
                             new_main_argv,
                             NULL,   /* no manifest */
                             required_architectures,
-                            _srt_const_strv (self->required_libraries));
+                            _srt_const_strv (self->required_libraries),
+                            _srt_const_strv (self->server_argv));
 }

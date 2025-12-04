@@ -20,6 +20,7 @@ struct _SrtEmulator
   gchar *manifest;
   GQuark *required_architectures;
   GStrv required_libraries;
+  GStrv server_argv;
   size_t n_emulated_architectures;
   size_t n_required_architectures;
 };

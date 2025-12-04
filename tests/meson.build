@@ -257,6 +257,7 @@ foreach helper : [
   'mock-bad-check-vdpau',
   'mock-bad-check-vulkan',
   'mock-bad-check-xdg-portal',
+  'mock-emulator-server',
   'mock-good-check-va-api',
   'mock-good-check-vdpau',
   'mock-good-check-xdg-portal',
@@ -617,6 +618,7 @@ if get_option('installed_tests')
     'gfx-provider-minimal.json',
     'gfx-provider-root.json',
     'mock-emulator.sh',
+    'mock-emulator-server.sh',
     'run-in-ldlp-runtime.sh',
     install_dir: tests_dir,
   )

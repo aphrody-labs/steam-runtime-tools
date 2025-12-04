@@ -22,6 +22,11 @@ fi
 
 shift
 
+if [ ! -d "$MOCK_EMULATOR_SERVER_STATE/server-flag" ]; then
+    echo "Expected $MOCK_EMULATOR_SERVER_STATE/server-flag to have been created" >&2
+    exit 1
+fi
+
 if [ "$PV_TEST_SET_WHEN_EMULATING" != set ]; then
     echo "PV_TEST_SET_WHEN_EMULATING should be 'set' but is: $PV_TEST_SET_WHEN_EMULATING" >&2
     exit 1

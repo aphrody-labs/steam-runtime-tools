@@ -1097,6 +1097,7 @@ main (int argc,
   /* Set up adverb inside container */
     {
       g_autoptr(FlatpakBwrap) adverb_argv = NULL;
+      SrtEmulatorServer *emulator_server = NULL;
 
       adverb_argv = flatpak_bwrap_new (flatpak_bwrap_empty_env);
 
@@ -1156,6 +1157,24 @@ main (int argc,
                               "--exit-with-parent",
                               "--subreaper",
                               NULL);
+
+      if (!_srt_subprocess_runner_await_emulator (self->run_in_current_context,
+                                                  SRT_ARCHITECTURE_QUARK_NONE,
+                                                  NULL,
+                                                  &emulator_server,
+                                                  error))
+        goto out;
+
+      if (emulator_server != NULL)
+        {
+          int exit_fd = _srt_emulator_server_steal_exit_fd (emulator_server);
+
+          g_return_val_if_fail (exit_fd >= 0, FALSE);
+          /* pv-adverb will hold the fd open for as long as any game process
+           * is running, preventing the server from exiting prematurely */
+          g_array_append_val (inherit_fds, exit_fd);
+          flatpak_bwrap_add_arg_printf (adverb_argv, "--fd=%d", exit_fd);
+        }
 
       if (!pv_wrap_adverb_assign_stdio (adverb_argv,
                                         self->options.terminal,
@@ -1292,6 +1311,13 @@ main (int argc,
           g_clear_error (&local_error);
         }
     }
+
+  if (!_srt_subprocess_runner_await_emulator (self->run_in_current_context,
+                                              SRT_ARCHITECTURE_QUARK_NONE,
+                                              NULL,
+                                              NULL,
+                                              error))
+    goto out;
 
   if (self->options.only_prepare)
     {

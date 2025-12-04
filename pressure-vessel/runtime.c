@@ -2230,8 +2230,12 @@ pv_runtime_get_adverb (PvRuntime *self,
   g_return_val_if_fail (self->adverb_architecture != NULL, FALSE);
   adverb_arch_quark = g_quark_from_static_string (self->adverb_architecture->multiarch_tuple);
 
-  emulator_for_adverb = _srt_subprocess_runner_get_emulator_for_arch (self->run_in_current_context,
-                                                                      adverb_arch_quark);
+  if (!_srt_subprocess_runner_await_emulator (self->run_in_current_context,
+                                              adverb_arch_quark,
+                                              &emulator_for_adverb,
+                                              NULL,
+                                              error))
+    return FALSE;
 
   if (self->workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID)
     ld_library_path = pv_runtime_get_ld_library_path (self);
@@ -2555,8 +2559,12 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
    * to the argv. Instead we need to insert the emulator into the middle
    * of the argv, after srt-bwrap or system bwrap, but before the
    * ${arch}-capsule-capture-libs command. */
-  emulator = _srt_subprocess_runner_get_emulator_for_arch (self->run_in_current_context,
-                                                           arch->tuple_quark);
+  if (!_srt_subprocess_runner_await_emulator (self->run_in_current_context,
+                                              arch->tuple_quark,
+                                              &emulator,
+                                              NULL,
+                                              error))
+    return FALSE;
 
   if (emulator != NULL)
     {

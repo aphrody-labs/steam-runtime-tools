@@ -97,8 +97,11 @@ SrtSubprocessRunner *_srt_subprocess_runner_new_swap_working_directory (SrtSubpr
                                                                         const char *working_directory);
 
 SrtEmulator *_srt_subprocess_runner_get_emulator (SrtSubprocessRunner *self);
-SrtEmulator *_srt_subprocess_runner_get_emulator_for_arch (SrtSubprocessRunner *self,
-                                                           GQuark architecture);
+gboolean _srt_subprocess_runner_await_emulator (SrtSubprocessRunner *self,
+                                                GQuark architecture,
+                                                SrtEmulator **emulator_out,
+                                                SrtEmulatorServer **emulator_server_out,
+                                                GError **error);
 const char * const *_srt_subprocess_runner_get_environ (SrtSubprocessRunner *self);
 const char *_srt_subprocess_runner_getenv (SrtSubprocessRunner *self, const char *var);
 const char *_srt_subprocess_runner_get_bin_path (SrtSubprocessRunner *self);

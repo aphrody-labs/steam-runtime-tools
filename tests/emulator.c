@@ -518,9 +518,6 @@ test_relative (Fixture *f,
       "libgcc_s.so.1",
       NULL
     };
-  g_autofree char *expected_path = NULL;
-  g_autofree char *expected_realpath = NULL;
-  g_autofree char *actual_realpath = NULL;
   const char * const * argv;
   const SrtEnvOverlay *overlay;
   g_autofree char *manifest_realpath = NULL;
@@ -534,28 +531,38 @@ test_relative (Fixture *f,
   g_assert_nonnull (emulator);
   dump_emulator (f->qemu_json, emulator);
 
-  argv = _srt_emulator_get_argv (emulator);
-  g_assert_nonnull (argv);
-  g_assert_nonnull (argv[0]);
-  g_assert_cmpstrv (&argv[1], expected_args);
-  actual_realpath = realpath (argv[0], NULL);
-  expected_path = g_test_build_filename (G_TEST_DIST, "mock-emulator.sh", NULL);
-  expected_realpath = realpath (expected_path, NULL);
-  g_assert_cmpstr (expected_realpath, ==, actual_realpath);
-  g_clear_pointer (&actual_realpath, g_free);
+    {
+      g_autofree char *expected_path = NULL;
+      g_autofree char *expected_realpath = NULL;
+      g_autofree char *actual_realpath = NULL;
 
-  argv = _srt_emulator_get_container_argv (emulator);
-  actual_realpath = realpath (argv[0], NULL);
-  g_assert_cmpstr (expected_realpath, ==, actual_realpath);
-  g_assert_cmpstr (argv[1], ==, "--in-container");
-  g_assert_cmpstrv (&argv[2], expected_args);
-  g_clear_pointer (&actual_realpath, g_free);
+      argv = _srt_emulator_get_argv (emulator);
+      g_assert_nonnull (argv);
+      g_assert_nonnull (argv[0]);
+      g_assert_cmpstrv (&argv[1], expected_args);
+      actual_realpath = realpath (argv[0], NULL);
+      expected_path = g_test_build_filename (G_TEST_DIST, "mock-emulator.sh", NULL);
+      expected_realpath = realpath (expected_path, NULL);
+      g_assert_cmpstr (expected_realpath, ==, actual_realpath);
+      g_clear_pointer (&actual_realpath, g_free);
 
-  argv = _srt_emulator_get_main_argv (emulator);
-  actual_realpath = realpath (argv[0], NULL);
-  g_assert_cmpstr (expected_realpath, ==, actual_realpath);
-  g_assert_cmpstr (argv[1], ==, "--main-game");
-  g_assert_cmpstrv (&argv[2], expected_args);
+      argv = _srt_emulator_get_container_argv (emulator);
+      g_assert_nonnull (argv);
+      g_assert_nonnull (argv[0]);
+      actual_realpath = realpath (argv[0], NULL);
+      g_assert_cmpstr (expected_realpath, ==, actual_realpath);
+      g_assert_cmpstr (argv[1], ==, "--in-container");
+      g_assert_cmpstrv (&argv[2], expected_args);
+      g_clear_pointer (&actual_realpath, g_free);
+
+      argv = _srt_emulator_get_main_argv (emulator);
+      g_assert_nonnull (argv);
+      g_assert_nonnull (argv[0]);
+      actual_realpath = realpath (argv[0], NULL);
+      g_assert_cmpstr (expected_realpath, ==, actual_realpath);
+      g_assert_cmpstr (argv[1], ==, "--main-game");
+      g_assert_cmpstrv (&argv[2], expected_args);
+    }
 
   arch_quarks = _srt_emulator_get_emulated_architectures (emulator, &n);
   g_assert_cmpuint (n, ==, 1);

@@ -266,6 +266,7 @@ _srt_emulator_new_from_manifest (const char *path,
   g_auto(GStrv) argv = NULL;
   g_auto(GStrv) container_argv = NULL;
   g_auto(GStrv) main_argv = NULL;
+  g_auto(GStrv) server_argv = NULL;
   g_auto(GStrv) required_libraries = NULL;
   g_autofree char *real_manifest = NULL;
   JsonNode *member;
@@ -311,6 +312,10 @@ _srt_emulator_new_from_manifest (const char *path,
                            &main_argv, error))
     return NULL;
 
+  if (!manifest_read_argv (object, "server_argv", real_manifest,
+                           &server_argv, error))
+    return NULL;
+
   if (!manifest_read_architectures (object, "emulated_architectures",
                                     emulated_architectures, error))
     return NULL;
@@ -345,7 +350,8 @@ _srt_emulator_new_from_manifest (const char *path,
                             _srt_const_strv (main_argv),
                             real_manifest,
                             required_architectures,
-                            _srt_const_strv (required_libraries));
+                            _srt_const_strv (required_libraries),
+                            _srt_const_strv (server_argv));
 }
 
 static void
@@ -412,6 +418,10 @@ _srt_emulator_serialize_manifest (SrtEmulator *self)
                                             FALSE);
           _srt_json_builder_add_strv_value (builder, "main_argv",
                                             _srt_const_strv (self->main_argv),
+                                            /* emit nothing if NULL */
+                                            FALSE);
+          _srt_json_builder_add_strv_value (builder, "server_argv",
+                                            _srt_const_strv (self->server_argv),
                                             /* emit nothing if NULL */
                                             FALSE);
 

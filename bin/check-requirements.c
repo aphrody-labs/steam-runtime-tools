@@ -300,6 +300,7 @@ main (int argc,
 
   sysroot = _srt_sysroot_new_direct (&error);
   runner = _srt_subprocess_runner_new_full (NULL,   /* no emulator */
+                                            NULL,   /* no emulator */
                                             _srt_const_strv (subproc_environ),
                                             NULL,
                                             NULL,

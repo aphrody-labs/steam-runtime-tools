@@ -11,6 +11,7 @@
 
 #include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/emulator-internal.h"
+#include "steam-runtime-tools/emulator-server-internal.h"
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
 #include "steam-runtime-tools/system-info.h"
 
@@ -62,6 +63,7 @@ _srt_subprocess_runner_new (void)
 
 static inline SrtSubprocessRunner *
 _srt_subprocess_runner_new_full (SrtEmulator *emulator,
+                                 SrtEmulatorServer *emulator_server,
                                  const char * const *envp,
                                  const char *bin_path,
                                  const char *helpers_path,
@@ -69,8 +71,11 @@ _srt_subprocess_runner_new_full (SrtEmulator *emulator,
                                  SrtTestFlags flags,
                                  const char *working_directory)
 {
+  g_return_val_if_fail (emulator != NULL || emulator_server == NULL, NULL);
+
   return g_object_new (SRT_TYPE_SUBPROCESS_RUNNER,
                        "emulator", emulator,
+                       "emulator-server", emulator_server,
                        "environ", envp,
                        "bin-path", bin_path,
                        "helpers-path", helpers_path,
@@ -92,8 +97,11 @@ SrtSubprocessRunner *_srt_subprocess_runner_new_swap_working_directory (SrtSubpr
                                                                         const char *working_directory);
 
 SrtEmulator *_srt_subprocess_runner_get_emulator (SrtSubprocessRunner *self);
-SrtEmulator *_srt_subprocess_runner_get_emulator_for_arch (SrtSubprocessRunner *self,
-                                                           GQuark architecture);
+gboolean _srt_subprocess_runner_await_emulator (SrtSubprocessRunner *self,
+                                                GQuark architecture,
+                                                SrtEmulator **emulator_out,
+                                                SrtEmulatorServer **emulator_server_out,
+                                                GError **error);
 const char * const *_srt_subprocess_runner_get_environ (SrtSubprocessRunner *self);
 const char *_srt_subprocess_runner_getenv (SrtSubprocessRunner *self, const char *var);
 const char *_srt_subprocess_runner_get_bin_path (SrtSubprocessRunner *self);

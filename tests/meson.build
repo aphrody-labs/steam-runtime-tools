@@ -257,6 +257,7 @@ foreach helper : [
   'mock-bad-check-vdpau',
   'mock-bad-check-vulkan',
   'mock-bad-check-xdg-portal',
+  'mock-emulator-server',
   'mock-good-check-va-api',
   'mock-good-check-vdpau',
   'mock-good-check-xdg-portal',
@@ -612,11 +613,13 @@ endif
 if get_option('installed_tests')
   install_data(
     'emulator-mock.json',
+    'emulator-nonexistent.json',
     'emulator-qemu-arm.json',
     'gfx-provider-full.json',
     'gfx-provider-minimal.json',
     'gfx-provider-root.json',
     'mock-emulator.sh',
+    'mock-emulator-server.sh',
     'run-in-ldlp-runtime.sh',
     install_dir: tests_dir,
   )

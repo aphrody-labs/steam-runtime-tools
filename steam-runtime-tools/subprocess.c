@@ -771,8 +771,11 @@ struct _SrtSubprocessRunner
 {
   GObject parent;
   /* For now we assume that we won't need more than one emulator,
-   * so this is just a nullable pointer rather than an array. */
+   * so this is just a nullable pointer to the emulator and a nullable
+   * pointer to its server, rather than an array of (emulator,server)
+   * pairs. */
   SrtEmulator *emulator;
+  SrtEmulatorServer *emulator_server;
   /* Environment */
   GStrv envp;
   /* Path to find steam-runtime-launch-client etc., or %NULL */
@@ -799,6 +802,7 @@ enum
   PROP_0,
   PROP_BIN_PATH,
   PROP_EMULATOR,
+  PROP_EMULATOR_SERVER,
   PROP_ENVIRON,
   PROP_HELPERS_PATH,
   PROP_SYSROOT,
@@ -856,6 +860,10 @@ _srt_subprocess_runner_get_property (GObject *object,
         g_value_set_object (value, self->emulator);
         break;
 
+      case PROP_EMULATOR_SERVER:
+        g_value_set_object (value, self->emulator_server);
+        break;
+
       case PROP_ENVIRON:
         g_value_set_boxed (value, self->envp);
         break;
@@ -904,6 +912,12 @@ _srt_subprocess_runner_set_property (GObject *object,
         self->emulator = g_value_dup_object (value);
         break;
 
+      case PROP_EMULATOR_SERVER:
+        /* Construct-only */
+        g_return_if_fail (self->emulator_server == NULL);
+        self->emulator_server = g_value_dup_object (value);
+        break;
+
       case PROP_ENVIRON:
         /* Construct-only */
         g_return_if_fail (self->envp == NULL);
@@ -949,6 +963,7 @@ _srt_subprocess_runner_dispose (GObject *object)
   SrtSubprocessRunner *self = SRT_SUBPROCESS_RUNNER (object);
 
   g_clear_object (&self->emulator);
+  g_clear_object (&self->emulator_server);
   g_clear_object (&self->sysroot);
 
   G_OBJECT_CLASS (_srt_subprocess_runner_parent_class)->dispose (object);
@@ -986,6 +1001,11 @@ _srt_subprocess_runner_class_init (SrtSubprocessRunnerClass *cls)
     g_param_spec_object ("emulator", NULL, NULL, SRT_TYPE_EMULATOR,
                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                         G_PARAM_STATIC_STRINGS);
+  properties[PROP_EMULATOR_SERVER] =
+    g_param_spec_object ("emulator-server", NULL, NULL,
+                        SRT_TYPE_EMULATOR_SERVER,
+                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                        G_PARAM_STATIC_STRINGS);
   properties[PROP_ENVIRON] =
     g_param_spec_boxed ("environ", NULL, NULL, G_TYPE_STRV,
                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
@@ -1017,6 +1037,7 @@ _srt_subprocess_runner_new_swap_envp (SrtSubprocessRunner *self,
 {
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
   return _srt_subprocess_runner_new_full (self->emulator,
+                                          self->emulator_server,
                                           envp,
                                           self->bin_path,
                                           self->helpers_path,
@@ -1031,6 +1052,7 @@ _srt_subprocess_runner_new_swap_helpers_path (SrtSubprocessRunner *self,
 {
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
   return _srt_subprocess_runner_new_full (self->emulator,
+                                          self->emulator_server,
                                           _srt_const_strv (self->envp),
                                           self->bin_path,
                                           path,
@@ -1045,6 +1067,7 @@ _srt_subprocess_runner_new_swap_sysroot (SrtSubprocessRunner *self,
 {
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
   return _srt_subprocess_runner_new_full (self->emulator,
+                                          self->emulator_server,
                                           _srt_const_strv (self->envp),
                                           self->bin_path,
                                           self->helpers_path,
@@ -1059,6 +1082,7 @@ _srt_subprocess_runner_new_swap_test_flags (SrtSubprocessRunner *self,
 {
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
   return _srt_subprocess_runner_new_full (self->emulator,
+                                          self->emulator_server,
                                           _srt_const_strv (self->envp),
                                           self->bin_path,
                                           self->helpers_path,
@@ -1073,6 +1097,7 @@ _srt_subprocess_runner_new_swap_working_directory (SrtSubprocessRunner *self,
 {
   g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), NULL);
   return _srt_subprocess_runner_new_full (self->emulator,
+                                          self->emulator_server,
                                           _srt_const_strv (self->envp),
                                           self->bin_path,
                                           self->helpers_path,
@@ -1465,15 +1490,14 @@ _srt_subprocess_runner_child_setup_cb (gpointer user_data)
   _srt_child_setup_unblock_signals (NULL);
 }
 
-SrtEmulator *
+static SrtEmulator *
 _srt_subprocess_runner_get_emulator_for_arch (SrtSubprocessRunner *self,
                                               GQuark architecture)
 {
   const GQuark *archs;
   size_t n = 0;
 
-  if (architecture == SRT_ARCHITECTURE_QUARK_NONE)
-    return NULL;
+  g_return_val_if_fail (architecture != SRT_ARCHITECTURE_QUARK_NONE, NULL);
 
   if (self->emulator == NULL)
     return NULL;
@@ -1489,6 +1513,67 @@ _srt_subprocess_runner_get_emulator_for_arch (SrtSubprocessRunner *self,
   return NULL;
 }
 
+/*
+ * _srt_subprocess_runner_await_emulator:
+ * @self: The subprocess runner
+ * @architecture: An architecture tuple, or %SRT_ARCHITECTURE_QUARK_NONE
+ *  to wait for any emulator(s) in use regardless of architecture
+ * @emulator_out: (out) (transfer none) (optional) (nullable): On success,
+ *  used to return a pointer to the emulator,
+ *  valid as long as a reference to @self is held
+ * @emulator_out: (out) (transfer none) (optional) (nullable): On success,
+ *  used to return a pointer to the emulator server,
+ *  valid as long as a reference to @self is held
+ *
+ * If the emulator for @self has an associated server,
+ * block the current thread until it is ready,
+ * returning %FALSE if that fails.
+ *
+ * On success,
+ * put a pointer to the emulator (if any) in @emulator_out
+ * and a pointer to the emulator server (if any) in @emulator_server_out,
+ * and return %TRUE.
+ *
+ * Returns: %TRUE on success
+ */
+gboolean
+_srt_subprocess_runner_await_emulator (SrtSubprocessRunner *self,
+                                       GQuark architecture,
+                                       SrtEmulator **emulator_out,
+                                       SrtEmulatorServer **emulator_server_out,
+                                       GError **error)
+{
+  SrtEmulator *emulator;
+
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (self), FALSE);
+  g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+
+  if (emulator_out != NULL)
+    *emulator_out = NULL;
+
+  if (emulator_server_out != NULL)
+    *emulator_server_out = NULL;
+
+  if (architecture == SRT_ARCHITECTURE_QUARK_NONE)
+    emulator = _srt_subprocess_runner_get_emulator (self);
+  else
+    emulator = _srt_subprocess_runner_get_emulator_for_arch (self, architecture);
+
+  if (emulator != NULL
+      && self->emulator_server != NULL
+      && !_srt_emulator_server_wait_for_ready (self->emulator_server,
+                                               error))
+    return FALSE;
+
+  if (emulator_out != NULL)
+    *emulator_out = emulator;
+
+  if (emulator_server_out != NULL)
+    *emulator_server_out = self->emulator_server;
+
+  return TRUE;
+}
+
 static gboolean
 _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
                               SrtHelperFlags flags,
@@ -1502,7 +1587,7 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
   g_autoptr(GPtrArray) modified_argv = NULL;
   g_auto(GStrv) my_environ = NULL;
   ChildSetupData child_setup_data = { .flags = flags };
-  SrtEmulator *emulator;
+  SrtEmulator *emulator = NULL;
   GSpawnFlags spawn_flags = G_SPAWN_DO_NOT_REAP_CHILD;
   int *stdout_fdp = NULL;
   int *stderr_fdp = NULL;
@@ -1588,7 +1673,13 @@ _srt_subprocess_runner_spawn (SrtSubprocessRunner *self,
         g_return_val_if_reached (FALSE);
     }
 
-  emulator = _srt_subprocess_runner_get_emulator_for_arch (self, architecture);
+  if (architecture != SRT_ARCHITECTURE_QUARK_NONE
+      && !_srt_subprocess_runner_await_emulator (self,
+                                                 architecture,
+                                                 &emulator,
+                                                 NULL,
+                                                 error))
+    return FALSE;
 
   if (emulator != NULL)
     {

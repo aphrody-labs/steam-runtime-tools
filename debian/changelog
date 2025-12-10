@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20251210.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20251210.0) steamrt; urgency=medium
 
   * pressure-vessel:
     - CPU emulators can now configure `server_argv` in their
@@ -10,7 +10,7 @@ steam-runtime-tools (0.20251210.0) UNRELEASED; urgency=medium
   * Tests:
     - Improve some assertions
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 10 Dec 2025 13:30:23 +0000
+ -- Simon McVittie <smcv@collabora.com>  Wed, 10 Dec 2025 13:33:15 +0000
 
 steam-runtime-tools (0.20251201.0) steamrt; urgency=medium
 

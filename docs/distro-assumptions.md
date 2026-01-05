@@ -223,7 +223,7 @@ ELF interpreter:
 All shared libraries that the OS vendor expects Steam to use, other than
 those provided by Steam itself, need to appear in the dynamic linker's
 search path.
-There are two ways this can happen:
+There are three ways this can happen:
 
 1. They can be in a directory that is listed in the `LD_LIBRARY_PATH`
     environment variable

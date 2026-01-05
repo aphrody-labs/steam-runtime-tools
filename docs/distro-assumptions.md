@@ -121,6 +121,12 @@ The container runtime assumes that the canonicalized paths of all
 libraries in those locations are below either those locations (preferred),
 or below `/gnu/store` or `/nix`.
 
+The container runtime framework assumes that writing out a new
+file `/etc/ld.so.conf` inside the container,
+and then running `/sbin/ldconfig`,
+will be enough to make `ldconfig` search the paths listed in that file.
+(This is [known to be false][steam-runtime#791] on Exherbo.)
+
 The glibc locale data conventionally stored in `/usr/lib/locale` is
 assumed to be found in one of the following paths:
 
@@ -673,5 +679,6 @@ container runtime on a new distribution, in particular:
 [scout]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/scout/README.md
 [sniper]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/sniper/README.md
 [soldier]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/soldier/README.md
+[steam-runtime#791]: https://github.com/ValveSoftware/steam-runtime/issues/791
 [systemd]: https://systemd.io/
 [user namespace requirements]: https://github.com/flatpak/flatpak/wiki/User-namespace-requirements

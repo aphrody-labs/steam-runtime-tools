@@ -244,7 +244,7 @@ _srt_get_extra_ld_so_cache_filenames (void)
  * as used upstream, in Debian and in the Steam Runtime.
  *
  * The result does not include any architecture-specific filenames.
- * If we supported any, they would be part of #SrtKnownArchitecture.
+ * For those, see #SrtKnownArchitecture.extra_ld_so_confs.
  *
  * Returns: (array zero-terminated=1) (element-type filename): The filenames
  */

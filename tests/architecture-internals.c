@@ -130,6 +130,7 @@ dump_architecture (const char *label,
 
   dump_strv ("Multilib suffixes", arch->multilib_suffixes);
   dump_strv ("Extra ld.so.cache filenames", arch->extra_ld_so_caches);
+  dump_strv ("Extra ld.so.conf filenames", arch->extra_ld_so_confs);
   dump_strv ("libdl ${PLATFORM} can expand to",
              arch->libdl_platform_expansions);
 }
@@ -269,6 +270,14 @@ test_architecture_get_by_tuple (Fixture *f,
   g_assert_true (g_strv_contains (arch->extra_ld_so_caches,
                                   "ld-x86_64-pc-linux-gnu.cache"));
 
+  g_assert_nonnull (arch->extra_ld_so_confs);
+
+  for (i = 0; arch->extra_ld_so_confs[i] != NULL; i++)
+    g_assert_false (g_path_is_absolute (arch->extra_ld_so_confs[i]));
+
+  g_assert_true (g_strv_contains (arch->extra_ld_so_confs,
+                                  "ld-x86_64-pc-linux-gnu.path"));
+
   g_assert_nonnull (arch->libdl_platform_expansions);
   g_assert_true (g_strv_contains (arch->libdl_platform_expansions, "xeon_phi"));
   g_assert_true (g_strv_contains (arch->libdl_platform_expansions, "haswell"));
@@ -305,6 +314,14 @@ test_architecture_get_by_tuple (Fixture *f,
   g_assert_true (g_strv_contains (arch->extra_ld_so_caches,
                                   "ld-i686-pc-linux-gnu.cache"));
 
+  g_assert_nonnull (arch->extra_ld_so_confs);
+
+  for (i = 0; arch->extra_ld_so_confs[i] != NULL; i++)
+    g_assert_false (g_path_is_absolute (arch->extra_ld_so_confs[i]));
+
+  g_assert_true (g_strv_contains (arch->extra_ld_so_confs,
+                                  "ld-i686-pc-linux-gnu.path"));
+
   g_assert_nonnull (arch->libdl_platform_expansions);
   g_assert_true (g_strv_contains (arch->libdl_platform_expansions, "i686"));
   g_assert_true (g_strv_contains (arch->libdl_platform_expansions, "i586"));
@@ -340,6 +357,14 @@ test_architecture_get_by_tuple (Fixture *f,
 
   g_assert_true (g_strv_contains (arch->extra_ld_so_caches,
                                   "ld-aarch64-unknown-linux-gnueabi.cache"));
+
+  g_assert_nonnull (arch->extra_ld_so_confs);
+
+  for (i = 0; arch->extra_ld_so_confs[i] != NULL; i++)
+    g_assert_false (g_path_is_absolute (arch->extra_ld_so_confs[i]));
+
+  g_assert_true (g_strv_contains (arch->extra_ld_so_confs,
+                                  "ld-aarch64-unknown-linux-gnueabi.path"));
 
   g_assert_nonnull (arch->libdl_platform_expansions);
   g_assert_true (g_strv_contains (arch->libdl_platform_expansions, "aarch64"));

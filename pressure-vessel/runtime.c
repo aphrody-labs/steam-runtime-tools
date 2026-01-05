@@ -4113,6 +4113,11 @@ bind_runtime_ld_so (PvRuntime *self,
                                    mutable_cache_path,
                                    "etc",
                                    known->extra_ld_so_caches);
+          symlink_each_ld_so_file (self,
+                                   bwrap,
+                                   mutable_conf_path,
+                                   "etc",
+                                   known->extra_ld_so_confs);
         }
     }
 

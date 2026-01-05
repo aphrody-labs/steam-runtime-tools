@@ -139,6 +139,9 @@ get_vk_error_string (VkResult error_code)
         STR(ERROR_NOT_ENOUGH_SPACE_KHR);
         STR(PIPELINE_BINARY_MISSING_KHR);
 #endif
+#if VK_HEADER_VERSION >= 335
+        STR(ERROR_PRESENT_TIMING_QUEUE_FULL_EXT);
+#endif
         STR(RESULT_MAX_ENUM);
 #undef STR
       default:

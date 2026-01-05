@@ -3812,13 +3812,56 @@ pv_runtime_symlinkat (const gchar *target,
   return TRUE;
 }
 
+/*
+ * symlink_each_ld_so_file:
+ * @self: The runtime
+ * @bwrap: (nullable): bubblewrap arguments or %NULL
+ * @target: Target for symlinks
+ * @symlinks_relative_to: (nullable): If non-%NULL, each item in @symlinks
+ *  is relative to this path, which in turn is relative to the root of
+ *  the container
+ * @symlinks: (nullable): Zero or more symlinks to create, relative
+ *  to @symlinks_relative_to or to the root of the container
+ */
+static void
+symlink_each_ld_so_file (PvRuntime *self,
+                         FlatpakBwrap *bwrap,
+                         const char *target,
+                         const char *symlinks_relative_to,
+                         const char * const *symlinks)
+{
+  if (symlinks == NULL)
+    return;
+
+  for (size_t j = 0; symlinks[j] != NULL; j++)
+    {
+      g_autoptr(GError) local_error = NULL;
+      g_autofree gchar *joined = NULL;
+      const char *name = symlinks[j];
+      const char *path;
+
+      if (symlinks_relative_to != NULL)
+        path = joined = g_build_filename (symlinks_relative_to, name, NULL);
+      else
+        path = name;
+
+      if (!pv_runtime_make_symlink_in_container (self,
+                                                 bwrap,
+                                                 target,
+                                                 path,
+                                                 PV_RUNTIME_EMULATION_ROOTS_INTERPRETER_ONLY,
+                                                 &local_error))
+        _srt_log_warning ("%s", local_error->message);
+    }
+}
+
 static gboolean
 bind_runtime_ld_so (PvRuntime *self,
                     FlatpakBwrap *bwrap,
                     SrtEnvOverlay *container_env,
                     GError **error)
 {
-  gsize i, j;
+  gsize i;
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
   g_return_val_if_fail (bwrap == NULL || !pv_bwrap_was_finished (bwrap), FALSE);
@@ -3929,7 +3972,6 @@ bind_runtime_ld_so (PvRuntime *self,
        * bwrap in /oldroot */
       g_autofree gchar *ld_so_cache_on_host = NULL;
       g_autofree gchar *ld_so_conf_on_host = NULL;
-      const char * const *extra_filenames;
 
       if (self->workarounds & PV_WORKAROUND_FLAGS_STEAMSNAP_356)
         mutable_ldso_dir = MUTABLE_LDSO_DIR_SNAP;
@@ -4037,38 +4079,18 @@ bind_runtime_ld_so (PvRuntime *self,
        * a distribution-specific path, e.g. Clear Linux uses
        * /var/cache/ldconfig/ld.so.cache. For simplicity, we make all these paths
        * symlinks, so that we only have to populate the cache in one place. */
-      extra_filenames = _srt_get_extra_ld_so_cache_filenames ();
-
-      for (i = 0; extra_filenames[i] != NULL; i++)
-        {
-          g_autoptr(GError) local_error = NULL;
-          const char *path = extra_filenames[i];
-
-          if (!pv_runtime_make_symlink_in_container (self,
-                                                     bwrap,
-                                                     mutable_cache_path,
-                                                     path,
-                                                     PV_RUNTIME_EMULATION_ROOTS_INTERPRETER_ONLY,
-                                                     &local_error))
-            _srt_log_warning ("%s", local_error->message);
-        }
+      symlink_each_ld_so_file (self,
+                               bwrap,
+                               mutable_cache_path,
+                               NULL,
+                               _srt_get_extra_ld_so_cache_filenames ());
 
       /* Similar, but for ld.so.conf, for example on Solus. */
-      extra_filenames = _srt_get_extra_ld_so_conf_filenames ();
-
-      for (i = 0; extra_filenames[i] != NULL; i++)
-        {
-          g_autoptr(GError) local_error = NULL;
-          const char *path = extra_filenames[i];
-
-          if (!pv_runtime_make_symlink_in_container (self,
-                                                     bwrap,
-                                                     mutable_conf_path,
-                                                     path,
-                                                     PV_RUNTIME_EMULATION_ROOTS_INTERPRETER_ONLY,
-                                                     &local_error))
-            _srt_log_warning ("%s", local_error->message);
-        }
+      symlink_each_ld_so_file (self,
+                               bwrap,
+                               mutable_conf_path,
+                               NULL,
+                               _srt_get_extra_ld_so_conf_filenames ());
 
       /* glibc from some distributions will want to load the ld.so cache from
        * a distribution- and architecture-specific path, e.g. Exherbo
@@ -4083,28 +4105,14 @@ bind_runtime_ld_so (PvRuntime *self,
 
           known = _srt_architecture_get_by_tuple (tuple);
 
-          if (known == NULL || known->extra_ld_so_caches == NULL)
+          if (known == NULL)
             continue;
 
-          for (j = 0; known->extra_ld_so_caches[j] != NULL; j++)
-            {
-              const char *base = known->extra_ld_so_caches[j];
-              g_autoptr(GError) local_error = NULL;
-              g_autofree gchar *path = NULL;
-
-              if (base == NULL)
-                break;
-
-              path = g_build_filename ("etc", base, NULL);
-
-              if (!pv_runtime_make_symlink_in_container (self,
-                                                         bwrap,
-                                                         mutable_cache_path,
-                                                         path,
-                                                         PV_RUNTIME_EMULATION_ROOTS_INTERPRETER_ONLY,
-                                                         &local_error))
-                _srt_log_warning ("%s", local_error->message);
-            }
+          symlink_each_ld_so_file (self,
+                                   bwrap,
+                                   mutable_cache_path,
+                                   "etc",
+                                   known->extra_ld_so_caches);
         }
     }
 

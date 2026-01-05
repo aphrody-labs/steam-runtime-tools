@@ -121,11 +121,15 @@ The container runtime assumes that the canonicalized paths of all
 libraries in those locations are below either those locations (preferred),
 or below `/gnu/store` or `/nix`.
 
-The container runtime framework assumes that writing out a new
-file `/etc/ld.so.conf` inside the container,
-and then running `/sbin/ldconfig`,
-will be enough to make `ldconfig` search the paths listed in that file.
-(This is [known to be false][steam-runtime#791] on Exherbo.)
+The container runtime framework assumes that `/sbin/ldconfig` reads
+its list of additional library paths from one of these locations:
+
+* `/etc/ld.so.conf` (glibc default, preferred)
+* `/usr/share/defaults/etc/ld.so.conf`, as used on Solus
+* `/etc/ld-x86_64-pc-linux-gnu.path` or
+    `/etc/ld-i686-pc-linux-gnu.path`, as used on Exherbo
+* more paths can be added if necessary,
+    [contact the maintainers][Steam Runtime issues]
 
 The glibc locale data conventionally stored in `/usr/lib/locale` is
 assumed to be found in one of the following paths:

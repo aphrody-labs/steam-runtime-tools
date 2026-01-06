@@ -1,7 +1,7 @@
 # Steam Runtime distribution assumptions
 
 <!-- This document:
-Copyright 2022 Collabora Ltd.
+Copyright 2022-2026 Collabora Ltd.
 SPDX-License-Identifier: MIT
 -->
 

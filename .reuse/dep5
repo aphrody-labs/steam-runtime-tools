@@ -3,7 +3,7 @@ Upstream-Name: steam-runtime-tools
 Source: https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/
 
 Files: debian/*
-Copyright: 2013-2021 Collabora Ltd.
+Copyright: 2013-2026 Collabora Ltd.
 License: MIT
 
 Files:
@@ -19,7 +19,7 @@ Files:
  tests/pressure-vessel/mock-emulators/*.json
  .gitlab/issue_templates/*
  .gitlab/merge_request_templates/*
-Copyright: 2019-2023 Collabora Ltd.
+Copyright: 2019-2025 Collabora Ltd.
 License: MIT
 
 Files:

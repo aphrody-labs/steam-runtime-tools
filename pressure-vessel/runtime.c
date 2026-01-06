@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2022 Collabora Ltd.
+ * Copyright © 2020-2026 Collabora Ltd.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *

@@ -2,7 +2,7 @@
  * Copyright (c) 2012 Arvin Schnell <arvin.schnell@gmail.com>
  * Copyright (c) 2012 Rob Clark <rob@ti.com>
  * Copyright © 2015 Intel Corporation
- * Copyright © 2019-2021 Collabora Ltd.
+ * Copyright © 2019-2026 Collabora Ltd.
  *
  * SPDX-License-Identifier: Apache-2.0
  *

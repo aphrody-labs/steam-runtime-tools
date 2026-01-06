@@ -61,6 +61,8 @@ typedef struct
   const char * const *extra_ld_so_architectures;
   /* Alternative paths for ld.so.cache, other than ld.so.cache itself. */
   const char * const *extra_ld_so_caches;
+  /* Alternative paths for ld.so.conf, other than ld.so.conf itself. */
+  const char * const *extra_ld_so_confs;
   /* Known values that ${PLATFORM} can expand to. */
   const char * const *libdl_platform_expansions;
   /* Directory used in Steam for gameoverlayrenderer.so. */

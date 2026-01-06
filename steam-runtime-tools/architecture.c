@@ -78,7 +78,11 @@ static const SrtKnownArchitecture known_architectures[] =
           NULL
       }),
       .extra_ld_so_caches = ((const char * const[]){
-          "ld-x86_64-pc-linux-gnu.cache",
+          "ld-x86_64-pc-linux-gnu.cache",   /* Exherbo */
+          NULL
+      }),
+      .extra_ld_so_confs = ((const char * const[]){
+          "ld-x86_64-pc-linux-gnu.path",    /* Exherbo */
           NULL
       }),
       .libdl_platform_expansions = ((const char * const[]){
@@ -117,7 +121,11 @@ static const SrtKnownArchitecture known_architectures[] =
           NULL
       }),
       .extra_ld_so_caches = ((const char * const[]){
-          "ld-i686-pc-linux-gnu.cache",
+          "ld-i686-pc-linux-gnu.cache",   /* Exherbo */
+          NULL
+      }),
+      .extra_ld_so_confs = ((const char * const[]){
+          "ld-i686-pc-linux-gnu.path",    /* Exherbo */
           NULL
       }),
       .libdl_platform_expansions = ((const char * const[]){
@@ -178,7 +186,11 @@ static const SrtKnownArchitecture known_architectures[] =
        * and arm-linux-gnueabihf) but we don't expect this to ever
        * matter for the Steam Runtime. */
       .extra_ld_so_caches = ((const char * const[]){
-          "ld-aarch64-unknown-linux-gnueabi.cache",
+          "ld-aarch64-unknown-linux-gnueabi.cache",   /* Exherbo */
+          NULL
+      }),
+      .extra_ld_so_confs = ((const char * const[]){
+          "ld-aarch64-unknown-linux-gnueabi.path",    /* Exherbo */
           NULL
       }),
       .libdl_platform_expansions = ((const char * const[]){ "aarch64", NULL }),

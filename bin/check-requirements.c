@@ -98,6 +98,11 @@ check_x86_features (SrtX86FeatureFlags features)
   return ((features & X86_FEATURES_REQUIRED) == X86_FEATURES_REQUIRED);
 }
 
+static const char has_elevated_privileges[] =
+"Steam is not designed to be given elevated privileges\n"
+"such as setuid, setgid or setcap.\n"
+;
+
 static const char need_unprivileged_userns_clone[] =
 "Steam now requires user namespaces to be enabled.\n"
 "\n"
@@ -268,6 +273,13 @@ main (int argc,
     }
 
   _srt_unblock_signals ();
+
+  if (!_srt_check_not_setuid ())
+    {
+      output = has_elevated_privileges;
+      exit_code = EX_OSERR;
+      goto out;
+    }
 
   x86_features = _srt_feature_get_x86_flags (NULL, &known);
 

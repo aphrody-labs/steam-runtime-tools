@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260106.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260106.0) steamrt; urgency=medium
 
   * pressure-vessel:
     - Add infrastructure for architecture-specific ld.so.conf
@@ -9,7 +9,7 @@ steam-runtime-tools (0.20260106.0) UNRELEASED; urgency=medium
   * Tests:
     - Fix CI regression with newer Vulkan-Headers (steam-runtime-tools!905)
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 06 Jan 2026 12:17:11 +0000
+ -- Simon McVittie <smcv@collabora.com>  Tue, 06 Jan 2026 16:36:54 +0000
 
 steam-runtime-tools (0.20251210.0) steamrt; urgency=medium
 

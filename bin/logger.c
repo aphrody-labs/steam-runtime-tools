@@ -261,6 +261,9 @@ run (int argc,
                                        NULL, NULL, error))
     return FALSE;
 
+  if (!_srt_check_not_setuid ())
+    return glnx_throw (error, "Steam is not designed to be given elevated privileges such as setuid, setgid or setcap");
+
   option_context = g_option_context_new ("[COMMAND [ARGUMENTS...]]");
   g_option_context_add_main_entries (option_context, option_entries, NULL);
 

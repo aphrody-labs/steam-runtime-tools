@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260107.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260115.0) steamrt; urgency=medium
 
   * Diagnostic tools:
     - s-r-check-requirements: Bail out with an error if elevated privileges
@@ -10,7 +10,7 @@ steam-runtime-tools (0.20260107.0) UNRELEASED; urgency=medium
       srt-logger before s-r-check-requirements, so an error message is
       better diagnosis than a crash.
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 07 Jan 2026 13:23:11 +0000
+ -- Simon McVittie <smcv@collabora.com>  Thu, 15 Jan 2026 16:20:33 +0000
 
 steam-runtime-tools (0.20260106.0) steamrt; urgency=medium
 

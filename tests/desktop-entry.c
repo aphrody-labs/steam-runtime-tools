@@ -173,7 +173,7 @@ main (int argc,
 
   argv0 = argv[0];
 
-  /* We can't use %G_TEST_OPTION_ISOLATE_DIRS because we are targeting an older glib verion.
+  /* We can't use %G_TEST_OPTION_ISOLATE_DIRS because we are targeting an older glib version.
    * As a workaround we use our function `setup_env()`.
    * We can't use an environ because in `_srt_steam_check()` we call `g_app_info_get_*` that
    * doesn't support a custom environ. */

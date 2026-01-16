@@ -983,11 +983,13 @@ print_layer_details (JsonBuilder *builder,
             json_builder_set_member_name (builder, "error");
             json_builder_add_string_value (builder, error->message);
           }
+
+        loadable_issues = srt_vulkan_layer_get_issues (iter->data);
         json_builder_set_member_name (builder, "issues");
         json_builder_begin_array (builder);
-        loadable_issues = srt_vulkan_layer_get_issues (iter->data);
         jsonify_loadable_issues (builder, loadable_issues);
         json_builder_end_array (builder);
+
         json_builder_end_object (builder);
       }
     }
@@ -1047,9 +1049,9 @@ print_openxr_1_runtime_details (JsonBuilder *builder,
       g_clear_error (&error);
     }
 
+  loadable_issues = srt_openxr_1_runtime_get_issues (rt);
   json_builder_set_member_name (builder, "issues");
   json_builder_begin_array (builder);
-  loadable_issues = srt_openxr_1_runtime_get_issues (rt);
   jsonify_loadable_issues (builder, loadable_issues);
   json_builder_end_array (builder);
 
@@ -1260,11 +1262,12 @@ main (int argc,
   steamscript_version = srt_system_info_dup_steamscript_version (info);
   json_builder_add_string_value (builder, steamscript_version);
 
+  steam_issues = srt_system_info_get_steam_issues (info);
   json_builder_set_member_name (builder, "issues");
   json_builder_begin_array (builder);
-  steam_issues = srt_system_info_get_steam_issues (info);
   jsonify_steam_issues (builder, steam_issues);
   json_builder_end_array (builder);
+
   json_builder_end_object (builder);
 
   json_builder_set_member_name (builder, "runtime");
@@ -1279,9 +1282,10 @@ main (int argc,
       json_builder_set_member_name (builder, "version");
       version = srt_system_info_dup_runtime_version (info);
       json_builder_add_string_value (builder, version);
+
+      runtime_issues = srt_system_info_get_runtime_issues (info);
       json_builder_set_member_name (builder, "issues");
       json_builder_begin_array (builder);
-      runtime_issues = srt_system_info_get_runtime_issues (info);
       jsonify_runtime_issues (builder, runtime_issues);
       json_builder_end_array (builder);
 
@@ -1434,10 +1438,10 @@ main (int argc,
 
       if (can_run && check_libraries)
         {
-          json_builder_set_member_name (builder, "library-issues-summary");
-          json_builder_begin_array (builder);
           library_issues = srt_system_info_check_libraries (info, tuple,
                                                             &libraries);
+          json_builder_set_member_name (builder, "library-issues-summary");
+          json_builder_begin_array (builder);
           jsonify_library_issues (builder, library_issues);
           json_builder_end_array (builder);
         }
@@ -1486,9 +1490,9 @@ main (int argc,
 
   json_builder_end_object (builder);
 
+  locale_issues = srt_system_info_get_locale_issues (info);
   json_builder_set_member_name (builder, "locale-issues");
   json_builder_begin_array (builder);
-  locale_issues = srt_system_info_get_locale_issues (info);
   jsonify_locale_issues (builder, locale_issues);
   json_builder_end_array (builder);
 
@@ -1570,9 +1574,9 @@ main (int argc,
           g_clear_error (&error);
         }
 
+      loadable_issues = srt_egl_icd_get_issues (icd_iter->data);
       json_builder_set_member_name (builder, "issues");
       json_builder_begin_array (builder);
-      loadable_issues = srt_egl_icd_get_issues (icd_iter->data);
       jsonify_loadable_issues (builder, loadable_issues);
       json_builder_end_array (builder);
 
@@ -1615,9 +1619,9 @@ main (int argc,
           g_clear_error (&error);
         }
 
+      loadable_issues = srt_egl_external_platform_get_issues (icd_iter->data);
       json_builder_set_member_name (builder, "issues");
       json_builder_begin_array (builder);
-      loadable_issues = srt_egl_external_platform_get_issues (icd_iter->data);
       jsonify_loadable_issues (builder, loadable_issues);
       json_builder_end_array (builder);
 
@@ -1676,9 +1680,9 @@ main (int argc,
           g_clear_error (&error);
         }
 
+      loadable_issues = srt_vulkan_icd_get_issues (icd_iter->data);
       json_builder_set_member_name (builder, "issues");
       json_builder_begin_array (builder);
-      loadable_issues = srt_vulkan_icd_get_issues (icd_iter->data);
       jsonify_loadable_issues (builder, loadable_issues);
       json_builder_end_array (builder);
 
@@ -1820,9 +1824,9 @@ main (int argc,
           json_builder_end_object (builder);
         }
 
+      xdg_portal_issues = srt_system_info_get_xdg_portal_issues (info, &xdg_portal_messages);
       json_builder_set_member_name (builder, "issues");
       json_builder_begin_array (builder);
-      xdg_portal_issues = srt_system_info_get_xdg_portal_issues (info, &xdg_portal_messages);
       jsonify_xdg_portal_issues (builder, xdg_portal_issues);
       json_builder_end_array (builder);
 

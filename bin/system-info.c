@@ -262,6 +262,20 @@ jsonify_display_wayland_issues (JsonBuilder *builder,
 }
 
 static void
+jsonify_bwrap_issues (JsonBuilder *builder,
+                                SrtBwrapIssues issues)
+{
+  jsonify_flags (builder, SRT_TYPE_BWRAP_ISSUES, issues);
+}
+
+static void
+jsonify_flatpak_issues (JsonBuilder *builder,
+                                SrtFlatpakIssues issues)
+{
+  jsonify_flags (builder, SRT_TYPE_FLATPAK_ISSUES, issues);
+}
+
+static void
 jsonify_x86_features (JsonBuilder *builder,
                       SrtX86FeatureFlags present,
                       SrtX86FeatureFlags known)
@@ -763,8 +777,8 @@ jsonify_container (JsonBuilder *builder,
           case SRT_CONTAINER_TYPE_FLATPAK:
             json_builder_set_member_name (builder, "flatpak_issues");
             json_builder_begin_array (builder);
-            jsonify_flags (builder, SRT_TYPE_FLATPAK_ISSUES,
-                           srt_container_info_get_flatpak_issues (container_info));
+            jsonify_flatpak_issues (builder,
+                                    srt_container_info_get_flatpak_issues (container_info));
             json_builder_end_array (builder);
 
             if (flatpak_version != NULL)
@@ -783,7 +797,7 @@ jsonify_container (JsonBuilder *builder,
           default:
             json_builder_set_member_name (builder, "bubblewrap_issues");
             json_builder_begin_array (builder);
-            jsonify_flags (builder, SRT_TYPE_BWRAP_ISSUES, bwrap_issues);
+            jsonify_bwrap_issues (builder, bwrap_issues);
             json_builder_end_array (builder);
 
             /* Don't log the path to bwrap in the common case that it's

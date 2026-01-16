@@ -314,11 +314,12 @@ print_libraries_details (JsonBuilder *builder,
           _srt_json_builder_add_string_force_utf8 (builder, "path",
                                                    srt_library_get_absolute_path (l->data));
 
-          if (srt_library_get_issues (l->data) != SRT_LIBRARY_ISSUES_NONE)
+          SrtLibraryIssues library_issues = srt_library_get_issues (l->data);
+          if (library_issues != SRT_LIBRARY_ISSUES_NONE)
             {
               json_builder_set_member_name (builder, "issues");
               json_builder_begin_array (builder);
-              jsonify_library_issues (builder, srt_library_get_issues (l->data));
+              jsonify_library_issues (builder, library_issues);
               json_builder_end_array (builder);
 
               int exit_status = srt_library_get_exit_status (l->data);
@@ -390,12 +391,14 @@ print_graphics_details(JsonBuilder *builder,
           jsonify_enum (builder, SRT_TYPE_GRAPHICS_LIBRARY_VENDOR, library_vendor);
         }
 
-      if (srt_graphics_get_issues (g->data) != SRT_GRAPHICS_ISSUES_NONE)
+      SrtGraphicsIssues graphics_issues = srt_graphics_get_issues (g->data);
+      if (graphics_issues != SRT_GRAPHICS_ISSUES_NONE)
         {
           json_builder_set_member_name (builder, "issues");
           json_builder_begin_array (builder);
-          jsonify_graphics_issues (builder, srt_graphics_get_issues (g->data));
+          jsonify_graphics_issues (builder, graphics_issues);
           json_builder_end_array (builder);
+
           int exit_status = srt_graphics_get_exit_status (g->data);
           if (exit_status != 0)
             {
@@ -468,11 +471,12 @@ print_graphics_details(JsonBuilder *builder,
                   if (messages != NULL)
                     _srt_json_builder_add_array_of_lines (builder, "messages", messages);
 
-                  if (srt_graphics_device_get_issues (iter->data) != SRT_GRAPHICS_ISSUES_NONE)
+                  SrtGraphicsIssues graphics_device_issues = srt_graphics_device_get_issues (iter->data);
+                  if (graphics_device_issues != SRT_GRAPHICS_ISSUES_NONE)
                     {
                       json_builder_set_member_name (builder, "issues");
                       json_builder_begin_array (builder);
-                      jsonify_graphics_issues (builder, srt_graphics_device_get_issues (iter->data));
+                      jsonify_graphics_issues (builder, graphics_device_issues);
                       json_builder_end_array (builder);
                     }
                   json_builder_end_object (builder);
@@ -756,10 +760,12 @@ jsonify_container (JsonBuilder *builder,
   SrtBwrapIssues bwrap_issues;
   const char *bwrap_messages;
   const char *bwrap_path;
+  SrtFlatpakIssues flatpak_issues;
   const gchar *flatpak_version = NULL;
   const gchar *host_directory = NULL;
 
   type = srt_container_info_get_container_type (container_info);
+  flatpak_issues = srt_container_info_get_flatpak_issues (container_info);
   flatpak_version = srt_container_info_get_flatpak_version (container_info);
   host_directory = srt_container_info_get_container_host_directory (container_info);
   bwrap_issues = srt_container_info_get_bwrap_issues (container_info);
@@ -777,8 +783,7 @@ jsonify_container (JsonBuilder *builder,
           case SRT_CONTAINER_TYPE_FLATPAK:
             json_builder_set_member_name (builder, "flatpak_issues");
             json_builder_begin_array (builder);
-            jsonify_flatpak_issues (builder,
-                                    srt_container_info_get_flatpak_issues (container_info));
+            jsonify_flatpak_issues (builder, flatpak_issues);
             json_builder_end_array (builder);
 
             if (flatpak_version != NULL)

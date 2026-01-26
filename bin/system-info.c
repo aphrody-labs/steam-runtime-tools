@@ -1628,10 +1628,18 @@ main (int argc,
   json_builder_end_object (builder);
 
   locale_issues = srt_system_info_get_locale_issues (info);
-  json_builder_set_member_name (builder, "locale-issues");
-  json_builder_begin_array (builder);
-  jsonify_locale_issues (builder, locale_issues);
-  json_builder_end_array (builder);
+  if (locale_issues == SRT_LOCALE_ISSUES_NONE)
+    {
+      json_builder_set_member_name (builder, "locales-ok");
+      json_builder_add_boolean_value (builder, TRUE);
+    }
+  else
+    {
+      json_builder_set_member_name (builder, "locale-issues");
+      json_builder_begin_array (builder);
+      jsonify_locale_issues (builder, locale_issues);
+      json_builder_end_array (builder);
+    }
 
   json_builder_set_member_name (builder, "locales");
   json_builder_begin_object (builder);

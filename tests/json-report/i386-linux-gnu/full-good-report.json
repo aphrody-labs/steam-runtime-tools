@@ -287,7 +287,7 @@
       }
     }
   },
-  "locale-issues" : [],
+  "locales-ok": true,
   "locales" : {
     "<default>" : {
       "resulting-name" : "en_US.UTF-8",

@@ -1,3 +1,11 @@
+steam-runtime-tools (0.20260126.0) UNRELEASED; urgency=medium
+
+  [ Antonio Ospite ]
+  * Diagnostic tools:
+    - Refactoring
+
+ -- Simon McVittie <smcv@collabora.com>  Mon, 26 Jan 2026 14:57:01 +0000
+
 steam-runtime-tools (0.20260115.0) steamrt; urgency=medium
 
   * Diagnostic tools:

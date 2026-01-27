@@ -45,17 +45,20 @@ pressure_vessel_args=()
 if [ -n "${PRESSURE_VESSEL_SSH_HOST-"${IMAGES_SSH_HOST-}"}" ] && [ -n "${PRESSURE_VESSEL_SSH_PATH-}" ]; then
     pressure_vessel_args=( \
         "${pressure_vessel_args[@]}" \
-        --pressure-vessel-ssh-host="${PRESSURE_VESSEL_SSH_HOST-"${IMAGES_SSH_HOST}"}" \
-        --pressure-vessel-ssh-path="${PRESSURE_VESSEL_SSH_PATH}" \
+        --ssh-host="${PRESSURE_VESSEL_SSH_HOST-"${IMAGES_SSH_HOST}"}" \
+        --ssh-path="${PRESSURE_VESSEL_SSH_PATH}" \
     )
 elif [ -n "${PRESSURE_VESSEL_DOWNLOAD_URL-}" ]; then
     pressure_vessel_args=( \
         "${pressure_vessel_args[@]}" \
-        --pressure-vessel-uri="${PRESSURE_VESSEL_DOWNLOAD_URL}" \
+        --uri="${PRESSURE_VESSEL_DOWNLOAD_URL}" \
     )
 fi
 
 echo "1..1"
+
+mkdir -p .cache
+python3 ./download-pressure-vessel.py "${pressure_vessel_args[@]}" .cache
 
 rm -fr depots/test-sniper-unpacked
 mkdir -p depots/test-sniper-unpacked
@@ -64,11 +67,11 @@ python3 ./populate-depot.py \
     --depot-archive=depots/SteamLinuxRuntime_sniper.tar.xz \
     --fast \
     --no-include-archives \
+    --pressure-vessel-archive=.cache/pressure-vessel-bin.tar.gz \
     --toolmanifest \
     --unpack-runtime \
     --versioned-directories \
     "${populate_depot_args[@]}" \
-    "${pressure_vessel_args[@]}" \
     sniper \
     ${NULL+}
 

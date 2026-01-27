@@ -6,6 +6,7 @@
 r"""
 To run manually:
 
+./download-pressure-vessel.py .cache
 ./populate-depot.py \
     --depot=depots/test \
     --depot-version local \
@@ -13,8 +14,7 @@ To run manually:
     --version latest \
     --ssh-host ... \
     --ssh-path .../steamrt-SUITE/snapshots \
-    --pressure-vessel-version latest \
-    --pressure-vessel-ssh-path .../pressure-vessel/snapshots \
+    --pressure-vessel-archive .cache/pressure-vessel-bin.tar.gz \
     --minimize \
     --unpack-ld-library-path depots/ldlp \
     soldier

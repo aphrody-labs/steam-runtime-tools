@@ -72,10 +72,6 @@ HERE = Path(__file__).resolve().parent
 logger = logging.getLogger('populate-depot')
 
 
-DEFAULT_PRESSURE_VESSEL_URI = (
-    'https://repo.steampowered.com/pressure-vessel/snapshots'
-)
-
 DEFAULT_IMAGES_URI = (
     'https://repo.steampowered.com/steamrt-images-SUITE/snapshots'
 )
@@ -96,102 +92,6 @@ ARCH_TO_TUPLE = {
 
 class InvocationError(Exception):
     pass
-
-
-class PressureVesselRelease:
-    def __init__(
-        self,
-        *,
-        cache: str = '.cache',
-        ssh_host: str = '',
-        ssh_path: str = '',
-        uri: str = DEFAULT_PRESSURE_VESSEL_URI,
-        version: str = ''
-    ) -> None:
-        self.cache = cache
-        self.pinned_version: Optional[str] = None
-        self.ssh_host = ssh_host
-        self.ssh_path = ssh_path
-        self.uri = uri
-        self.version = version
-
-    def get_uri(
-        self,
-        filename: str,
-        version: Optional[str] = None,
-    ) -> str:
-        uri = self.uri
-        v = version or self.pinned_version or self.version or 'latest'
-        return f'{uri}/{v}/{filename}'
-
-    def get_ssh_path(
-        self,
-        filename: str,
-        version: Optional[str] = None,
-    ) -> str:
-        ssh_host = self.ssh_host
-        ssh_path = self.ssh_path
-        v = version or self.pinned_version or self.version or 'latest'
-
-        if not ssh_host or not ssh_path:
-            raise RuntimeError('ssh host/path not configured')
-
-        return f'{ssh_path}/{v}/{filename}'
-
-    def fetch(
-        self,
-        filename: str,
-        opener: urllib.request.OpenerDirector,
-        version: Optional[str] = None,
-    ) -> str:
-        dest = os.path.join(self.cache, filename)
-
-        if self.ssh_host and self.ssh_path:
-            path = self.get_ssh_path(filename)
-            logger.info('Downloading %r...', path)
-            subprocess.run([
-                'rsync',
-                '--archive',
-                '--partial',
-                '--progress',
-                self.ssh_host + ':' + path,
-                dest,
-            ], check=True)
-        else:
-            uri = self.get_uri(filename)
-            logger.info('Downloading %r...', uri)
-
-            with opener.open(uri) as response:
-                with open(dest + '.new', 'wb') as writer:
-                    shutil.copyfileobj(response, writer)
-
-                os.rename(dest + '.new', dest)
-
-        return dest
-
-    def pin_version(
-        self,
-        opener: urllib.request.OpenerDirector,
-    ) -> str:
-        pinned = self.pinned_version
-
-        if pinned is None:
-            if self.ssh_host and self.ssh_path:
-                path = self.get_ssh_path(filename='VERSION.txt')
-                logger.info('Determining version number from %r...', path)
-                pinned = subprocess.run([
-                    'ssh', self.ssh_host,
-                    'cat {}'.format(shlex.quote(path)),
-                ], stdout=subprocess.PIPE).stdout.decode('utf-8').strip()
-            else:
-                uri = self.get_uri(filename='VERSION.txt')
-                logger.info('Determining version number from %r...', uri)
-                with opener.open(uri) as response:
-                    pinned = response.read().decode('utf-8').strip()
-
-            self.pinned_version = pinned
-
-        return pinned
 
 
 class Runtime:
@@ -518,10 +418,6 @@ class Main:
         mtree: bool = True,
         multiarch_tuples: Sequence[str] = (),
         pressure_vessel_archive: str = '',
-        pressure_vessel_ssh_host: str = '',
-        pressure_vessel_ssh_path: str = '',
-        pressure_vessel_uri: str = DEFAULT_PRESSURE_VESSEL_URI,
-        pressure_vessel_version: str = '',
         runtime: str = 'scout',
         scripts_version: str = '',
         source_dir: str = str(HERE),
@@ -588,9 +484,6 @@ class Main:
         self.layered = layered
         self.mtree = mtree
         self.multiarch_tuples = multiarch_tuples
-        self.pressure_vessel_ssh_host = pressure_vessel_ssh_host or ssh_host
-        self.pressure_vessel_ssh_path = pressure_vessel_ssh_path
-        self.pressure_vessel_uri = pressure_vessel_uri
         self.scripts_version = scripts_version
         self.source_dir = source_dir
         self.ssh_host = ssh_host
@@ -612,24 +505,6 @@ class Main:
         ):
             raise InvocationError(f'Unknown archive format: {depot_archive}')
 
-        n_sources = 0
-
-        for source in (
-            pressure_vessel_archive,
-            pressure_vessel_version,
-        ):
-            if source:
-                n_sources += 1
-
-        if n_sources == 0:
-            pressure_vessel_version = 'latest'
-        elif n_sources > 1:
-            raise RuntimeError(
-                'Cannot combine '
-                '--pressure-vessel-archive and '
-                '--pressure-vessel-version'
-            )
-
         os.makedirs(self.cache, exist_ok=True)
 
         if '=' in runtime:
@@ -648,13 +523,15 @@ class Main:
 
         self.versions: List[ComponentVersion] = []
 
-        self.pressure_vessel_path: Optional[Path] = None
-        self.pressure_vessel_version = ''
-
-        if pressure_vessel_version:
-            self.pressure_vessel_version = pressure_vessel_version
+        if self.layered:
+            self.pressure_vessel_path: Path | None = None
         elif pressure_vessel_archive:
             self.pressure_vessel_path = Path(pressure_vessel_archive)
+        else:
+            raise InvocationError(
+                '--pressure-vessel-archive is required when not '
+                'using --layered'
+            )
 
         if 'SOURCE_DATE_EPOCH' in os.environ:
             self.reference_timestamp = int(os.environ['SOURCE_DATE_EPOCH'])
@@ -847,17 +724,9 @@ class Main:
         if os.path.exists(root):
             self.merge_dir_into_depot(root)
 
-        if self.pressure_vessel_version:
-            logger.info(
-                'Downloading standalone pressure-vessel release'
-            )
-            pv_version.version = self.download_pressure_vessel_standalone(
-                self.pressure_vessel_version
-            )
-        else:
-            pressure_vessel_path = self.pressure_vessel_path
-            assert pressure_vessel_path is not None
-            self.use_local_pressure_vessel(str(pressure_vessel_path))
+        pressure_vessel_path = self.pressure_vessel_path
+        assert pressure_vessel_path is not None
+        self.use_local_pressure_vessel(str(pressure_vessel_path))
 
         for path in ('metadata/VERSION.txt', 'sources/VERSION.txt'):
             full = os.path.join(self.depot, 'pressure-vessel', path)
@@ -1144,23 +1013,6 @@ class Main:
 
         logger.info('%r', argv)
         subprocess.run(argv, check=True)
-
-    def download_pressure_vessel_standalone(
-        self,
-        version: str,
-    ) -> str:
-        pv = PressureVesselRelease(
-            cache=self.cache,
-            ssh_host=self.pressure_vessel_ssh_host,
-            ssh_path=self.pressure_vessel_ssh_path,
-            uri=self.pressure_vessel_uri,
-            version=version,
-        )
-        pinned = pv.pin_version(self.opener)
-        self.use_local_pressure_vessel(
-            pv.fetch('pressure-vessel-bin.tar.gz', self.opener, pinned)
-        )
-        return pinned
 
     def use_local_runtime(self, runtime: Runtime) -> None:
         assert runtime.path
@@ -1708,7 +1560,9 @@ class Main:
 
 class SelfTest(unittest.TestCase):
     def test_filename_is_friendly(self) -> None:
-        m = Main()
+        # This happens to be the easiest way to create a Main object
+        # with all required parameters
+        m = Main(layered=True)
 
         for good in (
             'bin/bash',
@@ -1880,35 +1734,6 @@ def main() -> None:
         )
     )
 
-    parser.add_argument(
-        '--pressure-vessel-uri',
-        default=DEFAULT_PRESSURE_VESSEL_URI,
-        metavar='URI',
-        help=(
-            'Download pressure-vessel from a versioned subdirectory of URI'
-        ),
-    )
-    parser.add_argument(
-        '--pressure-vessel-ssh-host', default='', metavar='HOST',
-        help=(
-            'Use ssh and rsync to download pressure-vessel from HOST '
-            '[default: same as --ssh-host]'
-        ),
-    )
-    parser.add_argument(
-        '--pressure-vessel-ssh-path', default='', metavar='PATH',
-        help=(
-            'Use ssh and rsync to download pressure-vessel from a versioned '
-            'subdirectory of PATH on HOST'
-        ),
-    )
-    parser.add_argument(
-        '--pressure-vessel-version', default='', metavar='0.x.y|latest',
-        help=(
-            'Use this version of pressure-vessel from --pressure-vessel-uri '
-            'or --pressure-vessel-ssh-path'
-        )
-    )
     parser.add_argument(
         '--pressure-vessel-archive', default='', metavar='PATH',
         help=(

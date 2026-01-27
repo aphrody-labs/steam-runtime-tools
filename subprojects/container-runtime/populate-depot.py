@@ -1507,44 +1507,55 @@ class Main:
         app_vdf = f'app_build_{self.steam_app_id}.vdf'
         depot_vdfs: Dict[str, str] = {}
 
-        depot_vdf = f'depot_build_{self.steam_depot_id}.vdf'
-        file_mappings: List[Tuple[str, Any]] = []
-
-        for child in sorted(main_depot.iterdir()):
-            if child.name in ('steampipe', 'var'):
-                continue
-            elif child.is_dir():
-                file_mappings.append(
-                    (
-                        'FileMapping', dict(
-                            LocalPath=f'../{child.name}/*',
-                            DepotPath=f'{child.name}/',
-                            recursive='1',
-                        ),
-                    )
-                )
+        for depot_id, depot_path in (
+            (self.steam_depot_id, main_depot),
+        ):
+            depot_vdf = f'depot_build_{depot_id}.vdf'
+            file_mappings: List[Tuple[str, Any]] = []
+            # Path to depot, relative to steampipe
+            if depot_path == main_depot:
+                rel_depot = Path('..')
             else:
-                file_mappings.append(
-                    (
-                        'FileMapping', dict(
-                            LocalPath='../' + str(
-                                child.relative_to(main_depot)
+                rel_depot = Path('..', depot_path.relative_to(main_depot))
+
+            for child in sorted(depot_path.iterdir()):
+                rel_child = rel_depot / child.name
+
+                if (
+                    depot_path == main_depot
+                    and child.name in ('steampipe', 'var')
+                ):
+                    continue
+                elif child.is_dir():
+                    file_mappings.append(
+                        (
+                            'FileMapping', dict(
+                                LocalPath=str(rel_child) + '/*',
+                                DepotPath=f'{child.name}/',
+                                recursive='1',
                             ),
-                            DepotPath='.',
-                        ),
+                        )
                     )
+                else:
+                    file_mappings.append(
+                        (
+                            'FileMapping', dict(
+                                LocalPath=str(rel_child),
+                                DepotPath='.',
+                            ),
+                        )
+                    )
+
+            content = dict(
+                DepotBuildConfig=VDFDict(
+                    [('DepotID', depot_id)] + file_mappings,
                 )
-
-        content = dict(
-            DepotBuildConfig=VDFDict(
-                [('DepotID', self.steam_depot_id)] + file_mappings,
             )
-        )
 
-        with open(steampipe / depot_vdf, 'w') as writer:
-            vdf.dump(content, writer, pretty=True, escaped=True)
+            with open(steampipe / depot_vdf, 'w') as writer:
+                vdf.dump(content, writer, pretty=True, escaped=True)
 
-        depot_vdfs[self.steam_depot_id] = depot_vdf
+            depot_vdfs[depot_id] = depot_vdf
 
         content = dict(
             appbuild=dict(

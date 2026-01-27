@@ -4133,13 +4133,13 @@ json_parsing (Fixture *f,
   jt->architecture[1] = jt->architecture[0];
   jt->architecture[0] = i386_architecture_partial;
   jt->architecture[1].runtime_linker.path = "/lib64/ld-linux-x86-64.so.2";
-  jt->xdg_portal.messages = "timeout: failed to run command ‘x86_64-linux-gnu-check-xdg-portal’: No such file or directory\n",
+  jt->xdg_portal.messages = "timeout: failed to run command ‘x86_64-linux-gnu-check-xdg-portal’: No such file or directory\n";
 
   jt = &json_test[2];  /* partial-2 report */
   jt->architecture[1] = jt->architecture[0];
   jt->architecture[0] = i386_architecture_missing;
   jt->architecture[1].runtime_linker.path = "/lib64/ld-linux-x86-64.so.2";
-  jt->architecture[1].runtime_linker.error_message = "Expected \"/lib64/ld-linux-x86-64.so.2\" in report, but got \"/foobar\"",
+  jt->architecture[1].runtime_linker.error_message = "Expected \"/lib64/ld-linux-x86-64.so.2\" in report, but got \"/foobar\"";
 
   jt = &json_test[3];  /* empty report */
   jt->architecture[1] = jt->architecture[0];

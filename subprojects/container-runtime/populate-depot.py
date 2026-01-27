@@ -522,9 +522,6 @@ class Main:
         mtree: bool = True,
         multiarch_tuples: Sequence[str] = (),
         pressure_vessel_archive: str = '',
-        pressure_vessel_from_runtime: str = '',
-        pressure_vessel_from_runtime_json: str = '',
-        pressure_vessel_guess: str = '',
         pressure_vessel_official: bool = False,
         pressure_vessel_ssh_host: str = '',
         pressure_vessel_ssh_path: str = '',
@@ -623,9 +620,6 @@ class Main:
 
         for source in (
             pressure_vessel_archive,
-            pressure_vessel_from_runtime,
-            pressure_vessel_from_runtime_json,
-            pressure_vessel_guess,
             pressure_vessel_version,
         ):
             if source:
@@ -635,11 +629,8 @@ class Main:
             pressure_vessel_version = 'latest'
         elif n_sources > 1:
             raise RuntimeError(
-                'Cannot combine more than one of '
-                '--pressure-vessel, '
-                '--pressure-vessel-archive, '
-                '--pressure-vessel-from-runtime, '
-                '--pressure-vessel-from-runtime-json and '
+                'Cannot combine '
+                '--pressure-vessel-archive and '
                 '--pressure-vessel-version'
             )
 
@@ -661,23 +652,6 @@ class Main:
 
         self.versions: List[ComponentVersion] = []
 
-        if pressure_vessel_guess:
-            if self.runtime.name == pressure_vessel_guess:
-                pressure_vessel_from_runtime = pressure_vessel_guess
-            elif pressure_vessel_guess.startswith('{'):
-                pressure_vessel_from_runtime_json = pressure_vessel_guess
-            elif os.path.isdir(pressure_vessel_guess):
-                pressure_vessel_archive = os.path.join(
-                    pressure_vessel_guess, 'pressure-vessel-bin.tar.gz',
-                )
-            elif (
-                os.path.isfile(pressure_vessel_guess)
-                and pressure_vessel_guess.endswith('.tar.gz')
-            ):
-                pressure_vessel_archive = pressure_vessel_guess
-            else:
-                pressure_vessel_from_runtime = pressure_vessel_guess
-
         self.pressure_vessel_runtime: Optional[Runtime] = None
         self.pressure_vessel_version = ''
 
@@ -692,19 +666,7 @@ class Main:
                 },
                 default_suite='scout',
             )
-        elif self.runtime.name == pressure_vessel_from_runtime:
-            self.pressure_vessel_runtime = self.runtime
-        elif pressure_vessel_from_runtime:
-            self.pressure_vessel_runtime = self.new_runtime(
-                pressure_vessel_from_runtime, {},
-                default_suite=pressure_vessel_from_runtime,
-            )
-        elif pressure_vessel_from_runtime_json:
-            self.pressure_vessel_runtime = self.new_runtime(
-                'scout',
-                json.loads(pressure_vessel_from_runtime_json),
-                default_suite='scout',
-            )
+            assert self.pressure_vessel_runtime.path
 
         if 'SOURCE_DATE_EPOCH' in os.environ:
             self.reference_timestamp = int(os.environ['SOURCE_DATE_EPOCH'])
@@ -913,20 +875,14 @@ class Main:
             )
         else:
             assert pressure_vessel_runtime is not None
+            assert pressure_vessel_runtime.path
 
-            if pressure_vessel_runtime.path:
-                self.use_local_pressure_vessel(pressure_vessel_runtime.path)
+            self.use_local_pressure_vessel(pressure_vessel_runtime.path)
 
-                if pressure_vessel_runtime.official:
-                    pv_version.comment = 'pressure-vessel-bin.tar.gz'
-                else:
-                    pv_version.comment = 'from local file'
+            if pressure_vessel_runtime.official:
+                pv_version.comment = 'pressure-vessel-bin.tar.gz'
             else:
-                pv_version.comment = (
-                    self.download_pressure_vessel_from_runtime(
-                        pressure_vessel_runtime
-                    )
-                )
+                pv_version.comment = 'from local file'
 
         for path in ('metadata/VERSION.txt', 'sources/VERSION.txt'):
             full = os.path.join(self.depot, 'pressure-vessel', path)
@@ -1264,25 +1220,6 @@ class Main:
             pv.fetch('pressure-vessel-bin.tar.gz', self.opener, pinned)
         )
         return pinned
-
-    def download_pressure_vessel_from_runtime(self, runtime: Runtime) -> str:
-        filename = 'pressure-vessel-bin.tar.gz'
-        runtime.pin_version(self.opener)
-
-        downloaded = runtime.fetch(
-            filename,
-            self.opener,
-        )
-
-        os.makedirs(self.depot, exist_ok=True)
-        subprocess.run(
-            [
-                'tar', '-C', self.depot, '-xf', downloaded,
-            ],
-            check=True,
-        )
-
-        return filename
 
     def use_local_runtime(self, runtime: Runtime) -> None:
         assert runtime.path
@@ -2134,31 +2071,6 @@ def main() -> None:
         '--pressure-vessel-archive', default='', metavar='PATH',
         help=(
             'Unpack pressure-vessel from the named archive'
-        ),
-    )
-    parser.add_argument(
-        '--pressure-vessel-from-runtime', default='', metavar='NAME',
-        help=(
-            'Get pressure-vessel from the named runtime (default "scout")'
-        ),
-    )
-    parser.add_argument(
-        '--pressure-vessel-from-runtime-json', default='', metavar='NAME',
-        help=(
-            'Get pressure-vessel from a separate runtime version given as a '
-            'JSON object'
-        ),
-    )
-    parser.add_argument(
-        '--pressure-vessel', default='', metavar='NAME|PATH|DETAILS',
-        dest='pressure_vessel_guess',
-        help=(
-            '--pressure-vessel-archive=ARCHIVE, '
-            '--pressure-vessel-archive=DIRECTORY/pressure-vessel-bin.tar.gz, '
-            '--pressure-vessel-from-runtime=NAME or '
-            '--pressure-vessel-from-runtime-json=DETAILS, '
-            'based on form of argument given '
-            '(disambiguate with ./ if necessary)'
         ),
     )
     parser.add_argument(

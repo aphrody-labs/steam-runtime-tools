@@ -563,7 +563,7 @@ class Main:
         source_root: Path,
         depot: Path,
     ):
-        for (dirpath, dirnames, filenames) in os.walk(str(source_root)):
+        for (dirpath, dirnames, filenames) in os.walk(source_root):
             relative_path = Path(dirpath).relative_to(source_root)
 
             for member in dirnames:
@@ -580,7 +580,7 @@ class Main:
                     merged.unlink()
 
                 merged.parent.mkdir(exist_ok=True, parents=True)
-                shutil.copy(str(source), str(merged))
+                shutil.copy(source, merged)
 
     def run(self) -> None:
         if self.layered:
@@ -1501,26 +1501,16 @@ class Main:
         assert self.steam_app_id
         assert self.steam_depot_id
 
-        depot = Path(self.depot)
-        steampipe = depot / 'steampipe'
+        main_depot = Path(self.depot)
+        steampipe = main_depot / 'steampipe'
         steampipe.mkdir(exist_ok=True)
         app_vdf = f'app_build_{self.steam_app_id}.vdf'
+        depot_vdfs: Dict[str, str] = {}
+
         depot_vdf = f'depot_build_{self.steam_depot_id}.vdf'
-
-        content = dict(
-            appbuild=dict(
-                appid=self.steam_app_id,
-                buildoutput='output',
-                depots={self.steam_depot_id: depot_vdf},
-            )
-        )
-
-        with open(steampipe / app_vdf, 'w') as writer:
-            vdf.dump(content, writer, pretty=True, escaped=True)
-
         file_mappings: List[Tuple[str, Any]] = []
 
-        for child in sorted(depot.iterdir()):
+        for child in sorted(main_depot.iterdir()):
             if child.name in ('steampipe', 'var'):
                 continue
             elif child.is_dir():
@@ -1537,7 +1527,9 @@ class Main:
                 file_mappings.append(
                     (
                         'FileMapping', dict(
-                            LocalPath='../' + str(child.relative_to(depot)),
+                            LocalPath='../' + str(
+                                child.relative_to(main_depot)
+                            ),
                             DepotPath='.',
                         ),
                     )
@@ -1550,6 +1542,19 @@ class Main:
         )
 
         with open(steampipe / depot_vdf, 'w') as writer:
+            vdf.dump(content, writer, pretty=True, escaped=True)
+
+        depot_vdfs[self.steam_depot_id] = depot_vdf
+
+        content = dict(
+            appbuild=dict(
+                appid=self.steam_app_id,
+                buildoutput='output',
+                depots=depot_vdfs,
+            )
+        )
+
+        with open(steampipe / app_vdf, 'w') as writer:
             vdf.dump(content, writer, pretty=True, escaped=True)
 
     def do_depot_archive(self, name: str) -> None:

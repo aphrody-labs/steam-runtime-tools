@@ -561,19 +561,20 @@ class Main:
     def merge_dir_into_depot(
         self,
         source_root: Path,
+        depot: Path,
     ):
         for (dirpath, dirnames, filenames) in os.walk(str(source_root)):
             relative_path = Path(dirpath).relative_to(source_root)
 
             for member in dirnames:
-                (self.depot / relative_path / member).mkdir(
+                (depot / relative_path / member).mkdir(
                     exist_ok=True,
                     parents=True,
                 )
 
             for member in filenames:
                 source = Path(dirpath, member)
-                merged = self.depot / relative_path / member
+                merged = depot / relative_path / member
 
                 with suppress(FileNotFoundError):
                     merged.unlink()
@@ -626,7 +627,8 @@ class Main:
             )
 
         self.merge_dir_into_depot(
-            self.source_dir / 'runtimes' / 'scout-on-soldier'
+            self.source_dir / 'runtimes' / 'scout-on-soldier',
+            self.depot,
         )
 
         runtime = self.runtime
@@ -735,12 +737,12 @@ class Main:
     def do_container_runtime(self) -> None:
         pv_version = ComponentVersion('pressure-vessel')
 
-        self.merge_dir_into_depot(self.source_dir / 'common')
+        self.merge_dir_into_depot(self.source_dir / 'common', self.depot)
 
         root = self.source_dir / 'runtimes' / self.runtime.name
 
         if root.exists():
-            self.merge_dir_into_depot(root)
+            self.merge_dir_into_depot(root, self.depot)
 
         tuples = list(self.multiarch_tuples)
 

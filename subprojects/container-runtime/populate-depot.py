@@ -65,10 +65,6 @@ from typing import (
     Tuple,
 )
 
-from debian.deb822 import (
-    Sources,
-)
-
 
 HERE = Path(__file__).resolve().parent
 
@@ -536,8 +532,6 @@ class Main:
         suite: str = '',
         toolmanifest: bool = False,
         unpack_ld_library_path: str = '',
-        unpack_sources: Sequence[str] = (),
-        unpack_sources_into: str = '.',
         version: str = '',
         versioned_directories: bool = False,
         **kwargs: Dict[str, Any],
@@ -605,8 +599,6 @@ class Main:
         self.steam_depot_id = steam_depot_id
         self.toolmanifest = toolmanifest
         self.unpack_ld_library_path = unpack_ld_library_path
-        self.unpack_sources = unpack_sources
-        self.unpack_sources_into = unpack_sources_into
         self.versioned_directories = versioned_directories
 
         if (
@@ -747,11 +739,6 @@ class Main:
         if self.include_sdk_sysroot:
             raise InvocationError(
                 'Cannot use --include-sdk-* with --layered'
-            )
-
-        if self.unpack_sources:
-            raise InvocationError(
-                'Cannot use --unpack-source with --layered'
             )
 
         self.merge_dir_into_depot(
@@ -900,17 +887,6 @@ class Main:
                 'Downloading LD_LIBRARY_PATH Steam Runtime from scout into %r',
                 self.unpack_ld_library_path)
             self.download_scout_tarball(scout)
-
-        if self.unpack_sources:
-            logger.info(
-                'Will download %s source code into %r',
-                ', '.join(self.unpack_sources), self.unpack_sources_into)
-            os.makedirs(self.unpack_sources_into, exist_ok=True)
-
-            os.makedirs(
-                os.path.join(self.unpack_sources_into, self.runtime.name),
-                exist_ok=True,
-            )
 
         runtime = self.runtime
 
@@ -1196,43 +1172,6 @@ class Main:
 
             os.link(src, dest)
 
-        if self.unpack_sources:
-            with open(
-                os.path.join(runtime.path, runtime.sources), 'rb',
-            ) as reader:
-                for stanza in Sources.iter_paragraphs(
-                    sequence=reader,
-                    use_apt_pkg=True,
-                ):
-                    if stanza['package'] in self.unpack_sources:
-                        for f in stanza['files']:
-                            name = f['name']
-
-                            if name.endswith('.dsc'):
-                                dest = os.path.join(
-                                    self.unpack_sources_into,
-                                    runtime.name,
-                                    stanza['package'],
-                                )
-
-                                with suppress(FileNotFoundError):
-                                    logger.info('Removing %r', dest)
-                                    shutil.rmtree(dest)
-
-                                subprocess.run(
-                                    [
-                                        'dpkg-source',
-                                        '-x',
-                                        dest,
-                                        os.path.join(
-                                            runtime.path,
-                                            'sources',
-                                            f['name'],
-                                        ),
-                                    ],
-                                    check=True,
-                                )
-
     def download_runtime(self, runtime: Runtime) -> None:
         """
         Download a pre-prepared Platform from a previous container
@@ -1245,68 +1184,6 @@ class Main:
             include_sdk_sysroot=self.include_sdk_sysroot,
         ):
             runtime.fetch(basename, self.opener)
-
-        if self.unpack_sources:
-            with tempfile.TemporaryDirectory(prefix='populate-depot.') as tmp:
-                want = set(self.unpack_sources)
-                downloaded = runtime.fetch(
-                    runtime.sources,
-                    self.opener,
-                )
-                with open(downloaded, 'rb') as reader:
-                    for stanza in Sources.iter_paragraphs(
-                        sequence=reader,
-                        use_apt_pkg=True,
-                    ):
-                        if stanza['package'] in self.unpack_sources:
-                            logger.info(
-                                'Found %s in %s',
-                                stanza['package'], runtime.name,
-                            )
-                            want.discard(stanza['package'])
-                            os.makedirs(
-                                os.path.join(self.cache or tmp, 'sources'),
-                                exist_ok=True,
-                            )
-
-                            file_path: Dict[str, str] = {}
-
-                            for f in stanza['files']:
-                                name = f['name']
-                                file_path[name] = runtime.fetch(
-                                    os.path.join('sources', name),
-                                    self.opener,
-                                )
-
-                            for f in stanza['files']:
-                                name = f['name']
-
-                                if name.endswith('.dsc'):
-                                    dest = os.path.join(
-                                        self.unpack_sources_into,
-                                        runtime.name,
-                                        stanza['package'],
-                                    )
-
-                                    with suppress(FileNotFoundError):
-                                        logger.info('Removing %r', dest)
-                                        shutil.rmtree(dest)
-
-                                    subprocess.run(
-                                        [
-                                            'dpkg-source',
-                                            '-x',
-                                            file_path[name],
-                                            dest,
-                                        ],
-                                        check=True,
-                                    )
-
-                if want:
-                    logger.warning(
-                        'Did not find source package(s) %s in %s',
-                        ', '.join(want), runtime.name,
-                    )
 
     def download_scout_tarball(self, runtime: Runtime) -> None:
         """
@@ -2087,21 +1964,6 @@ def main() -> None:
         '--unpack-runtime', '--unpack-runtimes', dest='_ignored',
         action='store_true', default=True,
         help='Ignored for backwards compatibility',
-    )
-    parser.add_argument(
-        '--unpack-source', metavar='PACKAGE', action='append', default=[],
-        dest='unpack_sources',
-        help=(
-            'Download and unpack the given source package from each runtime '
-            'if it exists, for use in regression testing. May be repeated.'
-        )
-    )
-    parser.add_argument(
-        '--unpack-sources-into', metavar='PATH', default='.',
-        help=(
-            'Unpack any source packages specified by --unpack-source '
-            'into PATH/RUNTIME/SOURCE (default: ./RUNTIME/SOURCE).'
-        )
     )
     parser.add_argument(
         '--versioned-directories', action='store_true', default=True,

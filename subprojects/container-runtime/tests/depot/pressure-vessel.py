@@ -17,8 +17,6 @@ To run manually:
     --pressure-vessel-ssh-path .../pressure-vessel/snapshots \
     --minimize \
     --unpack-ld-library-path depots/ldlp \
-    --unpack-source steamrt \
-    --unpack-sources-into depots \
     soldier
 
 rm -fr depots/artifacts

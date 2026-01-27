@@ -1244,7 +1244,7 @@ class Main:
         for basename in runtime.get_archives(
             include_sdk_sysroot=self.include_sdk_sysroot,
         ):
-            downloaded = runtime.fetch(basename, self.opener)
+            runtime.fetch(basename, self.opener)
 
         if self.unpack_sources:
             with tempfile.TemporaryDirectory(prefix='populate-depot.') as tmp:

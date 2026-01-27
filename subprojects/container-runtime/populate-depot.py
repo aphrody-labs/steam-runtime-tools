@@ -485,7 +485,7 @@ class Main:
         self.mtree = mtree
         self.multiarch_tuples = multiarch_tuples
         self.scripts_version = scripts_version
-        self.source_dir = source_dir
+        self.source_dir = Path(source_dir)
         self.ssh_host = ssh_host
         self.ssh_path = ssh_path
         self.steam_app_id = steam_app_id
@@ -558,9 +558,9 @@ class Main:
 
     def merge_dir_into_depot(
         self,
-        source_root: str,
+        source_root: Path,
     ):
-        for (dirpath, dirnames, filenames) in os.walk(source_root):
+        for (dirpath, dirnames, filenames) in os.walk(str(source_root)):
             relative_path = Path(dirpath).relative_to(source_root)
 
             for member in dirnames:
@@ -624,7 +624,7 @@ class Main:
             )
 
         self.merge_dir_into_depot(
-            os.path.join(self.source_dir, 'runtimes', 'scout-on-soldier')
+            self.source_dir / 'runtimes' / 'scout-on-soldier'
         )
 
         if self.runtime.version:
@@ -717,11 +717,11 @@ class Main:
     def do_container_runtime(self) -> None:
         pv_version = ComponentVersion('pressure-vessel')
 
-        self.merge_dir_into_depot(os.path.join(self.source_dir, 'common'))
+        self.merge_dir_into_depot(self.source_dir / 'common')
 
-        root = os.path.join(self.source_dir, 'runtimes', self.runtime.name)
+        root = self.source_dir / 'runtimes' / self.runtime.name
 
-        if os.path.exists(root):
+        if root.exists():
             self.merge_dir_into_depot(root)
 
         pressure_vessel_path = self.pressure_vessel_path

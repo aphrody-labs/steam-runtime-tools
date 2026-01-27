@@ -598,7 +598,12 @@ class Main:
         self.steam_app_id = steam_app_id
         self.steam_depot_id = steam_depot_id
         self.toolmanifest = toolmanifest
-        self.unpack_ld_library_path = unpack_ld_library_path
+
+        if not unpack_ld_library_path:
+            self.unpack_ld_library_path: Optional[Path] = None
+        else:
+            self.unpack_ld_library_path = Path(unpack_ld_library_path)
+
         self.versioned_directories = versioned_directories
 
         if (
@@ -731,7 +736,7 @@ class Main:
         if self.runtime.name != 'scout':
             raise InvocationError('Can only layer scout onto soldier')
 
-        if self.unpack_ld_library_path:
+        if self.unpack_ld_library_path is not None:
             raise InvocationError(
                 'Cannot use --unpack-ld-library-path with --layered'
             )
@@ -746,7 +751,7 @@ class Main:
         )
 
         if self.runtime.version:
-            self.unpack_ld_library_path = str(self.depot)
+            self.unpack_ld_library_path = self.depot
             self.download_scout_tarball(self.runtime)
             local_version = ComponentVersion('LD_LIBRARY_PATH')
             version = self.runtime.pinned_version
@@ -874,7 +879,7 @@ class Main:
 
         self.versions.append(pv_version)
 
-        if self.unpack_ld_library_path:
+        if self.unpack_ld_library_path is not None:
             if self.runtime.name == 'scout':
                 scout = self.runtime
             else:
@@ -885,7 +890,7 @@ class Main:
                 )
             logger.info(
                 'Downloading LD_LIBRARY_PATH Steam Runtime from scout into %r',
-                self.unpack_ld_library_path)
+                str(self.unpack_ld_library_path))
             self.download_scout_tarball(scout)
 
         runtime = self.runtime
@@ -1190,21 +1195,21 @@ class Main:
         Download a pre-prepared LD_LIBRARY_PATH Steam Runtime from a
         previous scout build.
         """
+        dest = self.unpack_ld_library_path
+        assert dest is not None
+
         filename = 'steam-runtime.tar.xz'
 
         pinned = runtime.pin_version(self.opener)
         logger.info('Downloading steam-runtime build %s', pinned)
-        os.makedirs(self.unpack_ld_library_path, exist_ok=True)
+        dest.mkdir(exist_ok=True, parents=True)
 
         downloaded = runtime.fetch(
             filename,
             self.opener,
         )
         subprocess.run(
-            [
-                'tar', '-C', self.unpack_ld_library_path, '-xf',
-                downloaded,
-            ],
+            ['tar', '-C', str(dest), '-xf', downloaded],
             check=True,
         )
 

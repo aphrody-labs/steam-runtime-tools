@@ -247,11 +247,6 @@ class Runtime:
             self.architecture,
             self.suite,
         )
-        self.debug_tarball = '{}-{}-{}-debug.tar.gz'.format(
-            self.sdk,
-            self.architecture,
-            self.suite,
-        )
         self.sysroot_tarball = '{}-{}-{}-sysroot.tar.gz'.format(
             self.sdk,
             self.architecture,

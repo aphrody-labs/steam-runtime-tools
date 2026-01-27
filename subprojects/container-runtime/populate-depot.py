@@ -522,7 +522,6 @@ class Main:
         mtree: bool = True,
         multiarch_tuples: Sequence[str] = (),
         pressure_vessel_archive: str = '',
-        pressure_vessel_official: bool = False,
         pressure_vessel_ssh_host: str = '',
         pressure_vessel_ssh_path: str = '',
         pressure_vessel_uri: str = DEFAULT_PRESSURE_VESSEL_URI,
@@ -652,21 +651,13 @@ class Main:
 
         self.versions: List[ComponentVersion] = []
 
-        self.pressure_vessel_runtime: Optional[Runtime] = None
+        self.pressure_vessel_path: Optional[Path] = None
         self.pressure_vessel_version = ''
 
         if pressure_vessel_version:
             self.pressure_vessel_version = pressure_vessel_version
         elif pressure_vessel_archive:
-            self.pressure_vessel_runtime = self.new_runtime(
-                'scout',
-                {
-                    'official': pressure_vessel_official,
-                    'path': pressure_vessel_archive,
-                },
-                default_suite='scout',
-            )
-            assert self.pressure_vessel_runtime.path
+            self.pressure_vessel_path = Path(pressure_vessel_archive)
 
         if 'SOURCE_DATE_EPOCH' in os.environ:
             self.reference_timestamp = int(os.environ['SOURCE_DATE_EPOCH'])
@@ -864,8 +855,6 @@ class Main:
         if os.path.exists(root):
             self.merge_dir_into_depot(root)
 
-        pressure_vessel_runtime = self.pressure_vessel_runtime
-
         if self.pressure_vessel_version:
             logger.info(
                 'Downloading standalone pressure-vessel release'
@@ -874,15 +863,9 @@ class Main:
                 self.pressure_vessel_version
             )
         else:
-            assert pressure_vessel_runtime is not None
-            assert pressure_vessel_runtime.path
-
-            self.use_local_pressure_vessel(pressure_vessel_runtime.path)
-
-            if pressure_vessel_runtime.official:
-                pv_version.comment = 'pressure-vessel-bin.tar.gz'
-            else:
-                pv_version.comment = 'from local file'
+            pressure_vessel_path = self.pressure_vessel_path
+            assert pressure_vessel_path is not None
+            self.use_local_pressure_vessel(str(pressure_vessel_path))
 
         for path in ('metadata/VERSION.txt', 'sources/VERSION.txt'):
             full = os.path.join(self.depot, 'pressure-vessel', path)
@@ -912,15 +895,9 @@ class Main:
                 new_name = metadata / license_file.name.replace(':', '_')
                 license_file.rename(new_name)
 
-        if pressure_vessel_runtime is not None:
-            pv_version.runtime = pressure_vessel_runtime.suite or ''
-            pv_version.runtime_version = (
-                pressure_vessel_runtime.pinned_version or ''
-            )
-
         self.versions.append(pv_version)
 
-        if self.unpack_ld_library_path and pressure_vessel_runtime is None:
+        if self.unpack_ld_library_path:
             if self.runtime.name == 'scout':
                 scout = self.runtime
             else:
@@ -933,13 +910,6 @@ class Main:
                 'Downloading LD_LIBRARY_PATH Steam Runtime from scout into %r',
                 self.unpack_ld_library_path)
             self.download_scout_tarball(scout)
-        elif self.unpack_ld_library_path:
-            assert pressure_vessel_runtime is not None
-            logger.info(
-                'Downloading LD_LIBRARY_PATH Steam Runtime from same place '
-                'as pressure-vessel into %r',
-                self.unpack_ld_library_path)
-            self.download_scout_tarball(pressure_vessel_runtime)
 
         if self.unpack_sources:
             logger.info(
@@ -2074,11 +2044,8 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        '--pressure-vessel-official', default=False, action='store_true',
-        help=(
-            'Assume that a copy of pressure-vessel provided as a local '
-            'file/directory is an official one'
-        ),
+        '--pressure-vessel-official', dest='_ignored', action='store_true',
+        help='Ignored for backwards compatibility',
     )
     parser.add_argument(
         '--no-include-archives', dest='_ignored', action='store_true',

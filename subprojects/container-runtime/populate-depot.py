@@ -585,7 +585,7 @@ class Main:
         self.default_architecture = architecture
         self.default_suite = suite
         self.default_version = version
-        self.depot = os.path.abspath(depot)
+        self.depot = Path(depot).resolve()
         self.depot_archive = depot_archive
         self.depot_version = depot_version
         self.fast = fast
@@ -687,23 +687,23 @@ class Main:
         source_root: str,
     ):
         for (dirpath, dirnames, filenames) in os.walk(source_root):
-            relative_path = os.path.relpath(dirpath, source_root)
+            relative_path = Path(dirpath).relative_to(source_root)
 
             for member in dirnames:
-                os.makedirs(
-                    os.path.join(self.depot, relative_path, member),
+                (self.depot / relative_path / member).mkdir(
                     exist_ok=True,
+                    parents=True,
                 )
 
             for member in filenames:
-                source = os.path.join(dirpath, member)
-                merged = os.path.join(self.depot, relative_path, member)
+                source = Path(dirpath, member)
+                merged = self.depot / relative_path / member
 
                 with suppress(FileNotFoundError):
-                    os.unlink(merged)
+                    merged.unlink()
 
-                os.makedirs(os.path.dirname(merged), exist_ok=True)
-                shutil.copy(source, merged)
+                merged.parent.mkdir(exist_ok=True, parents=True)
+                shutil.copy(str(source), str(merged))
 
     def run(self) -> None:
         if self.layered:
@@ -759,7 +759,7 @@ class Main:
         )
 
         if self.runtime.version:
-            self.unpack_ld_library_path = self.depot
+            self.unpack_ld_library_path = str(self.depot)
             self.download_scout_tarball(self.runtime)
             local_version = ComponentVersion('LD_LIBRARY_PATH')
             version = self.runtime.pinned_version

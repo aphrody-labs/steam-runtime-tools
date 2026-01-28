@@ -734,8 +734,11 @@ class Main:
             return stdout.decode('utf-8').strip()
 
     def do_container_runtime(self) -> None:
+        runtime_version, runtime_subdir = self.provide_runtime_usr()
+
         versions: List[ComponentVersion] = []
 
+        runtime = self.runtime
         pv_version = ComponentVersion('pressure-vessel')
 
         self.merge_dir_into_depot(self.source_dir / 'common', self.depot)
@@ -831,90 +834,10 @@ class Main:
                 str(self.unpack_ld_library_path))
             self.download_scout_tarball(scout)
 
-        runtime = self.runtime
-
-        if runtime.path:
-            logger.info(
-                'Using runtime from local directory %r',
-                runtime.path)
-            self.use_local_runtime(runtime)
-        else:
-            logger.info(
-                'Downloading runtime from %s',
-                runtime)
-            self.download_runtime(runtime)
-
-        component_version = ComponentVersion(runtime.name)
-
-        if runtime.path:
-            with open(
-                os.path.join(runtime.path, runtime.build_id_file), 'r',
-            ) as text_reader:
-                version = text_reader.read().strip()
-        else:
-            version = runtime.pinned_version or ''
-            assert version
-
-        runtime_files = set()
-
-        if self.versioned_directories:
-            subdir = '{}_platform_{}'.format(runtime.name, version)
-        else:
-            subdir = runtime.name
-
-        dest = os.path.join(self.depot, subdir)
-        runtime_files.add(subdir + '/')
-
-        with suppress(FileNotFoundError):
-            shutil.rmtree(dest)
-
-        os.makedirs(dest, exist_ok=True)
-        argv = [
-            'tar',
-            '-C', dest,
-            '-xf',
-            os.path.join(self.cache, runtime.tarball),
-        ]
-        logger.info('%r', argv)
-        subprocess.run(argv, check=True)
-        self.minimize_runtime(dest)
-
-        if self.include_sdk_sysroot:
-            if self.versioned_directories:
-                sysroot_subdir = '{}_sysroot_{}'.format(
-                    runtime.name, version,
-                )
-            else:
-                sysroot_subdir = '{}_sysroot'.format(runtime.name)
-
-            sysroot = os.path.join(self.depot, sysroot_subdir)
-            runtime_files.add(sysroot_subdir + '/')
-
-            with suppress(FileNotFoundError):
-                shutil.rmtree(sysroot)
-
-            os.makedirs(os.path.join(sysroot, 'files'), exist_ok=True)
-            argv = [
-                'tar',
-                '-C', os.path.join(sysroot, 'files'),
-                '--exclude', 'dev/*',
-                '-xf',
-                os.path.join(self.cache, runtime.sysroot_tarball),
-            ]
-            logger.info('%r', argv)
-            subprocess.run(argv, check=True)
-
-            os.makedirs(
-                os.path.join(
-                    sysroot, 'files', 'usr', 'lib', 'debug',
-                ),
-                exist_ok=True,
-            )
-
         with open(os.path.join(self.depot, 'run'), 'w') as writer:
             writer.write(
                 RUN_IN_DIR_SOURCE.format(
-                    escaped_dir=shlex.quote(subdir),
+                    escaped_dir=shlex.quote(runtime_subdir),
                     escaped_multiarch_tuples=shlex.quote(':'.join(tuples)),
                     source_for_generated_file=(
                         'Generated file, do not edit'
@@ -931,16 +854,7 @@ class Main:
             )
             os.chmod(os.path.join(self.depot, 'run-in-' + runtime.name), 0o755)
 
-        comment = ', '.join(sorted(runtime_files))
-
-        if runtime.path and not runtime.official:
-            comment += ' (from local build)'
-
-        component_version.version = version
-        component_version.runtime = runtime.suite
-        component_version.runtime_version = version
-        component_version.comment = comment
-        versions.append(component_version)
+        versions.append(runtime_version)
 
         if self.toolmanifest:
 
@@ -1072,6 +986,99 @@ class Main:
             ):
                 logger.info('Component version: %s', entry)
                 writer.write(entry.to_tsv())
+
+    def provide_runtime_usr(self) -> Tuple[ComponentVersion, str]:
+        runtime = self.runtime
+
+        if runtime.path:
+            logger.info(
+                'Using runtime from local directory %r',
+                runtime.path)
+            self.use_local_runtime(runtime)
+        else:
+            logger.info(
+                'Downloading runtime from %s',
+                runtime)
+            self.download_runtime(runtime)
+
+        component_version = ComponentVersion(runtime.name)
+
+        if runtime.path:
+            with open(
+                os.path.join(runtime.path, runtime.build_id_file), 'r',
+            ) as text_reader:
+                version = text_reader.read().strip()
+        else:
+            version = runtime.pinned_version or ''
+            assert version
+
+        runtime_files = set()
+
+        if self.versioned_directories:
+            subdir = '{}_platform_{}'.format(runtime.name, version)
+        else:
+            subdir = runtime.name
+
+        dest = os.path.join(self.depot, subdir)
+        runtime_files.add(subdir + '/')
+
+        with suppress(FileNotFoundError):
+            shutil.rmtree(dest)
+
+        os.makedirs(dest, exist_ok=True)
+        argv = [
+            'tar',
+            '-C', dest,
+            '-xf',
+            os.path.join(self.cache, runtime.tarball),
+        ]
+        logger.info('%r', argv)
+        subprocess.run(argv, check=True)
+        self.minimize_runtime(dest)
+
+        if self.include_sdk_sysroot:
+            if self.versioned_directories:
+                sysroot_subdir = '{}_sysroot_{}'.format(
+                    runtime.name, version,
+                )
+            else:
+                sysroot_subdir = '{}_sysroot'.format(runtime.name)
+
+            sysroot = os.path.join(self.depot, sysroot_subdir)
+            runtime_files.add(sysroot_subdir + '/')
+
+            with suppress(FileNotFoundError):
+                shutil.rmtree(sysroot)
+
+            os.makedirs(os.path.join(sysroot, 'files'), exist_ok=True)
+            argv = [
+                'tar',
+                '-C', os.path.join(sysroot, 'files'),
+                '--exclude', 'dev/*',
+                '-xf',
+                os.path.join(self.cache, runtime.sysroot_tarball),
+            ]
+            logger.info('%r', argv)
+            subprocess.run(argv, check=True)
+
+            os.makedirs(
+                os.path.join(
+                    sysroot, 'files', 'usr', 'lib', 'debug',
+                ),
+                exist_ok=True,
+            )
+
+        comment = ', '.join(sorted(runtime_files))
+
+        if runtime.path and not runtime.official:
+            comment += ' (from local build)'
+
+        component_version.version = version
+        component_version.runtime = runtime.suite
+        component_version.runtime_version = version
+        component_version.comment = comment
+
+        return component_version, subdir
 
     def use_local_pressure_vessel(
         self,

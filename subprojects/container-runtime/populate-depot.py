@@ -753,7 +753,7 @@ class Main:
 
         pressure_vessel_path = self.pressure_vessel_path
         assert pressure_vessel_path is not None
-        self.use_local_pressure_vessel(str(pressure_vessel_path))
+        self.use_local_pressure_vessel(pressure_vessel_path, self.depot)
 
         for path in ('metadata/VERSION.txt', 'sources/VERSION.txt'):
             full = os.path.join(self.depot, 'pressure-vessel', path)
@@ -1073,15 +1073,19 @@ class Main:
                 logger.info('Component version: %s', entry)
                 writer.write(entry.to_tsv())
 
-    def use_local_pressure_vessel(self, path: str = '.') -> None:
-        pv_dir = os.path.join(self.depot, 'pressure-vessel')
+    def use_local_pressure_vessel(
+        self,
+        archive: Path,
+        dest: Path,
+    ) -> None:
+        pv_dir = dest / 'pressure-vessel'
         os.makedirs(pv_dir, exist_ok=True)
-        argv = ['tar', '-C', pv_dir, '--strip-components=1', '-xf']
+        argv = ['tar', '-C', str(pv_dir), '--strip-components=1', '-xf']
 
-        if os.path.isfile(path):
-            argv.append(path)
+        if archive.is_file():
+            argv.append(str(archive))
         else:
-            argv.append(os.path.join(path, 'pressure-vessel-bin.tar.gz'))
+            argv.append(str(archive / 'pressure-vessel-bin.tar.gz'))
 
         logger.info('%r', argv)
         subprocess.run(argv, check=True)

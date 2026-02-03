@@ -839,6 +839,8 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
  *  such as %SRT_ABI_X86_64
  * @driver_class: Get the extra directories based on this ELF class, like
  *  ELFCLASS64.
+ * @modules_subdir: (type filename): A subdirectory of library_search_path
+ * where to search for the extra modules.
  *
  * Given a loader path, this function tries to create a list of extra directories where it
  * might be possible to find driver modules.
@@ -850,7 +852,8 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
 static GList *
 _srt_get_extra_modules_directory (const gchar *library_search_path,
                                   const gchar *multiarch_tuple,
-                                  int driver_class)
+                                  int driver_class,
+                                  const gchar *modules_subdir)
 {
   GList *ret = NULL;
   const gchar *libqual = NULL;
@@ -864,7 +867,7 @@ _srt_get_extra_modules_directory (const gchar *library_search_path,
 
   /* If the loader path ends with "/mesa" we try to look one directory above.
    * For example this is how Ubuntu 16.04 works, the loaders are in ${libdir}/mesa
-   * and the DRI modules in ${libdir}/dri */
+   * and the DRI modules in ${libdir}/${modules_subdir} */
   if (g_str_has_suffix (dir, "/mesa"))
     {
       dir[strlen (dir) - strlen ("/mesa") + 1] = '\0';
@@ -873,7 +876,7 @@ _srt_get_extra_modules_directory (const gchar *library_search_path,
         dir[strlen (dir) - 1] = '\0';
     }
 
-  ret = g_list_prepend (ret, g_build_filename (dir, "dri", NULL));
+  ret = g_list_prepend (ret, g_build_filename (dir, modules_subdir, NULL));
   g_debug ("Looking in lib directory: %s", (const char *) ret->data);
 
   lib_multiarch = g_strdup_printf ("/lib/%s", multiarch_tuple);
@@ -901,9 +904,9 @@ _srt_get_extra_modules_directory (const gchar *library_search_path,
         g_return_val_if_reached (NULL);
     }
 
-  ret = g_list_prepend (ret, g_build_filename (dir, "lib", "dri", NULL));
+  ret = g_list_prepend (ret, g_build_filename (dir, "lib", modules_subdir, NULL));
   g_debug ("Looking in lib directory: %s", (const char *) ret->data);
-  ret = g_list_prepend (ret, g_build_filename (dir, libqual, "dri", NULL));
+  ret = g_list_prepend (ret, g_build_filename (dir, libqual, modules_subdir, NULL));
   g_debug ("Looking in libQUAL directory: %s", (const char *) ret->data);
 
   ret = g_list_sort (ret, (GCompareFunc) strcmp);
@@ -1043,7 +1046,7 @@ _srt_get_modules_from_loader_library (SrtSysroot *sysroot,
           const char *multiarch_tuple = g_quark_to_string (arch_quark);
           GList *extras;
 
-          extras = _srt_get_extra_modules_directory (libdir, multiarch_tuple, driver_class);
+          extras = _srt_get_extra_modules_directory (libdir, multiarch_tuple, driver_class, "dri");
           for (this_extra_path = extras; this_extra_path != NULL; this_extra_path = this_extra_path->next)
             {
               if (!g_hash_table_contains (drivers_set, this_extra_path->data))

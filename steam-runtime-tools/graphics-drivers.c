@@ -1196,8 +1196,8 @@ _srt_get_modules_full (SrtSysroot *sysroot,
   const gchar *ld_library_path = NULL;
   const char *multiarch_tuple;
   g_autoptr(GHashTable) drivers_set = NULL;
-  gboolean colon_separated_drivers_path;
-  gboolean is_dri;
+  gboolean colon_separated_drivers_path = FALSE;
+  gboolean is_dri = FALSE;
   gboolean is_extra = FALSE;
   g_autoptr(GPtrArray) vdpau_argv = NULL;
   g_autoptr(GError) error = NULL;
@@ -1231,8 +1231,6 @@ _srt_get_modules_full (SrtSysroot *sysroot,
       case SRT_GRAPHICS_VDPAU_MODULE:
         loader_libraries = vdpau_loaders;
         env_override = "VDPAU_DRIVER_PATH";
-        colon_separated_drivers_path = FALSE;
-        is_dri = FALSE;
         break;
 
       case SRT_GRAPHICS_GLX_MODULE:

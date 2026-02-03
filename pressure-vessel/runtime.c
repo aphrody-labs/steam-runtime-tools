@@ -6680,6 +6680,7 @@ collect_mesa_drirc (PvRuntime *self,
                     PvRuntimeLibraryData *drirc_data_in_provider)
 {
   g_autoptr(SrtObjectList) dri_drivers = NULL;
+  g_autoptr(SrtObjectList) gbm_backends = NULL;
 
   for (guint i = 0; i < egl_icd_details->len; i++)
     {
@@ -6746,6 +6747,27 @@ collect_mesa_drirc (PvRuntime *self,
       g_return_if_fail (g_path_is_absolute (resolved));
       pv_runtime_collect_lib_data (self, arch, "drirc.d", resolved,
                                    "/dri", PV_RUNTIME_DATA_FLAGS_NONE,
+                                   drirc_data_in_provider);
+    }
+
+  /* And since GBM backends can also trigger drirc parsing,
+   * explicitly handle those too, in case they are in a path
+   * different from where DRI drivers are.
+   */
+  gbm_backends = srt_system_info_list_gbm_backends (arch->system_info,
+                                                    arch->tuple,
+                                                    SRT_DRIVER_FLAGS_NONE);
+
+  for (const GList *icd_iter = gbm_backends;
+       icd_iter != NULL;
+       icd_iter = icd_iter->next)
+    {
+      g_autofree gchar *resolved = NULL;
+
+      resolved = srt_gbm_backend_resolve_library_path (icd_iter->data);
+      g_return_if_fail (g_path_is_absolute (resolved));
+      pv_runtime_collect_lib_data (self, arch, "drirc.d", resolved,
+                                   "/gbm", PV_RUNTIME_DATA_FLAGS_NONE,
                                    drirc_data_in_provider);
     }
 }
@@ -7648,6 +7670,53 @@ pv_append_host_dri_library_paths (PvRuntime *self,
     _srt_search_path_append (search_path, drivers_path);
 }
 
+/*
+ * @patterns: (element-type filename):
+ */
+static gboolean
+collect_gbm_backends (PvRuntime *self,
+                      RuntimeArchitecture *arch,
+                      GPtrArray *patterns,
+                      GString *gbm_path,
+                      GError **error)
+{
+  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
+    _srt_profiling_start ("Collecting GBM backends");
+  g_autoptr(GPtrArray) details_arr = NULL;
+  g_autoptr(SrtObjectList) gbm_backends = NULL;
+  /* The GBM loader looks up backends by name, not by readdir(),
+   * so order doesn't matter unless there are name collisions. */
+  gboolean use_numbered_subdirs = FALSE;
+
+  g_debug ("Enumerating %s GBM backends on provider...", arch->tuple);
+    {
+      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) enum_timer =
+        _srt_profiling_start ("Enumerating GBM backends");
+
+      gbm_backends = srt_system_info_list_gbm_backends (arch->system_info,
+                                                        arch->tuple,
+                                                        SRT_DRIVER_FLAGS_NONE);
+    }
+
+  if (gbm_backends == NULL)
+    return TRUE;
+
+  details_arr = icd_details_array_sized_new (g_list_length (gbm_backends));
+  icd_details_fill_array_single_arch (details_arr,
+                                      arch->tuple_quark,
+                                      arch->provider,
+                                      gbm_backends,
+                                      arch->known_arch);
+
+  if (!bind_icds (self, arch, "gbm",
+                  (IcdDetails **) details_arr->pdata,
+                  details_arr->len,
+                  &use_numbered_subdirs, patterns, gbm_path, error))
+    return FALSE;
+
+  return TRUE;
+}
+
 /* Prepend the given @new_entry to the colon-delimited directory list in the
  * original environment variable @var (in turn defaulting that to @default_)
  * if not given.
@@ -7709,6 +7778,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 {
   gsize i, j;
   g_autoptr(GString) dri_path = g_string_new ("");
+  g_autoptr(GString) gbm_path = g_string_new ("");
   g_autoptr(GString) egl_path = g_string_new ("");
   g_autoptr(GString) egl_ext_platform_path = g_string_new ("");
   g_autoptr(GString) vulkan_path = g_string_new ("");
@@ -7800,6 +7870,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           g_autoptr(GPtrArray) dirs = NULL;
           g_autofree gchar *this_dri_path_in_container = g_build_filename (arch->libdir_in_container,
                                                                            "dri", NULL);
+          g_autofree gchar *this_gbm_path_in_container = g_build_filename (arch->libdir_in_container,
+                                                                           "gbm", NULL);
           /* Can either be relative to the sysroot, or absolute */
           g_autofree gchar *ld_so_in_runtime = NULL;
           g_autofree gchar *libdrm = NULL;
@@ -7827,6 +7899,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                    arch->ld_so, ld_so_in_runtime);
 
           _srt_search_path_append (dri_path, this_dri_path_in_container);
+          _srt_search_path_append (gbm_path, this_gbm_path_in_container);
           _srt_search_path_append (va_api_path, this_dri_path_in_container);
 
           if (!glnx_shutil_mkdir_p_at (self->overrides_fd,
@@ -7935,6 +8008,9 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
             }
 
           if (!collect_dri_drivers (self, arch, patterns, dri_path, error))
+            return FALSE;
+
+          if (!collect_gbm_backends (self, arch, patterns, gbm_path, error))
             return FALSE;
 
           /* We always have at least one pattern, because
@@ -8298,6 +8374,11 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
       _srt_env_overlay_set (container_env, "LIBGL_DRIVERS_PATH", NULL);
       _srt_env_overlay_set (container_env, "LIBVA_DRIVERS_PATH", NULL);
     }
+
+  if (gbm_path->len != 0)
+    _srt_env_overlay_set (container_env, "GBM_BACKENDS_PATH", gbm_path->str);
+  else
+    _srt_env_overlay_set (container_env, "GBM_BACKENDS_PATH", NULL);
 
   if (egl_path->len != 0)
     _srt_env_overlay_set (container_env, "__EGL_VENDOR_LIBRARY_FILENAMES",

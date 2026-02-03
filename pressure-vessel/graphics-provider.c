@@ -140,6 +140,21 @@ enumerate_arch (gpointer data)
   if (g_cancellable_is_cancelled (inputs->cancellable))
     goto out;
 
+  if (TRUE)
+    {
+      G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =
+        _srt_profiling_start ("Enumerating %s GBM drivers in thread",
+                              tuple);
+      G_GNUC_UNUSED g_autoptr(SrtObjectList) drivers = NULL;
+
+      drivers = srt_system_info_list_gbm_backends (system_info,
+                                                   tuple,
+                                                   SRT_DRIVER_FLAGS_NONE);
+    }
+
+  if (g_cancellable_is_cancelled (inputs->cancellable))
+    goto out;
+
   if (features & SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VA_API)
     {
       G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) part_timer =

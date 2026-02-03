@@ -819,6 +819,13 @@ class TestInsideRuntime(BaseTest):
                     overrides_libdir=overrides_libdir,
                 )
 
+                self.assertGraphicsModulesOverrides(
+                    modules=host_info.get('gbm_backends', ()),
+                    module_type='gbm',
+                    multiarch=multiarch,
+                    overrides_libdir=overrides_libdir,
+                )
+
                 for stack, host_details in (
                     host_info.get('graphics-details', {}).items()
                 ):

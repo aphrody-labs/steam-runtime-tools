@@ -1206,6 +1206,13 @@ class BaseContainersTest(BaseTest):
                     overrides_libdir=overrides_libdir,
                 )
 
+                self.assertGraphicsModulesOverrides(
+                    modules=arch_info.get('gbm_backends', ()),
+                    module_type='gbm',
+                    multiarch=multiarch,
+                    overrides_libdir=overrides_libdir,
+                )
+
                 if is_scout:
                     if self.host_is_debian_derived:
                         link = os.path.join(

@@ -1653,12 +1653,14 @@ _srt_get_modules_full (SrtSysroot *sysroot,
  *
  * Implementation of srt_system_info_list_dri_drivers() etc.
  *
- * The returned list for GLX modules is in an unspecified order.
+ * The order of the graphics modules depends on their types:
  *
- * Instead the returned list for all the other graphics modules will have the
- * most-preferred directories first and the least-preferred directories last.
- * Within a directory, the drivers will be in lexicographic order, for example
- * `nouveau_dri.so`, `r200_dri.so`, `r600_dri.so` in that order.
+ * - The returned list for GLX modules is in an unspecified order.
+ *
+ * - Instead the returned list for all the other graphics modules will have
+ *   the most-preferred directories first and the least-preferred directories
+ *   last.  Within a directory, the drivers will be in lexicographic order,
+ *   for example `nouveau_dri.so`, `r200_dri.so`, `r600_dri.so` in that order.
  *
  * Returns: (transfer full) (element-type GObject) (nullable): A list of
  *  opaque #SrtDriDriver, etc. objects, or %NULL if nothing was found. Free with

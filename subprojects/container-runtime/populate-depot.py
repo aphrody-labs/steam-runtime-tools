@@ -65,20 +65,12 @@ from typing import (
     Tuple,
 )
 
-from debian.deb822 import (
-    Sources,
-)
-
 
 HERE = Path(__file__).resolve().parent
 
 
 logger = logging.getLogger('populate-depot')
 
-
-DEFAULT_PRESSURE_VESSEL_URI = (
-    'https://repo.steampowered.com/pressure-vessel/snapshots'
-)
 
 DEFAULT_IMAGES_URI = (
     'https://repo.steampowered.com/steamrt-images-SUITE/snapshots'
@@ -100,102 +92,6 @@ ARCH_TO_TUPLE = {
 
 class InvocationError(Exception):
     pass
-
-
-class PressureVesselRelease:
-    def __init__(
-        self,
-        *,
-        cache: str = '.cache',
-        ssh_host: str = '',
-        ssh_path: str = '',
-        uri: str = DEFAULT_PRESSURE_VESSEL_URI,
-        version: str = ''
-    ) -> None:
-        self.cache = cache
-        self.pinned_version: Optional[str] = None
-        self.ssh_host = ssh_host
-        self.ssh_path = ssh_path
-        self.uri = uri
-        self.version = version
-
-    def get_uri(
-        self,
-        filename: str,
-        version: Optional[str] = None,
-    ) -> str:
-        uri = self.uri
-        v = version or self.pinned_version or self.version or 'latest'
-        return f'{uri}/{v}/{filename}'
-
-    def get_ssh_path(
-        self,
-        filename: str,
-        version: Optional[str] = None,
-    ) -> str:
-        ssh_host = self.ssh_host
-        ssh_path = self.ssh_path
-        v = version or self.pinned_version or self.version or 'latest'
-
-        if not ssh_host or not ssh_path:
-            raise RuntimeError('ssh host/path not configured')
-
-        return f'{ssh_path}/{v}/{filename}'
-
-    def fetch(
-        self,
-        filename: str,
-        opener: urllib.request.OpenerDirector,
-        version: Optional[str] = None,
-    ) -> str:
-        dest = os.path.join(self.cache, filename)
-
-        if self.ssh_host and self.ssh_path:
-            path = self.get_ssh_path(filename)
-            logger.info('Downloading %r...', path)
-            subprocess.run([
-                'rsync',
-                '--archive',
-                '--partial',
-                '--progress',
-                self.ssh_host + ':' + path,
-                dest,
-            ], check=True)
-        else:
-            uri = self.get_uri(filename)
-            logger.info('Downloading %r...', uri)
-
-            with opener.open(uri) as response:
-                with open(dest + '.new', 'wb') as writer:
-                    shutil.copyfileobj(response, writer)
-
-                os.rename(dest + '.new', dest)
-
-        return dest
-
-    def pin_version(
-        self,
-        opener: urllib.request.OpenerDirector,
-    ) -> str:
-        pinned = self.pinned_version
-
-        if pinned is None:
-            if self.ssh_host and self.ssh_path:
-                path = self.get_ssh_path(filename='VERSION.txt')
-                logger.info('Determining version number from %r...', path)
-                pinned = subprocess.run([
-                    'ssh', self.ssh_host,
-                    'cat {}'.format(shlex.quote(path)),
-                ], stdout=subprocess.PIPE).stdout.decode('utf-8').strip()
-            else:
-                uri = self.get_uri(filename='VERSION.txt')
-                logger.info('Determining version number from %r...', uri)
-                with opener.open(uri) as response:
-                    pinned = response.read().decode('utf-8').strip()
-
-            self.pinned_version = pinned
-
-        return pinned
 
 
 class Runtime:
@@ -522,14 +418,6 @@ class Main:
         mtree: bool = True,
         multiarch_tuples: Sequence[str] = (),
         pressure_vessel_archive: str = '',
-        pressure_vessel_from_runtime: str = '',
-        pressure_vessel_from_runtime_json: str = '',
-        pressure_vessel_guess: str = '',
-        pressure_vessel_official: bool = False,
-        pressure_vessel_ssh_host: str = '',
-        pressure_vessel_ssh_path: str = '',
-        pressure_vessel_uri: str = DEFAULT_PRESSURE_VESSEL_URI,
-        pressure_vessel_version: str = '',
         runtime: str = 'scout',
         scripts_version: str = '',
         source_dir: str = str(HERE),
@@ -540,8 +428,6 @@ class Main:
         suite: str = '',
         toolmanifest: bool = False,
         unpack_ld_library_path: str = '',
-        unpack_sources: Sequence[str] = (),
-        unpack_sources_into: str = '.',
         version: str = '',
         versioned_directories: bool = False,
         **kwargs: Dict[str, Any],
@@ -589,7 +475,7 @@ class Main:
         self.default_architecture = architecture
         self.default_suite = suite
         self.default_version = version
-        self.depot = os.path.abspath(depot)
+        self.depot = Path(depot).resolve()
         self.depot_archive = depot_archive
         self.depot_version = depot_version
         self.fast = fast
@@ -598,19 +484,19 @@ class Main:
         self.layered = layered
         self.mtree = mtree
         self.multiarch_tuples = multiarch_tuples
-        self.pressure_vessel_ssh_host = pressure_vessel_ssh_host or ssh_host
-        self.pressure_vessel_ssh_path = pressure_vessel_ssh_path
-        self.pressure_vessel_uri = pressure_vessel_uri
         self.scripts_version = scripts_version
-        self.source_dir = source_dir
+        self.source_dir = Path(source_dir)
         self.ssh_host = ssh_host
         self.ssh_path = ssh_path
         self.steam_app_id = steam_app_id
         self.steam_depot_id = steam_depot_id
         self.toolmanifest = toolmanifest
-        self.unpack_ld_library_path = unpack_ld_library_path
-        self.unpack_sources = unpack_sources
-        self.unpack_sources_into = unpack_sources_into
+
+        if not unpack_ld_library_path:
+            self.unpack_ld_library_path: Optional[Path] = None
+        else:
+            self.unpack_ld_library_path = Path(unpack_ld_library_path)
+
         self.versioned_directories = versioned_directories
 
         if (
@@ -618,30 +504,6 @@ class Main:
             and not depot_archive.endswith(('.tar.gz', '.tar.xz'))
         ):
             raise InvocationError(f'Unknown archive format: {depot_archive}')
-
-        n_sources = 0
-
-        for source in (
-            pressure_vessel_archive,
-            pressure_vessel_from_runtime,
-            pressure_vessel_from_runtime_json,
-            pressure_vessel_guess,
-            pressure_vessel_version,
-        ):
-            if source:
-                n_sources += 1
-
-        if n_sources == 0:
-            pressure_vessel_version = 'latest'
-        elif n_sources > 1:
-            raise RuntimeError(
-                'Cannot combine more than one of '
-                '--pressure-vessel, '
-                '--pressure-vessel-archive, '
-                '--pressure-vessel-from-runtime, '
-                '--pressure-vessel-from-runtime-json and '
-                '--pressure-vessel-version'
-            )
 
         os.makedirs(self.cache, exist_ok=True)
 
@@ -661,49 +523,14 @@ class Main:
 
         self.versions: List[ComponentVersion] = []
 
-        if pressure_vessel_guess:
-            if self.runtime.name == pressure_vessel_guess:
-                pressure_vessel_from_runtime = pressure_vessel_guess
-            elif pressure_vessel_guess.startswith('{'):
-                pressure_vessel_from_runtime_json = pressure_vessel_guess
-            elif os.path.isdir(pressure_vessel_guess):
-                pressure_vessel_archive = os.path.join(
-                    pressure_vessel_guess, 'pressure-vessel-bin.tar.gz',
-                )
-            elif (
-                os.path.isfile(pressure_vessel_guess)
-                and pressure_vessel_guess.endswith('.tar.gz')
-            ):
-                pressure_vessel_archive = pressure_vessel_guess
-            else:
-                pressure_vessel_from_runtime = pressure_vessel_guess
-
-        self.pressure_vessel_runtime: Optional[Runtime] = None
-        self.pressure_vessel_version = ''
-
-        if pressure_vessel_version:
-            self.pressure_vessel_version = pressure_vessel_version
+        if self.layered:
+            self.pressure_vessel_path: Path | None = None
         elif pressure_vessel_archive:
-            self.pressure_vessel_runtime = self.new_runtime(
-                'scout',
-                {
-                    'official': pressure_vessel_official,
-                    'path': pressure_vessel_archive,
-                },
-                default_suite='scout',
-            )
-        elif self.runtime.name == pressure_vessel_from_runtime:
-            self.pressure_vessel_runtime = self.runtime
-        elif pressure_vessel_from_runtime:
-            self.pressure_vessel_runtime = self.new_runtime(
-                pressure_vessel_from_runtime, {},
-                default_suite=pressure_vessel_from_runtime,
-            )
-        elif pressure_vessel_from_runtime_json:
-            self.pressure_vessel_runtime = self.new_runtime(
-                'scout',
-                json.loads(pressure_vessel_from_runtime_json),
-                default_suite='scout',
+            self.pressure_vessel_path = Path(pressure_vessel_archive)
+        else:
+            raise InvocationError(
+                '--pressure-vessel-archive is required when not '
+                'using --layered'
             )
 
         if 'SOURCE_DATE_EPOCH' in os.environ:
@@ -731,26 +558,26 @@ class Main:
 
     def merge_dir_into_depot(
         self,
-        source_root: str,
+        source_root: Path,
     ):
-        for (dirpath, dirnames, filenames) in os.walk(source_root):
-            relative_path = os.path.relpath(dirpath, source_root)
+        for (dirpath, dirnames, filenames) in os.walk(str(source_root)):
+            relative_path = Path(dirpath).relative_to(source_root)
 
             for member in dirnames:
-                os.makedirs(
-                    os.path.join(self.depot, relative_path, member),
+                (self.depot / relative_path / member).mkdir(
                     exist_ok=True,
+                    parents=True,
                 )
 
             for member in filenames:
-                source = os.path.join(dirpath, member)
-                merged = os.path.join(self.depot, relative_path, member)
+                source = Path(dirpath, member)
+                merged = self.depot / relative_path / member
 
                 with suppress(FileNotFoundError):
-                    os.unlink(merged)
+                    merged.unlink()
 
-                os.makedirs(os.path.dirname(merged), exist_ok=True)
-                shutil.copy(source, merged)
+                merged.parent.mkdir(exist_ok=True, parents=True)
+                shutil.copy(str(source), str(merged))
 
     def run(self) -> None:
         if self.layered:
@@ -786,7 +613,7 @@ class Main:
         if self.runtime.name != 'scout':
             raise InvocationError('Can only layer scout onto soldier')
 
-        if self.unpack_ld_library_path:
+        if self.unpack_ld_library_path is not None:
             raise InvocationError(
                 'Cannot use --unpack-ld-library-path with --layered'
             )
@@ -796,13 +623,8 @@ class Main:
                 'Cannot use --include-sdk-* with --layered'
             )
 
-        if self.unpack_sources:
-            raise InvocationError(
-                'Cannot use --unpack-source with --layered'
-            )
-
         self.merge_dir_into_depot(
-            os.path.join(self.source_dir, 'runtimes', 'scout-on-soldier')
+            self.source_dir / 'runtimes' / 'scout-on-soldier'
         )
 
         if self.runtime.version:
@@ -895,38 +717,16 @@ class Main:
     def do_container_runtime(self) -> None:
         pv_version = ComponentVersion('pressure-vessel')
 
-        self.merge_dir_into_depot(os.path.join(self.source_dir, 'common'))
+        self.merge_dir_into_depot(self.source_dir / 'common')
 
-        root = os.path.join(self.source_dir, 'runtimes', self.runtime.name)
+        root = self.source_dir / 'runtimes' / self.runtime.name
 
-        if os.path.exists(root):
+        if root.exists():
             self.merge_dir_into_depot(root)
 
-        pressure_vessel_runtime = self.pressure_vessel_runtime
-
-        if self.pressure_vessel_version:
-            logger.info(
-                'Downloading standalone pressure-vessel release'
-            )
-            pv_version.version = self.download_pressure_vessel_standalone(
-                self.pressure_vessel_version
-            )
-        else:
-            assert pressure_vessel_runtime is not None
-
-            if pressure_vessel_runtime.path:
-                self.use_local_pressure_vessel(pressure_vessel_runtime.path)
-
-                if pressure_vessel_runtime.official:
-                    pv_version.comment = 'pressure-vessel-bin.tar.gz'
-                else:
-                    pv_version.comment = 'from local file'
-            else:
-                pv_version.comment = (
-                    self.download_pressure_vessel_from_runtime(
-                        pressure_vessel_runtime
-                    )
-                )
+        pressure_vessel_path = self.pressure_vessel_path
+        assert pressure_vessel_path is not None
+        self.use_local_pressure_vessel(str(pressure_vessel_path))
 
         for path in ('metadata/VERSION.txt', 'sources/VERSION.txt'):
             full = os.path.join(self.depot, 'pressure-vessel', path)
@@ -946,25 +746,9 @@ class Main:
 
                 break
 
-        if pv_version.version in ('0.20250501.0', '0.20250516.0'):
-            # Workaround: some versions contained non-Steampipe-friendly
-            # filenames
-            metadata = Path(self.depot, 'pressure-vessel', 'metadata')
-            licenses = metadata.glob('*.txt')
-
-            for license_file in licenses:
-                new_name = metadata / license_file.name.replace(':', '_')
-                license_file.rename(new_name)
-
-        if pressure_vessel_runtime is not None:
-            pv_version.runtime = pressure_vessel_runtime.suite or ''
-            pv_version.runtime_version = (
-                pressure_vessel_runtime.pinned_version or ''
-            )
-
         self.versions.append(pv_version)
 
-        if self.unpack_ld_library_path and pressure_vessel_runtime is None:
+        if self.unpack_ld_library_path is not None:
             if self.runtime.name == 'scout':
                 scout = self.runtime
             else:
@@ -975,26 +759,8 @@ class Main:
                 )
             logger.info(
                 'Downloading LD_LIBRARY_PATH Steam Runtime from scout into %r',
-                self.unpack_ld_library_path)
+                str(self.unpack_ld_library_path))
             self.download_scout_tarball(scout)
-        elif self.unpack_ld_library_path:
-            assert pressure_vessel_runtime is not None
-            logger.info(
-                'Downloading LD_LIBRARY_PATH Steam Runtime from same place '
-                'as pressure-vessel into %r',
-                self.unpack_ld_library_path)
-            self.download_scout_tarball(pressure_vessel_runtime)
-
-        if self.unpack_sources:
-            logger.info(
-                'Will download %s source code into %r',
-                ', '.join(self.unpack_sources), self.unpack_sources_into)
-            os.makedirs(self.unpack_sources_into, exist_ok=True)
-
-            os.makedirs(
-                os.path.join(self.unpack_sources_into, self.runtime.name),
-                exist_ok=True,
-            )
 
         runtime = self.runtime
 
@@ -1248,42 +1014,6 @@ class Main:
         logger.info('%r', argv)
         subprocess.run(argv, check=True)
 
-    def download_pressure_vessel_standalone(
-        self,
-        version: str,
-    ) -> str:
-        pv = PressureVesselRelease(
-            cache=self.cache,
-            ssh_host=self.pressure_vessel_ssh_host,
-            ssh_path=self.pressure_vessel_ssh_path,
-            uri=self.pressure_vessel_uri,
-            version=version,
-        )
-        pinned = pv.pin_version(self.opener)
-        self.use_local_pressure_vessel(
-            pv.fetch('pressure-vessel-bin.tar.gz', self.opener, pinned)
-        )
-        return pinned
-
-    def download_pressure_vessel_from_runtime(self, runtime: Runtime) -> str:
-        filename = 'pressure-vessel-bin.tar.gz'
-        runtime.pin_version(self.opener)
-
-        downloaded = runtime.fetch(
-            filename,
-            self.opener,
-        )
-
-        os.makedirs(self.depot, exist_ok=True)
-        subprocess.run(
-            [
-                'tar', '-C', self.depot, '-xf', downloaded,
-            ],
-            check=True,
-        )
-
-        return filename
-
     def use_local_runtime(self, runtime: Runtime) -> None:
         assert runtime.path
 
@@ -1299,43 +1029,6 @@ class Main:
 
             os.link(src, dest)
 
-        if self.unpack_sources:
-            with open(
-                os.path.join(runtime.path, runtime.sources), 'rb',
-            ) as reader:
-                for stanza in Sources.iter_paragraphs(
-                    sequence=reader,
-                    use_apt_pkg=True,
-                ):
-                    if stanza['package'] in self.unpack_sources:
-                        for f in stanza['files']:
-                            name = f['name']
-
-                            if name.endswith('.dsc'):
-                                dest = os.path.join(
-                                    self.unpack_sources_into,
-                                    runtime.name,
-                                    stanza['package'],
-                                )
-
-                                with suppress(FileNotFoundError):
-                                    logger.info('Removing %r', dest)
-                                    shutil.rmtree(dest)
-
-                                subprocess.run(
-                                    [
-                                        'dpkg-source',
-                                        '-x',
-                                        dest,
-                                        os.path.join(
-                                            runtime.path,
-                                            'sources',
-                                            f['name'],
-                                        ),
-                                    ],
-                                    check=True,
-                                )
-
     def download_runtime(self, runtime: Runtime) -> None:
         """
         Download a pre-prepared Platform from a previous container
@@ -1347,90 +1040,28 @@ class Main:
         for basename in runtime.get_archives(
             include_sdk_sysroot=self.include_sdk_sysroot,
         ):
-            downloaded = runtime.fetch(basename, self.opener)
-
-        if self.unpack_sources:
-            with tempfile.TemporaryDirectory(prefix='populate-depot.') as tmp:
-                want = set(self.unpack_sources)
-                downloaded = runtime.fetch(
-                    runtime.sources,
-                    self.opener,
-                )
-                with open(downloaded, 'rb') as reader:
-                    for stanza in Sources.iter_paragraphs(
-                        sequence=reader,
-                        use_apt_pkg=True,
-                    ):
-                        if stanza['package'] in self.unpack_sources:
-                            logger.info(
-                                'Found %s in %s',
-                                stanza['package'], runtime.name,
-                            )
-                            want.discard(stanza['package'])
-                            os.makedirs(
-                                os.path.join(self.cache or tmp, 'sources'),
-                                exist_ok=True,
-                            )
-
-                            file_path: Dict[str, str] = {}
-
-                            for f in stanza['files']:
-                                name = f['name']
-                                file_path[name] = runtime.fetch(
-                                    os.path.join('sources', name),
-                                    self.opener,
-                                )
-
-                            for f in stanza['files']:
-                                name = f['name']
-
-                                if name.endswith('.dsc'):
-                                    dest = os.path.join(
-                                        self.unpack_sources_into,
-                                        runtime.name,
-                                        stanza['package'],
-                                    )
-
-                                    with suppress(FileNotFoundError):
-                                        logger.info('Removing %r', dest)
-                                        shutil.rmtree(dest)
-
-                                    subprocess.run(
-                                        [
-                                            'dpkg-source',
-                                            '-x',
-                                            file_path[name],
-                                            dest,
-                                        ],
-                                        check=True,
-                                    )
-
-                if want:
-                    logger.warning(
-                        'Did not find source package(s) %s in %s',
-                        ', '.join(want), runtime.name,
-                    )
+            runtime.fetch(basename, self.opener)
 
     def download_scout_tarball(self, runtime: Runtime) -> None:
         """
         Download a pre-prepared LD_LIBRARY_PATH Steam Runtime from a
         previous scout build.
         """
+        dest = self.unpack_ld_library_path
+        assert dest is not None
+
         filename = 'steam-runtime.tar.xz'
 
         pinned = runtime.pin_version(self.opener)
         logger.info('Downloading steam-runtime build %s', pinned)
-        os.makedirs(self.unpack_ld_library_path, exist_ok=True)
+        dest.mkdir(exist_ok=True, parents=True)
 
         downloaded = runtime.fetch(
             filename,
             self.opener,
         )
         subprocess.run(
-            [
-                'tar', '-C', self.unpack_ld_library_path, '-xf',
-                downloaded,
-            ],
+            ['tar', '-C', str(dest), '-xf', downloaded],
             check=True,
         )
 
@@ -1929,7 +1560,9 @@ class Main:
 
 class SelfTest(unittest.TestCase):
     def test_filename_is_friendly(self) -> None:
-        m = Main()
+        # This happens to be the easiest way to create a Main object
+        # with all required parameters
+        m = Main(layered=True)
 
         for good in (
             'bin/bash',
@@ -2102,71 +1735,14 @@ def main() -> None:
     )
 
     parser.add_argument(
-        '--pressure-vessel-uri',
-        default=DEFAULT_PRESSURE_VESSEL_URI,
-        metavar='URI',
-        help=(
-            'Download pressure-vessel from a versioned subdirectory of URI'
-        ),
-    )
-    parser.add_argument(
-        '--pressure-vessel-ssh-host', default='', metavar='HOST',
-        help=(
-            'Use ssh and rsync to download pressure-vessel from HOST '
-            '[default: same as --ssh-host]'
-        ),
-    )
-    parser.add_argument(
-        '--pressure-vessel-ssh-path', default='', metavar='PATH',
-        help=(
-            'Use ssh and rsync to download pressure-vessel from a versioned '
-            'subdirectory of PATH on HOST'
-        ),
-    )
-    parser.add_argument(
-        '--pressure-vessel-version', default='', metavar='0.x.y|latest',
-        help=(
-            'Use this version of pressure-vessel from --pressure-vessel-uri '
-            'or --pressure-vessel-ssh-path'
-        )
-    )
-    parser.add_argument(
         '--pressure-vessel-archive', default='', metavar='PATH',
         help=(
             'Unpack pressure-vessel from the named archive'
         ),
     )
     parser.add_argument(
-        '--pressure-vessel-from-runtime', default='', metavar='NAME',
-        help=(
-            'Get pressure-vessel from the named runtime (default "scout")'
-        ),
-    )
-    parser.add_argument(
-        '--pressure-vessel-from-runtime-json', default='', metavar='NAME',
-        help=(
-            'Get pressure-vessel from a separate runtime version given as a '
-            'JSON object'
-        ),
-    )
-    parser.add_argument(
-        '--pressure-vessel', default='', metavar='NAME|PATH|DETAILS',
-        dest='pressure_vessel_guess',
-        help=(
-            '--pressure-vessel-archive=ARCHIVE, '
-            '--pressure-vessel-archive=DIRECTORY/pressure-vessel-bin.tar.gz, '
-            '--pressure-vessel-from-runtime=NAME or '
-            '--pressure-vessel-from-runtime-json=DETAILS, '
-            'based on form of argument given '
-            '(disambiguate with ./ if necessary)'
-        ),
-    )
-    parser.add_argument(
-        '--pressure-vessel-official', default=False, action='store_true',
-        help=(
-            'Assume that a copy of pressure-vessel provided as a local '
-            'file/directory is an official one'
-        ),
+        '--pressure-vessel-official', dest='_ignored', action='store_true',
+        help='Ignored for backwards compatibility',
     )
     parser.add_argument(
         '--no-include-archives', dest='_ignored', action='store_true',
@@ -2218,21 +1794,6 @@ def main() -> None:
         '--unpack-runtime', '--unpack-runtimes', dest='_ignored',
         action='store_true', default=True,
         help='Ignored for backwards compatibility',
-    )
-    parser.add_argument(
-        '--unpack-source', metavar='PACKAGE', action='append', default=[],
-        dest='unpack_sources',
-        help=(
-            'Download and unpack the given source package from each runtime '
-            'if it exists, for use in regression testing. May be repeated.'
-        )
-    )
-    parser.add_argument(
-        '--unpack-sources-into', metavar='PATH', default='.',
-        help=(
-            'Unpack any source packages specified by --unpack-source '
-            'into PATH/RUNTIME/SOURCE (default: ./RUNTIME/SOURCE).'
-        )
     )
     parser.add_argument(
         '--versioned-directories', action='store_true', default=True,

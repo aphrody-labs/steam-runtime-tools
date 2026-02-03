@@ -36,6 +36,7 @@
 #include <steam-runtime-tools/enums.h>
 #include <steam-runtime-tools/graphics.h>
 #include <steam-runtime-tools/graphics-drivers-dri.h>
+#include <steam-runtime-tools/graphics-drivers-gbm.h>
 #include <steam-runtime-tools/graphics-drivers-egl.h>
 #include <steam-runtime-tools/graphics-drivers-glx.h>
 #include <steam-runtime-tools/graphics-drivers-openxr-1.h>

@@ -367,6 +367,8 @@ SrtVaApiVersion _srt_va_api_driver_version (int dfd,
 
 SrtDriDriver *srt_dri_driver_new (const gchar *library_path,
                                   gboolean is_extra);
+SrtGbmBackend *srt_gbm_backend_new (const gchar *library_path,
+                                    gboolean is_extra);
 SrtGlxIcd *srt_glx_icd_new (const gchar *library_soname,
                             const gchar *library_path);
 SrtVdpauDriver *srt_vdpau_driver_new (const gchar *library_path,

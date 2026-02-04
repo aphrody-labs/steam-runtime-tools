@@ -47,6 +47,11 @@ if args.install:
 else:
     full_path = args.path
 
+# Safety check to prevent accidental execution in the steam-runtime-tools root
+# directory
+if os.path.exists(os.path.join(full_path, '.git')):
+    raise RuntimeError("The target directory seems to be a git repo, refusing to run.")
+
 # We recreate the chosen destination 'sysroot', to avoid potential issues with
 # old files
 try:

@@ -415,6 +415,8 @@ class TestContainers(BaseTest):
 
         cls.host_srsi = host_srsi
 
+        os.makedirs(cls.artifacts, exist_ok=True)
+
         if host_srsi is not None:
             logger.info("We have the host srsi %s", host_srsi)
             with open(
@@ -472,11 +474,11 @@ class TestContainers(BaseTest):
         self.pv_dir = cls.pv_dir
         self.pv_wrap = cls.pv_wrap
 
+        os.makedirs(os.path.join(cls.artifacts, 'tmp'), exist_ok=True)
+
         # The artifacts directory is going to be the current working
         # directory inside the container, so we copy things we will
         # need into that directory.
-        os.makedirs(os.path.join(cls.artifacts, 'tmp'), exist_ok=True)
-
         for f in ('testutils.py', 'inside-runtime.py'):
             for d in (
                 os.path.dirname(os.path.abspath(__file__)),

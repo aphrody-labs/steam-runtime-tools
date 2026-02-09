@@ -70,7 +70,8 @@ typedef enum
  * @SRT_DRIVER_FLAGS_NONE: Get just the drivers found in the canonical folders
  * @SRT_DRIVER_FLAGS_INCLUDE_ALL: Get all the drivers that have been found,
  *  even if they are in directories that we do not believe will normally be
- *  loaded (srt_dri_driver_is_extra() or srt_va_api_driver_is_extra() will
+ *  loaded (srt_dri_driver_is_extra() or srt_gbm_backend_is_extra() or
+ *  srt_va_api_driver_is_extra() will
  *  return %TRUE)
  *
  * A bitfield with flags representing filters, used when retrieving a
@@ -161,6 +162,10 @@ _SRT_PUBLIC
 GList *srt_system_info_list_dri_drivers (SrtSystemInfo *self,
                                          const char *multiarch_tuple,
                                          SrtDriverFlags flags);
+_SRT_PUBLIC
+GList *srt_system_info_list_gbm_backends (SrtSystemInfo *self,
+                                          const char *multiarch_tuple,
+                                          SrtDriverFlags flags);
 _SRT_PUBLIC
 GList *srt_system_info_list_va_api_drivers (SrtSystemInfo *self,
                                             const char *multiarch_tuple,

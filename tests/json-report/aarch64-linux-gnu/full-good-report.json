@@ -147,6 +147,11 @@
           "library_path" : "/usr/lib/dri/radeonsi_dri.so"
         }
       ],
+      "gbm_backends" : [
+        {
+          "library_path" : "/usr/lib/gbm/dri_gbm.so"
+        }
+      ],
       "va-api_drivers" : [
         {
           "library_path" : "/usr/lib/dri/vdpau_drv_video.so"

@@ -526,6 +526,41 @@ print_dri_details (JsonBuilder *builder,
 }
 
 static void
+print_gbm_details (JsonBuilder *builder,
+                   GList *gbm_list)
+{
+  GList *iter;
+
+  json_builder_set_member_name (builder, "gbm_backends");
+  json_builder_begin_array (builder);
+    {
+      for (iter = gbm_list; iter != NULL; iter = iter->next)
+        {
+          const gchar *library;
+          g_autofree gchar *resolved = NULL;
+
+          json_builder_begin_object (builder);
+          library = srt_gbm_backend_get_library_path (iter->data);
+          json_builder_set_member_name (builder, "library_path");
+          json_builder_add_string_value (builder, library);
+          resolved = srt_gbm_backend_resolve_library_path (iter->data);
+          if (g_strcmp0 (library, resolved) != 0)
+            {
+              json_builder_set_member_name (builder, "library_path_resolved");
+              json_builder_add_string_value (builder, resolved);
+            }
+          if (srt_gbm_backend_is_extra (iter->data))
+            {
+              json_builder_set_member_name (builder, "is_extra");
+              json_builder_add_boolean_value (builder, TRUE);
+            }
+          json_builder_end_object (builder);
+        }
+    }
+  json_builder_end_array (builder); // End gbm_backends
+}
+
+static void
 print_va_api_details (JsonBuilder *builder,
                       GList *va_api_list)
 {
@@ -1365,6 +1400,7 @@ main (int argc,
     {
       GList *libraries = NULL;
       GList *dri_list = NULL;
+      GList *gbm_list = NULL;
       GList *va_api_list = NULL;
       GList *vdpau_list = NULL;
       GList *glx_list = NULL;
@@ -1461,6 +1497,10 @@ main (int argc,
                                                    extra_driver_flags);
       print_dri_details (builder, dri_list);
 
+      gbm_list = srt_system_info_list_gbm_backends (info, tuple,
+                                                    extra_driver_flags);
+      print_gbm_details (builder, gbm_list);
+
       va_api_list = srt_system_info_list_va_api_drivers (info, tuple,
                                                          extra_driver_flags);
       print_va_api_details (builder, va_api_list);
@@ -1483,6 +1523,7 @@ main (int argc,
       json_builder_end_object (builder); // End multiarch_tuple object
       g_list_free_full (libraries, g_object_unref);
       g_list_free_full (dri_list, g_object_unref);
+      g_list_free_full (gbm_list, g_object_unref);
       g_list_free_full (va_api_list, g_object_unref);
       g_list_free_full (vdpau_list, g_object_unref);
       g_list_free_full (glx_list, g_object_unref);

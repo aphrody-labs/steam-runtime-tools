@@ -540,6 +540,7 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
             break;
 
           case SRT_GRAPHICS_DRI_MODULE:
+          case SRT_GRAPHICS_GBM_MODULE:
           case SRT_GRAPHICS_VAAPI_MODULE:
           case NUM_SRT_GRAPHICS_MODULES:
           default:
@@ -654,6 +655,7 @@ _srt_list_links_from_directory (SrtSubprocessRunner *runner,
  * @module: Which graphic module to search
  * @drivers_out: (inout): Prepend the found drivers to this list.
  *  If @module is #SRT_GRAPHICS_DRI_MODULE, the element-type will be #SrtDriDriver.
+ *  Otherwise if @module is #SRT_GRAPHICS_GBM_MODULE, the element-type will be #SrtGbmBackend.
  *  Otherwise if @module is #SRT_GRAPHICS_VAAPI_MODULE, the element-type will be #SrtVaApiDriver.
  *
  * @drivers_out will be prepended only with modules that are of the same ELF class that
@@ -691,6 +693,11 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
     {
       case SRT_GRAPHICS_DRI_MODULE:
         module_suffix[0] = "_dri.so";
+        module_suffix[1] = NULL;
+        break;
+
+      case SRT_GRAPHICS_GBM_MODULE:
+        module_suffix[0] = "_gbm.so";
         module_suffix[1] = NULL;
         break;
 
@@ -801,6 +808,12 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
             *drivers_out = g_list_prepend (*drivers_out,
                                            srt_dri_driver_new (this_driver_in_provider,
                                                                is_extra));
+            break;
+
+          case SRT_GRAPHICS_GBM_MODULE:
+            *drivers_out = g_list_prepend (*drivers_out,
+                                           srt_gbm_backend_new (this_driver_in_provider,
+                                                                is_extra));
             break;
 
           case SRT_GRAPHICS_VAAPI_MODULE:
@@ -1004,6 +1017,8 @@ _srt_get_modules_from_loader_library (SrtSysroot *sysroot,
 
   if (module == SRT_GRAPHICS_VDPAU_MODULE)
     libdir_driver = g_build_filename (libdir, "vdpau", NULL);
+  else if (module == SRT_GRAPHICS_GBM_MODULE)
+    libdir_driver = g_build_filename (libdir, "gbm", NULL);
   else
     libdir_driver = g_build_filename (libdir, "dri", NULL);
 
@@ -1046,7 +1061,12 @@ _srt_get_modules_from_loader_library (SrtSysroot *sysroot,
           const char *multiarch_tuple = g_quark_to_string (arch_quark);
           GList *extras;
 
-          extras = _srt_get_extra_modules_directory (libdir, multiarch_tuple, driver_class, "dri");
+
+          if (module == SRT_GRAPHICS_GBM_MODULE)
+            extras = _srt_get_extra_modules_directory (libdir, multiarch_tuple, driver_class, "gbm");
+          else
+            extras = _srt_get_extra_modules_directory (libdir, multiarch_tuple, driver_class, "dri");
+
           for (this_extra_path = extras; this_extra_path != NULL; this_extra_path = this_extra_path->next)
             {
               if (!g_hash_table_contains (drivers_set, this_extra_path->data))
@@ -1169,8 +1189,9 @@ _srt_list_glx_icds (SrtSysroot *sysroot,
  * @check_flags: Flags affecting how we do the search
  * @module: Which graphic module to search
  * @drivers_out: (inout): Prepend the found drivers to this list.
- *  If @module is #SRT_GRAPHICS_DRI_MODULE or #SRT_GRAPHICS_VAAPI_MODULE or
- *  #SRT_GRAPHICS_VDPAU_MODULE, the element-type will be #SrtDriDriver, or
+ *  If @module is #SRT_GRAPHICS_DRI_MODULE or #SRT_GRAPHICS_GBM_MODULE or
+ *  #SRT_GRAPHICS_VAAPI_MODULE or #SRT_GRAPHICS_VDPAU_MODULE,
+ *  the element-type will be #SrtDriDriver or #SrtGbmBackend or
  *  #SrtVaApiDriver or #SrtVdpauDriver, respectively.
  *
  * On exit, `drivers_out` will have the least-preferred directories first and the
@@ -1191,6 +1212,7 @@ _srt_get_modules_full (SrtSysroot *sysroot,
   const char * const *loader_libraries;
   static const char *const dri_loaders[] = { "libGLX_mesa.so.0", "libEGL_mesa.so.0",
                                              "libGL.so.1", NULL };
+  static const char *const gbm_loaders[] = { "libgbm.so.1", NULL };
   static const char *const va_api_loaders[] = { "libva.so.2", "libva.so.1", NULL };
   static const char *const vdpau_loaders[] = { "libvdpau.so.1", NULL };
   const char * const *envp;
@@ -1201,6 +1223,7 @@ _srt_get_modules_full (SrtSysroot *sysroot,
   g_autoptr(GHashTable) drivers_set = NULL;
   gboolean colon_separated_drivers_path = FALSE;
   gboolean is_dri = FALSE;
+  gboolean is_gbm = FALSE;
   gboolean is_extra = FALSE;
   g_autoptr(GPtrArray) vdpau_argv = NULL;
   g_autoptr(GError) error = NULL;
@@ -1222,6 +1245,13 @@ _srt_get_modules_full (SrtSysroot *sysroot,
         env_override = "LIBGL_DRIVERS_PATH";
         colon_separated_drivers_path = TRUE;
         is_dri = TRUE;
+        break;
+
+      case SRT_GRAPHICS_GBM_MODULE:
+        loader_libraries = gbm_loaders;
+        env_override = "GBM_BACKENDS_PATH";
+        colon_separated_drivers_path = TRUE;
+        is_gbm = TRUE;
         break;
 
       case SRT_GRAPHICS_VAAPI_MODULE:
@@ -1252,18 +1282,31 @@ _srt_get_modules_full (SrtSysroot *sysroot,
     {
       g_debug ("A driver path environment is available: %s", drivers_path);
     }
-  else if (provider != NULL && is_dri)
+  else if (provider != NULL && (is_dri || is_gbm))
     {
       const SrtGraphicsProviderArchitecture *arch;
 
       arch = _srt_graphics_provider_get_architecture (provider, arch_quark);
 
-      if (arch != NULL)
-        drivers_path = _srt_graphics_provider_architecture_get_dri_path (arch);
+      if (is_dri)
+        {
+          if (arch != NULL)
+            drivers_path = _srt_graphics_provider_architecture_get_dri_path (arch);
 
-      if (drivers_path != NULL)
-        g_debug ("Using DRI path from %s: %s",
-                 _srt_graphics_provider_describe (provider), drivers_path);
+          if (drivers_path != NULL)
+            g_debug ("Using DRI path from %s: %s",
+                     _srt_graphics_provider_describe (provider), drivers_path);
+        }
+      else
+        {
+          g_assert (is_gbm);
+          if (arch != NULL)
+            drivers_path = _srt_graphics_provider_architecture_get_gbm_path (arch);
+
+          if (drivers_path != NULL)
+            g_debug ("Using GBM path from %s: %s",
+                     _srt_graphics_provider_describe (provider), drivers_path);
+        }
 
       colon_separated_drivers_path = FALSE;
     }
@@ -1325,13 +1368,18 @@ _srt_get_modules_full (SrtSysroot *sysroot,
    * (reference:
    * <https://gitlab.com/freedesktop-sdk/freedesktop-sdk/blob/master/elements/components/libva.bst>)
    *
-   * For Mesa there is just a single path:
+   * For Mesa DRI drivers there is just a single path:
    * "%{libdir}/GL/lib/dri"
    * (really `GL/default/lib/dri` or `GL/mesa-git/lib/dri`, but `GL/lib/dri` is
    * populated with symbolic links; reference:
    * <https://gitlab.com/freedesktop-sdk/freedesktop-sdk/blob/master/elements/extensions/mesa/mesa.bst>
    * and
    * <https://gitlab.com/freedesktop-sdk/freedesktop-sdk/blob/master/elements/flatpak-images/platform.bst>)
+   *
+   * Similarly, for Mesa GBM backends there is just a single path:
+   * "%{libdir}/GL/lib/gbm"
+   * (reference:
+   * <https://gitlab.com/freedesktop-sdk/freedesktop-sdk/blob/master/elements/extensions/mesa/mesa.yml>)
    *
    * For VDPAU there is just a single path:
    * "%{libdir}/vdpau"
@@ -1376,6 +1424,21 @@ _srt_get_modules_full (SrtSysroot *sysroot,
                                           arch_quark,
                                           known_arch,
                                           check_flags, gl_lib_dri,
+                                          is_extra, module, drivers_out);
+            }
+        }
+
+      if (module == SRT_GRAPHICS_GBM_MODULE)
+        {
+          g_autofree gchar *gl_lib_gbm = g_build_filename (libdir, "GL", "lib", "gbm", NULL);
+
+          if (!g_hash_table_contains (drivers_set, gl_lib_gbm))
+            {
+              g_hash_table_add (drivers_set, g_strdup (gl_lib_gbm));
+              _srt_get_modules_from_path (sysroot, runner,
+                                          arch_quark,
+                                          known_arch,
+                                          check_flags, gl_lib_gbm,
                                           is_extra, module, drivers_out);
             }
         }

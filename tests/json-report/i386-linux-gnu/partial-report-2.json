@@ -46,6 +46,8 @@
         }
       },
       "dri_drivers" : [
+      ],
+      "gbm_backends" : [
       ]
     }
   },

@@ -76,6 +76,51 @@ out:
 }
 
 /*
+ * _srt_gbm_backend_get_from_report:
+ * @json_obj: (not nullable): A JSON Object used to search for "gbm_backends"
+ *  property
+ *
+ * If the provided @json_obj doesn't have a "gbm_backends" member, or it is
+ * malformed, %NULL will be returned.
+ *
+ * Returns: A list of #SrtGbmBackend that have been found, or %NULL if none
+ *  has been found.
+ */
+GList *
+_srt_gbm_backend_get_from_report (JsonObject *json_obj)
+{
+  JsonArray *array;
+  GList *gbm_backends = NULL;
+
+  g_return_val_if_fail (json_obj != NULL, NULL);
+
+  if (json_object_has_member (json_obj, "gbm_backends"))
+    {
+      array = json_object_get_array_member (json_obj, "gbm_backends");
+
+      if (array == NULL)
+        goto out;
+
+      guint length = json_array_get_length (array);
+      for (guint j = 0; j < length; j++)
+        {
+          const gchar *gbm_path = NULL;
+          gboolean is_extra = FALSE;
+          JsonObject *json_gbm_obj = json_array_get_object_element (array, j);
+          gbm_path = json_object_get_string_member_with_default (json_gbm_obj, "library_path",
+                                                                 NULL);
+          is_extra = json_object_get_boolean_member_with_default (json_gbm_obj, "is_extra",
+                                                                  FALSE);
+
+          gbm_backends = g_list_prepend (gbm_backends, srt_gbm_backend_new (gbm_path, is_extra));
+        }
+    }
+
+out:
+  return g_list_reverse (gbm_backends);
+}
+
+/*
  * _srt_glx_icd_get_from_report:
  * @json_obj: (not nullable): A JSON Object used to search for "glx_drivers"
  *  property

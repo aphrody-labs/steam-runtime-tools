@@ -393,6 +393,17 @@ Mesa's `libgbm.so.1` is required for some Steam features and some games,
 and must be in the dynamic linker search path
 (`ld.so` cache or `LD_LIBRARY_PATH`).
 
+GBM backends are optional.
+If the `libgbm.so.1` library is required, then the GBM backends such
+as `dri_gbm.so` are assumed to be available in the search path
+defined by `GBM_BACKENDS_PATH`, or in a `gbm` subdirectory of the
+directory containing the loader library `libgbm.so.1`.
+Some special cases for the Flatpak freedesktop.org SDK are also checked
+(see steam-runtime-tools source code for details).
+If the operating system needs a non-standard search path to be used,
+then Steam should be run with the `GBM_BACKENDS_PATH` environment variable
+set appropriately.
+
 EGL drivers are recommended.
 They are located in the same way that is documented for the upstream
 libglvnd project: [EGL ICD enumeration][].

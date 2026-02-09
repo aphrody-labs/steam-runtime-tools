@@ -76,6 +76,7 @@ main (int argc,
   static const char *const sonames[] = { "libvdpau_r9000.so", "libGLX_mesa.so.0",
                                          "libGLX_nvidia.so.0", "libEGL_mesa.so.0",
                                          "libGL.so.1", "libva.so.2", "libva.so.1",
+                                         "libgbm.so.1",
                                          "libvdpau.so.1", NULL };
 
   if (g_strcmp0 (argv[first_pattern_index], "--link-target=/") == 0)

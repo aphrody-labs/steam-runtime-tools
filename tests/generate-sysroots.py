@@ -69,6 +69,7 @@ dirs = ''
 for abi in supported_abis:
     dirs = dirs + textwrap.dedent('''\
         debian10/usr/lib/{0}/dri
+        debian10/usr/lib/{0}/gbm
         debian10/usr/lib/{0}/vdpau
         fake-steam-runtime/usr/lib/steamrt/expectations/{0}
         steamrt/overrides/lib/{0}
@@ -132,29 +133,38 @@ fedora/custom_path2
 fedora/custom_path3
 fedora/proc/sys/user
 fedora/usr/lib/dri
+fedora/usr/lib/gbm
 fedora/usr/lib/vdpau
 fedora/usr/lib64/dri
+fedora/usr/lib64/gbm
 fedora/usr/lib64/vdpau
 fedora/usr/share/vulkan/implicit_layer.d
 fedora/run/systemd
 fedora/sys/class/dmi/id
 flatpak-example/usr/lib/dri
+flatpak-example/usr/lib/gbm
 flatpak-example/usr/lib/x86_64-mock-abi/GL/lib/dri
+flatpak-example/usr/lib/x86_64-mock-abi/GL/lib/gbm
 flatpak-example/usr/lib/x86_64-mock-abi/dri
 flatpak-example/usr/lib/x86_64-mock-abi/dri/intel-vaapi-driver
+flatpak-example/usr/lib/x86_64-mock-abi/gbm
 flatpak-example/usr/lib/x86_64-mock-abi/vdpau
 flatpak-example/run/host
 invalid-os-release/usr/lib
 invalid-os-release/run/host
 no-os-release/another_custom_path
 no-os-release/custom_path32/dri
+no-os-release/custom_path32/gbm
 no-os-release/custom_path32/va
 no-os-release/custom_path32/vdpau
 no-os-release/custom_path32_2/dri
+no-os-release/custom_path32_2/gbm
 no-os-release/custom_path32_2/va
 no-os-release/custom_path64/dri
+no-os-release/custom_path64/gbm
 no-os-release/custom_path64/va
 no-os-release/usr/lib/dri
+no-os-release/usr/lib/gbm
 no-os-release/usr/lib/vdpau
 podman-example/run/host
 steamrt/etc
@@ -168,7 +178,9 @@ steamrt-unofficial/etc
 steamrt-unofficial/usr/lib
 steamrt-unofficial/proc/1
 ubuntu16/usr/lib/dri
+ubuntu16/usr/lib/gbm
 ubuntu16/usr/lib/x86_64-mock-ubuntu/dri
+ubuntu16/usr/lib/x86_64-mock-ubuntu/gbm
 ubuntu16/usr/lib/x86_64-mock-ubuntu/mesa
 ubuntu16/usr/lib/x86_64-mock-ubuntu/vdpau
 ubuntu16/sys/class/dmi/id
@@ -184,6 +196,8 @@ for abi in supported_abis:
         debian10/usr/lib/{0}/ld.so
         debian10/usr/lib/{0}/dri/i965_dri.so
         debian10/usr/lib/{0}/dri/r600_drv_video.so
+        debian10/usr/lib/{0}/gbm/dri_gbm.so
+        debian10/usr/lib/{0}/libgbm.so.1
         debian10/usr/lib/{0}/libEGL_mesa.so.0
         debian10/usr/lib/{0}/libGLX_mesa.so.0
         debian10/usr/lib/{0}/libva.so.2
@@ -197,11 +211,13 @@ for abi in supported_abis:
 files = files + '''
 debian10/usr/lib/i386-linux-gnu/dri/r300_dri.so
 debian10/usr/lib/i386-linux-gnu/dri/radeonsi_dri.so
+debian10/usr/lib/i386-linux-gnu/gbm/dri_gbm.so
 debian10/usr/lib/i386-linux-gnu/libGLX_nvidia.so.0
 debian10/usr/lib/i386-linux-gnu/vdpau/libvdpau_r600.so
 debian10/usr/lib/x86_64-linux-gnu/dri/r600_dri.so
 debian10/usr/lib/x86_64-linux-gnu/dri/radeon_dri.so
 debian10/usr/lib/x86_64-linux-gnu/dri/radeonsi_drv_video.so
+debian10/usr/lib/x86_64-linux-gnu/gbm/dri_gbm.so
 debian10/usr/lib/x86_64-linux-gnu/libGL.so.1
 debian10/usr/lib/x86_64-linux-gnu/vdpau/libvdpau_r600.so.1.0.0
 debian-unstable/.dockerenv
@@ -232,8 +248,10 @@ fedora/usr/lib/dri/i965_dri.so
 fedora/usr/lib/dri/r300_dri.so
 fedora/usr/lib/dri/r600_drv_video.so
 fedora/usr/lib/dri/radeonsi_dri.so
+fedora/usr/lib/gbm/dri_gbm.so
 fedora/usr/lib/libEGL_mesa.so.0
 fedora/usr/lib/libGL.so.1
+fedora/usr/lib/libgbm.so.1
 fedora/usr/lib/libva.so.1
 fedora/usr/lib/libvdpau.so.1
 fedora/usr/lib/vdpau/libvdpau_nouveau.so.1
@@ -245,18 +263,23 @@ fedora/usr/lib64/dri/r600_dri.so
 fedora/usr/lib64/dri/r600_drv_video.so
 fedora/usr/lib64/dri/radeon_dri.so
 fedora/usr/lib64/dri/radeonsi_drv_video.so
+fedora/usr/lib64/gbm/dri_gbm.so
 fedora/usr/lib64/libEGL_mesa.so.0
+fedora/usr/lib64/libgbm.so.1
 fedora/usr/lib64/libva.so.2
 fedora/usr/lib64/libvdpau.so.1
 fedora/usr/lib64/vdpau/libvdpau_r300.so
 fedora/usr/lib64/vdpau/libvdpau_radeonsi.so
 flatpak-example/usr/lib/dri/r300_dri.so
 flatpak-example/usr/lib/dri/r600_drv_video.so
+flatpak-example/usr/lib/gbm/dri_gbm.so
 flatpak-example/usr/lib/x86_64-mock-abi/GL/lib/dri/i965_dri.so
 flatpak-example/usr/lib/x86_64-mock-abi/GL/lib/dri/r600_drv_video.so
+flatpak-example/usr/lib/x86_64-mock-abi/GL/lib/gbm/dri_gbm.so
 flatpak-example/usr/lib/x86_64-mock-abi/dri/intel-vaapi-driver/i965_drv_video.so
 flatpak-example/usr/lib/x86_64-mock-abi/dri/radeonsi_drv_video.so
 flatpak-example/usr/lib/x86_64-mock-abi/libEGL_mesa.so.0
+flatpak-example/usr/lib/x86_64-mock-abi/libgbm.so.1
 flatpak-example/usr/lib/x86_64-mock-abi/libva.so.2
 flatpak-example/usr/lib/x86_64-mock-abi/libvdpau.so.1
 flatpak-example/usr/lib/x86_64-mock-abi/vdpau/libvdpau_radeonsi.so.1
@@ -265,18 +288,23 @@ invalid-os-release/run/host/.exists
 no-os-release/another_custom_path/libvdpau_custom.so
 no-os-release/custom_path32/dri/r600_dri.so
 no-os-release/custom_path32/dri/radeon_dri.so
+no-os-release/custom_path32/gbm/dri_gbm.so
 no-os-release/custom_path32/va/r600_drv_video.so
 no-os-release/custom_path32/va/radeonsi_drv_video.so
 no-os-release/custom_path32/vdpau/libvdpau_r600.so.1
 no-os-release/custom_path32/vdpau/libvdpau_radeonsi.so.1
 no-os-release/custom_path32_2/dri/r300_dri.so
+no-os-release/custom_path32_2/gbm/dri_gbm.so
 no-os-release/custom_path32_2/va/nouveau_drv_video.so
 no-os-release/custom_path64/dri/i965_dri.so
+no-os-release/custom_path64/gbm/dri_gbm.so
 no-os-release/custom_path64/va/radeonsi_drv_video.so
 no-os-release/usr/lib/dri/i965_dri.so
 no-os-release/usr/lib/dri/r600_drv_video.so
 no-os-release/usr/lib/dri/radeonsi_dri.so
+no-os-release/usr/lib/gbm/dri_gbm.so
 no-os-release/usr/lib/libGL.so.1
+no-os-release/usr/lib/libgbm.so.1
 no-os-release/usr/lib/libva.so.1
 no-os-release/usr/lib/libvdpau.so.1
 no-os-release/usr/lib/libvdpau_r9000.so
@@ -290,10 +318,12 @@ steamrt-overrides-issues/usr/lib/pressure-vessel/overrides/bin/.keep
 steamrt-overrides-issues/usr/lib/pressure-vessel/overrides/lib/i386-linux-gnu/.keep
 ubuntu16/lib64/ld-linux-x86-64.so.2
 ubuntu16/usr/lib/dri/radeonsi_dri.so
+ubuntu16/usr/lib/gbm/dri_gbm.so
 ubuntu16/usr/lib/x86_64-mock-ubuntu/dri/i965_dri.so
 ubuntu16/usr/lib/x86_64-mock-ubuntu/dri/radeon_dri.so
 ubuntu16/usr/lib/x86_64-mock-ubuntu/dri/radeonsi_drv_video.so
 ubuntu16/usr/lib/x86_64-mock-ubuntu/libva.so.1
+ubuntu16/usr/lib/x86_64-mock-ubuntu/libgbm.so.1
 ubuntu16/usr/lib/x86_64-mock-ubuntu/mesa/libGL.so.1
 ubuntu16/usr/lib/x86_64-mock-ubuntu/vdpau/libvdpau_r600.so.1.0.0
 ubuntu16/usr/lib/x86_64-mock-ubuntu/vdpau/libvdpau_radeonsi.so.1.0.0

@@ -2803,6 +2803,9 @@ check_list_suffixes (const GList *list,
           case SRT_GRAPHICS_DRI_MODULE:
             value = srt_dri_driver_get_library_path (iter->data);
             break;
+          case SRT_GRAPHICS_GBM_MODULE:
+            value = srt_gbm_backend_get_library_path (iter->data);
+            break;
           case SRT_GRAPHICS_VAAPI_MODULE:
             value = srt_va_api_driver_get_library_path (iter->data);
             break;
@@ -2837,6 +2840,10 @@ check_list_extra (const GList *list,
         {
           case SRT_GRAPHICS_DRI_MODULE:
             g_assert_cmpint (is_extra, ==, srt_dri_driver_is_extra (iter->data));
+            break;
+
+          case SRT_GRAPHICS_GBM_MODULE:
+            g_assert_cmpint (is_extra, ==, srt_gbm_backend_is_extra (iter->data));
             break;
 
           case SRT_GRAPHICS_VAAPI_MODULE:
@@ -2876,6 +2883,7 @@ check_list_links (const GList *list,
 
           case SRT_GRAPHICS_VAAPI_MODULE:
           case SRT_GRAPHICS_DRI_MODULE:
+          case SRT_GRAPHICS_GBM_MODULE:
           case NUM_SRT_GRAPHICS_MODULES:
           default:
             g_return_if_reached ();
@@ -2904,6 +2912,11 @@ check_paths_are_absolute (const GList *list,
           case SRT_GRAPHICS_DRI_MODULE:
             library_path = srt_dri_driver_get_library_path (iter->data);
             absolute_path = srt_dri_driver_resolve_library_path (iter->data);
+            break;
+
+          case SRT_GRAPHICS_GBM_MODULE:
+            library_path = srt_gbm_backend_get_library_path (iter->data);
+            absolute_path = srt_gbm_backend_resolve_library_path (iter->data);
             break;
 
           case SRT_GRAPHICS_VDPAU_MODULE:
@@ -2941,6 +2954,11 @@ check_paths_are_relative (const GList *list,
           case SRT_GRAPHICS_DRI_MODULE:
             library_path = srt_dri_driver_get_library_path (iter->data);
             absolute_path = srt_dri_driver_resolve_library_path (iter->data);
+            break;
+
+          case SRT_GRAPHICS_GBM_MODULE:
+            library_path = srt_gbm_backend_get_library_path (iter->data);
+            absolute_path = srt_gbm_backend_resolve_library_path (iter->data);
             break;
 
           case SRT_GRAPHICS_VDPAU_MODULE:
@@ -3350,6 +3368,264 @@ test_dri_flatpak (Fixture *f,
   g_test_message ("VA-API drivers...");
   va_api = srt_system_info_list_va_api_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
   check_list_suffixes (va_api, va_api_suffixes, SRT_GRAPHICS_VAAPI_MODULE);
+}
+
+static void
+test_gbm_debian10 (Fixture *f,
+                   gconstpointer context)
+{
+  g_autoptr(SrtSystemInfo) info = NULL;
+  g_auto(GStrv) envp = NULL;
+  g_autofree gchar *sysroot = NULL;
+  GList *gbm;
+  const gchar *multiarch_tuples[] = {"i386-mock-debian", "x86_64-mock-debian", NULL};
+  const gchar *gbm_suffixes_i386[] = {"/lib/i386-linux-gnu/gbm/dri_gbm.so",
+                                      NULL};
+  const gchar *gbm_suffixes_x86_64[] = {"/lib/x86_64-linux-gnu/gbm/dri_gbm.so",
+                                        NULL};
+
+  g_test_message ("Entering %s", G_STRFUNC);
+
+  sysroot = g_build_filename (f->sysroots, "debian10", NULL);
+  envp = g_get_environ ();
+  envp = g_environ_setenv (envp, "SRT_TEST_SYSROOT", sysroot, TRUE);
+  envp = g_environ_unsetenv (envp, "GBM_BACKENDS_PATH");
+
+  info = srt_system_info_new (NULL);
+  srt_system_info_set_environ (info, envp);
+  srt_system_info_set_sysroot (info, sysroot);
+  srt_system_info_set_helpers_path (info, f->builddir);
+  /* This test assumes that the results of inspect-library on the host
+   * are valid in the sysroot, as above */
+  srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
+
+  /* The output is guaranteed to be in aphabetical order */
+  g_test_message ("i386 GBM backends...");
+  gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  check_list_suffixes (gbm, gbm_suffixes_i386, SRT_GRAPHICS_GBM_MODULE);
+  check_paths_are_absolute (gbm, SRT_GRAPHICS_GBM_MODULE);
+  g_list_free_full (gbm, g_object_unref);
+
+  g_test_message ("x86_64 GBM backends...");
+  gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[1], SRT_DRIVER_FLAGS_NONE);
+  check_list_suffixes (gbm, gbm_suffixes_x86_64, SRT_GRAPHICS_GBM_MODULE);
+  check_paths_are_absolute (gbm, SRT_GRAPHICS_GBM_MODULE);
+  g_list_free_full (gbm, g_object_unref);
+
+  /* Do it again, this time using the cached result.
+   * While doing it we also try to get the "extra" drivers.
+   * We expect to receive the same drivers list as before because we are using
+   * a multiarch tuple that is different from what we have in debian10/usr/lib
+   * so _srt_get_extra_modules_folder will fail to split the path.
+   * Anyway, even if the folder had the same name as the multiarch tuple,
+   * we still would be unable to get extras because the drivers that we are
+   * using (e.g. libGL.so.1) are just empty files, so `elf_begin` would fail. */
+  g_test_message ("i386 GBM backends, from cache, with extras...");
+  gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  check_list_suffixes (gbm, gbm_suffixes_i386, SRT_GRAPHICS_GBM_MODULE);
+  g_list_free_full (gbm, g_object_unref);
+
+  g_test_message ("x86_64 GBM backends, from cache, with extras...");
+  gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[1], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  check_list_suffixes (gbm, gbm_suffixes_x86_64, SRT_GRAPHICS_GBM_MODULE);
+  g_list_free_full (gbm, g_object_unref);
+}
+
+static void
+test_gbm_fedora (Fixture *f,
+                 gconstpointer context)
+{
+  g_autoptr(SrtSystemInfo) info = NULL;
+  g_auto(GStrv) envp = NULL;
+  g_autofree gchar *sysroot = NULL;
+  GList *gbm;
+  const gchar *multiarch_tuples[] = {"i386-mock-fedora", "x86_64-mock-fedora", NULL};
+  const gchar *gbm_suffixes_32[] = {"/usr/lib/gbm/dri_gbm.so",
+                                    NULL};
+  const gchar *gbm_suffixes_64[] = {"/usr/lib64/gbm/dri_gbm.so",
+                                    NULL};
+
+  g_test_message ("Entering %s", G_STRFUNC);
+
+  sysroot = g_build_filename (f->sysroots, "fedora", NULL);
+  envp = g_get_environ ();
+  envp = g_environ_setenv (envp, "SRT_TEST_SYSROOT", sysroot, TRUE);
+  envp = g_environ_unsetenv (envp, "GBM_BACKENDS_PATH");
+
+  info = srt_system_info_new (NULL);
+  srt_system_info_set_environ (info, envp);
+  srt_system_info_set_sysroot (info, sysroot);
+  srt_system_info_set_helpers_path (info, f->builddir);
+  /* This test assumes that the results of inspect-library on the host
+   * are valid in the sysroot, as above */
+  srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
+
+  g_test_message ("i386 GBM backends...");
+  gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  check_list_suffixes (gbm, gbm_suffixes_32, SRT_GRAPHICS_GBM_MODULE);
+  g_list_free_full (gbm, g_object_unref);
+
+  g_test_message ("x86_64 GBM backends...");
+  gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[1], SRT_DRIVER_FLAGS_NONE);
+  check_list_suffixes (gbm, gbm_suffixes_64, SRT_GRAPHICS_GBM_MODULE);
+  g_list_free_full (gbm, g_object_unref);
+}
+
+static void
+test_gbm_ubuntu16 (Fixture *f,
+                   gconstpointer context)
+{
+  g_autoptr(SrtSystemInfo) info = NULL;
+  g_auto(GStrv) envp = NULL;
+  g_autofree gchar *sysroot = NULL;
+  GList *gbm;
+  const gchar *multiarch_tuples[] = {"x86_64-mock-ubuntu", NULL};
+  const gchar *gbm_suffixes[] = {NULL};
+  const gchar *gbm_suffixes_extra[] = {"/lib/gbm/dri_gbm.so",
+                                       NULL};
+
+  g_test_message ("Entering %s", G_STRFUNC);
+
+  sysroot = g_build_filename (f->sysroots, "ubuntu16", NULL);
+  envp = g_get_environ ();
+  envp = g_environ_setenv (envp, "SRT_TEST_SYSROOT", sysroot, TRUE);
+  envp = g_environ_setenv (envp, "SRT_TEST_ELF_CLASS_FROM_PATH", "1", TRUE);
+  envp = g_environ_unsetenv (envp, "GBM_BACKENDS_PATH");
+
+  info = srt_system_info_new (NULL);
+  srt_system_info_set_environ (info, envp);
+  srt_system_info_set_sysroot (info, sysroot);
+  srt_system_info_set_helpers_path (info, f->builddir);
+  /* This test assumes that the results of inspect-library on the host
+   * are valid in the sysroot, as above */
+  srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
+
+  g_test_message ("GBM backends...");
+  gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  check_list_suffixes (gbm, gbm_suffixes, SRT_GRAPHICS_GBM_MODULE);
+  g_list_free_full (gbm, g_object_unref);
+
+  g_test_message ("GBM backends (all)...");
+  gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  check_list_suffixes (gbm, gbm_suffixes_extra, SRT_GRAPHICS_GBM_MODULE);
+  g_list_free_full (gbm, g_object_unref);
+}
+
+static void
+test_gbm_with_env (Fixture *f,
+                   gconstpointer context)
+{
+  g_autoptr(SrtSystemInfo) info = NULL;
+  g_auto(GStrv) envp = NULL;
+  g_autofree gchar *sysroot = NULL;
+  const gchar *libgbm = NULL;
+  const gchar *libgbm2 = NULL;
+  const gchar *libgbm3 = NULL;
+  g_autofree gchar *libgbm_combined = NULL;
+  GList *gbm;
+  const gchar *multiarch_tuples[] = {"i386-mock-fedora", NULL};
+  const gchar *gbm_suffixes[] = {"custom_path32/gbm/dri_gbm.so",
+                                 "custom_path32_2/gbm/dri_gbm.so",
+                                 NULL};
+  const gchar *gbm_suffixes_with_extras[] = {"custom_path32/gbm/dri_gbm.so",
+                                             "custom_path32_2/gbm/dri_gbm.so",
+                                             "/usr/lib/gbm/dri_gbm.so",
+                                             NULL};
+
+  g_test_message ("Entering %s", G_STRFUNC);
+
+#ifndef _SRT_MULTIARCH
+  g_test_skip ("Unsupported architecture");
+  return;
+#endif
+
+  sysroot = g_build_filename (f->sysroots, "no-os-release", NULL);
+
+  libgbm = "/custom_path32/gbm";
+  libgbm2 = "/custom_path32_2/gbm";
+  /* We have these two 64bit directories but we are using only one mock 32bit executable.
+   * So we expect to not receive the content of these directories because we should
+   * find 32bit only libraries. */
+  libgbm3 = "/custom_path64/gbm";
+
+  libgbm_combined = g_strjoin (":", libgbm, libgbm2, libgbm3, NULL);
+
+  envp = g_get_environ ();
+  envp = g_environ_setenv (envp, "SRT_TEST_SYSROOT", sysroot, TRUE);
+  envp = g_environ_setenv (envp, "GBM_BACKENDS_PATH", libgbm_combined, TRUE);
+
+  info = srt_system_info_new (NULL);
+  srt_system_info_set_environ (info, envp);
+  srt_system_info_set_sysroot (info, sysroot);
+  srt_system_info_set_helpers_path (info, f->builddir);
+  /* This test assumes that the results of inspect-library on the host
+   * are valid in the sysroot, as above */
+  srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
+
+  /* The output is guaranteed to be in aphabetical order */
+  g_test_message ("GBM backends...");
+  gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  check_list_suffixes (gbm, gbm_suffixes, SRT_GRAPHICS_GBM_MODULE);
+  check_paths_are_absolute (gbm, SRT_GRAPHICS_GBM_MODULE);
+  g_list_free_full (gbm, g_object_unref);
+
+  /* Do it again, this time including the extras */
+  g_test_message ("GBM backends (all)...");
+  gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  check_list_suffixes (gbm, gbm_suffixes_with_extras, SRT_GRAPHICS_GBM_MODULE);
+  /* Minus one to not count the NULL terminator */
+  check_list_extra (gbm, G_N_ELEMENTS(gbm_suffixes)-1, SRT_GRAPHICS_GBM_MODULE);
+  check_paths_are_absolute (gbm, SRT_GRAPHICS_GBM_MODULE);
+  g_list_free_full (gbm, g_object_unref);
+
+  /* Test relative path.
+   * Move to the sysroots path because otherwise we can't use the
+   * relative paths */
+  if (g_chdir (sysroot) != 0)
+    g_error ("chdir %s: %s", sysroot, g_strerror (errno));
+  g_free (libgbm_combined);
+  /* Plus one to remove the leading "/" */
+  libgbm_combined = g_strjoin (":", libgbm + 1, libgbm2 + 1, libgbm3 + 1, NULL);
+  envp = g_environ_setenv (envp, "GBM_BACKENDS_PATH", libgbm_combined, TRUE);
+  srt_system_info_set_environ (info, envp);
+
+  g_test_message ("GBM backends (with relative path)...");
+  gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  check_list_suffixes (gbm, gbm_suffixes, SRT_GRAPHICS_GBM_MODULE);
+  check_paths_are_relative (gbm, SRT_GRAPHICS_GBM_MODULE);
+  g_list_free_full (gbm, g_object_unref);
+}
+
+static void
+test_gbm_flatpak (Fixture *f,
+                  gconstpointer context)
+{
+  g_autoptr(SrtSystemInfo) info;
+  g_auto(GStrv) envp = NULL;
+  g_autofree gchar *sysroot = NULL;
+  g_autoptr(SrtObjectList) gbm = NULL;
+  const gchar *multiarch_tuples[] = { "x86_64-mock-abi", NULL };
+  const gchar *gbm_suffixes[] = {"/usr/lib/x86_64-mock-abi/GL/lib/gbm/dri_gbm.so",
+                                  NULL};
+
+  g_test_message ("Entering %s", G_STRFUNC);
+
+  sysroot = g_build_filename (f->sysroots, "flatpak-example", NULL);
+  envp = g_get_environ ();
+  envp = g_environ_setenv (envp, "SRT_TEST_SYSROOT", sysroot, TRUE);
+  envp = g_environ_unsetenv (envp, "GBM_BACKENDS_PATH");
+
+  info = srt_system_info_new (NULL);
+  srt_system_info_set_environ (info, envp);
+  srt_system_info_set_sysroot (info, sysroot);
+  srt_system_info_set_helpers_path (info, f->builddir);
+  /* This test assumes that the results of inspect-library on the host
+   * are valid in the sysroot, as above */
+  srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
+
+  g_test_message ("GBM backends...");
+  gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  check_list_suffixes (gbm, gbm_suffixes, SRT_GRAPHICS_GBM_MODULE);
 }
 
 typedef struct
@@ -4100,6 +4376,17 @@ main (int argc,
               setup, test_dri_with_env, teardown);
   g_test_add ("/graphics/dri/flatpak", Fixture, NULL,
               setup, test_dri_flatpak, teardown);
+
+  g_test_add ("/graphics/gbm/debian10", Fixture, NULL,
+              setup, test_gbm_debian10, teardown);
+  g_test_add ("/graphics/gbm/fedora", Fixture, NULL,
+              setup, test_gbm_fedora, teardown);
+  g_test_add ("/graphics/gbm/ubuntu16", Fixture, NULL,
+              setup, test_gbm_ubuntu16, teardown);
+  g_test_add ("/graphics/gbm/with_env", Fixture, NULL,
+              setup, test_gbm_with_env, teardown);
+  g_test_add ("/graphics/gbm/flatpak", Fixture, NULL,
+              setup, test_gbm_flatpak, teardown);
 
   g_test_add ("/graphics/vdpau/basic", Fixture, NULL,
               setup, test_vdpau, teardown);

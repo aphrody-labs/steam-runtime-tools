@@ -3960,10 +3960,16 @@ srt_system_info_list_dri_drivers (SrtSystemInfo *self,
  *  %SRT_DRIVER_FLAGS_INCLUDE_ALL flag is set.
  *
  * List of the available Mesa GBM modules.
- * the implementation only supports parsed reports for now.
+ *
+ * `$GBM_BACKENDS_PATH` will be used as the search path, if set.
+ * Otherwise some implementation-dependent paths will be used instead.
+ *
+ * Note that if `$GBM_BACKENDS_PATH` is set, all drivers outside that
+ * path will be treated as "extra", and omitted from the list unless
+ * %SRT_DRIVER_FLAGS_INCLUDE_ALL is used.
  *
  * Returns: (transfer full) (element-type SrtGbmBackend) (nullable): A list of
- *  opaque #SrtGbmBackend objects, or %NULL if self->report is false. Free with
+ *  opaque #SrtGbmBackend objects, or %NULL if nothing was found. Free with
  *  `g_list_free_full(list, g_object_unref)`.
  */
 GList *
@@ -3971,11 +3977,8 @@ srt_system_info_list_gbm_backends (SrtSystemInfo *self,
                                    const char *multiarch_tuple,
                                    SrtDriverFlags flags)
 {
-  if (self->from_report)
-    return _srt_system_info_list_graphics_modules (self, multiarch_tuple, flags,
-                                                   SRT_GRAPHICS_GBM_MODULE);
-  else
-    return NULL;
+  return _srt_system_info_list_graphics_modules (self, multiarch_tuple, flags,
+                                                 SRT_GRAPHICS_GBM_MODULE);
 }
 
 /**

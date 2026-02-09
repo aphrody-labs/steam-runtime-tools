@@ -725,6 +725,24 @@ keys:
             This key is optional and if is not provided, the default `false`
             value should be assumed.
 
+    **gbm_backends**
+    :   An array of objects describing the Mesa GBM backend modules that have been
+        found. These backends are used by Mesa and by older versions of Xorg.
+        Every object can have the following keys:
+
+        **library_path**
+        :   Path to the driver module that has been found.
+
+        **library_path_resolved**
+        :   Absolute path to the driver module that has been found.
+            This key is present only if **library_path** is relative.
+
+        **is_extra**
+        :   A boolean value indicating whether the driver module is in an
+            "unusual" location, probably not in the canonical search path.
+            This key is optional and if is not provided, the default `false`
+            value should be assumed.
+
     **va-api_drivers**
     :   An array of objects describing the VA-API driver modules that have been
         found. These drivers are used by the VA-API, either `libva.so.2` (the

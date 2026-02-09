@@ -162,6 +162,10 @@ GList *srt_system_info_list_dri_drivers (SrtSystemInfo *self,
                                          const char *multiarch_tuple,
                                          SrtDriverFlags flags);
 _SRT_PUBLIC
+GList *srt_system_info_list_gbm_backends (SrtSystemInfo *self,
+                                          const char *multiarch_tuple,
+                                          SrtDriverFlags flags);
+_SRT_PUBLIC
 GList *srt_system_info_list_va_api_drivers (SrtSystemInfo *self,
                                             const char *multiarch_tuple,
                                             SrtDriverFlags flags);

@@ -367,6 +367,15 @@ test_null_sysroot (Fixture *f,
     {
       g_autoptr(SrtObjectList) drivers = NULL;
 
+      drivers = srt_system_info_list_gbm_backends (info,
+                                                   ANY_VALID_MULTIARCH_TUPLE,
+                                                   SRT_DRIVER_FLAGS_INCLUDE_ALL);
+      g_assert_null (drivers);
+    }
+
+    {
+      g_autoptr(SrtObjectList) drivers = NULL;
+
       drivers = srt_system_info_list_va_api_drivers (info,
                                                      ANY_VALID_MULTIARCH_TUPLE,
                                                      SRT_DRIVER_FLAGS_INCLUDE_ALL);

@@ -3944,6 +3944,28 @@ srt_system_info_list_dri_drivers (SrtSystemInfo *self,
 }
 
 /**
+ * srt_system_info_list_gbm_backends:
+ * @self: The #SrtSystemInfo object
+ * @multiarch_tuple: (not nullable) (type filename): A Debian-style multiarch
+ *  tuple such as %SRT_ABI_X86_64
+ * @flags: Filter the list of GBM backends accordingly to these flags.
+ *  For example, "extra" drivers that are unlikely to be found by
+ *  the Mesa GBM loader will only be included if the
+ *  %SRT_DRIVER_FLAGS_INCLUDE_ALL flag is set.
+ *
+ * Stub implementation.
+ *
+ * Returns: (nullable): %NULL
+ */
+GList *
+srt_system_info_list_gbm_backends (SrtSystemInfo *self,
+                                   const char *multiarch_tuple,
+                                   SrtDriverFlags flags)
+{
+  return NULL;
+}
+
+/**
  * srt_system_info_list_va_api_drivers:
  * @self: The #SrtSystemInfo object
  * @multiarch_tuple: (not nullable) (type filename): A Debian-style multiarch

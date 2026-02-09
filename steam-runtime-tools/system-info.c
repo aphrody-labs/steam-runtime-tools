@@ -3923,7 +3923,7 @@ _srt_system_info_list_graphics_modules (SrtSystemInfo *self,
  *
  * List of the available Mesa DRI modules.
  *
- * For the search $LIBGL_DRIVERS_PATH will be used if set.
+ * `$LIBGL_DRIVERS_PATH` will be used as the search path, if set.
  * Otherwise some implementation-dependent paths will be used instead.
  *
  * Note that if `$LIBGL_DRIVERS_PATH` is set, all drivers outside that
@@ -3955,7 +3955,7 @@ srt_system_info_list_dri_drivers (SrtSystemInfo *self,
  *
  * List of the available VA-API drivers.
  *
- * For the search $LIBVA_DRIVERS_PATH will be used if set.
+ * `$LIBVA_DRIVERS_PATH` will be used as the search path, if set.
  * Otherwise some implementation-dependent paths will be used instead.
  *
  * Note that if `$LIBVA_DRIVERS_PATH` is set, all drivers outside that
@@ -3987,7 +3987,7 @@ srt_system_info_list_va_api_drivers (SrtSystemInfo *self,
  *
  * List of the available VDPAU drivers.
  *
- * For the search $VDPAU_DRIVER_PATH will be used if set.
+ * `$VDPAU_DRIVER_PATH` will be used as the search path, if set.
  * Otherwise some implementation-dependent paths will be used instead.
  *
  * Note that if `$VDPAU_DRIVER_PATH` is set, all drivers outside that

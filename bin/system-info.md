@@ -722,7 +722,7 @@ keys:
         **is_extra**
         :   A boolean value indicating whether the driver module is in an
             "unusual" location, probably not in the canonical search path.
-            This key is optional and if is not provided, the default %FALSE
+            This key is optional and if is not provided, the default `false`
             value should be assumed.
 
     **va-api_drivers**
@@ -747,7 +747,7 @@ keys:
         **is_extra**
         :   A boolean value indicating whether the driver module is in an
             "unusual" location, probably not in the canonical search path.
-            This key is optional and if is not provided, the default %FALSE
+            This key is optional and if is not provided, the default `false`
             value should be assumed.
 
     **vdpau_drivers**
@@ -770,7 +770,7 @@ keys:
         **is_extra**
         :   A boolean value indicating whether the driver module is in an
             "unusual" location, probably not in the canonical search path.
-            This key is optional and if is not provided, the default %FALSE
+            This key is optional and if is not provided, the default `false`
             value should be assumed.
 
     **glx_drivers**

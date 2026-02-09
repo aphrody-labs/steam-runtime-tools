@@ -2961,6 +2961,7 @@ typedef struct
   SrtLibraryIssues issues;
   RuntimeLinkerTest runtime_linker;
   DriverTest dri_drivers[5];
+  DriverTest gbm_backends[5];
   DriverTest va_api_drivers[5];
   DriverTest vdpau_drivers[5];
   DriverTest glx_drivers[5];
@@ -3206,6 +3207,12 @@ static JsonTest json_test[] =
           },
           {
             .library_path = "/usr/lib/dri/radeonsi_dri.so",
+          },
+        },
+        .gbm_backends =
+        {
+          {
+            .library_path = "/usr/lib/gbm/dri_gbm.so",
           },
         },
         .va_api_drivers =
@@ -3817,6 +3824,12 @@ static const ArchitectureTest i386_architecture_full =
       .library_path = "/usr/lib32/dri/vmwgfx_dri.so",
     },
   },
+  .gbm_backends =
+  {
+    {
+      .library_path = "/usr/lib32/gbm/dri_gbm.so",
+    },
+  },
   .va_api_drivers =
   {
     {
@@ -4152,6 +4165,7 @@ json_parsing (Fixture *f,
               : t->openxr_1_rt_fallback.json_path != NULL ? &t->openxr_1_rt_fallback
               : NULL;
           GList *dri_list;
+          GList *gbm_list;
           GList *va_api_list;
           GList *vdpau_list;
           GList *glx_list;
@@ -4238,6 +4252,17 @@ json_parsing (Fixture *f,
             }
           g_assert_cmpstr (this_arch.dri_drivers[jj].library_path, ==, NULL);
 
+          gbm_list = srt_system_info_list_gbm_backends (info, multiarch_tuples[j],
+                                                        SRT_DRIVER_FLAGS_INCLUDE_ALL);
+          for (jj = 0, iter = gbm_list; iter != NULL; iter = iter->next, jj++)
+            {
+              g_assert_cmpstr (this_arch.gbm_backends[jj].library_path, ==,
+                               srt_gbm_backend_get_library_path (iter->data));
+              g_assert_cmpint (this_arch.gbm_backends[jj].is_extra, ==,
+                               srt_gbm_backend_is_extra (iter->data));
+            }
+          g_assert_cmpstr (this_arch.gbm_backends[jj].library_path, ==, NULL);
+
           va_api_list = srt_system_info_list_va_api_drivers (info, multiarch_tuples[j],
                                                              SRT_DRIVER_FLAGS_INCLUDE_ALL);
           for (jj = 0, iter = va_api_list; iter != NULL; iter = iter->next, jj++)
@@ -4293,6 +4318,7 @@ json_parsing (Fixture *f,
             }
 
           g_list_free_full (dri_list, g_object_unref);
+          g_list_free_full (gbm_list, g_object_unref);
           g_list_free_full (va_api_list, g_object_unref);
           g_list_free_full (vdpau_list, g_object_unref);
           g_list_free_full (glx_list, g_object_unref);

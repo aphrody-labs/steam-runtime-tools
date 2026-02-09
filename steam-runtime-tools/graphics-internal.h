@@ -277,6 +277,7 @@ _srt_graphics_rendering_interface_nick_to_enum (const gchar *nick,
  * @SRT_GRAPHICS_VAAPI_MODULE: VA-API driver module
  * @SRT_GRAPHICS_VDPAU_MODULE: VDPAU driver module
  * @SRT_GRAPHICS_GLX_MODULE: GLX ICD module
+ * @SRT_GRAPHICS_GBM_MODULE: Mesa GBM backend module
  * @NUM_SRT_GRAPHICS_MODULES: 1 more than the last valid enum value
  */
 typedef enum
@@ -285,6 +286,7 @@ typedef enum
   SRT_GRAPHICS_VAAPI_MODULE,
   SRT_GRAPHICS_VDPAU_MODULE,
   SRT_GRAPHICS_GLX_MODULE,
+  SRT_GRAPHICS_GBM_MODULE,
   NUM_SRT_GRAPHICS_MODULES  /* Always add new values before this one */
 } SrtGraphicsModule;
 
@@ -335,6 +337,7 @@ GList *_srt_get_vulkan_from_json_report (JsonObject *json_obj);
 GList *_srt_get_explicit_vulkan_layers_from_json_report (JsonObject *json_obj);
 GList *_srt_get_implicit_vulkan_layers_from_json_report (JsonObject *json_obj);
 GList *_srt_dri_driver_get_from_report (JsonObject *json_obj);
+GList *_srt_gbm_backend_get_from_report (JsonObject *json_obj);
 GList *_srt_va_api_driver_get_from_report (JsonObject *json_obj);
 GList *_srt_vdpau_driver_get_from_report (JsonObject *json_obj);
 GList *_srt_glx_icd_get_from_report (JsonObject *json_obj);

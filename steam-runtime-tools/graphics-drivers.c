@@ -534,8 +534,8 @@ _srt_list_modules_from_directory (SrtSubprocessRunner *runner,
                  * files in `driver_directory`. */
                 driver_link = g_file_read_link (driver_path, NULL);
                 *modules_out = g_list_prepend (*modules_out, srt_vdpau_driver_new (driver_path,
-                                                                                  driver_link,
-                                                                                  is_extra));
+                                                                                   driver_link,
+                                                                                   is_extra));
               }
             break;
 
@@ -783,15 +783,15 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
                                                 SRT_LIBRARY_SYMBOLS_FORMAT_PLAIN, NULL);
 
           /* If "${multiarch}-inspect-library" was unable to load the driver, it's safe to assume that
-          * its ELF class was not what we were searching for. */
+           * its ELF class was not what we were searching for. */
           if (issues & SRT_LIBRARY_ISSUES_CANNOT_LOAD)
             continue;
         }
       else if (want_arch_quark != g_quark_from_static_string (found_arch->multiarch_tuple))
         {
           g_debug ("The library \"%s\" has a multiarch %s, but we were looking for %s. Skipping...",
-                    this_driver_in_provider, found_arch->multiarch_tuple,
-                    g_quark_to_string (want_arch_quark));
+                   this_driver_in_provider, found_arch->multiarch_tuple,
+                   g_quark_to_string (want_arch_quark));
           continue;
         }
 
@@ -799,8 +799,8 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
         {
           case SRT_GRAPHICS_DRI_MODULE:
             *drivers_out = g_list_prepend (*drivers_out,
-                                            srt_dri_driver_new (this_driver_in_provider,
-                                                                is_extra));
+                                           srt_dri_driver_new (this_driver_in_provider,
+                                                               is_extra));
             break;
 
           case SRT_GRAPHICS_VAAPI_MODULE:
@@ -818,9 +818,9 @@ _srt_get_modules_from_path (SrtSysroot *sysroot,
                                                        dent->d_name,
                                                        NULL, NULL);
             *drivers_out = g_list_prepend (*drivers_out,
-                                            srt_vdpau_driver_new (this_driver_in_provider,
-                                                                  this_driver_link,
-                                                                  is_extra));
+                                           srt_vdpau_driver_new (this_driver_in_provider,
+                                                                 this_driver_link,
+                                                                 is_extra));
             break;
 
           case SRT_GRAPHICS_GLX_MODULE:
@@ -1020,7 +1020,7 @@ _srt_get_modules_from_loader_library (SrtSysroot *sysroot,
   if (module == SRT_GRAPHICS_DRI_MODULE)
     {
       /* Used on Slackware according to
-        * https://github.com/ValveSoftware/steam-runtime/issues/318 */
+       * https://github.com/ValveSoftware/steam-runtime/issues/318 */
       g_autofree gchar *slackware = g_build_filename (libdir, "xorg",
                                                       "modules", "dri",
                                                       NULL);

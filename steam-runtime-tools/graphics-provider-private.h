@@ -13,6 +13,7 @@
 struct _SrtGraphicsProviderArchitecture
 {
   char *dri_path;
+  char *gbm_path;
   char **fallback_library_paths;
   char *gconv_path;
   GQuark tuple_quark;
@@ -22,6 +23,7 @@ struct _SrtGraphicsProviderArchitecture
 #define SRT_GRAPHICS_PROVIDER_ARCHITECTURE_INIT \
 { \
   .dri_path = NULL, \
+  .gbm_path = NULL, \
   .fallback_library_paths = NULL, \
   .gconv_path = NULL, \
   .tuple_quark = SRT_ARCHITECTURE_QUARK_NONE, \

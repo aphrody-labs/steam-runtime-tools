@@ -8,6 +8,7 @@
     "architectures": {
       "x86_64-linux-gnu": {
         "dri": "/usr/lib/dri",
+        "gbm": "/usr/lib/gbm",
         "fallback_library_paths": ["/usr/lib", "/usr/lib64"],
         "gconv": "/usr/lib/gconv",
         "va_api": true,
@@ -15,6 +16,7 @@
       },
       "i386-linux-gnu": {
         "dri": "/usr/lib32/dri",
+        "gbm": "/usr/lib32/gbm",
         "fallback_library_paths": ["/usr/lib32"],
         "gconv": "/usr/lib32/gconv",
         "vdpau": false,

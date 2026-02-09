@@ -150,6 +150,21 @@ the default is to auto-detect it,
 which may incur a startup time cost
 (especially when running under CPU emulation).
 
+### `gbm` (string)
+
+An absolute path (starting with `/`).
+If present,
+compatibility tools may assume that Mesa GBM backends in this graphics provider
+are files named `*_gbm.so` in the given directory inside the `root`.
+
+Relative paths as values for this field are not allowed
+(they are reserved for possible future use).
+
+If not specified,
+the default is to auto-detect it,
+which may incur a startup time cost
+(especially when running under CPU emulation).
+
 ### `fallback_library_paths` (array of strings)
 
 If present,
@@ -250,10 +265,12 @@ might look like this:
         "architectures": {
           "x86_64-linux-gnu": {
             "dri": "/usr/lib/dri",
+            "gbm": "/usr/lib/gbm",
             "gconv": "/usr/lib/gconv"
           },
           "i386-linux-gnu": {
             "dri": "/usr/lib32/dri",
+            "gbm": "/usr/lib32/gbm",
             "fallback_library_paths": ["/usr/lib32"],
             "gconv": "/usr/lib32/gconv"
           }

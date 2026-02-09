@@ -54,6 +54,7 @@ const SrtGraphicsProviderArchitecture *_srt_graphics_provider_get_architecture (
 SrtGraphicsProviderFeatureFlags _srt_graphics_provider_architecture_get_features (const SrtGraphicsProviderArchitecture *self);
 GQuark _srt_graphics_provider_architecture_get_tuple (const SrtGraphicsProviderArchitecture *self);
 const char *_srt_graphics_provider_architecture_get_dri_path (const SrtGraphicsProviderArchitecture *self);
+const char *_srt_graphics_provider_architecture_get_gbm_path (const SrtGraphicsProviderArchitecture *self);
 const char * const *_srt_graphics_provider_architecture_get_fallback_library_paths (const SrtGraphicsProviderArchitecture *self);
 const char *_srt_graphics_provider_architecture_get_gconv_path (const SrtGraphicsProviderArchitecture *self);
 

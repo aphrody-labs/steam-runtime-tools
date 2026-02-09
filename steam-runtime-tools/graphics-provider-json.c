@@ -272,6 +272,16 @@ foreach_arch_object_cb (JsonObject *archs_object,
       goto fail;
     }
 
+  if (!manifest_copy_optional_string (object, "gbm",
+                                      &arch.gbm_path, data->error))
+    goto fail;
+
+  if (arch.gbm_path != NULL && arch.gbm_path[0] != '/')
+    {
+      glnx_throw (data->error, "\"gbm\" value must be an absolute path");
+      goto fail;
+    }
+
   if (!manifest_copy_optional_strv (object, "fallback_library_paths",
                                     &arch.fallback_library_paths, data->error))
     goto fail;

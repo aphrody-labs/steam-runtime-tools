@@ -98,6 +98,13 @@ dump_architecture (const SrtGraphicsProviderArchitecture *arch)
   else
     g_test_message ("\t\tDRI path unknown");
 
+  s = _srt_graphics_provider_architecture_get_gbm_path (arch);
+
+  if (s != NULL)
+    g_test_message ("\t\tGBM path in sysroot: %s", s);
+  else
+    g_test_message ("\t\tGBM path unknown");
+
   dump_feature_flags ("\t\t", _srt_graphics_provider_architecture_get_features (arch));
 
   strv = _srt_graphics_provider_architecture_get_fallback_library_paths (arch);
@@ -163,9 +170,14 @@ assert_arch_equivalent (const SrtGraphicsProviderArchitecture *a,
   g_assert_cmpstr (g_quark_to_string (_srt_graphics_provider_architecture_get_tuple (a)),
                    ==,
                    g_quark_to_string (_srt_graphics_provider_architecture_get_tuple (b)));
+
   g_assert_cmpstr (_srt_graphics_provider_architecture_get_dri_path (a),
                    ==,
                    _srt_graphics_provider_architecture_get_dri_path (b));
+
+  g_assert_cmpstr (_srt_graphics_provider_architecture_get_gbm_path (a),
+                   ==,
+                   _srt_graphics_provider_architecture_get_gbm_path (b));
 
   strv_a = _srt_graphics_provider_architecture_get_fallback_library_paths (a);
   strv_b = _srt_graphics_provider_architecture_get_fallback_library_paths (b);
@@ -308,8 +320,12 @@ test_basic (Fixture *f,
       q = _srt_graphics_provider_architecture_get_tuple (arch);
       g_assert_cmpstr (g_quark_to_string (q),
                        ==, g_quark_to_string (glados));
+
       s = _srt_graphics_provider_architecture_get_dri_path (arch);
       g_assert_cmpstr (s, ==, NULL);
+      s = _srt_graphics_provider_architecture_get_gbm_path (arch);
+      g_assert_cmpstr (s, ==, NULL);
+
       g_assert_null (_srt_graphics_provider_architecture_get_fallback_library_paths (arch));
       features = _srt_graphics_provider_architecture_get_features (arch);
       g_assert_cmpuint (features,
@@ -536,6 +552,8 @@ test_full (Fixture *f,
       g_assert_cmpstr (g_quark_to_string (q), ==, SRT_ABI_X86_64);
       s = _srt_graphics_provider_architecture_get_dri_path (x86_64);
       g_assert_cmpstr (s, ==, "/usr/lib/dri");
+      s = _srt_graphics_provider_architecture_get_gbm_path (x86_64);
+      g_assert_cmpstr (s, ==, "/usr/lib/gbm");
       strv = _srt_graphics_provider_architecture_get_fallback_library_paths (x86_64);
       g_assert_nonnull (strv);
       g_assert_cmpstrv (strv, x86_64_fallbacks);
@@ -555,6 +573,8 @@ test_full (Fixture *f,
       g_assert_cmpstr (g_quark_to_string (q), ==, SRT_ABI_I386);
       s = _srt_graphics_provider_architecture_get_dri_path (i386);
       g_assert_cmpstr (s, ==, "/usr/lib32/dri");
+      s = _srt_graphics_provider_architecture_get_gbm_path (i386);
+      g_assert_cmpstr (s, ==, "/usr/lib32/gbm");
       strv = _srt_graphics_provider_architecture_get_fallback_library_paths (i386);
       g_assert_nonnull (strv);
       g_assert_cmpstrv (strv, i386_fallbacks);
@@ -675,6 +695,14 @@ test_invalid (Fixture *f,
       "    }\n"
       "  }\n"
       "}}\n" },
+    { "non-string gbm",
+      "{\"graphics_provider_v0\": {\n"
+      "  \"architectures\": {\n"
+      "    \"i386-linux-gnu\": {\n"
+      "      \"gbm\": true\n"
+      "    }\n"
+      "  }\n"
+      "}}\n" },
     /* We reserve relative paths for dri modules as maybe meaning
      * relative to some default location in future, so for now we don't
      * allow them at all */
@@ -683,6 +711,14 @@ test_invalid (Fixture *f,
       "  \"architectures\": {\n"
       "    \"i386-linux-gnu\": {\n"
       "      \"dri\": \"./dri\"\n"
+      "    }\n"
+      "  }\n"
+      "}}\n" },
+    { "non-absolute gbm",
+      "{\"graphics_provider_v0\": {\n"
+      "  \"architectures\": {\n"
+      "    \"i386-linux-gnu\": {\n"
+      "      \"gbm\": \"./gbm\"\n"
       "    }\n"
       "  }\n"
       "}}\n" },

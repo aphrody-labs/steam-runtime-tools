@@ -97,6 +97,7 @@ EXECUTABLES = [
     'steam-runtime-check-requirements',
     'steam-runtime-launch-client',
     'steam-runtime-launcher-interface-0',
+    'steam-runtime-steam-remote',
     'steam-runtime-system-info',
 ]
 LIBEXEC_EXECUTABLES = [

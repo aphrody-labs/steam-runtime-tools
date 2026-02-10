@@ -106,6 +106,7 @@ LIBEXEC_EXECUTABLES = [
     'pv-locale-gen',
     'pv-try-setlocale',
     'srt-bwrap',
+    'srt-logger',
 ]
 
 

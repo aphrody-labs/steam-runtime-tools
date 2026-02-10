@@ -94,6 +94,7 @@ SCRIPTS = [
 EXECUTABLES = [
     'pressure-vessel-wrap',
     'pv-verify',
+    'steam-runtime-check-requirements',
     'steam-runtime-launch-client',
     'steam-runtime-launcher-interface-0',
     'steam-runtime-system-info',

@@ -109,6 +109,7 @@ LIBEXEC_EXECUTABLES = [
     'srt-logger',
 ]
 LIBEXEC_DATA = [
+    'logger-0.bash',
 ]
 
 

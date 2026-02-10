@@ -108,6 +108,8 @@ LIBEXEC_EXECUTABLES = [
     'srt-bwrap',
     'srt-logger',
 ]
+LIBEXEC_DATA = [
+]
 
 
 def install(src, dst, mode=0o644):
@@ -483,6 +485,12 @@ def main():
             install_exe(
                 os.path.join(path, exe),
                 os.path.join(inst_pkglibexecdir, exe),
+            )
+
+        for data in LIBEXEC_DATA:
+            install(
+                os.path.join(path, data),
+                os.path.join(inst_pkglibexecdir, data),
             )
 
         for arch in architectures:

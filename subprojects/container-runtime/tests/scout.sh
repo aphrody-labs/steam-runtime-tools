@@ -90,6 +90,7 @@ rm -fr depots/test-scout-layered-ga
 mkdir -p depots/test-scout-layered-ga
 python3 ./populate-depot.py \
     --depot=depots/test-scout-layered-ga \
+    --depot-version="test test" \
     --layered \
     "${populate_depot_args[@]}" \
     --version=latest-steam-client-general-availability \
@@ -106,6 +107,11 @@ test -d depots/test-scout-layered-ga/steam-runtime/usr/
 
 if ! grep -E $'^LD_LIBRARY_PATH\t[0-9.]+\tscout\t[0-9.]+\t#' depots/test-scout-layered-ga/VERSIONS.txt >/dev/null; then
     echo "Bail out! LD_LIBRARY_PATH runtime's version number not found"
+    exit 1
+fi
+
+if ! grep -E $'^depot\ttest test\t\t\t#' depots/test-scout-layered-ga/VERSIONS.txt >/dev/null; then
+    echo "Bail out! Overall depot version number not found"
     exit 1
 fi
 

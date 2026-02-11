@@ -56,7 +56,7 @@ elif [ -n "${PRESSURE_VESSEL_DOWNLOAD_URL-}" ]; then
     )
 fi
 
-echo "1..3"
+echo "1..4"
 
 mkdir -p .cache
 python3 ./download-pressure-vessel.py "${pressure_vessel_args[@]}" .cache
@@ -168,6 +168,19 @@ done
 
 echo "ok 2 - scout, layered on soldier, with own copy of GA LDLP runtime"
 
+rm -fr depots/test-scout-layered-ga-again
+mkdir -p depots/test-scout-layered-ga-again
+python3 ./populate-depot.py \
+    --depot=depots/test-scout-layered-ga-again \
+    --depot-version="test test" \
+    --layered \
+    "${populate_depot_args[@]}" \
+    'scout={"path": ".cache", "version": "local"}' \
+    ${NULL+}
+find depots/test-scout-layered-ga -ls > depots/test-scout-layered-ga-again.txt
+
+echo "ok 3 - scout, layered on soldier, with local copy of GA LDLP runtime"
+
 rm -fr depots/test-scout-layered-beta
 mkdir -p depots/test-scout-layered-beta
 python3 ./populate-depot.py \
@@ -191,6 +204,6 @@ if ! grep -E $'^LD_LIBRARY_PATH\t[0-9.]+\tscout\t[0-9.]+\t#' depots/test-scout-l
     exit 1
 fi
 
-echo "ok 3 - scout, layered on soldier, with own copy of beta LDLP runtime"
+echo "ok 4 - scout, layered on soldier, with own copy of beta LDLP runtime"
 
 # vim:set sw=4 sts=4 et:

@@ -627,7 +627,23 @@ class Main:
             self.source_dir / 'runtimes' / 'scout-on-soldier'
         )
 
-        if self.runtime.version:
+        runtime = self.runtime
+
+        if runtime.path:
+            logger.info('Using runtime from local directory %r', runtime.path)
+            self.unpack_ld_library_path = self.depot
+            local_version = ComponentVersion('LD_LIBRARY_PATH')
+            extracted_version = self.use_local_scout_tarball(
+                str(Path(runtime.path, 'steam-runtime.tar.xz')),
+            )
+            assert extracted_version is not None
+            local_version.version = extracted_version
+            local_version.runtime = 'scout'
+            local_version.runtime_version = extracted_version
+            local_version.comment = 'steam-runtime/'
+            self.versions.append(local_version)
+        elif runtime.version:
+            logger.info('Downloading runtime from %s', runtime)
             self.unpack_ld_library_path = self.depot
             self.download_scout_tarball(self.runtime)
             local_version = ComponentVersion('LD_LIBRARY_PATH')
@@ -1056,14 +1072,42 @@ class Main:
         logger.info('Downloading steam-runtime build %s', pinned)
         dest.mkdir(exist_ok=True, parents=True)
 
-        downloaded = runtime.fetch(
-            filename,
-            self.opener,
-        )
+        downloaded = runtime.fetch(filename, self.opener)
+        got = self.use_local_scout_tarball(downloaded)
+
+        if pinned != got:
+            logger.warning(
+                'Unexpected runtime: expected %s, got %s',
+                pinned, got,
+            )
+
+    def use_local_scout_tarball(self, archive: str) -> str:
+        """
+        Unpack a pre-prepared LD_LIBRARY_PATH Steam Runtime from a
+        local archive.
+        Return its version number in 1.0.yyyymmdd.x format.
+        """
+        dest = self.unpack_ld_library_path
+        assert dest is not None
+
         subprocess.run(
-            ['tar', '-C', str(dest), '-xf', downloaded],
+            ['tar', '-C', str(dest), '-xf', archive],
             check=True,
         )
+
+        with open(dest / 'steam-runtime' / 'version.txt') as reader:
+            marker = reader.read().strip()
+
+        version_bits = marker.split('_')
+
+        if len(version_bits) != 2:
+            logger.warning(
+                'Unexpected format for runtime version: %s', marker,
+            )
+            return 'local'
+        else:
+            logger.info('scout runtime version %s', version_bits[1])
+            return version_bits[1]
 
     def octal_escape_char(self, match: 're.Match') -> str:
         ret: List[str] = []

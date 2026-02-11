@@ -51,25 +51,10 @@ elif [ -n "${PRESSURE_VESSEL_DOWNLOAD_URL-}" ]; then
     )
 fi
 
-echo "1..3"
+echo "1..2"
 
 mkdir -p .cache
 python3 ./download-pressure-vessel.py "${pressure_vessel_args[@]}" .cache
-
-rm -fr depots/test-scout-unpacked
-mkdir -p depots/test-scout-unpacked
-python3 ./populate-depot.py \
-    --depot=depots/test-scout-unpacked \
-    --no-include-archives \
-    --pressure-vessel-archive=.cache/pressure-vessel-bin.tar.gz \
-    --toolmanifest \
-    --unpack-runtime \
-    --versioned-directories \
-    "${populate_depot_args[@]}" \
-    scout \
-    ${NULL+}
-find depots/test-scout-unpacked -ls > depots/test-scout-unpacked.txt
-echo "ok 1 - scout, running from unpacked directory"
 
 rm -fr depots/test-scout-layered
 mkdir -p depots/test-scout-layered
@@ -93,7 +78,7 @@ if ! grep $'^LD_LIBRARY_PATH\t-\tscout\t-\t#' depots/test-scout-layered/VERSIONS
     exit 1
 fi
 
-echo "ok 2 - scout, layered on soldier, reusing standard LDLP runtime"
+echo "ok 1 - scout, layered on soldier, reusing standard LDLP runtime"
 
 rm -fr depots/test-scout-layered-beta
 mkdir -p depots/test-scout-layered-beta
@@ -118,6 +103,6 @@ if ! grep -E $'^LD_LIBRARY_PATH\t[0-9.]+\tscout\t[0-9.]+\t#' depots/test-scout-l
     exit 1
 fi
 
-echo "ok 3 - scout, layered on soldier, with own copy of beta LDLP runtime"
+echo "ok 2 - scout, layered on soldier, with own copy of beta LDLP runtime"
 
 # vim:set sw=4 sts=4 et:

@@ -9,7 +9,12 @@ if [ -n "${TESTS_ONLY-}" ]; then
     exit 0
 fi
 
-populate_depot_args=("--steam-app-id=1070560")
+app_id=1070560
+depot_id=1070561
+populate_depot_args=(
+    "--steam-app-id=$app_id" \
+    "--steam-depot-id=$depot_id" \
+)
 
 if [ -n "${IMAGES_DOWNLOAD_CREDENTIAL-}" ]; then
     populate_depot_args=( \
@@ -62,6 +67,7 @@ python3 ./populate-depot.py \
     --depot=depots/test-scout-layered \
     --layered \
     "${populate_depot_args[@]}" \
+    --toolmanifest \
     --version= \
     scout \
     ${NULL+}
@@ -102,6 +108,57 @@ if ! grep -E $'^LD_LIBRARY_PATH\t[0-9.]+\tscout\t[0-9.]+\t#' depots/test-scout-l
     echo "Bail out! LD_LIBRARY_PATH runtime's version number not found"
     exit 1
 fi
+
+if ! [ -e "depots/test-scout-layered-ga/steampipe/app_build_$app_id.vdf" ]; then
+    echo "Bail out! app_build_1628350.vdf not found"
+    exit 1
+fi
+
+if ! [ -e "depots/test-scout-layered-ga/steampipe/depot_build_$depot_id.vdf" ]; then
+    echo "Bail out! depot_build_$depot_id.vdf not found"
+    exit 1
+fi
+
+for path in \
+    README.md \
+    VERSIONS.txt \
+    run-in-scout-on-soldier \
+    scout-on-soldier-entry-point-v2 \
+    steam-runtime/ \
+    toolmanifest.vdf \
+; do
+    if [ -e "depots/test-scout-layered-ga/${path}" ]; then
+        echo "# $depot_id has $path on-disk"
+    else
+        echo "Bail out! Depot $depot_id lacks $path"
+        exit 1
+    fi
+
+    if [ "${path%/}" = "${path}" ]; then
+        path_suffix=''
+
+        if [ -d "depots/test-scout-layered-ga/${path}" ]; then
+            echo "Bail out! $path should not be a directory"
+            exit 1
+        fi
+    else
+        path_suffix='*'
+
+        if ! [ -d "depots/test-scout-layered-ga/${path}" ]; then
+            echo "Bail out! $path should be a directory"
+            exit 1
+        fi
+    fi
+
+    if grep -q -F "\"LocalPath\" \"../${path}${path_suffix}\"" \
+        "depots/test-scout-layered-ga/steampipe/depot_build_$depot_id.vdf"
+    then
+        echo "# $depot_id VDF has ${path}${path_suffix}"
+    else
+        echo "Bail out! depot_build_$depot_id.vdf lacks $path"
+        exit 1
+    fi
+done
 
 echo "ok 2 - scout, layered on soldier, with own copy of GA LDLP runtime"
 

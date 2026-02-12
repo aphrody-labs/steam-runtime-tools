@@ -804,6 +804,35 @@ keys:
         **library_path**
         :   Absolute path to the library that imlements the **library_soname**.
 
+    **openxr-1-runtime**
+    :   Details of the active OpenXR runtime for this architecture.
+        Omitted from the report if there is no active OpenXR runtime.
+        If present, it is an object with the following keys:
+
+        **json_path**
+        :   Path to the JSON manifest describing the runtime,
+            for example `/usr/share/openxr/1/openxr_monado.json`
+
+        **json_origin**
+        :   Path at which the JSON manifest was discovered,
+            for example `/etc/xdg/openxr/1/active_runtime.json`.
+            Omitted if it would be the same as the **json_path**.
+
+        **issues**
+        :   An array of strings representing problems with the ICD,
+            in the same representation documented for EGL ICDs.
+
+        and additionally the following keys and values if the metadata was
+        loaded successfully:
+
+        **library_path**, **dlopen**
+        :   The same as documented for EGL ICDs.
+
+        or the following keys and values if the metadata failed to load:
+
+        **error-domain**, **error-code**, **error**
+        :   The same as documented for EGL ICDs.
+
 **locale-issues**
 :   An array of strings indicating locale-related issues.
     The array is empty if no problems were detected.

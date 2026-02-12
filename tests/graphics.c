@@ -2789,7 +2789,7 @@ _test_layer_values (SrtVulkanLayer *layer,
   g_assert_cmpint (test->issues, ==, srt_vulkan_layer_get_issues (layer));
 
   layer_dup = srt_vulkan_layer_new_replace_library_path (layer,
-                                                         "/run/host/vulkan_layer.json");
+                                                         "/run/host/vulkan_layer.so");
 
   g_assert_cmpstr (test->name, ==, srt_vulkan_layer_get_name (layer_dup));
   g_assert_cmpstr (test->description, ==,
@@ -2804,7 +2804,7 @@ _test_layer_values (SrtVulkanLayer *layer,
   if (test->library_path == NULL)
     g_assert_cmpstr (NULL, ==, srt_vulkan_layer_get_library_path (layer_dup));
   else
-    g_assert_cmpstr ("/run/host/vulkan_layer.json", ==,
+    g_assert_cmpstr ("/run/host/vulkan_layer.so", ==,
                       srt_vulkan_layer_get_library_path (layer_dup));
 
   if (test->json_to_compare != NULL)

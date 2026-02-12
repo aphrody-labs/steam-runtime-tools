@@ -1000,7 +1000,7 @@ keys:
 
 **openxr-1**
 :   An object containing non-architecture-specific details of OpenXR 1
-    runtimes.
+    runtimes and layers.
     It has the following keys:
 
     **active-fallback**
@@ -1017,6 +1017,39 @@ keys:
         or the non-architecture-specific **active-fallback**.
         Each item in the list is an object with the same keys and values
         as the per-architecture **openxr-1-runtime**.
+
+    **explicit_layers**
+    :   A list of OpenXR 1 explicit layers.
+        Each item is an object with these members:
+
+        **json_path**, **json_origin**
+        :   The same as for OpenXR runtimes
+
+        If the manifest was loaded successfully,
+        the object has the following additional members:
+
+        **name**
+        :   The name that uniquely identifies this layer to applications,
+            as a string
+
+        **description**
+        :   A brief description of the layer as a string
+
+        **api_version**
+        :   The major.minor version of the OpenXR 1 API that is implemented,
+            as a string
+
+        **implementation_version**
+        :   The version of the layer implementation as a string
+
+        If the manifest was not loaded successfully,
+        instead it has **error-domain**, **error-code** and **error** members
+        in the same encoding documented above for EGL ICDs.
+
+    **implicit_layers**
+    :   A list of OpenXR 1 implicit layers.
+        Each item is an object with the same members documented above
+        for **explicit_layers**.
 
 **desktop-entries**
 :   An array of objects describing the Steam related desktop entries

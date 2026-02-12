@@ -2664,6 +2664,182 @@ test_icd_openxr_loading (Fixture *f,
     }
 }
 
+/*
+ * Assert that the GObject properties of @layer are consistent with the
+ * getter methods, and its state is internally consistent.
+ */
+static void
+assert_openxr_layer_consistent (SrtOpenXr1Layer *layer)
+{
+  g_autofree char *json_path = NULL;
+  g_autofree char *json_origin = NULL;
+  g_autofree char *library_path = NULL;
+  g_autofree char *resolved_property = NULL;
+  g_autofree char *resolved_by_accessor = NULL;
+  g_autofree char *name = NULL;
+  g_autofree char *description = NULL;
+  g_autofree char *api_version = NULL;
+  g_autofree char *impl_version = NULL;
+  SrtLoadableIssues issues;
+  SrtBaseJsonGraphicsModule *json;
+
+  dump_json_graphics_module (layer);
+
+  g_assert_nonnull (layer);
+  g_assert_true (SRT_IS_OPENXR_1_LAYER (layer));
+  g_object_get (layer,
+                "json-path", &json_path,
+                "json-origin", &json_origin,
+                "library-path", &library_path,
+                "resolved-library-path", &resolved_property,
+                "name", &name,
+                "description", &description,
+                "api-version", &api_version,
+                "implementation-version", &impl_version,
+                "issues", &issues,
+                NULL);
+
+  g_assert_nonnull (json_path);
+  g_assert_nonnull (json_origin);
+  g_assert_cmpint (issues, ==, srt_openxr_1_layer_get_issues (layer));
+  g_assert_cmpstr (json_path, ==, srt_openxr_1_layer_get_json_path (layer));
+  g_assert_cmpstr (json_origin, ==, srt_openxr_1_layer_get_json_origin (layer));
+  g_assert_cmpstr (library_path, ==, srt_openxr_1_layer_get_library_path (layer));
+  resolved_by_accessor = srt_openxr_1_layer_resolve_library_path (layer);
+  g_assert_cmpstr (resolved_property, ==, resolved_by_accessor);
+  g_assert_cmpstr (name, ==, srt_openxr_1_layer_get_name (layer));
+  g_assert_cmpstr (description, ==, srt_openxr_1_layer_get_description (layer));
+  g_assert_cmpstr (api_version, ==, srt_openxr_1_layer_get_api_version (layer));
+  g_assert_cmpstr (impl_version, ==, srt_openxr_1_layer_get_implementation_version (layer));
+
+  json = SRT_BASE_JSON_GRAPHICS_MODULE (layer);
+  /* These fields are not used for OpenXR layers */
+  g_assert_cmpstr (json->library_arch, ==, NULL);
+  g_assert_cmpstr (json->type, ==, NULL);
+  g_assert_null (json->component_layers);
+  g_assert_false (json->portability_driver);
+  g_assert_null (json->pre_instance_functions);
+  g_assert_null (json->device_extensions);
+  g_assert_cmpstr (json->enable_env_var.value, ==, NULL);
+  g_assert_cmpstr (json->disable_env_var.value, ==, NULL);
+  g_assert_cmpstr (json->original_json, ==, NULL);
+
+  if (srt_openxr_1_layer_check_error (layer, NULL))
+    {
+      g_assert_nonnull (library_path);
+      g_assert_nonnull (resolved_property);
+      g_assert_nonnull (name);
+      g_assert_nonnull (description);
+      g_assert_nonnull (api_version);
+      g_assert_nonnull (impl_version);
+    }
+  else
+    {
+      g_assert_cmpint (issues & SRT_LOADABLE_ISSUES_CANNOT_LOAD, !=, 0);
+      g_assert_null (library_path);
+      g_assert_null (resolved_property);
+      g_assert_null (name);
+      g_assert_null (description);
+      g_assert_null (api_version);
+      g_assert_null (impl_version);
+    }
+}
+
+/*
+ * Assert that @layer is in the non-error state and internally consistent.
+ */
+static void
+assert_openxr_layer_no_error (SrtOpenXr1Layer *layer)
+{
+  g_autoptr(GError) error = NULL;
+  gboolean ok;
+
+  assert_openxr_layer_consistent (layer);
+  ok = srt_openxr_1_layer_check_error (layer, &error);
+  g_assert_no_error (error);
+  g_assert_true (ok);
+}
+
+/*
+ * Assert that @layer is in the error state and internally consistent.
+ */
+static void
+assert_openxr_layer_has_error (SrtOpenXr1Layer *layer,
+                               const char *expect_domain,
+                               int expect_code,
+                               const char *expect_message)
+{
+  g_autoptr(GError) error = NULL;
+  gboolean ok;
+
+  assert_openxr_layer_consistent (layer);
+  ok = srt_openxr_1_layer_check_error (layer, &error);
+  g_assert_false (ok);
+  g_assert_nonnull (error);
+
+  if (expect_domain != NULL)
+    {
+      g_assert_cmpstr (g_quark_to_string (error->domain), ==, expect_domain);
+      g_assert_cmpint (error->code, ==, expect_code);
+    }
+
+  if (expect_message != NULL)
+    g_assert_cmpstr (error->message, ==, expect_message);
+}
+
+/*
+ * Test the GObject interface of OpenXR layers.
+ */
+static void
+test_openxr_layer_object (Fixture *f,
+                          const void *context)
+{
+  g_autoptr(SrtOpenXr1Layer) good = NULL;
+  g_autoptr(SrtOpenXr1Layer) bad = NULL;
+  g_autoptr(GError) error = NULL;
+
+  good = srt_openxr_1_layer_new ("/nonexistent/layer.json",
+                                 "/etc/openxr/1/api_layer/explicit.d/nonexistent.json",
+                                 "constructed layer",
+                                 "/nonexistent/libXRLayer.so",
+                                 "1.0",
+                                 "1.2.3",
+                                 "My first layer",
+                                 SRT_LOADABLE_ISSUES_NONE);
+  assert_openxr_layer_no_error (good);
+  g_assert_cmpstr (srt_openxr_1_layer_get_json_path (good),
+                   ==, "/nonexistent/layer.json");
+  g_assert_cmpstr (srt_openxr_1_layer_get_json_origin (good),
+                   ==, "/etc/openxr/1/api_layer/explicit.d/nonexistent.json");
+  g_assert_cmpstr (srt_openxr_1_layer_get_name (good),
+                   ==, "constructed layer");
+  g_assert_cmpstr (srt_openxr_1_layer_get_library_path (good),
+                   ==, "/nonexistent/libXRLayer.so");
+  g_assert_cmpstr (srt_openxr_1_layer_get_description (good),
+                   ==, "My first layer");
+  g_assert_cmpstr (srt_openxr_1_layer_get_api_version (good), ==, "1.0");
+  g_assert_cmpstr (srt_openxr_1_layer_get_implementation_version (good),
+                   ==, "1.2.3");
+  g_assert_cmpint (srt_openxr_1_layer_get_issues (good),
+                   ==, SRT_LOADABLE_ISSUES_NONE);
+
+  g_set_error (&error, G_IO_ERROR, G_IO_ERROR_BUSY, "No");
+  bad = srt_openxr_1_layer_new_error ("/nonexistent/nope.json",
+                                      "/etc/openxr/1/api_layer/explicit.d/nonexistent.json",
+                                      SRT_LOADABLE_ISSUES_CANNOT_LOAD,
+                                      error);
+  assert_openxr_layer_has_error (bad,
+                                 g_quark_to_string (error->domain),
+                                 error->code,
+                                 error->message);
+  g_assert_cmpstr (srt_openxr_1_layer_get_json_path (bad),
+                   ==, "/nonexistent/nope.json");
+  g_assert_cmpstr (srt_openxr_1_layer_get_json_origin (bad),
+                   ==, "/etc/openxr/1/api_layer/explicit.d/nonexistent.json");
+  g_assert_cmpint (srt_openxr_1_layer_get_issues (bad),
+                   ==, SRT_LOADABLE_ISSUES_CANNOT_LOAD);
+}
+
 typedef struct
 {
   const gchar *name;
@@ -4716,6 +4892,8 @@ main (int argc,
   g_test_add ("/graphics/icd/openxr/loading/override", Fixture,
               &openxr_loading_config_override,
               setup, test_icd_openxr_loading, teardown);
+  g_test_add ("/graphics/icd/openxr-layer/object", Fixture, NULL,
+              setup, test_openxr_layer_object, teardown);
 
   g_test_add ("/graphics/layers/vulkan/xdg", Fixture, NULL,
               setup, test_layer_vulkan, teardown);

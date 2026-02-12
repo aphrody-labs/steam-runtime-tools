@@ -94,6 +94,7 @@ struct _SrtBaseJsonGraphicsModule
   GHashTable *pre_instance_functions;
   /* (element-type DeviceExtension) */
   GList *device_extensions;
+  /* For OpenXR layers, value is %NULL */
   EnvironmentVariable enable_env_var;
   EnvironmentVariable disable_env_var;
   gchar *original_json;
@@ -123,6 +124,14 @@ struct _SrtEglExternalPlatform
 };
 
 struct _SrtOpenXr1Runtime
+{
+  /*< private >*/
+  SrtBaseJsonGraphicsModule parent;
+
+  char *json_origin;
+};
+
+struct _SrtOpenXr1Layer
 {
   /*< private >*/
   SrtBaseJsonGraphicsModule parent;

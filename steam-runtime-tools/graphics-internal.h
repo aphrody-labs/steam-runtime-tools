@@ -367,6 +367,7 @@ SrtVaApiVersion _srt_va_api_driver_version (int dfd,
 #define _SRT_GRAPHICS_OPENXR_1_RUNTIME_SUFFIX "openxr/1"
 
 #define _SRT_GRAPHICS_MANIFEST_MEMBER_OPENXR_1_RUNTIME "runtime"
+#define _SRT_GRAPHICS_MANIFEST_MEMBER_OPENXR_1_API_LAYER "api_layer"
 
 SrtDriDriver *srt_dri_driver_new (const gchar *library_path,
                                   gboolean is_extra);
@@ -407,6 +408,18 @@ SrtOpenXr1Runtime *srt_openxr_1_runtime_load_json (const gchar *json_path,
                                                    const gchar *library_path,
                                                    JsonObject *runtime_object,
                                                    SrtLoadableIssues issues);
+SrtOpenXr1Layer *srt_openxr_1_layer_new (const char *json_path,
+                                         const char *json_origin,
+                                         const char *name,
+                                         const char *library_path,
+                                         const char *api_version,
+                                         const char *implementation_version,
+                                         const char *description,
+                                         SrtLoadableIssues issues);
+SrtOpenXr1Layer *srt_openxr_1_layer_new_error (const char *json_path,
+                                               const char *json_origin,
+                                               SrtLoadableIssues issues,
+                                               const GError *error);
 SrtVulkanIcd *srt_vulkan_icd_new_error (const gchar *json_path,
                                         SrtLoadableIssues issues,
                                         const GError *error);

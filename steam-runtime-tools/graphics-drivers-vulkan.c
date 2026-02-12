@@ -1190,13 +1190,15 @@ vulkan_layer_parse_json (const gchar *path,
       array_length = json_array_get_length (instance_json_array);
       for (i = 0; i < array_length; i++)
         {
-          InstanceExtension *ie = g_slice_new0 (InstanceExtension);
           JsonObject *instance_extension = json_array_get_object_element (instance_json_array, i);
-          ie->name = g_strdup (json_object_get_string_member_with_default (instance_extension,
-                                                                           "name", NULL));
-          ie->spec_version = g_strdup (json_object_get_string_member_with_default (instance_extension,
-                                                                                   "spec_version",
-                                                                                   NULL));
+          InstanceExtension *ie =
+            instance_extension_new (json_object_get_string_member_with_default (instance_extension,
+                                                                                "name",
+                                                                                NULL),
+                                    json_object_get_string_member_with_default (instance_extension,
+                                                                                "spec_version",
+                                                                                NULL),
+                                    NULL);
 
           if (ie->name == NULL || ie->spec_version == NULL)
             {
@@ -1623,15 +1625,7 @@ vulkan_layer_dup (SrtVulkanLayer *self)
         g_hash_table_insert (ret->parent.pre_instance_functions, g_strdup (key), g_strdup (value));
     }
 
-  for (l = self->parent.instance_extensions; l != NULL; l = l->next)
-    {
-      InstanceExtension *ie = g_slice_new0 (InstanceExtension);
-      InstanceExtension *self_ie = l->data;
-      ie->name = g_strdup (self_ie->name);
-      ie->spec_version = g_strdup (self_ie->spec_version);
-      ret->parent.instance_extensions = g_list_prepend (ret->parent.instance_extensions, ie);
-    }
-  ret->parent.instance_extensions = g_list_reverse (ret->parent.instance_extensions);
+  ret->parent.instance_extensions = instance_extension_list_copy (self->parent.instance_extensions);
 
   for (l = self->parent.device_extensions; l != NULL; l = l->next)
     {

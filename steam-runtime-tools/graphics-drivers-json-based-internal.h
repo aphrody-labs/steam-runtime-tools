@@ -143,6 +143,27 @@ device_extension_free (gpointer p)
   g_slice_free (DeviceExtension, self);
 }
 
+static inline InstanceExtension *
+instance_extension_new (const char *name,
+                        const char *spec_version,
+                        const char *extension_version)
+{
+  InstanceExtension *ret = g_slice_new0 (InstanceExtension);
+
+  ret->name = g_strdup (name);
+  ret->spec_version = g_strdup (spec_version);
+  ret->extension_version = g_strdup (extension_version);
+  return ret;
+}
+
+static inline InstanceExtension *
+instance_extension_copy (InstanceExtension *self)
+{
+  return instance_extension_new (self->name,
+                                 self->spec_version,
+                                 self->extension_version);
+}
+
 static inline void
 instance_extension_free (gpointer p)
 {
@@ -152,6 +173,17 @@ instance_extension_free (gpointer p)
   g_free (self->spec_version);
   g_free (self->extension_version);
   g_slice_free (InstanceExtension, self);
+}
+
+static inline GList *
+instance_extension_list_copy (const GList *input)
+{
+  GList *ret = NULL;
+
+  for (const GList *iter = input; iter != NULL; iter = iter->next)
+    ret = g_list_prepend (ret, instance_extension_copy (iter->data));
+
+  return g_list_reverse (ret);
 }
 
 SrtBaseJsonGraphicsModule *_srt_base_json_graphics_module_new_error (GType type,

@@ -956,7 +956,7 @@ keys:
 
 **vulkan**
 :   An object describing Vulkan support. Currently the keys are **icds**,
-    **external_layers** and **internal_layers**. For **icds**, its value is an
+    **explicit_layers** and **implicit_layers**. For **icds**, its value is an
     array of objects describing ICDs, with the same keys and values as for EGL
     ICDs, plus the following extra keys:
 
@@ -972,9 +972,9 @@ keys:
         If this entry was not provided by the ICD, **library_arch** will be
         omitted.
 
-    Instead, the value of **external_layers**, and **internal_layers**, is an
-    array of objects, where the former describes external Vulkan layers and
-    the latter describes internal Vulkan layers. They have the same keys and
+    Instead, the value of **explicit_layers**, and **implicit_layers**, is an
+    array of objects, where the former describes explicit Vulkan layers and
+    the latter describes implicit Vulkan layers. They have the same keys and
     values as for Vulkan ICDs, with the differences that **library_path**
     might be omitted, if it is not present, and the **duplicated** issues
     signals that two layers not only have a **library_path** that points to

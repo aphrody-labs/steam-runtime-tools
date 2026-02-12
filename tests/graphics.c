@@ -97,6 +97,167 @@ icd_mode_to_string (IcdMode mode)
 }
 
 static void
+dump_json_graphics_module (void *p)
+{
+  SrtBaseGraphicsModule *base = SRT_BASE_GRAPHICS_MODULE (p);
+  SrtBaseJsonGraphicsModule *json = SRT_BASE_JSON_GRAPHICS_MODULE (p);
+
+  g_return_if_fail (p != NULL);
+  g_return_if_fail (SRT_IS_BASE_JSON_GRAPHICS_MODULE (p));
+  g_return_if_fail (SRT_IS_BASE_GRAPHICS_MODULE (p));
+
+  g_test_message ("%s for JSON manifest: %s",
+                  G_OBJECT_TYPE_NAME (p), json->json_path);
+  g_test_message ("\tissues: 0x%x", base->issues);
+
+  if (base->error != NULL)
+    {
+      g_test_message ("\terror: %s #%d %s",
+                      g_quark_to_string (base->error->domain),
+                      base->error->code,
+                      base->error->message);
+    }
+  else
+    {
+      g_test_message ("\tlibrary path: %s", base->library_path ?: "(null)");
+      g_test_message ("\tAPI version: %s", json->api_version ?: "(null)");
+      g_test_message ("\tlibrary arch: %s", json->library_arch ?: "(null)");
+      g_test_message ("\tfile format: %s", json->file_format_version ?: "(null)");
+      g_test_message ("\tname: %s", json->name ?: "(null)");
+      g_test_message ("\ttype: %s", json->type ?: "(null)");
+      g_test_message ("\timpl version: %s", json->implementation_version ?: "(null)");
+      g_test_message ("\tdescription: %s", json->description ?: "(null)");
+      g_test_message ("\tportability driver: %s", json->portability_driver ? "y": "n");
+
+      if (json->component_layers != NULL)
+        {
+          g_test_message ("\tcomponent layers:");
+
+          for (size_t i = 0; json->component_layers[i] != NULL; i++)
+            g_test_message ("\t\t#%zu: %s", i, json->component_layers[i]);
+
+          g_test_message ("\t\t.");
+        }
+      else
+        {
+          g_test_message ("\tcomponent layers: (none)");
+        }
+
+      if (json->functions != NULL)
+        {
+          GHashTableIter iter;
+          void *k, *v;
+
+          g_test_message ("\tfunctions:");
+
+          g_hash_table_iter_init (&iter, json->functions);
+
+          while (g_hash_table_iter_next (&iter, &k, &v))
+            g_test_message ("\t\t%s => %s", (const char *) k, (const char *) v);
+
+          g_test_message ("\t\t.");
+        }
+      else
+        {
+          g_test_message ("\tfunctions: none");
+        }
+
+      if (json->instance_extensions != NULL)
+        {
+          const GList *iter;
+          size_t i;
+
+          g_test_message ("\tinstance extensions:");
+
+          for (iter = json->instance_extensions, i = 0;
+               iter != NULL;
+               iter = iter->next, i++)
+            {
+              const InstanceExtension *ie = iter->data;
+
+              g_test_message ("\t\t%s: spec version %s, ext version %s",
+                              ie->name,
+                              ie->spec_version ?: "(null)",
+                              ie->extension_version ?: "(null)");
+            }
+
+          g_test_message ("\t\t.");
+        }
+      else
+        {
+          g_test_message ("\tinstance extensions: none");
+        }
+
+      if (json->pre_instance_functions != NULL)
+        {
+          GHashTableIter iter;
+          void *k, *v;
+
+          g_test_message ("\tpre-instance functions:");
+
+          g_hash_table_iter_init (&iter, json->pre_instance_functions);
+
+          while (g_hash_table_iter_next (&iter, &k, &v))
+            g_test_message ("\t\t%s => %s", (const char *) k, (const char *) v);
+
+          g_test_message ("\t\t.");
+        }
+      else
+        {
+          g_test_message ("\tpre-instance functions: none");
+        }
+
+      if (json->device_extensions != NULL)
+        {
+          const GList *iter;
+          size_t i;
+
+          g_test_message ("\tdevice extensions:");
+
+          for (iter = json->device_extensions, i = 0;
+               iter != NULL;
+               iter = iter->next, i++)
+            {
+              const DeviceExtension *de = iter->data;
+
+              g_test_message ("\t\t%s: spec version %s",
+                              de->name,
+                              de->spec_version ?: "(null)");
+
+              if (de->entrypoints != NULL)
+                {
+                  for (size_t j = 0; de->entrypoints[j] != NULL; j++)
+                    g_test_message ("\t\t\tentry point: %s",
+                                    de->entrypoints[j]);
+                }
+            }
+
+          g_test_message ("\t\t.");
+        }
+      else
+        {
+          g_test_message ("\tdevice extensions: none");
+        }
+
+      if (json->enable_env_var.name != NULL)
+        g_test_message ("\tenable with %s=%s",
+                        json->enable_env_var.name,
+                        json->enable_env_var.value ?: "(anything)");
+
+      if (json->disable_env_var.name != NULL)
+        g_test_message ("\tdisable with %s=%s",
+                        json->disable_env_var.name,
+                        json->disable_env_var.value ?: "(anything)");
+
+      if (json->original_json != NULL)
+        g_test_message ("\toriginal JSON: %zu bytes",
+                        strlen (json->original_json));
+      else
+        g_test_message ("\toriginal JSON: (null)");
+    }
+}
+
+static void
 setup (Fixture *f,
        gconstpointer context)
 {
@@ -1301,6 +1462,7 @@ static void
 assert_vulkan_icd_has_error (const char *sysroot,
                              SrtVulkanIcd *icd)
 {
+  dump_json_graphics_module (icd);
   g_assert_false (srt_vulkan_icd_check_error (icd, NULL));
   assert_vulkan_icd (sysroot, icd);
 }
@@ -1314,6 +1476,7 @@ assert_vulkan_icd_no_error (const char *sysroot,
 {
   GError *error = NULL;
 
+  dump_json_graphics_module (icd);
   srt_vulkan_icd_check_error (icd, &error);
   g_assert_no_error (error);
   assert_vulkan_icd (sysroot, icd);
@@ -1964,6 +2127,7 @@ test_icd_openxr_json (Fixture *f,
                                  sysroot_path_runtime_link,
                                  _SRT_GRAPHICS_MANIFEST_MEMBER_OPENXR_1_RUNTIME);
   g_assert_true (SRT_IS_OPENXR_1_RUNTIME (rt));
+  dump_json_graphics_module (rt);
 
   srt_openxr_1_runtime_check_error (rt, &error);
   g_assert_no_error (error);
@@ -2104,6 +2268,7 @@ test_icd_openxr_json_errors (Fixture *f,
                                      tests[i].sysroot_runtime_path,
                                      _SRT_GRAPHICS_MANIFEST_MEMBER_OPENXR_1_RUNTIME);
       g_assert_true (SRT_IS_OPENXR_1_RUNTIME (rt));
+      dump_json_graphics_module (rt);
 
       g_assert_false (srt_openxr_1_runtime_check_error (rt, &error));
       /* Accept any error code from the expected domain. */
@@ -2282,6 +2447,7 @@ test_icd_openxr_loading (Fixture *f,
           g_test_message ("%s active #%" G_GSIZE_FORMAT "", G_STRFUNC, i);
           rt = g_hash_table_lookup (active, config->active[i].abi);
           g_assert_nonnull (rt);
+          dump_json_graphics_module (rt);
           g_assert_cmpstr (srt_openxr_1_runtime_get_json_path (rt), ==,
                            config->active[i].path);
           g_assert_cmpstr (srt_openxr_1_runtime_get_json_origin (rt), ==,
@@ -2306,6 +2472,8 @@ test_icd_openxr_loading (Fixture *f,
           g_assert_nonnull (list);
           rt = list->data;
           g_assert_nonnull (rt);
+          dump_json_graphics_module (rt);
+
           /* This one is a symlink. */
           if (g_str_equal (config->inactive[i], "/usr/share/openxr/1/monado.alt.json"))
             g_assert_cmpstr (srt_openxr_1_runtime_get_json_path (rt), ==,
@@ -2598,7 +2766,7 @@ _test_layer_values (SrtVulkanLayer *layer,
   g_autoptr(GError) error = NULL;
   g_autoptr(SrtVulkanLayer) layer_dup = NULL;
 
-  g_test_message ("Layer: %s", srt_vulkan_layer_get_json_path (layer));
+  dump_json_graphics_module (layer);
 
   if (test->error_message_suffix != NULL)
     {

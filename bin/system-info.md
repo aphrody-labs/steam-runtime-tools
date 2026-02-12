@@ -982,7 +982,7 @@ keys:
     And finally they also have the following extra keys:
 
     **name**
-    :   The name that uniquely identify this layer to applications
+    :   The name that uniquely identifies this layer to applications
 
     **description**
     :   Brief description of the layer

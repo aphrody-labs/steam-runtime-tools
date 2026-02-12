@@ -258,6 +258,157 @@ dump_json_graphics_module (void *p)
 }
 
 static void
+assert_base_graphics_modules_similar (void *original_voidp,
+                                      void *changed_voidp,
+                                      const char *changed_library_path)
+{
+  SrtBaseGraphicsModule *original = SRT_BASE_GRAPHICS_MODULE (original_voidp);
+  SrtBaseGraphicsModule *changed = SRT_BASE_GRAPHICS_MODULE (changed_voidp);
+
+  g_return_if_fail (original_voidp != NULL);
+  g_return_if_fail (changed_voidp != NULL);
+  g_return_if_fail (SRT_IS_BASE_GRAPHICS_MODULE (original));
+  g_return_if_fail (SRT_IS_BASE_GRAPHICS_MODULE (changed));
+
+  if (original->error != NULL)
+    {
+      g_assert_nonnull (changed->error);
+      g_assert_cmpstr (g_quark_to_string (changed->error->domain),
+                       ==, g_quark_to_string (original->error->domain));
+      g_assert_cmpint (changed->error->code, ==, original->error->code);
+      g_assert_cmpstr (changed->error->message, ==, original->error->message);
+    }
+
+  if (changed_library_path != NULL)
+    g_assert_cmpstr (changed->library_path, ==, changed_library_path);
+  else
+    g_assert_cmpstr (changed->library_path, ==, original->library_path);
+
+  g_assert_cmpint (changed->issues, ==, original->issues);
+}
+
+static void
+assert_json_graphics_modules_similar (void *original_voidp,
+                                      void *changed_voidp,
+                                      const char *changed_file_format_version,
+                                      const char *changed_json_path)
+{
+  SrtBaseJsonGraphicsModule *original = SRT_BASE_JSON_GRAPHICS_MODULE (original_voidp);
+  SrtBaseJsonGraphicsModule *changed = SRT_BASE_JSON_GRAPHICS_MODULE (changed_voidp);
+  const GList *o_iter;
+  const GList *c_iter;
+
+  g_return_if_fail (original_voidp != NULL);
+  g_return_if_fail (changed_voidp != NULL);
+  g_return_if_fail (SRT_IS_BASE_JSON_GRAPHICS_MODULE (original));
+  g_return_if_fail (SRT_IS_BASE_JSON_GRAPHICS_MODULE (changed));
+
+  g_assert_cmpstr (changed->api_version, ==, original->api_version);
+
+  if (changed_json_path != NULL)
+    g_assert_cmpstr (changed->json_path, ==, changed_json_path);
+  else
+    g_assert_cmpstr (changed->json_path, ==, original->json_path);
+
+  g_assert_cmpstr (changed->library_arch, ==, original->library_arch);
+
+  if (changed_file_format_version != NULL)
+    g_assert_cmpstr (changed->file_format_version, ==, changed_file_format_version);
+  else
+    g_assert_cmpstr (changed->file_format_version, ==, original->file_format_version);
+
+  g_assert_cmpstr (changed->name, ==, original->name);
+  g_assert_cmpstr (changed->type, ==, original->type);
+  g_assert_cmpstr (changed->implementation_version, ==, original->implementation_version);
+  g_assert_cmpstr (changed->description, ==, original->description);
+
+  if (original->component_layers == NULL
+      || original->component_layers[0] == NULL)
+    g_assert_true (changed->component_layers == NULL
+                   || changed->component_layers[0] == NULL);
+  else
+    g_assert_cmpstrv (changed->component_layers, original->component_layers);
+
+  g_assert_cmpint (changed->portability_driver, ==, original->portability_driver);
+
+  if (original->functions != NULL && g_hash_table_size (original->functions) != 0)
+    {
+      GHashTableIter iter;
+      void *k, *v;
+
+      g_hash_table_iter_init (&iter, original->functions);
+
+      while (g_hash_table_iter_next (&iter, &k, &v))
+        g_assert_cmpstr (g_hash_table_lookup (changed->functions, k), ==, v);
+
+      g_assert_cmpuint (g_hash_table_size (changed->functions),
+                        ==, g_hash_table_size (original->functions));
+    }
+  else
+    {
+      g_assert_true (changed->functions == NULL
+                     || g_hash_table_size (changed->functions) == 0);
+    }
+
+  g_assert_cmpuint (g_list_length (changed->instance_extensions),
+                    ==, g_list_length (original->instance_extensions));
+
+  for (c_iter = changed->instance_extensions, o_iter = original->instance_extensions;
+       c_iter != NULL;
+       c_iter = c_iter->next, o_iter = o_iter->next)
+    {
+      const InstanceExtension *c = c_iter->data;
+      const InstanceExtension *o = o_iter->data;
+
+      g_assert_cmpstr (c->name, ==, o->name);
+      g_assert_cmpstr (c->spec_version, ==, o->spec_version);
+      g_assert_cmpstr (c->extension_version, ==, o->extension_version);
+    }
+
+  if (original->pre_instance_functions != NULL
+      && g_hash_table_size (original->pre_instance_functions) != 0)
+    {
+      GHashTableIter iter;
+      void *k, *v;
+
+      g_hash_table_iter_init (&iter, original->pre_instance_functions);
+
+      while (g_hash_table_iter_next (&iter, &k, &v))
+        g_assert_cmpstr (g_hash_table_lookup (changed->pre_instance_functions, k), ==, v);
+
+      g_assert_cmpuint (g_hash_table_size (changed->pre_instance_functions),
+                        ==, g_hash_table_size (original->pre_instance_functions));
+    }
+  else
+    {
+      g_assert_true (changed->pre_instance_functions == NULL
+                     || g_hash_table_size (changed->pre_instance_functions) == 0);
+    }
+
+  g_assert_cmpuint (g_list_length (changed->device_extensions),
+                    ==, g_list_length (original->device_extensions));
+
+  for (c_iter = changed->device_extensions, o_iter = original->device_extensions;
+       c_iter != NULL;
+       c_iter = c_iter->next, o_iter = o_iter->next)
+    {
+      const DeviceExtension *c = c_iter->data;
+      const DeviceExtension *o = o_iter->data;
+
+      g_assert_cmpstr (c->name, ==, o->name);
+      g_assert_cmpstr (c->spec_version, ==, o->spec_version);
+      g_assert_cmpstrv (c->entrypoints, o->entrypoints);
+    }
+
+  g_assert_cmpstr (changed->enable_env_var.name, ==, original->enable_env_var.name);
+  g_assert_cmpstr (changed->enable_env_var.value, ==, original->enable_env_var.value);
+  g_assert_cmpstr (changed->disable_env_var.name, ==, original->disable_env_var.name);
+  g_assert_cmpstr (changed->disable_env_var.value, ==, original->disable_env_var.value);
+
+  /* Intentionally no assertion here about original_json */
+}
+
+static void
 setup (Fixture *f,
        gconstpointer context)
 {
@@ -934,6 +1085,13 @@ test_icd_egl (Fixture *f,
                                                     "/run/host/libEGL_icd.so");
       /* Copying an invalid ICD yields another invalid ICD. */
       assert_egl_icd_has_error (iter->data);
+      assert_base_graphics_modules_similar (iter->data,
+                                            other,
+                                            NULL);
+      assert_json_graphics_modules_similar (iter->data,
+                                            other,
+                                            NULL,
+                                            NULL);
       g_object_unref (other);
 
       iter = iter->next;
@@ -1135,10 +1293,14 @@ test_icd_egl (Fixture *f,
       /* The pointers are not equal */
       g_assert_true (srt_egl_icd_get_json_path (other) !=
                      srt_egl_icd_get_json_path (iter->data));
-      g_assert_cmpstr (srt_egl_icd_get_library_path (other), ==,
-                       "/run/host/libEGL.so");
-      g_assert_cmpint (srt_egl_icd_get_issues (iter->data), ==,
-                       SRT_LOADABLE_ISSUES_NONE);
+      /* Everything is the same except the library_path */
+      assert_base_graphics_modules_similar (iter->data,
+                                            other,
+                                            "/run/host/libEGL.so");
+      assert_json_graphics_modules_similar (iter->data,
+                                            other,
+                                            NULL,
+                                            NULL);
 
       iter = iter->next;
       g_assert_null (iter);
@@ -1535,6 +1697,13 @@ assert_vulkan_icds (const char *sysroot,
       g_assert_cmpint (srt_vulkan_icd_get_issues (iter->data), ==,
                        SRT_LOADABLE_ISSUES_CANNOT_LOAD);
       assert_vulkan_icd_has_error (sysroot, iter->data);
+      assert_base_graphics_modules_similar (iter->data,
+                                            other,
+                                            NULL);
+      assert_json_graphics_modules_similar (iter->data,
+                                            other,
+                                            NULL,
+                                            NULL);
       g_object_unref (other);
 
       iter = iter->next;
@@ -1751,21 +1920,19 @@ assert_vulkan_icds (const char *sysroot,
       other = srt_vulkan_icd_new_replace_library_path (iter->data,
                                                        "/run/host/vulkan_icd.so");
       assert_vulkan_icd_no_error (sysroot, iter->data);
-      g_assert_cmpstr (srt_vulkan_icd_get_json_path (other), ==,
-                       srt_vulkan_icd_get_json_path (iter->data));
+      /* Everything is the same, except the library_path */
+      assert_base_graphics_modules_similar (iter->data,
+                                            other,
+                                            "/run/host/vulkan_icd.so");
+      assert_json_graphics_modules_similar (iter->data,
+                                            other,
+                                            NULL,
+                                            NULL);
       /* The pointers are not equal */
       g_assert_true (srt_vulkan_icd_get_json_path (other) !=
                      srt_vulkan_icd_get_json_path (iter->data));
-      g_assert_cmpstr (srt_vulkan_icd_get_api_version (other), ==,
-                       srt_vulkan_icd_get_api_version (iter->data));
-      /* The pointers are not equal */
       g_assert_true (srt_vulkan_icd_get_api_version (other) !=
                      srt_vulkan_icd_get_api_version (iter->data));
-      g_assert_cmpstr (srt_vulkan_icd_get_library_path (other), ==,
-                       "/run/host/vulkan_icd.so");
-      /* The %SRT_LOADABLE_ISSUES_DUPLICATED issues flag is preserved */
-      g_assert_cmpint (srt_vulkan_icd_get_issues (other), ==,
-                       SRT_LOADABLE_ISSUES_DUPLICATED);
       g_object_unref (other);
 
       iter = iter->next;
@@ -2161,13 +2328,16 @@ test_icd_openxr_json (Fixture *f,
   rt_basename = srt_openxr_1_runtime_new_replace_library_path (rt,
                                                                "libopenxr_monado.so");
 
-  g_assert_cmpstr (srt_openxr_1_runtime_get_json_path (rt_basename),
-                   ==, sysroot_path_runtime);
+  /* Everything is the same except the library_path */
   g_assert_cmpstr (srt_openxr_1_runtime_get_json_origin (rt_basename),
                    ==, sysroot_path_runtime_link);
-  g_assert_cmpstr (srt_openxr_1_runtime_get_library_path (rt_basename),
-                   ==, "libopenxr_monado.so");
-  g_assert_cmpstr (srt_openxr_1_runtime_get_name (rt_basename), ==, "Monado");
+  assert_base_graphics_modules_similar (rt,
+                                        rt_basename,
+                                        "libopenxr_monado.so");
+  assert_json_graphics_modules_similar (rt,
+                                        rt_basename,
+                                        NULL,
+                                        NULL);
 
   resolved_library_path = srt_openxr_1_runtime_resolve_library_path (rt_basename);
   g_assert_cmpstr (resolved_library_path, ==, "libopenxr_monado.so");
@@ -2175,12 +2345,13 @@ test_icd_openxr_json (Fixture *f,
 
   rt_relative = srt_openxr_1_runtime_new_replace_library_path (rt,
                                                                "../libopenxr_monado.so");
-
-  g_assert_cmpstr (srt_openxr_1_runtime_get_json_path (rt_relative),
-                   ==, sysroot_path_runtime);
-  g_assert_cmpstr (srt_openxr_1_runtime_get_library_path (rt_relative),
-                   ==, "../libopenxr_monado.so");
-  g_assert_cmpstr (srt_openxr_1_runtime_get_name (rt_relative), ==, "Monado");
+  assert_base_graphics_modules_similar (rt,
+                                        rt_relative,
+                                        "../libopenxr_monado.so");
+  assert_json_graphics_modules_similar (rt,
+                                        rt_relative,
+                                        NULL,
+                                        NULL);
 
   /* This specifically makes sure that, following the behavior of the
    * official OpenXR loader,  the library path is resolved relative to the
@@ -2802,10 +2973,25 @@ _test_layer_values (SrtVulkanLayer *layer,
    * after calling the replace function we still expect to have a
    * NULL library_path. */
   if (test->library_path == NULL)
-    g_assert_cmpstr (NULL, ==, srt_vulkan_layer_get_library_path (layer_dup));
+    {
+      assert_base_graphics_modules_similar (layer,
+                                            layer_dup,
+                                            NULL);
+      assert_json_graphics_modules_similar (layer,
+                                            layer_dup,
+                                            NULL,
+                                            NULL);
+    }
   else
-    g_assert_cmpstr ("/run/host/vulkan_layer.so", ==,
-                      srt_vulkan_layer_get_library_path (layer_dup));
+    {
+      assert_base_graphics_modules_similar (layer,
+                                            layer_dup,
+                                            "/run/host/vulkan_layer.so");
+      assert_json_graphics_modules_similar (layer,
+                                            layer_dup,
+                                            NULL,
+                                            NULL);
+    }
 
   if (test->json_to_compare != NULL)
     {

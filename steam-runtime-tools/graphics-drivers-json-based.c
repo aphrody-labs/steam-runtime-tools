@@ -252,9 +252,18 @@ maybe_emit_instance_extensions (JsonBuilder *builder,
               _srt_json_builder_add_required_string_member (builder,
                                                             "name",
                                                             ie->name);
-              _srt_json_builder_add_required_string_member (builder,
+
+              /* Vulkan layers have a spec_version, while OpenXR layers have
+               * an extension_version instead. Here we accept either one. */
+              g_warn_if_fail (((ie->spec_version != NULL)
+                               + (ie->extension_version != NULL))
+                              == 1);
+              _srt_json_builder_add_optional_string_member (builder,
                                                             "spec_version",
                                                             ie->spec_version);
+              _srt_json_builder_add_optional_string_member (builder,
+                                                            "extension_version",
+                                                            ie->extension_version);
             }
           json_builder_end_object (builder);
         }

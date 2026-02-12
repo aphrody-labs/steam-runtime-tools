@@ -61,6 +61,7 @@ typedef struct
 {
   gchar *name;
   gchar *spec_version;
+  gchar *extension_version;
 } InstanceExtension;
 
 typedef struct
@@ -149,6 +150,7 @@ instance_extension_free (gpointer p)
 
   g_free (self->name);
   g_free (self->spec_version);
+  g_free (self->extension_version);
   g_slice_free (InstanceExtension, self);
 }
 

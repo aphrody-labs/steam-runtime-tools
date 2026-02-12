@@ -292,17 +292,15 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
            json_builder_set_member_name (builder, member);
            json_builder_begin_object (builder);
             {
-              json_builder_set_member_name (builder, "library_path");
-              json_builder_add_string_value (builder, base->library_path);
-
-              json_builder_set_member_name (builder, "api_version");
-              json_builder_add_string_value (builder, self->api_version);
-
-              if (self->library_arch)
-                {
-                  json_builder_set_member_name (builder, "library_arch");
-                  json_builder_add_string_value (builder, self->library_arch);
-                }
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "library_path",
+                                                            base->library_path);
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "api_version",
+                                                            self->api_version);
+              _srt_json_builder_add_optional_string_member (builder,
+                                                            "library_arch",
+                                                            self->library_arch);
 
               if (self->portability_driver)
                 {
@@ -318,14 +316,16 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
           /* We parse and store all the information defined in file format
            * version 1.0.0, but nothing beyond that, so we use this version
            * in our output instead of quoting whatever was in the input. */
-          json_builder_set_member_name (builder, "file_format_version");
-          json_builder_add_string_value (builder, "1.0.0");
+          _srt_json_builder_add_required_string_member (builder,
+                                                        "file_format_version",
+                                                        "1.0.0");
 
            json_builder_set_member_name (builder, member);
            json_builder_begin_object (builder);
             {
-              json_builder_set_member_name (builder, "library_path");
-              json_builder_add_string_value (builder, base->library_path);
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "library_path",
+                                                            base->library_path);
             }
            json_builder_end_object (builder);
         }
@@ -356,32 +356,27 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
           json_builder_set_member_name (builder, "layer");
           json_builder_begin_object (builder);
             {
-              json_builder_set_member_name (builder, "name");
-              json_builder_add_string_value (builder, self->name);
-
-              json_builder_set_member_name (builder, "type");
-              json_builder_add_string_value (builder, self->type);
-
-              if (base->library_path != NULL)
-                {
-                  json_builder_set_member_name (builder, "library_path");
-                  json_builder_add_string_value (builder, base->library_path);
-                }
-
-              if (self->library_arch != NULL)
-                {
-                  json_builder_set_member_name (builder, "library_arch");
-                  json_builder_add_string_value (builder, self->library_arch);
-                }
-
-              json_builder_set_member_name (builder, "api_version");
-              json_builder_add_string_value (builder, self->api_version);
-
-              json_builder_set_member_name (builder, "implementation_version");
-              json_builder_add_string_value (builder, self->implementation_version);
-
-              json_builder_set_member_name (builder, "description");
-              json_builder_add_string_value (builder, self->description);
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "name",
+                                                            self->name);
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "type",
+                                                            self->type);
+              _srt_json_builder_add_optional_string_member (builder,
+                                                            "library_path",
+                                                            base->library_path);
+              _srt_json_builder_add_optional_string_member (builder,
+                                                            "library_arch",
+                                                            self->library_arch);
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "api_version",
+                                                            self->api_version);
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "implementation_version",
+                                                            self->implementation_version);
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "description",
+                                                            self->description);
 
               _srt_json_builder_add_strv_value (builder, "component_layers",
                                                 (const gchar * const *) self->component_layers,
@@ -489,14 +484,16 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
           json_builder_set_member_name (builder, member);
           json_builder_begin_object (builder);
             {
-              json_builder_set_member_name (builder, "library_path");
-              json_builder_add_string_value (builder, base->library_path);
-
-              if (self->name != NULL)
-                {
-                  json_builder_set_member_name (builder, "name");
-                  json_builder_add_string_value (builder, self->name);
-                }
+              /* Required, per the spec */
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "library_path",
+                                                            base->library_path);
+              /* Required per the spec, but for whatever reason we
+               * historically treated this as optional, so let's not
+               * regress */
+              _srt_json_builder_add_optional_string_member (builder,
+                                                            "name",
+                                                            self->name);
 
               if (self->functions != NULL)
                 {

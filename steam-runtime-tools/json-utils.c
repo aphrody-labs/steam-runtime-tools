@@ -331,6 +331,55 @@ _srt_json_builder_add_array_of_lines (JsonBuilder *builder,
 }
 
 /**
+ * _srt_json_builder_add_required_string_member:
+ * @builder: (not nullable): A JSON builder that is inside an object:
+ *  after json_builder_begin_object(), but before the corresponding
+ *  json_builder_end_object()
+ * @name: (not nullable): Name of a member
+ * @value: (not nullable): Value for the member
+ *
+ * Emit `{ name: value }` as JSON, reporting an internal error if either
+ * @name or @value is %NULL.
+ */
+void
+_srt_json_builder_add_required_string_member (JsonBuilder *builder,
+                                              const char *name,
+                                              const char *value)
+{
+  g_return_if_fail (builder != NULL);
+  g_return_if_fail (name != NULL);
+  g_return_if_fail (value != NULL);
+  json_builder_set_member_name (builder, name);
+  json_builder_add_string_value (builder, value);
+}
+
+/**
+ * _srt_json_builder_add_optional_string_member:
+ * @builder: (not nullable): A JSON builder that is inside an object:
+ *  after json_builder_begin_object(), but before the corresponding
+ *  json_builder_end_object()
+ * @name: (not nullable): Name of a member
+ * @value: (nullable): Value for the member, or %NULL to skip
+ *
+ * If @value is non-%NULL, emit it as a string value.
+ * If @value is %NULL, do not emit anything for @name at all.
+ */
+void
+_srt_json_builder_add_optional_string_member (JsonBuilder *builder,
+                                              const char *name,
+                                              const char *value)
+{
+  g_return_if_fail (builder != NULL);
+  g_return_if_fail (name != NULL);
+
+  if (value != NULL)
+    {
+      json_builder_set_member_name (builder, name);
+      json_builder_add_string_value (builder, value);
+    }
+}
+
+/**
  * _srt_json_builder_add_strv_value:
  * @builder: (not nullable): A JSON Builder where the provided @values
  *  will be appended

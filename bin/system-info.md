@@ -998,6 +998,26 @@ keys:
         are part of a meta-layer. This will be omitted if **library_path**
         is used instead.
 
+**openxr-1**
+:   An object containing non-architecture-specific details of OpenXR 1
+    runtimes.
+    It has the following keys:
+
+    **active-fallback**
+    :   The runtime that is active for unknown architectures,
+        if any.
+        Omitted from the report if there is no fallback.
+        If present,
+        the value is an object with the same keys and values as the
+        per-architecture **openxr-1-runtime**.
+
+    **inactive**
+    :   A list of additional OpenXR runtimes that were not already shown
+        as the active runtime in the per-architecture **openxr-1-runtime**
+        or the non-architecture-specific **active-fallback**.
+        Each item in the list is an object with the same keys and values
+        as the per-architecture **openxr-1-runtime**.
+
 **desktop-entries**
 :   An array of objects describing the Steam related desktop entries
     that have been found.

@@ -2671,6 +2671,7 @@ test_icd_openxr_loading (Fixture *f,
 static void
 assert_openxr_layer_consistent (SrtOpenXr1Layer *layer)
 {
+  g_autoptr(SrtOpenXr1Layer) edited = NULL;
   g_autofree char *json_path = NULL;
   g_autofree char *json_origin = NULL;
   g_autofree char *library_path = NULL;
@@ -2742,6 +2743,34 @@ assert_openxr_layer_consistent (SrtOpenXr1Layer *layer)
       g_assert_null (description);
       g_assert_null (api_version);
       g_assert_null (impl_version);
+    }
+
+  edited = srt_openxr_1_layer_new_replace_library_path (layer, "/run/host/lib.so");
+
+  if (srt_openxr_1_layer_check_error (layer, NULL))
+    {
+      /* Replacing the library path of a valid layer works */
+      assert_base_graphics_modules_similar (layer,
+                                            edited,
+                                            "/run/host/lib.so");
+      assert_json_graphics_modules_similar (layer,
+                                            edited,
+                                            NULL,
+                                            NULL);
+      g_assert_cmpstr (edited->json_origin, ==, layer->json_origin);
+    }
+  else
+    {
+      /* Replacing the library path of a layer in an error state doesn't
+       * change anything */
+      assert_base_graphics_modules_similar (layer,
+                                            edited,
+                                            NULL);
+      assert_json_graphics_modules_similar (layer,
+                                            edited,
+                                            NULL,
+                                            NULL);
+      g_assert_cmpstr (edited->json_origin, ==, layer->json_origin);
     }
 }
 

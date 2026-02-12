@@ -1338,6 +1338,85 @@ _srt_load_openxr_1_layers (SrtSysroot *sysroot,
   return g_list_reverse (ret);
 }
 
+static SrtOpenXr1Layer *
+openxr_1_layer_dup (SrtOpenXr1Layer *self)
+{
+  SrtBaseGraphicsModule *base;
+  GHashTableIter iter;
+
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), NULL);
+
+  base = SRT_BASE_GRAPHICS_MODULE (self);
+
+  SrtOpenXr1Layer *ret = srt_openxr_1_layer_new (self->parent.json_path,
+                                                 self->json_origin,
+                                                 self->parent.name,
+                                                 base->library_path,
+                                                 self->parent.api_version,
+                                                 self->parent.implementation_version,
+                                                 self->parent.description,
+                                                 base->issues);
+
+  if (self->parent.functions != NULL)
+    {
+      gpointer key;
+      gpointer value;
+
+      ret->parent.functions = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
+      g_hash_table_iter_init (&iter, self->parent.functions);
+
+      while (g_hash_table_iter_next (&iter, &key, &value))
+        g_hash_table_insert (ret->parent.functions, g_strdup (key), g_strdup (value));
+    }
+
+  ret->parent.instance_extensions = instance_extension_list_copy (self->parent.instance_extensions);
+  ret->parent.enable_env_var.name = g_strdup (self->parent.enable_env_var.name);
+  ret->parent.disable_env_var.name = g_strdup (self->parent.disable_env_var.name);
+
+  return ret;
+}
+
+/**
+ * srt_openxr_1_layer_new_replace_library_path:
+ * @self: An OpenXR layer
+ * @path: (type filename) (transfer none): A path
+ *
+ * Return a copy of @self with the srt_openxr_1_layer_get_library_path()
+ * changed to @path. For example, this is useful when setting up a
+ * container where the underlying shared object will be made available
+ * at a different absolute path.
+ *
+ * If @self does not have #SrtOpenXr1Layer:library-path set, or if it
+ * is in an error state, this returns a new reference to @self.
+ *
+ * Returns: (transfer full): A new reference to a #SrtOpenXr1Layer. Free with
+ *  g_object_unref().
+ */
+SrtOpenXr1Layer *
+srt_openxr_1_layer_new_replace_library_path (SrtOpenXr1Layer *self,
+                                             const char *library_path)
+{
+  SrtBaseGraphicsModule *base;
+  SrtOpenXr1Layer *ret = NULL;
+
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), NULL);
+  g_return_val_if_fail (library_path != NULL, NULL);
+
+  base = SRT_BASE_GRAPHICS_MODULE (self);
+
+  if (base->error != NULL || base->library_path == NULL)
+    return g_object_ref (self);
+
+  ret = openxr_1_layer_dup (self);
+  g_return_val_if_fail (ret != NULL, NULL);
+
+  base = SRT_BASE_GRAPHICS_MODULE (ret);
+  g_free (base->library_path);
+  base->library_path = g_strdup (library_path);
+
+  return ret;
+}
+
 /**
  * srt_openxr_1_layer_get_json_path:
  * @self: The OpenXR layer

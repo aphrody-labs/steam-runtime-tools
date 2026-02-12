@@ -107,6 +107,9 @@ _SRT_PUBLIC
 const char *srt_openxr_1_layer_get_implementation_version (SrtOpenXr1Layer *self);
 _SRT_PUBLIC
 SrtLoadableIssues srt_openxr_1_layer_get_issues (SrtOpenXr1Layer *self);
+_SRT_PUBLIC
+SrtOpenXr1Layer *srt_openxr_1_layer_new_replace_library_path (SrtOpenXr1Layer *self,
+                                                              const char *path);
 
 #ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (SrtOpenXr1Layer, g_object_unref)

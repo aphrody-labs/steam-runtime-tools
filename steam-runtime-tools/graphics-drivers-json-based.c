@@ -222,6 +222,46 @@ _srt_base_json_graphics_module_class_init (SrtBaseJsonGraphicsModuleClass *cls)
                                      base_properties);
 }
 
+/*
+ * emit_instance_extensions:
+ * @builder: must have called json_builder_begin_object()
+ * @instance_extensions: (element-type InstanceExtension):
+ *
+ * If @instance_extensions is non-empty, add a member named
+ * `instance_extensions` to the JSON builder and populate it from
+ * the list.
+ */
+static void
+maybe_emit_instance_extensions (JsonBuilder *builder,
+                                GList *instance_extensions)
+{
+  const GList *l;
+
+  if (instance_extensions == NULL)
+    return;
+
+  json_builder_set_member_name (builder, "instance_extensions");
+  json_builder_begin_array (builder);
+    {
+      for (l = instance_extensions; l != NULL; l = l->next)
+        {
+          InstanceExtension *ie = l->data;
+
+          json_builder_begin_object (builder);
+            {
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "name",
+                                                            ie->name);
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "spec_version",
+                                                            ie->spec_version);
+            }
+          json_builder_end_object (builder);
+        }
+    }
+  json_builder_end_array (builder);
+}
+
 /* See srt_egl_icd_write_to_file(), srt_vulkan_icd_write_to_file() and
  * srt_vulkan_layer_write_to_file() */
 gboolean
@@ -416,22 +456,8 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
                   json_builder_end_object (builder);
                 }
 
-              if (self->instance_extensions != NULL)
-                {
-                  json_builder_set_member_name (builder, "instance_extensions");
-                  json_builder_begin_array (builder);
-                  for (l = self->instance_extensions; l != NULL; l = l->next)
-                    {
-                      InstanceExtension *ie = l->data;
-                      json_builder_begin_object (builder);
-                      json_builder_set_member_name (builder, "name");
-                      json_builder_add_string_value (builder, ie->name);
-                      json_builder_set_member_name (builder, "spec_version");
-                      json_builder_add_string_value (builder, ie->spec_version);
-                      json_builder_end_object (builder);
-                    }
-                  json_builder_end_array (builder);
-                }
+              maybe_emit_instance_extensions (builder,
+                                              self->instance_extensions);
 
               if (self->device_extensions != NULL)
                 {

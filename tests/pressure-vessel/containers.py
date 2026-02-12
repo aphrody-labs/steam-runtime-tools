@@ -449,6 +449,15 @@ class BaseContainersTest(BaseTest):
             )
 
         if host_srsi is None:
+            pv = os.path.join(cls.containers_dir, 'pressure-vessel')
+
+            host_srsi = shutil.which(
+                os.path.join(
+                    pv, 'bin', 'steam-runtime-system-info',
+                )
+            )
+
+        if host_srsi is None:
             host_srsi = shutil.which('steam-runtime-system-info')
 
         cls.host_srsi = host_srsi

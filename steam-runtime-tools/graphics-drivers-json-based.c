@@ -300,6 +300,8 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
     member = "layer";
   else if (which == SRT_TYPE_OPENXR_1_RUNTIME)
     member = _SRT_GRAPHICS_MANIFEST_MEMBER_OPENXR_1_RUNTIME;
+  else if (which == SRT_TYPE_OPENXR_1_LAYER)
+    member = _SRT_GRAPHICS_MANIFEST_MEMBER_OPENXR_1_API_LAYER;
   else
     g_return_val_if_reached (FALSE);
 
@@ -508,7 +510,8 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
             }
           json_builder_end_object (builder);
         }
-      else if (which == SRT_TYPE_OPENXR_1_RUNTIME)
+      else if (which == SRT_TYPE_OPENXR_1_RUNTIME
+               || which == SRT_TYPE_OPENXR_1_LAYER)
         {
           /* We parse and store all the information defined in file format
            * version 1.0.0, but nothing beyond that, so we use this version
@@ -529,6 +532,36 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
               _srt_json_builder_add_optional_string_member (builder,
                                                             "name",
                                                             self->name);
+
+              if (which == SRT_TYPE_OPENXR_1_LAYER)
+                {
+                  _srt_json_builder_add_required_string_member (builder,
+                                                                "api_version",
+                                                                self->api_version);
+                  _srt_json_builder_add_required_string_member (builder,
+                                                                "implementation_version",
+                                                                self->implementation_version);
+                  _srt_json_builder_add_required_string_member (builder,
+                                                                "description",
+                                                                self->description);
+
+                  /* Unlike Vulkan layers, the enable_environment and
+                   * disable_environment for OpenXR layers are simple strings,
+                   * distinguishing between only two states: "set to anything"
+                   * (possibly empty!) and "unset" */
+                  _srt_json_builder_add_optional_string_member (builder,
+                                                                "enable_environment",
+                                                                self->enable_env_var.name);
+                  g_warn_if_fail (self->enable_env_var.value == NULL);
+
+                  _srt_json_builder_add_optional_string_member (builder,
+                                                                "disable_environment",
+                                                                self->disable_env_var.name);
+                  g_warn_if_fail (self->disable_env_var.value == NULL);
+
+                  maybe_emit_instance_extensions (builder,
+                                                  self->instance_extensions);
+                }
 
               if (self->functions != NULL)
                 {

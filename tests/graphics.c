@@ -52,6 +52,7 @@ static gchar *global_sysroots;
 typedef struct
 {
   TestsOpenFdSet old_fds;
+  SrtSysroot *real_root;
   gchar *srcdir;
   gchar *builddir;
   const gchar *sysroots;
@@ -412,9 +413,13 @@ static void
 setup (Fixture *f,
        gconstpointer context)
 {
+  g_autoptr(GError) error = NULL;
   const Config *config = context;
 
   f->old_fds = tests_check_fd_leaks_enter ();
+
+  f->real_root = _srt_sysroot_new_direct (&error);
+  g_assert_no_error (error);
 
   f->builddir = g_strdup (g_getenv ("G_TEST_BUILDDIR"));
 
@@ -590,6 +595,7 @@ teardown (Fixture *f,
   g_free (f->builddir);
   g_free (f->sysroot);
   g_strfreev (f->fake_icds_envp);
+  g_clear_object (&f->real_root);
 
   tests_check_fd_leaks_leave (f->old_fds);
 }
@@ -2817,6 +2823,49 @@ assert_openxr_layer_has_error (SrtOpenXr1Layer *layer,
 }
 
 /*
+ * Assert that saving @layer to a file, then loading the file,
+ * produces something almost functionally equivalent.
+ */
+static void
+assert_openxr_layer_can_round_trip_to_file (Fixture *f,
+                                            SrtOpenXr1Layer *layer)
+{
+  g_autoptr(GError) error = NULL;
+  g_autoptr(SrtOpenXr1Layer) reloaded = NULL;
+  g_auto(GLnxTmpDir) tmp_dir = { .initialized = FALSE };
+  g_autofree char *save_path = NULL;
+
+  glnx_mkdtemp ("openxr-json-test-XXXXXX", 0700, &tmp_dir, &error);
+  g_assert_no_error (error);
+  save_path = g_build_filename (tmp_dir.path, "output.json", NULL);
+
+  srt_openxr_1_layer_write_to_file (layer, save_path, &error);
+  g_assert_no_error (error);
+
+  reloaded = (SrtOpenXr1Layer *) load_manifest_from_json (SRT_TYPE_OPENXR_1_LAYER,
+                                                          f->real_root,
+                                                          save_path,
+                                                          _SRT_GRAPHICS_MANIFEST_MEMBER_OPENXR_1_API_LAYER);
+  g_assert_nonnull (reloaded);
+
+  glnx_tmpdir_delete (&tmp_dir, NULL, &error);
+  g_assert_no_error (error);
+
+  dump_json_graphics_module (reloaded);
+
+  /* The version we loaded from the file is the same as @layer,
+   * except that its JSON path has been replaced by @save_path. */
+  assert_base_graphics_modules_similar (layer,
+                                        reloaded,
+                                        NULL);
+  assert_json_graphics_modules_similar (layer,
+                                        reloaded,
+                                        NULL,
+                                        save_path);
+  g_assert_cmpstr (reloaded->json_origin, ==, save_path);
+}
+
+/*
  * Test the GObject interface of OpenXR layers.
  */
 static void
@@ -2851,6 +2900,7 @@ test_openxr_layer_object (Fixture *f,
                    ==, "1.2.3");
   g_assert_cmpint (srt_openxr_1_layer_get_issues (good),
                    ==, SRT_LOADABLE_ISSUES_NONE);
+  assert_openxr_layer_can_round_trip_to_file (f, good);
 
   g_set_error (&error, G_IO_ERROR, G_IO_ERROR_BUSY, "No");
   bad = srt_openxr_1_layer_new_error ("/nonexistent/nope.json",
@@ -3037,7 +3087,8 @@ static const OpenXrLayerTest openxr_layer_tests[] =
 };
 
 static void
-assert_openxr_layer_matches (SrtOpenXr1Layer *layer,
+assert_openxr_layer_matches (Fixture *f,
+                             SrtOpenXr1Layer *layer,
                              const OpenXrLayerExpected *expected,
                              const char *sysroot)
 {
@@ -3063,6 +3114,7 @@ assert_openxr_layer_matches (SrtOpenXr1Layer *layer,
     }
 
   assert_openxr_layer_no_error (layer);
+  assert_openxr_layer_can_round_trip_to_file (f, layer);
   g_assert_cmpstr (expected->name, ==, srt_openxr_1_layer_get_name (layer));
   g_assert_cmpstr (expected->description,
                    ==, srt_openxr_1_layer_get_description (layer));
@@ -3221,7 +3273,7 @@ test_openxr_layer_parsing (Fixture *f,
       for (iter = explicit_layers, j = 0;
            iter != NULL;
            iter = iter->next, j++)
-        assert_openxr_layer_matches (iter->data, &test->explicit_layers[j],
+        assert_openxr_layer_matches (f, iter->data, &test->explicit_layers[j],
                                      sysroot);
 
       g_assert_cmpstr (test->explicit_layers[j].name, ==, NULL);
@@ -3247,7 +3299,7 @@ test_openxr_layer_parsing (Fixture *f,
       for (iter = implicit_layers, j = 0;
            iter != NULL;
            iter = iter->next, j++)
-        assert_openxr_layer_matches (iter->data, &test->implicit_layers[j],
+        assert_openxr_layer_matches (f, iter->data, &test->implicit_layers[j],
                                      sysroot);
 
       g_assert_cmpstr (test->implicit_layers[j].name, ==, NULL);

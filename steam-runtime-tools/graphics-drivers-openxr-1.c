@@ -1418,6 +1418,31 @@ srt_openxr_1_layer_new_replace_library_path (SrtOpenXr1Layer *self,
 }
 
 /**
+ * srt_openxr_1_layer_write_to_file:
+ * @self: The OpenXR layer
+ * @path: (type filename): A filename
+ * @error: Used to describe the error on failure
+ *
+ * Serialize @self to the given JSON file.
+ *
+ * Returns: %TRUE on success
+ */
+gboolean
+srt_openxr_1_layer_write_to_file (SrtOpenXr1Layer *self,
+                                  const char *path,
+                                  GError **error)
+{
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), FALSE);
+  g_return_val_if_fail (path != NULL, FALSE);
+  g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+
+  return _srt_base_json_graphics_module_write_to_file (&self->parent,
+                                                       path,
+                                                       SRT_TYPE_OPENXR_1_LAYER,
+                                                       error);
+}
+
+/**
  * srt_openxr_1_layer_get_json_path:
  * @self: The OpenXR layer
  *

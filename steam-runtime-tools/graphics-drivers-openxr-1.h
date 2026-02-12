@@ -110,6 +110,10 @@ SrtLoadableIssues srt_openxr_1_layer_get_issues (SrtOpenXr1Layer *self);
 _SRT_PUBLIC
 SrtOpenXr1Layer *srt_openxr_1_layer_new_replace_library_path (SrtOpenXr1Layer *self,
                                                               const char *path);
+_SRT_PUBLIC
+gboolean srt_openxr_1_layer_write_to_file (SrtOpenXr1Layer *self,
+                                           const char *path,
+                                           GError **error);
 
 #ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (SrtOpenXr1Layer, g_object_unref)

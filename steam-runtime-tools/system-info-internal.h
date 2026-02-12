@@ -66,6 +66,7 @@ void _srt_system_info_set_multiarch_quarks (SrtSystemInfo *self,
                                             gsize n);
 
 const char *_srt_system_info_get_sysroot_path (SrtSystemInfo *self);
+SrtSysroot *_srt_system_info_get_sysroot (SrtSystemInfo *self);
 void _srt_system_info_set_sysroot (SrtSystemInfo *self,
                                    SrtSysroot *sysroot);
 

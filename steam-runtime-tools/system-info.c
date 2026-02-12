@@ -2292,6 +2292,12 @@ _srt_system_info_get_sysroot_path (SrtSystemInfo *self)
   return self->sysroot->path;
 }
 
+SrtSysroot *
+_srt_system_info_get_sysroot (SrtSystemInfo *self)
+{
+  return self->sysroot;
+}
+
 /**
  * srt_system_info_set_sysroot:
  * @self: The #SrtSystemInfo

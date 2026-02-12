@@ -646,7 +646,8 @@ _srt_loadable_flag_duplicates (GType which,
                     || which == SRT_TYPE_EGL_ICD
                     || which == SRT_TYPE_EGL_EXTERNAL_PLATFORM
                     || which == SRT_TYPE_VULKAN_LAYER
-                    || which == SRT_TYPE_OPENXR_1_RUNTIME);
+                    || which == SRT_TYPE_OPENXR_1_RUNTIME
+                    || which == SRT_TYPE_OPENXR_1_LAYER);
 
   loadable_seen = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
 
@@ -694,9 +695,12 @@ _srt_loadable_flag_duplicates (GType which,
                 }
             }
         }
-      else if (which == SRT_TYPE_VULKAN_LAYER)
+      else if (which == SRT_TYPE_VULKAN_LAYER
+               || which == SRT_TYPE_OPENXR_1_LAYER)
         {
-          name = srt_vulkan_layer_get_name (l->data);
+          SrtBaseJsonGraphicsModule *json = l->data;
+
+          name = json->name;
 
           if (resolved_path == NULL && name == NULL)
             continue;
@@ -908,7 +912,11 @@ load_json_dirs (SrtSysroot *sysroot,
 
 /*
  * load_manifest_from_json:
- * @type: %SRT_TYPE_EGL_ICD or %SRT_TYPE_EGL_EXTERNAL_PLATFORM or %SRT_TYPE_VULKAN_ICD
+ * @type: %SRT_TYPE_EGL_ICD
+ *  or %SRT_TYPE_EGL_EXTERNAL_PLATFORM
+ *  or %SRT_TYPE_VULKAN_ICD
+ *  or %SRT_TYPE_OPENXR_1_RUNTIME
+ *  or %SRT_TYPE_OPENXR_1_LAYER
  * @sysroot: (not nullable): The root directory, usually `/`
  * @filename: The filename of the metadata
  * @json_member_name: Name of the JSON object beneath the root, containing the
@@ -939,15 +947,21 @@ load_manifest_from_json (GType type,
   const char *library_path = NULL;
   const char *library_arch = NULL;
   gboolean portability_driver = FALSE;
+  gboolean is_openxr = FALSE;
   SrtLoadableIssues issues = SRT_LOADABLE_ISSUES_NONE;
   gsize len = 0;
 
   g_return_val_if_fail (type == SRT_TYPE_VULKAN_ICD
                         || type == SRT_TYPE_EGL_ICD
                         || type == SRT_TYPE_EGL_EXTERNAL_PLATFORM
-                        || type == SRT_TYPE_OPENXR_1_RUNTIME,
+                        || type == SRT_TYPE_OPENXR_1_RUNTIME
+                        || type == SRT_TYPE_OPENXR_1_LAYER,
                         NULL);
   g_return_val_if_fail (SRT_IS_SYSROOT (sysroot), NULL);
+
+  if (type == SRT_TYPE_OPENXR_1_RUNTIME
+      || type == SRT_TYPE_OPENXR_1_LAYER)
+    is_openxr = TRUE;
 
   if (!g_path_is_absolute (filename))
     {
@@ -961,11 +975,9 @@ load_manifest_from_json (GType type,
   if (!_srt_sysroot_load (sysroot, filename,
                           SRT_RESOLVE_FLAGS_RETURN_ABSOLUTE,
                           /* Make sure to get a fully resolved path for OpenXR
-                             runtimes, because that's the path used to resolve
+                             manifests, because that's the path used to resolve
                              relative library paths. */
-                          type == SRT_TYPE_OPENXR_1_RUNTIME
-                            ? &resolved_filename
-                            : NULL,
+                          is_openxr ? &resolved_filename : NULL,
                           &contents, &len, &error))
     {
       issues |= SRT_LOADABLE_ISSUES_CANNOT_LOAD;
@@ -1067,12 +1079,13 @@ load_manifest_from_json (GType type,
           goto out;
         }
     }
-  else if (type == SRT_TYPE_OPENXR_1_RUNTIME)
+  else if (is_openxr)
     {
       /*
        * Currently, the OpenXR loader rejects all versions other than 1.0.0:
        * https://github.com/KhronosGroup/OpenXR-SDK/blob/release-1.1.43/src/loader/manifest_file.cpp#L479-L487
        * so for now we follow that behavior.
+       * The same is true for runtimes and layers.
        */
       if (!g_str_equal (file_format_version, "1.0.0"))
         {
@@ -1204,6 +1217,24 @@ out:
 
       return G_OBJECT (rt);
     }
+  else if (type == SRT_TYPE_OPENXR_1_LAYER)
+    {
+      SrtOpenXr1Layer *layer;
+
+      if (error == NULL)
+        layer = srt_openxr_1_layer_load_json (resolved_filename,
+                                              filename,
+                                              library_path,
+                                              member_object,
+                                              issues);
+      else
+        layer = srt_openxr_1_layer_new_error (resolved_filename ?: filename,
+                                              filename,
+                                              issues,
+                                              error);
+
+      return G_OBJECT (layer);
+    }
   else
     {
       g_return_val_if_reached (NULL);
@@ -1212,7 +1243,11 @@ out:
 
 /*
  * prepend_manifest_from_json:
- * @type: %SRT_TYPE_EGL_ICD or %SRT_TYPE_EGL_EXTERNAL_PLATFORM or %SRT_TYPE_VULKAN_ICD
+ * @type: %SRT_TYPE_EGL_ICD
+ *  or %SRT_TYPE_EGL_EXTERNAL_PLATFORM
+ *  or %SRT_TYPE_VULKAN_ICD
+ *  or %SRT_TYPE_OPENXR_1_RUNTIME
+ *  or %SRT_TYPE_OPENXR_1_LAYER
  * @sysroot: (not nullable): The root directory, usually `/`
  * @filename: The filename of the metadata
  * @json_member_name: Name of the JSON object beneath the root, containing the

@@ -2842,6 +2842,391 @@ test_openxr_layer_object (Fixture *f,
 
 typedef struct
 {
+  const char *json_path;
+  /* Shorthand: if NULL, we expect it to be the same as json_path */
+  const char *json_origin;
+  SrtLoadableIssues issues;
+
+  const char *error_domain;
+  int error_code;
+  const char *error_message_suffix;
+
+  const char *name;
+  const char *library_path;
+  /* Shorthand: if NULL, we expect it to be the same as library_path */
+  const char *resolved_library_path;
+  const char *api_version;
+  const char *implementation_version;
+  const char *description;
+  const char *enable_environment;
+  const char *disable_environment;
+  /* Format: NAME=VALUE, sorted in strcmp() order */
+  const char *functions[3];
+  /* Format: NAME=EXTENSION_VERSION, sorted in strcmp() order */
+  const char *instance_extensions[3];
+} OpenXrLayerExpected;
+
+typedef struct
+{
+  const char *description;
+  const char *sysroot;
+  const char *xr_api_layer_path;
+  OpenXrLayerExpected explicit_layers[3];
+  OpenXrLayerExpected implicit_layers[3];
+} OpenXrLayerTest;
+
+static const OpenXrLayerTest openxr_layer_tests[] =
+{
+  {
+    .description = "Minimal and maximal layer manifests",
+    .sysroot = "fake-icds",
+    .explicit_layers =
+    {
+      {
+        .json_path = "/etc/xdg/openxr/1/api_layers/explicit.d/minimal.json",
+        .name = "XR_APILAYER_STEAMRT_minimal",
+        .library_path = "libXrApiLayer_minimal.so",
+        .api_version = "1.0",
+        .implementation_version = "123",
+        .description = "Only the required fields",
+      },
+      {
+        .json_path = "/usr/share/openxr/1/api_layers/explicit.d/maximal.json",
+        .name = "XR_APILAYER_STEAMRT_maximal",
+        .library_path = "libXrApiLayer_maximal.so",
+        .api_version = "1.0",
+        .implementation_version = "123",
+        .description = "All possible fields",
+        .functions =
+        {
+          "foobar=foobar",
+          "xrNegotiateLoaderApiLayerInterface=negotiate",
+          NULL
+        },
+        .instance_extensions=
+        {
+          "bar=1.2",
+          "foo=1.0",
+          NULL
+        },
+      },
+      { .name = NULL },
+    },
+    .implicit_layers =
+    {
+      {
+        .json_origin = "/etc/xdg/openxr/1/api_layers/implicit.d/minimal-symlink.json",
+        .json_path = "/opt/openxr-layers/implicit/minimal.json",
+        .name = "XR_APILAYER_STEAMRT_minimal",
+        .library_path = "./libXrApiLayer_minimal.so",
+        .resolved_library_path = "/opt/openxr-layers/implicit/./libXrApiLayer_minimal.so",
+        .api_version = "1.0",
+        .implementation_version = "0",
+        .description = "Only the required fields",
+        .disable_environment = "DISABLE_MINIMAL_LAYER",
+      },
+      {
+        .json_path = "/usr/share/openxr/1/api_layers/implicit.d/maximal.json",
+        .name = "XR_APILAYER_STEAMRT_maximal",
+        .library_path = "libXrApiLayer_maximal.so",
+        .api_version = "1.0",
+        .implementation_version = "1.2.3",
+        .description = "All possible fields",
+        .enable_environment = "ENABLE_MAXIMAL_LAYER",
+        .disable_environment = "DISABLE_MAXIMAL_LAYER",
+        .functions =
+        {
+          "foobar=foobar",
+          "xrNegotiateLoaderApiLayerInterface=negotiate",
+          NULL
+        },
+        .instance_extensions=
+        {
+          "bar=1.2",
+          "foo=1.0",
+          NULL
+        },
+      },
+      { .name = NULL },
+    },
+  },
+  {
+    .description = "Environment variable override",
+    .sysroot = "fake-icds",
+    .xr_api_layer_path = "/opt/openxr-layers",
+    .explicit_layers =
+    {
+      {
+        .json_path = "/opt/openxr-layers/invalid.json",
+        .error_domain = "g-io-error-quark",
+        .error_code = G_IO_ERROR_FAILED,
+        .error_message_suffix = "cannot be parsed because it is missing a required field",
+        .issues = SRT_LOADABLE_ISSUES_CANNOT_LOAD,
+      },
+      { .name = NULL },
+    },
+    .implicit_layers =
+    {
+      /* Same as in the previous test, because $XR_API_LAYER_PATH is ignored
+       * for implicit layers */
+      {
+        .json_origin = "/etc/xdg/openxr/1/api_layers/implicit.d/minimal-symlink.json",
+        .json_path = "/opt/openxr-layers/implicit/minimal.json",
+        .name = "XR_APILAYER_STEAMRT_minimal",
+        .library_path = "./libXrApiLayer_minimal.so",
+        .resolved_library_path = "/opt/openxr-layers/implicit/./libXrApiLayer_minimal.so",
+        .api_version = "1.0",
+        .implementation_version = "0",
+        .description = "Only the required fields",
+        .disable_environment = "DISABLE_MINIMAL_LAYER",
+      },
+      {
+        .json_path = "/usr/share/openxr/1/api_layers/implicit.d/maximal.json",
+        .name = "XR_APILAYER_STEAMRT_maximal",
+        .library_path = "libXrApiLayer_maximal.so",
+        .api_version = "1.0",
+        .implementation_version = "1.2.3",
+        .description = "All possible fields",
+        .enable_environment = "ENABLE_MAXIMAL_LAYER",
+        .disable_environment = "DISABLE_MAXIMAL_LAYER",
+        .functions =
+        {
+          "foobar=foobar",
+          "xrNegotiateLoaderApiLayerInterface=negotiate",
+          NULL
+        },
+        .instance_extensions=
+        {
+          "bar=1.2",
+          "foo=1.0",
+          NULL
+        },
+      },
+      { .name = NULL },
+    },
+  },
+};
+
+static void
+assert_openxr_layer_matches (SrtOpenXr1Layer *layer,
+                             const OpenXrLayerExpected *expected,
+                             const char *sysroot)
+{
+  g_autoptr(GError) error = NULL;
+  g_autofree char *resolved = NULL;
+  SrtBaseJsonGraphicsModule *json;
+
+  g_assert_cmpstr (expected->json_path, ==, srt_openxr_1_layer_get_json_path (layer));
+
+  if (expected->json_origin != NULL)
+    g_assert_cmpstr (expected->json_origin, ==, srt_openxr_1_layer_get_json_origin (layer));
+  else
+    g_assert_cmpstr (expected->json_path, ==, srt_openxr_1_layer_get_json_origin (layer));
+
+  if (expected->error_message_suffix != NULL)
+    {
+      assert_openxr_layer_has_error (layer, NULL, -1, NULL);
+      g_assert_false (srt_openxr_1_layer_check_error (layer, &error));
+      g_assert_true (g_str_has_suffix (error->message, expected->error_message_suffix));
+      g_assert_cmpstr (g_quark_to_string (error->domain), ==, expected->error_domain);
+      g_assert_cmpint (error->code, ==, expected->error_code);
+      return;
+    }
+
+  assert_openxr_layer_no_error (layer);
+  g_assert_cmpstr (expected->name, ==, srt_openxr_1_layer_get_name (layer));
+  g_assert_cmpstr (expected->description,
+                   ==, srt_openxr_1_layer_get_description (layer));
+  g_assert_cmpstr (expected->library_path,
+                   ==, srt_openxr_1_layer_get_library_path (layer));
+  g_assert_cmpstr (expected->api_version,
+                   ==, srt_openxr_1_layer_get_api_version (layer));
+  g_assert_cmpstr (expected->implementation_version,
+                   ==, srt_openxr_1_layer_get_implementation_version (layer));
+  g_assert_cmpstr (expected->description,
+                   ==, srt_openxr_1_layer_get_description (layer));
+
+  resolved = srt_openxr_1_layer_resolve_library_path (layer);
+
+  if (expected->resolved_library_path != NULL)
+    g_assert_cmpstr (expected->resolved_library_path, ==, resolved);
+  else
+    g_assert_cmpstr (expected->library_path, ==, resolved);
+
+  json = SRT_BASE_JSON_GRAPHICS_MODULE (layer);
+  g_assert_cmpstr (expected->enable_environment,
+                   ==, json->enable_env_var.name);
+  g_assert_cmpstr (expected->disable_environment,
+                   ==, json->disable_env_var.name);
+
+  if (expected->functions[0] != NULL)
+    {
+      g_autoptr(GPtrArray) strings = NULL;
+      GHashTableIter iter;
+      void *k, *v;
+
+      strings = g_ptr_array_new_full (g_hash_table_size (json->functions) + 1,
+                                      g_free);
+      g_hash_table_iter_init (&iter, json->functions);
+
+      while (g_hash_table_iter_next (&iter, &k, &v))
+        {
+          const char *name = k;
+          const char *instead = v;
+
+          g_ptr_array_add (strings,
+                           g_strdup_printf ("%s=%s", name, instead));
+        }
+
+      g_ptr_array_sort (strings, _srt_indirect_strcmp0);
+      g_ptr_array_add (strings, NULL);
+      g_assert_cmpstrv (expected->functions, strings->pdata);
+    }
+  else
+    {
+      g_assert_true (json->functions == NULL
+                     || g_hash_table_size (json->functions) == 0);
+    }
+
+  if (expected->instance_extensions[0] != NULL)
+    {
+      g_autoptr(GPtrArray) strings = NULL;
+      const GList *iter;
+
+      strings = g_ptr_array_new_full (g_list_length (json->instance_extensions) + 1,
+                                      g_free);
+
+      for (iter = json->instance_extensions;
+           iter != NULL;
+           iter = iter->next)
+        {
+          const InstanceExtension *ie = iter->data;
+
+          g_assert_nonnull (ie->name);
+          g_assert_null (ie->spec_version);
+          g_assert_nonnull (ie->extension_version);
+          g_ptr_array_add (strings,
+                           g_strdup_printf ("%s=%s", ie->name, ie->extension_version));
+        }
+
+      g_ptr_array_sort (strings, _srt_indirect_strcmp0);
+      g_ptr_array_add (strings, NULL);
+      g_assert_cmpstrv (expected->instance_extensions, strings->pdata);
+    }
+  else
+    {
+      g_assert_null (json->instance_extensions);
+    }
+
+  g_assert_cmpint (expected->issues, ==, srt_openxr_1_layer_get_issues (layer));
+}
+
+static void
+test_openxr_layer_parsing (Fixture *f,
+                           const void *context)
+{
+  const char * const multiarchs[] = { "x86_64-mock-abi", "i386-mock-abi", NULL };
+  g_auto(GStrv) envp = g_get_environ ();
+  g_auto(GLnxTmpDir) tmp_dir = { .initialized = FALSE };
+  g_autoptr(GError) error = NULL;
+
+  g_test_message ("Entering %s", G_STRFUNC);
+
+  glnx_mkdtemp ("layers-test-XXXXXX", 0700, &tmp_dir, &error);
+  g_assert_no_error (error);
+
+  for (size_t i = 0; i < G_N_ELEMENTS (openxr_layer_tests); i++)
+    {
+      const OpenXrLayerTest *test = &openxr_layer_tests[i];
+      g_autoptr(SrtSystemInfo) info = NULL;
+      g_autoptr(SrtObjectList) explicit_layers = NULL;
+      g_autoptr(SrtObjectList) implicit_layers = NULL;
+      g_autofree gchar *sysroot = NULL;
+      const GQuark *quarks;
+      size_t n_quarks;
+      const GList *iter;
+      size_t j;
+
+      g_test_message ("%s #%" G_GSIZE_FORMAT ": %s: %s",
+                      G_STRFUNC, i, test->sysroot, test->description);
+      sysroot = g_build_filename (f->sysroots, test->sysroot, NULL);
+      envp = g_environ_setenv (envp, "SRT_TEST_SYSROOT", sysroot, TRUE);
+      envp = g_environ_unsetenv (envp, "HOME");
+      envp = g_environ_unsetenv (envp, "XDG_CONFIG_DIRS");
+      envp = g_environ_unsetenv (envp, "XDG_DATA_DIRS");
+
+      if (test->xr_api_layer_path != NULL)
+        envp = g_environ_setenv (envp, "XR_API_LAYER_PATH", test->xr_api_layer_path, TRUE);
+      else
+        envp = g_environ_unsetenv (envp, "XR_API_LAYER_PATH");
+
+      info = srt_system_info_new (NULL);
+      g_assert_nonnull (info);
+      srt_system_info_set_environ (info, envp);
+      srt_system_info_set_sysroot (info, sysroot);
+      srt_system_info_set_multiarch_tuples (info, multiarchs);
+      srt_system_info_set_helpers_path (info, f->builddir);
+      /* This test assumes that the results of inspect-library on the host
+       * are valid in the sysroot, as above */
+      srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
+
+#if 0
+      /* TODO */
+      explicit_layers = srt_system_info_list_explicit_openxr_1_layers (info);
+#else
+      quarks = _srt_system_info_get_multiarch_quarks (info, &n_quarks);
+      explicit_layers = _srt_load_openxr_1_layers (_srt_system_info_get_sysroot (info),
+                                                   _srt_system_info_get_subprocess_runner (info),
+                                                   quarks,
+                                                   n_quarks,
+                                                   TRUE,    /* explicit */
+                                                   SRT_CHECK_FLAGS_NONE);
+#endif
+
+      for (iter = explicit_layers, j = 0;
+           iter != NULL;
+           iter = iter->next, j++)
+        g_test_message ("Explicit layer #%zu: %s",
+                        j, srt_openxr_1_layer_get_json_path (iter->data));
+
+      for (iter = explicit_layers, j = 0;
+           iter != NULL;
+           iter = iter->next, j++)
+        assert_openxr_layer_matches (iter->data, &test->explicit_layers[j],
+                                     sysroot);
+
+      g_assert_cmpstr (test->explicit_layers[j].name, ==, NULL);
+
+#if 0
+      /* TODO */
+      implicit_layers = srt_system_info_list_implicit_openxr_1_layers (info);
+#else
+      implicit_layers = _srt_load_openxr_1_layers (_srt_system_info_get_sysroot (info),
+                                                   _srt_system_info_get_subprocess_runner (info),
+                                                   quarks,
+                                                   n_quarks,
+                                                   FALSE,   /* not explicit */
+                                                   SRT_CHECK_FLAGS_NONE);
+#endif
+
+      for (iter = implicit_layers, j = 0;
+           iter != NULL;
+           iter = iter->next, j++)
+        g_test_message ("Implicit layer #%zu: %s",
+                        j, srt_openxr_1_layer_get_json_path (iter->data));
+
+      for (iter = implicit_layers, j = 0;
+           iter != NULL;
+           iter = iter->next, j++)
+        assert_openxr_layer_matches (iter->data, &test->implicit_layers[j],
+                                     sysroot);
+
+      g_assert_cmpstr (test->implicit_layers[j].name, ==, NULL);
+    }
+}
+
+typedef struct
+{
   const gchar *name;
   const gchar *description;
   const gchar *library_path;
@@ -4894,6 +5279,8 @@ main (int argc,
               setup, test_icd_openxr_loading, teardown);
   g_test_add ("/graphics/icd/openxr-layer/object", Fixture, NULL,
               setup, test_openxr_layer_object, teardown);
+  g_test_add ("/graphics/icd/openxr-layer/parsing", Fixture, NULL,
+              setup, test_openxr_layer_parsing, teardown);
 
   g_test_add ("/graphics/layers/vulkan/xdg", Fixture, NULL,
               setup, test_layer_vulkan, teardown);

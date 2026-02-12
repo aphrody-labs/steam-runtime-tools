@@ -517,6 +517,11 @@ split_into_search_paths (GPtrArray *search_paths,
 #define XDG_CONFIG_DIRS_VAR "XDG_CONFIG_DIRS"
 #define XDG_CONFIG_DIRS_DEFAULT "/etc/xdg"
 
+#define XDG_DATA_HOME_VAR "XDG_DATA_HOME"
+#define XDG_DATA_HOME_DEFAULT_SUBDIR ".local/share"
+#define XDG_DATA_DIRS_VAR "XDG_DATA_DIRS"
+#define XDG_DATA_DIRS_DEFAULT "/usr/local/share:/usr/share"
+
 /* By default, SYSCONFDIR defaults to /usr/local/etc:
    https://registry.khronos.org/OpenXR/specs/1.1/loader.html#linux-manifest-search-paths
    but in practice, it's generally configured to be "/etc" like EXTRASYSCONFDIR.
@@ -1080,6 +1085,257 @@ srt_openxr_1_layer_new_error (const char *json_path,
                        "json-origin", json_origin,
                        "issues", issues,
                        NULL);
+}
+
+SrtOpenXr1Layer *
+srt_openxr_1_layer_load_json (const char *path,
+                              const char *original_path,
+                              const char *library_path,
+                              JsonObject *api_layer,
+                              SrtLoadableIssues issues)
+{
+  const char *name = NULL;
+  const char *api_version = NULL;
+  const char *impl_version = NULL;
+  const char *description = NULL;
+  const char *s;
+  g_autoptr(SrtOpenXr1Layer) result = NULL;
+  g_autoptr(GError) error = NULL;
+  JsonArray *instance_json_array = NULL;
+  JsonNode *arr_node;
+  JsonObject *functions_obj = NULL;
+
+  g_return_val_if_fail (path != NULL, NULL);
+  g_return_val_if_fail (library_path != NULL, NULL);
+  g_return_val_if_fail (api_layer != NULL, NULL);
+
+  name = json_object_get_string_member_with_default (api_layer, "name", NULL);
+  api_version = json_object_get_string_member_with_default (api_layer,
+                                                            "api_version",
+                                                            NULL);
+  impl_version = json_object_get_string_member_with_default (api_layer,
+                                                             "implementation_version",
+                                                             NULL);
+  description = json_object_get_string_member_with_default (api_layer,
+                                                            "description",
+                                                            NULL);
+
+  if (name == NULL ||
+      api_version == NULL ||
+      impl_version == NULL ||
+      description == NULL)
+    {
+      g_debug ("A required field is missing from the JSON api_layer");
+      g_set_error (&error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                   "OpenXR layer in \"%s\" cannot be parsed because it is missing a required field",
+                   path);
+      return srt_openxr_1_layer_new_error (path,
+                                           original_path,
+                                           SRT_LOADABLE_ISSUES_CANNOT_LOAD,
+                                           error);
+    }
+
+  result = srt_openxr_1_layer_new (path,
+                                   original_path,
+                                   name,
+                                   library_path,
+                                   api_version,
+                                   impl_version,
+                                   description,
+                                   issues);
+
+  s = json_object_get_string_member_with_default (api_layer, "enable_environment", NULL);
+  result->parent.enable_env_var.name = g_strdup (s);
+
+  s = json_object_get_string_member_with_default (api_layer, "disable_environment", NULL);
+  result->parent.disable_env_var.name = g_strdup (s);
+
+  if (json_object_has_member (api_layer, "functions"))
+    functions_obj = json_object_get_object_member (api_layer, "functions");
+
+  if (functions_obj != NULL)
+    result->parent.functions = load_functions_from_json (functions_obj);
+
+  arr_node = json_object_get_member (api_layer, "instance_extensions");
+
+  if (arr_node != NULL && JSON_NODE_HOLDS_ARRAY (arr_node))
+    instance_json_array = json_node_get_array (arr_node);
+
+  if (instance_json_array != NULL)
+    {
+      size_t array_length = json_array_get_length (instance_json_array);
+
+      for (size_t i = 0; i < array_length; i++)
+        {
+          JsonObject *instance_extension = json_array_get_object_element (instance_json_array, i);
+          const char *ext_name;
+          const char *ext_version;
+
+          ext_name = json_object_get_string_member_with_default (instance_extension,
+                                                                 "name",
+                                                                 NULL);
+          ext_version = json_object_get_string_member_with_default (instance_extension,
+                                                                    "extension_version",
+                                                                    NULL);
+
+          if (ext_name == NULL || ext_version == NULL)
+            {
+              g_debug ("The OpenXR layer property 'instance_extensions' is "
+                       "missing some expected values, trying to continue...");
+            }
+          else
+            {
+              result->parent.instance_extensions =
+                g_list_prepend (result->parent.instance_extensions,
+                                instance_extension_new (ext_name,
+                                                        NULL,
+                                                        ext_version));
+            }
+        }
+
+      result->parent.instance_extensions = g_list_reverse (result->parent.instance_extensions);
+    }
+
+  return g_steal_pointer (&result);
+}
+
+static void
+openxr_1_layer_load_json_cb (SrtSysroot *sysroot,
+                             const char *filename,
+                             void *user_data)
+{
+  prepend_manifest_from_json (SRT_TYPE_OPENXR_1_LAYER, sysroot, filename,
+                              _SRT_GRAPHICS_MANIFEST_MEMBER_OPENXR_1_API_LAYER,
+                              user_data);
+}
+
+/* This follows:
+ * https://registry.khronos.org/OpenXR/specs/1.1/loader.html#linux-manifest-search-paths */
+static gchar **
+_srt_graphics_get_openxr_1_layer_search_paths (const char * const *envp,
+                                               const char *suffix)
+{
+  GPtrArray *search_paths = g_ptr_array_new_with_free_func (g_free);
+  const gchar *home;
+
+  home = _srt_environ_getenv (envp, "HOME") ?: g_get_home_dir();
+
+  /* XDG_CONFIG_HOME isn't actually documented in the spec or implemented
+   * in the loader, so we don't search it, contrary to normal expectations. */
+
+  /* XDG_CONFIG_DIRS */
+  split_env_path_into_search_paths (search_paths, envp,
+                                    XDG_CONFIG_DIRS_VAR,
+                                    XDG_CONFIG_DIRS_DEFAULT,
+                                    suffix);
+
+  /* We assume that the loader was built with SYSCONFDIR and
+   * EXTRASYSCONFDIR both set to /etc,
+   * which will normally be true for a distro-built loader */
+  g_ptr_array_add (search_paths,
+                   g_build_filename (SEARCH_DIR_SYSCONFDIR, suffix, NULL));
+
+  /* XDG_DATA_DIRS */
+  split_env_path_into_search_paths (search_paths, envp,
+                                    XDG_DATA_DIRS_VAR,
+                                    XDG_DATA_DIRS_DEFAULT,
+                                    suffix);
+
+  /* XDG_DATA_HOME.
+   * The OpenXR spec says this is/should be searched *after* XDG_DATA_DIRS,
+   * contrary to normal expectations */
+  add_xdg_home_dir_to_search_paths (search_paths, envp,
+                                    XDG_DATA_HOME_VAR, home,
+                                    XDG_DATA_HOME_DEFAULT_SUBDIR,
+                                    suffix);
+
+  g_ptr_array_add (search_paths, NULL);
+  return (char **) g_ptr_array_free (search_paths, FALSE);
+}
+
+/*
+ * _srt_load_openxr_1_layers:
+ * @sysroot: (not nullable): The root directory, usually `/`
+ * @runner: The execution environment
+ * @multiarch_tuples: (nullable): If not %NULL, duplicated
+ *  OpenXR layers are searched by their absolute path, obtained using
+ *  'inspect-library' in the provided multiarch tuples, instead of just their
+ *  resolved library path.
+ * @n_multiarch_tuples: Number of items in @multiarch_tuples
+ * @explicit: If %TRUE, load explicit layers, otherwise load implicit layers.
+ * @check_flags: Whether to check for problems
+ *
+ * Implementation of srt_system_info_list_explicit_openxr_1_layers() and
+ * srt_system_info_list_implicit_openxr_1_layers().
+ *
+ * Returns: (transfer full) (element-type SrtOpenXr1Layer): A list of OpenXR
+ *  layers, most-important first
+ */
+GList *
+_srt_load_openxr_1_layers (SrtSysroot *sysroot,
+                           SrtSubprocessRunner *runner,
+                           const GQuark *multiarch_tuples,
+                           size_t n_multiarch_tuples,
+                           gboolean explicit,
+                           SrtCheckFlags check_flags)
+{
+  GList *ret = NULL;
+  g_auto(GStrv) search_paths = NULL;
+  const char * const *envp;
+  const char *value;
+  const char *suffix;
+
+  g_return_val_if_fail (_srt_check_not_setuid (), NULL);
+  g_return_val_if_fail (SRT_IS_SYSROOT (sysroot), NULL);
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (runner), NULL);
+
+  envp = _srt_subprocess_runner_get_environ (runner);
+
+  if (explicit)
+    {
+      suffix = _SRT_GRAPHICS_OPENXR_1_EXPLICIT_LAYER_SUFFIX;
+      value = _srt_environ_getenv (envp, "XR_API_LAYER_PATH");
+    }
+  else
+    {
+      suffix = _SRT_GRAPHICS_OPENXR_1_IMPLICIT_LAYER_SUFFIX;
+      /* Similar to Vulkan, there is no environment variable to override
+       * the search path for implicit layers */
+      value = NULL;
+    }
+
+  if (value != NULL)
+    {
+      g_auto(GStrv) dirs = g_strsplit (value, G_SEARCHPATH_SEPARATOR_S, -1);
+
+      g_debug ("OpenXR explicit layer search path overridden to: %s", value);
+      load_json_dirs (sysroot,
+                      _srt_const_strv (dirs),
+                      NULL,
+                      _srt_indirect_strcmp0,
+                      openxr_1_layer_load_json_cb,
+                      &ret);
+    }
+  else
+    {
+      search_paths = _srt_graphics_get_openxr_1_layer_search_paths (envp,
+                                                                    suffix);
+      g_debug ("Using normal OpenXR layer search path");
+      load_json_dirs (sysroot,
+                      _srt_const_strv (search_paths),
+                      NULL,
+                      _srt_indirect_strcmp0,
+                      openxr_1_layer_load_json_cb,
+                      &ret);
+    }
+
+  if (!(check_flags & SRT_CHECK_FLAGS_SKIP_SLOW_CHECKS))
+    _srt_loadable_flag_duplicates (SRT_TYPE_OPENXR_1_LAYER, runner,
+                                   multiarch_tuples,
+                                   n_multiarch_tuples,
+                                   ret);
+
+  return g_list_reverse (ret);
 }
 
 /**

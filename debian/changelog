@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260213.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260213.0) steamrt; urgency=medium
 
   [ Simon McVittie ]
   * pressure-vessel:
@@ -25,7 +25,7 @@ steam-runtime-tools (0.20260213.0) UNRELEASED; urgency=medium
   * Tests:
     - Add a safety-catch against wrong parameter to generate-sysroots.py
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 13 Feb 2026 16:42:04 +0000
+ -- Simon McVittie <smcv@collabora.com>  Fri, 13 Feb 2026 18:11:30 +0000
 
 steam-runtime-tools (0.20260115.0) steamrt; urgency=medium
 

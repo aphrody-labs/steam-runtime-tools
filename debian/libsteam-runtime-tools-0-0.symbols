@@ -60,6 +60,10 @@ libsteam-runtime-tools-0.so.0 libsteam-runtime-tools-0-0 #MINVER#
  srt_enum_from_nick@Base 0.20200908.0
  srt_enum_value_to_nick@Base 0.20191209.0
  srt_flatpak_issues_get_type@Base 0.20240321.0~
+ srt_gbm_backend_get_library_path@Base 0.20260213.0
+ srt_gbm_backend_get_type@Base 0.20260213.0
+ srt_gbm_backend_is_extra@Base 0.20260213.0
+ srt_gbm_backend_resolve_library_path@Base 0.20260213.0
  srt_get_flags_from_json_array@Base 0.20200908.0
  srt_glx_icd_get_library_path@Base 0.20200306.0
  srt_glx_icd_get_library_soname@Base 0.20200306.0
@@ -240,6 +244,7 @@ libsteam-runtime-tools-0.so.0 libsteam-runtime-tools-0-0 #MINVER#
  srt_system_info_list_egl_external_platforms@Base 0.20220119.0
  srt_system_info_list_egl_icds@Base 0.20190926.0
  srt_system_info_list_explicit_vulkan_layers@Base 0.20201124.0
+ srt_system_info_list_gbm_backends@Base 0.20260213.0
  srt_system_info_list_glx_icds@Base 0.20200306.0
  srt_system_info_list_implicit_vulkan_layers@Base 0.20201124.0
  srt_system_info_list_inactive_openxr_1_runtimes@Base 0.20250820.0

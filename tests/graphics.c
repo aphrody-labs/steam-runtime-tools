@@ -98,6 +98,23 @@ icd_mode_to_string (IcdMode mode)
 }
 
 static void
+assert_same_list (const GList *left,
+                  const GList *right)
+{
+  while (left != NULL)
+    {
+      g_assert_nonnull (right);
+      g_assert_true (left->data == right->data);
+
+      left = left->next;
+      right = right->next;
+    }
+
+  /* If this assertion fails, the second list is too long */
+  g_assert_null (right);
+}
+
+static void
 dump_json_graphics_module (void *p)
 {
   SrtBaseGraphicsModule *base = SRT_BASE_GRAPHICS_MODULE (p);
@@ -3221,10 +3238,10 @@ test_openxr_layer_parsing (Fixture *f,
       const OpenXrLayerTest *test = &openxr_layer_tests[i];
       g_autoptr(SrtSystemInfo) info = NULL;
       g_autoptr(SrtObjectList) explicit_layers = NULL;
+      g_autoptr(SrtObjectList) explicit_layers2 = NULL;
       g_autoptr(SrtObjectList) implicit_layers = NULL;
+      g_autoptr(SrtObjectList) implicit_layers2 = NULL;
       g_autofree gchar *sysroot = NULL;
-      const GQuark *quarks;
-      size_t n_quarks;
       const GList *iter;
       size_t j;
 
@@ -3251,18 +3268,7 @@ test_openxr_layer_parsing (Fixture *f,
        * are valid in the sysroot, as above */
       srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
 
-#if 0
-      /* TODO */
       explicit_layers = srt_system_info_list_explicit_openxr_1_layers (info);
-#else
-      quarks = _srt_system_info_get_multiarch_quarks (info, &n_quarks);
-      explicit_layers = _srt_load_openxr_1_layers (_srt_system_info_get_sysroot (info),
-                                                   _srt_system_info_get_subprocess_runner (info),
-                                                   quarks,
-                                                   n_quarks,
-                                                   TRUE,    /* explicit */
-                                                   SRT_CHECK_FLAGS_NONE);
-#endif
 
       for (iter = explicit_layers, j = 0;
            iter != NULL;
@@ -3278,17 +3284,11 @@ test_openxr_layer_parsing (Fixture *f,
 
       g_assert_cmpstr (test->explicit_layers[j].name, ==, NULL);
 
-#if 0
-      /* TODO */
+      /* The second time we check them, they're read from the cache */
+      explicit_layers2 = srt_system_info_list_explicit_openxr_1_layers (info);
+      assert_same_list (explicit_layers, explicit_layers2);
+
       implicit_layers = srt_system_info_list_implicit_openxr_1_layers (info);
-#else
-      implicit_layers = _srt_load_openxr_1_layers (_srt_system_info_get_sysroot (info),
-                                                   _srt_system_info_get_subprocess_runner (info),
-                                                   quarks,
-                                                   n_quarks,
-                                                   FALSE,   /* not explicit */
-                                                   SRT_CHECK_FLAGS_NONE);
-#endif
 
       for (iter = implicit_layers, j = 0;
            iter != NULL;
@@ -3303,6 +3303,10 @@ test_openxr_layer_parsing (Fixture *f,
                                      sysroot);
 
       g_assert_cmpstr (test->implicit_layers[j].name, ==, NULL);
+
+      /* The second time we check them, they're read from the cache */
+      implicit_layers2 = srt_system_info_list_implicit_openxr_1_layers (info);
+      assert_same_list (implicit_layers, implicit_layers2);
     }
 }
 

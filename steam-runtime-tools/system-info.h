@@ -184,6 +184,10 @@ SrtOpenXr1Runtime *srt_system_info_dup_openxr_1_runtime (SrtSystemInfo *self,
 _SRT_PUBLIC
 GList *srt_system_info_list_inactive_openxr_1_runtimes (SrtSystemInfo *self,
                                                         const char *const *active_multiarch_tuples);
+_SRT_PUBLIC
+GList *srt_system_info_list_explicit_openxr_1_layers (SrtSystemInfo *self);
+_SRT_PUBLIC
+GList *srt_system_info_list_implicit_openxr_1_layers (SrtSystemInfo *self);
 
 _SRT_PUBLIC
 void srt_system_info_set_environ (SrtSystemInfo *self,

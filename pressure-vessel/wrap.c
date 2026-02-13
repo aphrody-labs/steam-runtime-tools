@@ -590,6 +590,9 @@ main (int argc,
       if (self->options.import_openxr_1_runtimes)
         flags |= PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES;
 
+      if (self->options.import_openxr_1_layers)
+        flags |= PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_LAYERS;
+
       if (self->options.import_vulkan_layers)
         flags |= PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS;
 

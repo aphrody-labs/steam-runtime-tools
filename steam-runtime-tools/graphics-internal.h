@@ -357,6 +357,9 @@ gchar ** _srt_graphics_get_vulkan_search_paths (SrtSysroot *sysroot,
 
 G_GNUC_INTERNAL
 gchar ** _srt_graphics_get_openxr_1_runtime_search_paths (const char * const *envp);
+G_GNUC_INTERNAL
+gchar ** _srt_graphics_get_openxr_1_layer_search_paths (const char * const *envp,
+                                                        const char *suffix);
 
 G_GNUC_INTERNAL
 SrtVaApiVersion _srt_va_api_driver_version (int dfd,

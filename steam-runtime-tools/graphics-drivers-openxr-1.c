@@ -1211,7 +1211,7 @@ openxr_1_layer_load_json_cb (SrtSysroot *sysroot,
 
 /* This follows:
  * https://registry.khronos.org/OpenXR/specs/1.1/loader.html#linux-manifest-search-paths */
-static gchar **
+gchar **
 _srt_graphics_get_openxr_1_layer_search_paths (const char * const *envp,
                                                const char *suffix)
 {

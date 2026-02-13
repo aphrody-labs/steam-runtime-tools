@@ -727,6 +727,41 @@ icd_stack_enumerate_openxr_1_runtimes (IcdStack *self,
     }
 }
 
+static void
+icd_stack_enumerate_openxr_1_layers (IcdStack *self,
+                                     PvGraphicsProvider *provider,
+                                     SrtSystemInfo *system_info,
+                                     const gchar *which_system)
+{
+  G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
+  g_autoptr(SrtObjectList) exp_layers = NULL;
+  g_autoptr(SrtObjectList) imp_layers = NULL;
+
+  timer = _srt_profiling_start ("Enumerating OpenXR 1 layers on %s system", which_system);
+
+  g_debug ("Enumerating OpenXR 1 explicit layers on %s system...", which_system);
+  exp_layers = srt_system_info_list_explicit_openxr_1_layers (system_info);
+
+  if (self->openxr_1_exp_layer_details == NULL)
+    self->openxr_1_exp_layer_details = icd_details_array_sized_new (g_list_length (exp_layers));
+
+  icd_details_fill_array_json_based (self->openxr_1_exp_layer_details,
+                                     provider,
+                                     "OpenXR 1 explicit layer",
+                                     exp_layers);
+
+  g_debug ("Enumerating OpenXR 1 implicit layers on %s system...", which_system);
+  imp_layers = srt_system_info_list_implicit_openxr_1_layers (system_info);
+
+  if (self->openxr_1_imp_layer_details == NULL)
+    self->openxr_1_imp_layer_details = icd_details_array_sized_new (g_list_length (imp_layers));
+
+  icd_details_fill_array_json_based (self->openxr_1_imp_layer_details,
+                                     provider,
+                                     "OpenXR 1 implicit layer",
+                                     imp_layers);
+}
+
 /*
  * icd_stack_enumerate:
  * @self: The stack
@@ -760,6 +795,9 @@ icd_stack_enumerate (IcdStack *self,
 
   if (runtime_flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
     icd_stack_enumerate_openxr_1_runtimes (self, provider, system_info, which_system);
+
+  if (runtime_flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_LAYERS)
+    icd_stack_enumerate_openxr_1_layers (self, provider, system_info, which_system);
 }
 
 void
@@ -771,6 +809,8 @@ icd_stack_free (IcdStack *self)
   g_clear_pointer (&self->vulkan_exp_layer_details, g_ptr_array_unref);
   g_clear_pointer (&self->vulkan_imp_layer_details, g_ptr_array_unref);
   g_clear_pointer (&self->openxr_1_runtime_details, g_hash_table_unref);
+  g_clear_pointer (&self->openxr_1_exp_layer_details, g_ptr_array_unref);
+  g_clear_pointer (&self->openxr_1_imp_layer_details, g_ptr_array_unref);
   g_slice_free (IcdStack, self);
 }
 

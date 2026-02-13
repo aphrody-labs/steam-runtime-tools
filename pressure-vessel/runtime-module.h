@@ -109,7 +109,7 @@ G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (PvModulePerArch, pv_module_per_arch_clear)
  *  #SrtEglIcd, #SrtEglExternalPlatform,
  *  #SrtVulkanIcd, #SrtVulkanLayer,
  *  #SrtDriDriver, #SrtVaApiDriver, #SrtVdpauDriver,
- *  #SrtOpenxr1Runtime
+ *  #SrtOpenXr1Runtime, #SrtOpenXr1Layer
  * @debug_name: Some sort of name for the module, to be used in diagnostic
  *  messages only. Assumed to be owned by @icd.
  * @provider: The graphics stack provider where we found this driver
@@ -238,6 +238,10 @@ void icd_details_fill_array_single_arch (GPtrArray *details_arr,
  *  based on a #SrtVulkanLayer representing an implicit layer
  * @openxr_1_runtime_details: (element-type utf8 IcdDetails): Map with
  *  owned string multiarch tuples as keys and owned IcdDetails as values
+ * @openxr_1_exp_layer_details: (element-type IcdDetails): Array of details
+ *  each based on a #SrtOpenXr1Layer representing an explicit layer
+ * @openxr_1_imp_layer_details: (element-type IcdDetails): Array of details
+ *  each based on a #SrtOpenXr1Layer representing an implicit layer
  *
  * Details of all drivers, Vulkan layers or similar things discovered in the
  * graphics provider via a JSON manifest.
@@ -250,6 +254,8 @@ typedef struct
   GPtrArray *vulkan_exp_layer_details;
   GPtrArray *vulkan_imp_layer_details;
   GHashTable *openxr_1_runtime_details;
+  GPtrArray *openxr_1_exp_layer_details;
+  GPtrArray *openxr_1_imp_layer_details;
 } IcdStack;
 
 IcdStack *icd_stack_new (void);

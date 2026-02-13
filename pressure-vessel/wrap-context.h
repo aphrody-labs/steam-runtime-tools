@@ -84,6 +84,7 @@ typedef struct
   gboolean generate_locales;
   gboolean import_ca_certs;
   gboolean import_openxr_1_runtimes;
+  gboolean import_openxr_1_layers;
   gboolean import_vulkan_layers;
   gboolean launcher;
   gboolean only_prepare;

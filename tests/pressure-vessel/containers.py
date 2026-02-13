@@ -1175,14 +1175,10 @@ class BaseContainersTest(BaseTest):
                         # We don't make any assertion about the search
                         # order here.
 
-                        # Take the realpath() on non-Debian-derived hosts,
-                        # because on Arch Linux, we find drivers in
-                        # /usr/lib64 that are physically in /usr/lib.
-                        # Be more strict on Debian because we know more
-                        # about the canonical paths there.
-                        if not self.host_is_debian_derived:
-                            with contextlib.suppress(OSError):
-                                path = os.path.realpath(path)
+                        # Take the realpath() because `path` might be a symlink
+                        # itself, and it will be followed when creating links
+                        # in the `overrides/` dir inside the container.
+                        path = os.path.realpath(path)
 
                         expect_symlinks.setdefault(
                             os.path.basename(path), []
@@ -1195,8 +1191,11 @@ class BaseContainersTest(BaseTest):
                         self.assertEqual(target[:10], '/run/host/')
                         target = target[9:]     # includes the / after host/
 
-                        # Again, take the realpath() on non-Debian-derived
-                        # hosts, but be more strict on Debian.
+                        # Take the realpath() on non-Debian-derived hosts,
+                        # because on Arch Linux, we find drivers in
+                        # /usr/lib64 that are physically in /usr/lib.
+                        # Be more strict on Debian because we know more
+                        # about the canonical paths there.
                         if not self.host_is_debian_derived:
                             with contextlib.suppress(OSError):
                                 target = os.path.realpath(target)

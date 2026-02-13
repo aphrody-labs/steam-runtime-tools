@@ -802,17 +802,13 @@ class TestInsideRuntime(BaseTest):
                         # order here.
                         host_path = '/run/host' + path
 
-                        # Take the realpath() on non-Debian-derived hosts,
-                        # because on Arch Linux, we find drivers in
-                        # /usr/lib64 that are physically in /usr/lib.
-                        # Be more strict on Debian because we know more
-                        # about the canonical paths there.
-                        if not host_is_debian_derived:
-                            with contextlib.suppress(OSError):
-                                host_path = os.path.realpath(host_path)
+                        # Take the realpath() because `path` might be a symlink
+                        # itself, and it will be followed when creating links
+                        # in the `overrides/` dir inside the container.
+                        host_path = os.path.realpath(host_path)
 
                         expect_symlinks.setdefault(
-                            os.path.basename(path), []
+                            os.path.basename(host_path), []
                         ).append(host_path)
 
                 for k, vs in expect_symlinks.items():
@@ -823,8 +819,11 @@ class TestInsideRuntime(BaseTest):
                         logger.info('Target of %s should be in %s', link, vs)
                         target = self.assertSymlink(link)
 
-                        # Again, take the realpath() on non-Debian-derived
-                        # hosts, but be more strict on Debian.
+                        # Take the realpath() on non-Debian-derived hosts,
+                        # because on Arch Linux, we find drivers in
+                        # /usr/lib64 that are physically in /usr/lib.
+                        # Be more strict on Debian because we know more
+                        # about the canonical paths there.
                         if not host_is_debian_derived:
                             with contextlib.suppress(OSError):
                                 target = os.path.realpath(link)

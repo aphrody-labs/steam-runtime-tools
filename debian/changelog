@@ -1,4 +1,21 @@
-steam-runtime-tools (0.20260210.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260213.0) UNRELEASED; urgency=medium
+
+  [ Simon McVittie ]
+  * pressure-vessel:
+    - Add more tools to relocatable bundle (steamrt/tasks#669)
+      + s-r-check-requirements
+      + s-r-steam-remote
+      + srt-logger and logger-0.bash
+  * Steam Linux Runtime 1.0:
+    - Allow building against a local scout LD_LIBRARY_PATH tarball.
+      This will let each scout release build a SteamLinuxRuntime.tar.xz
+      with an included copy of that same scout release, decoupling the
+      copy of scout used for SLR 1.0 from the copy of scout used to run
+      the Steam client and the Legacy Runtime 1.0 (steamrt/tasks#663)
+    - Improve test coverage (steamrt/tasks#663)
+    - Drop test coverage for the strict/non-layered SLR 1.0, as used
+      before June 2021 (steamrt/tasks#824)
+    - Refactoring (steamrt/tasks#891, steamrt/tasks#845)
 
   [ Antonio Ospite ]
   * Diagnostic tools:
@@ -8,11 +25,7 @@ steam-runtime-tools (0.20260210.0) UNRELEASED; urgency=medium
   * Tests:
     - Add a safety-catch against wrong parameter to generate-sysroots.py
 
-  [ Simon McVittie ]
-  * populate-depot:
-    - Refactoring (steamrt/tasks#891, steamrt/tasks#845)
-
- -- Simon McVittie <smcv@collabora.com>  Tue, 10 Feb 2026 17:23:29 +0000
+ -- Simon McVittie <smcv@collabora.com>  Fri, 13 Feb 2026 16:42:04 +0000
 
 steam-runtime-tools (0.20260115.0) steamrt; urgency=medium
 

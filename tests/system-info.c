@@ -421,6 +421,20 @@ test_null_sysroot (Fixture *f,
       g_assert_null (rt);
     }
 
+    {
+      g_autoptr(SrtObjectList) layers = NULL;
+
+      layers = srt_system_info_list_explicit_openxr_1_layers (info);
+      g_assert_null (layers);
+    }
+
+    {
+      g_autoptr(SrtObjectList) layers = NULL;
+
+      layers = srt_system_info_list_implicit_openxr_1_layers (info);
+      g_assert_null (layers);
+    }
+
   g_assert_cmpint (srt_system_info_get_container_type (info), ==,
                    SRT_CONTAINER_TYPE_UNKNOWN);
 

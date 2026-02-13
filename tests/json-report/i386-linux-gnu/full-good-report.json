@@ -394,7 +394,9 @@
           "issues" : []
         }
       ]
-    }
+    },
+    "explicit_layers": [],
+    "implicit_layers": []
   },
   "desktop-entries" : [
     {

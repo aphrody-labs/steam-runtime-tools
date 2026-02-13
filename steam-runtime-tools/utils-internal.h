@@ -711,3 +711,11 @@ gboolean _srt_fd_offset_read_loop (int fd,
                                    size_t len,
                                    size_t *n_read_out,
                                    GError **error);
+
+static inline GList *
+_srt_object_list_copy (GList *list)
+{
+  /* The double cast here avoids -Wcast-function-type:
+   * gcc allows casting any function pointer to/from GCallback */
+  return g_list_copy_deep (list, (GCopyFunc) G_CALLBACK (g_object_ref), NULL);
+}

@@ -94,8 +94,10 @@ SCRIPTS = [
 EXECUTABLES = [
     'pressure-vessel-wrap',
     'pv-verify',
+    'steam-runtime-check-requirements',
     'steam-runtime-launch-client',
     'steam-runtime-launcher-interface-0',
+    'steam-runtime-steam-remote',
     'steam-runtime-system-info',
 ]
 LIBEXEC_EXECUTABLES = [
@@ -104,6 +106,10 @@ LIBEXEC_EXECUTABLES = [
     'pv-locale-gen',
     'pv-try-setlocale',
     'srt-bwrap',
+    'srt-logger',
+]
+LIBEXEC_DATA = [
+    'logger-0.bash',
 ]
 
 
@@ -480,6 +486,12 @@ def main():
             install_exe(
                 os.path.join(path, exe),
                 os.path.join(inst_pkglibexecdir, exe),
+            )
+
+        for data in LIBEXEC_DATA:
+            install(
+                os.path.join(path, data),
+                os.path.join(inst_pkglibexecdir, data),
             )
 
         for arch in architectures:

@@ -8598,6 +8598,10 @@ pv_runtime_set_search_paths (PvRuntime *self,
    * container: in principle the layout could be totally different. */
   _srt_env_overlay_set (container_env, "PATH", "/usr/bin:/bin");
 
+  /* We use the time zone info from the container, but a host glibc might
+   * be looking for it in some other location */
+  _srt_env_overlay_set (container_env, "TZDIR", "/usr/share/zoneinfo");
+
   /* We need to set LD_LIBRARY_PATH here so that we can run
    * pv-adverb, even if it is going to regenerate
    * the ld.so.cache for better robustness before launching the

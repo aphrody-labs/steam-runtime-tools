@@ -1,3 +1,12 @@
+steam-runtime-tools (0.20260216.0) UNRELEASED; urgency=medium
+
+  * pressure-vessel:
+    - Always use the Steam Runtime's time zone info /usr/share/zoneinfo,
+      even if the host OS's glibc defaults to something non-FHS
+      (steam-runtime#795)
+
+ -- Simon McVittie <smcv@collabora.com>  Mon, 16 Feb 2026 17:57:09 +0000
+
 steam-runtime-tools (0.20260213.0) steamrt; urgency=medium
 
   [ Simon McVittie ]

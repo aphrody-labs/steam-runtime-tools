@@ -113,6 +113,10 @@ class Environment:
         else:
             self.docker = []
 
+        self.download_pressure_vessel = (
+            self.abs_srcdir / 'subprojects' / 'container-runtime'
+            / 'download-pressure-vessel.py'
+        )
         self.populate_depot = (
             self.abs_srcdir / 'subprojects' / 'container-runtime'
             / 'populate-depot.py'
@@ -174,8 +178,15 @@ class Environment:
             self.oci_run_argv = []
 
     def populate_depots(self):
+        self.cache.mkdir(exist_ok=True)
+
         with tempfile.TemporaryDirectory() as empty_depot_template:
             Path(empty_depot_template, 'common').mkdir()
+
+            subprocess.run(
+                [self.download_pressure_vessel, self.cache],
+                check=True,
+            )
 
             for suite in self.oci_images:
                 if not self.oci_images[suite]:
@@ -192,6 +203,9 @@ class Environment:
                         '--cache', self.cache,
                         '--depot', self.containers,
                         '--include-sdk-sysroot',
+                        '--pressure-vessel-archive', os.path.join(
+                            self.cache, 'pressure-vessel-bin.tar.gz',
+                        ),
                         '--no-mtrees',
                         '--no-versioned-directories',
                         '--source-dir', empty_depot_template,

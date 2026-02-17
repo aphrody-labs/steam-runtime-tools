@@ -4,6 +4,8 @@ build-aux/many-builds.py - build steam-runtime-tools and pressure-vessel
 
 # SYNOPSIS
 
+**build-aux/many-builds.py** [*OPTIONS*] **deps**
+
 **build-aux/many-builds.py** [*OPTIONS*] **setup** [*MESON SETUP OPTIONS*]
 
 **build-aux/many-builds.py** [*OPTIONS*] **build** [*NINJA OPTIONS*]
@@ -57,9 +59,9 @@ By default (when not using the **--docker** or **--podman** options),
 
 # STEPS
 
-## setup
+## deps
 
-The **setup** step is similar to **meson setup**. It also downloads
+The **deps** step downloads
 the necessary Steam Linux Runtime container runtime images to be able
 to test **pressure-vessel-wrap**, and the necessary SDK image to be
 able to compile for Steam Runtime 1 'scout'.
@@ -68,6 +70,10 @@ By default, the same SDK sysroot tarball that will be used for testing
 is used for compilation. If the **--docker** or **--podman** options
 are used, the official OCI container for the Steam Runtime 1 SDK will
 be downloaded and used for compilation.
+
+## setup
+
+The **setup** step is similar to **meson setup**.
 
 ## build
 

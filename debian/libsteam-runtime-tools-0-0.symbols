@@ -158,6 +158,19 @@ libsteam-runtime-tools-0.so.0 libsteam-runtime-tools-0-0 #MINVER#
  srt_locale_is_utf8@Base 0.20190909.0
  srt_locale_issues_get_type@Base 0.20190909.0
  srt_machine_type_get_type@Base 0.20220601.0
+ srt_openxr_1_layer_check_error@Base 0.20260217.0
+ srt_openxr_1_layer_get_api_version@Base 0.20260217.0
+ srt_openxr_1_layer_get_description@Base 0.20260217.0
+ srt_openxr_1_layer_get_implementation_version@Base 0.20260217.0
+ srt_openxr_1_layer_get_issues@Base 0.20260217.0
+ srt_openxr_1_layer_get_json_origin@Base 0.20260217.0
+ srt_openxr_1_layer_get_json_path@Base 0.20260217.0
+ srt_openxr_1_layer_get_library_path@Base 0.20260217.0
+ srt_openxr_1_layer_get_name@Base 0.20260217.0
+ srt_openxr_1_layer_get_type@Base 0.20260217.0
+ srt_openxr_1_layer_new_replace_library_path@Base 0.20260217.0
+ srt_openxr_1_layer_resolve_library_path@Base 0.20260217.0
+ srt_openxr_1_layer_write_to_file@Base 0.20260217.0
  srt_openxr_1_runtime_check_error@Base 0.20250408.0~
  srt_openxr_1_runtime_get_issues@Base 0.20250408.0~
  srt_openxr_1_runtime_get_json_origin@Base 0.20250408.0~
@@ -243,9 +256,11 @@ libsteam-runtime-tools-0.so.0 libsteam-runtime-tools-0-0 #MINVER#
  srt_system_info_list_driver_environment@Base 0.20200306.0
  srt_system_info_list_egl_external_platforms@Base 0.20220119.0
  srt_system_info_list_egl_icds@Base 0.20190926.0
+ srt_system_info_list_explicit_openxr_1_layers@Base 0.20260217.0
  srt_system_info_list_explicit_vulkan_layers@Base 0.20201124.0
  srt_system_info_list_gbm_backends@Base 0.20260213.0
  srt_system_info_list_glx_icds@Base 0.20200306.0
+ srt_system_info_list_implicit_openxr_1_layers@Base 0.20260217.0
  srt_system_info_list_implicit_vulkan_layers@Base 0.20201124.0
  srt_system_info_list_inactive_openxr_1_runtimes@Base 0.20250820.0
  srt_system_info_list_pinned_libs_32@Base 0.20191024.0

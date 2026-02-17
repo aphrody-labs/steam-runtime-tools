@@ -23,9 +23,111 @@ testing for steam-runtime-tools and pressure-vessel.
 
 # REQUIREMENTS
 
+You'll need about 25G of space available in your home directory
+for container images and so on
+(assuming **--podman**;
+avoid using that option if you are space-constrained).
+On a filesystem with transparent compression,
+such as btrfs with `compress=zstd`,
+this can be reduced to about 15G.
+
+On x86, 32-bit support is required.
+On Debian and derivatives,
+this means i386 as a foreign architecture:
+
+    sudo dpkg --add-architecture i386
+    sudo apt update
+
+Using **build-aux/many-builds.py** requires these Debian packages,
+or their closest equivalents on other distributions:
+
+* bubblewrap
+* clang
+* dbus-daemon
+* docker.io (if using **--docker**)
+* git
+* glslang-tools
+* gobject-introspection
+* gtk-doc-tools
+* libc6:i386
+* libcap-dev (not to be confused with libcap-ng)
+* libelf-dev (from elfutils, not to be confused with the older libelfg0-dev)
+* libgl-dev
+* libglib2.0-dev
+* libjson-glib-dev
+* libva-dev
+* libvulkan-dev
+* libwaffle-dev
+* libx11-dev
+* libxau-dev
+* libxcb1-dev
+* libxrandr-dev
+* meson
+* pandoc
+* pkgconf (or pkg-config in older releases)
+* podman (if using **--podman**)
+* python3
+* python3-vdf
+
+For 32-bit builds on x86,
+also install:
+
+* lib32gcc-$(gcc -dumpversion)-dev
+
 By default (when not using the **--docker** or **--podman** options),
-`many-builds.py` has
+`many-builds.py` also has
 [the same user namespace requirements as Flatpak](https://github.com/flatpak/flatpak/wiki/User-namespace-requirements).
+The same requirements apply to running tests for pressure-vessel.
+
+When using **--podman**,
+instead **podman**(1) must be installed.
+
+## Optional packages
+
+These packages add functionality but are not strictly required:
+
+* gcovr and/or lcov
+* libdbus-1-dev
+* libfontconfig-dev
+* libsdl2-dev
+* libsdl2-ttf-dev
+
+## Cross-compiling
+
+For aarch64 builds (optional),
+also run:
+
+    sudo dpkg --add-architecture arm64
+    sudo apt update
+
+and install:
+
+* gcc-aarch64-linux-gnu
+
+plus arm64 versions of:
+
+* libcap-dev
+* libelf-dev
+* libgl-dev
+* libglib2.0-dev
+* libjson-glib-dev
+* libva-dev
+* libvulkan-dev
+* libwaffle-dev
+* libx11-dev
+* libxau-dev
+* libxcb1-dev
+* libxrandr-dev
+* pkgconf
+
+Then re-run `build-aux/many-builds.py [OPTIONS] setup`.
+
+This will enable building `_build/arm64`.
+
+Similarly,
+for `_build/i386` install i386 versions of the packages above.
+`_build/i386` uses `-m32`,
+so you do not strictly need `gcc-i686-linux-gnu`.
 
 # OPTIONS
 

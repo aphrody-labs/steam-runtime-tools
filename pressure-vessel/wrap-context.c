@@ -64,6 +64,7 @@ pv_wrap_options_init (PvWrapOptions *self)
   self->graphics_provider = NULL;
   self->import_ca_certs = FALSE;
   self->import_openxr_1_runtimes = FALSE;
+  self->import_openxr_1_layers = FALSE;
   self->import_vulkan_layers = TRUE;
   self->launcher = FALSE;
   self->only_prepare = FALSE;
@@ -784,6 +785,8 @@ pv_wrap_options_parse_environment (PvWrapOptions *self,
                                                     self->import_ca_certs);
   self->import_openxr_1_runtimes = _srt_boolean_environment ("PRESSURE_VESSEL_IMPORT_OPENXR_1_RUNTIMES",
                                                              self->import_openxr_1_runtimes);
+  self->import_openxr_1_layers = _srt_boolean_environment ("PRESSURE_VESSEL_IMPORT_OPENXR_1_LAYERS",
+                                                           self->import_openxr_1_layers);
   self->import_vulkan_layers = _srt_boolean_environment ("PRESSURE_VESSEL_IMPORT_VULKAN_LAYERS",
                                                          self->import_vulkan_layers);
 
@@ -967,6 +970,16 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
       "`~/.config/openxr/1` for example, because we usually share the real "
       "home directory."
       "[Default unless $PRESSURE_VESSEL_IMPORT_OPENXR_1_RUNTIMES is 1]",
+      NULL },
+    { "import-openxr-1-layers", '\0',
+      G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &self->import_openxr_1_layers,
+      "Import OpenXR 1 layers from the host system. "
+      "[Default if $PRESSURE_VESSEL_IMPORT_OPENXR_1_LAYERS is 1]",
+      NULL },
+    { "no-import-openxr-1-layers", '\0',
+      G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &self->import_openxr_1_layers,
+      "Do not import OpenXR 1 layers from the host system. "
+      "[Default unless $PRESSURE_VESSEL_IMPORT_OPENXR_1_LAYERS is 1]",
       NULL },
     { "import-vulkan-layers", '\0',
       G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &self->import_vulkan_layers,

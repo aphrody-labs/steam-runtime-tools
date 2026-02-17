@@ -26,6 +26,7 @@
  * @PV_RUNTIME_FLAGS_IMPORT_CA_CERTS: Try to import CA certificates from
  *  the host system, which is assumed to be Debian-compatible
  * @PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES: Include host OpenXR 1 runtimes
+ * @PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_LAYERS: Include host OpenXR 1 layers
  * @PV_RUNTIME_FLAGS_NONE: None of the above
  *
  * Flags affecting how we set up the runtime.
@@ -44,6 +45,7 @@ typedef enum
   PV_RUNTIME_FLAGS_DETERMINISTIC = (1 << 9),
   PV_RUNTIME_FLAGS_IMPORT_CA_CERTS = (1 << 10),
   PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES = (1 << 11),
+  PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_LAYERS = (1 << 12),
   PV_RUNTIME_FLAGS_NONE = 0
 } PvRuntimeFlags;
 
@@ -60,6 +62,7 @@ typedef enum
    | PV_RUNTIME_FLAGS_DETERMINISTIC \
    | PV_RUNTIME_FLAGS_IMPORT_CA_CERTS \
    | PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES \
+   | PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_LAYERS \
    )
 
 /**

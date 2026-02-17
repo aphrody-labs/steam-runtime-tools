@@ -5102,7 +5102,8 @@ pv_runtime_take_ld_so_from_provider (PvRuntime *self,
 }
 
 /*
- * @json_set: Ignored and may be %NULL for OpenXR runtimes and Vulkan layers.
+ * @json_set: Ignored and may be %NULL for OpenXR runtimes,
+ *  OpenXR layers and Vulkan layers.
  *  Required for other file types.
  */
 static char *
@@ -5123,7 +5124,8 @@ get_manifest_relative_to_overrides (PvRuntime *self,
    * do is to add our directory to XDG_DATA_DIRS. Because we have
    * to do this for implicit layers anyway, for simplicity we do
    * the same thing for explicit layers. */
-  if (SRT_IS_VULKAN_LAYER (icd))
+  if (SRT_IS_VULKAN_LAYER (icd)
+      || SRT_IS_OPENXR_1_LAYER (icd))
     {
       if (arch != NULL)
         return g_strdup_printf ("%s/%.*" G_GSIZE_FORMAT "-%s.json",
@@ -5200,6 +5202,7 @@ setup_json_manifest (PvRuntime *self,
   SrtEglIcd *egl = NULL;
   SrtEglExternalPlatform *ext_platform = NULL;
   SrtOpenXr1Runtime *xr_rt = NULL;
+  SrtOpenXr1Layer *xr_layer = NULL;
   gboolean need_provider_json = FALSE;
   const SrtKnownArchitecture *provider_json_arch = NULL;
   g_autofree gchar *json_basename = NULL;
@@ -5237,6 +5240,10 @@ setup_json_manifest (PvRuntime *self,
   else if (SRT_IS_OPENXR_1_RUNTIME (details->icd))
     {
       xr_rt = SRT_OPENXR_1_RUNTIME (details->icd);
+    }
+  else if (SRT_IS_OPENXR_1_LAYER (details->icd))
+    {
+      xr_layer = SRT_OPENXR_1_LAYER (details->icd);
     }
   else
     {
@@ -5400,6 +5407,15 @@ setup_json_manifest (PvRuntime *self,
                                                                            details_arch->path_in_container);
 
               if (!srt_openxr_1_runtime_write_to_file (replacement, write_to_file, error))
+                return FALSE;
+            }
+          else if (xr_layer != NULL)
+            {
+              g_autoptr(SrtOpenXr1Layer) replacement = NULL;
+              replacement = srt_openxr_1_layer_new_replace_library_path (xr_layer,
+                                                                         details_arch->path_in_container);
+
+              if (!srt_openxr_1_layer_write_to_file (replacement, write_to_file, error))
                 return FALSE;
             }
           else
@@ -7653,10 +7669,12 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   g_autoptr(GString) egl_ext_platform_path = g_string_new ("");
   g_autoptr(GString) vulkan_path = g_string_new ("");
   /* We are currently using the explicit and implicit Vulkan layer paths
-   * and the OpenXR runtime paths only to check if we binded at least a single layer */
+   * and the OpenXR paths only to check if we binded at least a single layer */
   g_autoptr(GString) vulkan_exp_layer_path = g_string_new ("");
   g_autoptr(GString) vulkan_imp_layer_path = g_string_new ("");
   g_autoptr(GString) openxr_1_runtime_path = g_string_new ("");
+  g_autoptr(GString) openxr_1_exp_layer_path = g_string_new ("");
+  g_autoptr(GString) openxr_1_imp_layer_path = g_string_new ("");
   g_autoptr(GString) va_api_path = g_string_new ("");
   gboolean any_architecture_works = FALSE;
   g_autoptr(IcdStack) provider_stack = NULL;
@@ -7694,6 +7712,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
           /* We currently assume there are no FEX thunks for OpenXR */
           host_flags &= ~PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES;
+          host_flags &= ~PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_LAYERS;
 
           if (host_stack == NULL)
             host_stack = icd_stack_new ();
@@ -7843,6 +7862,27 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
               && !collect_openxr_1_runtime (self, arch, provider_stack->openxr_1_runtime_details,
                                             patterns, error))
             return FALSE;
+
+          if (self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_LAYERS)
+            {
+              if (!collect_json_based_drivers (self,
+                                               arch,
+                                               "OpenXR explicit layers",
+                                               provider_stack->openxr_1_exp_layer_details,
+                                               "openxr_1_exp_layer",
+                                               patterns,
+                                               error))
+                return FALSE;
+
+              if (!collect_json_based_drivers (self,
+                                               arch,
+                                               "OpenXR implicit layers",
+                                               provider_stack->openxr_1_imp_layer_details,
+                                               "openxr_1_imp_layer",
+                                               patterns,
+                                               error))
+                return FALSE;
+            }
 
           if (arch->provider_features & SRT_GRAPHICS_PROVIDER_FEATURE_FLAGS_VDPAU)
             {
@@ -8163,6 +8203,45 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
         }
     }
 
+  if (self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_LAYERS)
+    {
+      g_debug ("Setting up OpenXR explicit layer JSON...");
+      if (!setup_each_json_manifest (self, bwrap,
+                                     "share/" _SRT_GRAPHICS_OPENXR_1_EXPLICIT_LAYER_SUFFIX,
+                                     provider_stack->openxr_1_exp_layer_details,
+                                     openxr_1_exp_layer_path, error))
+        return FALSE;
+
+      if (host_stack != NULL
+          && host_stack->openxr_1_exp_layer_details != NULL)
+        {
+          for (i = 0; i < host_stack->openxr_1_exp_layer_details->len; i++)
+            {
+              IcdDetails *details = g_ptr_array_index (host_stack->openxr_1_exp_layer_details, i);
+              SrtOpenXr1Layer *layer = SRT_OPENXR_1_LAYER (details->icd);
+              _srt_search_path_append (openxr_1_exp_layer_path, srt_openxr_1_layer_get_json_path (layer));
+            }
+        }
+
+      g_debug ("Setting up OpenXR implicit layer JSON...");
+      if (!setup_each_json_manifest (self, bwrap,
+                                     "share/" _SRT_GRAPHICS_OPENXR_1_IMPLICIT_LAYER_SUFFIX,
+                                     provider_stack->openxr_1_imp_layer_details,
+                                     openxr_1_imp_layer_path, error))
+        return FALSE;
+
+      if (host_stack != NULL
+          && host_stack->openxr_1_imp_layer_details != NULL)
+        {
+          for (i = 0; i < host_stack->openxr_1_imp_layer_details->len; i++)
+            {
+              IcdDetails *details = g_ptr_array_index (host_stack->openxr_1_imp_layer_details, i);
+              SrtOpenXr1Layer *layer = SRT_OPENXR_1_LAYER (details->icd);
+              _srt_search_path_append (openxr_1_imp_layer_path, srt_openxr_1_layer_get_json_path (layer));
+            }
+        }
+    }
+
   if (dri_path->len != 0)
     {
       _srt_env_overlay_set (container_env, "LIBGL_DRIVERS_PATH", dri_path->str);
@@ -8212,13 +8291,18 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
    * in Vulkan-Loader 1.3.207, and it seems clearer if we unset it anyway. */
   _srt_env_overlay_set (container_env, "VK_ADD_DRIVER_FILES", NULL);
 
-  if (self->flags & PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS)
+  if (self->flags & (PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS
+                     | PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_LAYERS))
     {
       /* Implicit layers are not affected by "VK_LAYER_PATH". So instead of using
        * this environment variable, we prepend our "/overrides/share" to
        * "XDG_DATA_DIRS" to cover any explicit and implicit layers that we may
-       * have. */
-      if (vulkan_exp_layer_path->len != 0 || vulkan_imp_layer_path->len != 0)
+       * have.
+       * OpenXR implicit layers follow a similar pattern. */
+      if (vulkan_exp_layer_path->len != 0
+          || vulkan_imp_layer_path->len != 0
+          || openxr_1_exp_layer_path->len != 0
+          || openxr_1_imp_layer_path->len != 0)
         {
           g_autofree gchar *override_share =
             g_build_filename (self->overrides_in_container, "share", NULL);
@@ -8226,14 +8310,24 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           /* We are relying here on setup_json_manifest() having generated
            * all the layers' JSON manifests in the same directory. */
           check_path_entries_all_in_dir (vulkan_exp_layer_path->str,
-                                         override_share, "vulkan/explicit_layer.d");
+                                         override_share,
+                                         _SRT_GRAPHICS_EXPLICIT_VULKAN_LAYER_SUFFIX);
           check_path_entries_all_in_dir (vulkan_imp_layer_path->str,
-                                         override_share, "vulkan/implicit_layer.d");
+                                         override_share,
+                                         _SRT_GRAPHICS_IMPLICIT_VULKAN_LAYER_SUFFIX);
+          check_path_entries_all_in_dir (openxr_1_exp_layer_path->str,
+                                         override_share,
+                                         _SRT_GRAPHICS_OPENXR_1_EXPLICIT_LAYER_SUFFIX);
+          check_path_entries_all_in_dir (openxr_1_imp_layer_path->str,
+                                         override_share,
+                                         _SRT_GRAPHICS_OPENXR_1_IMPLICIT_LAYER_SUFFIX);
           pv_runtime_prepend_to_xdg_dirs (self, container_env, override_share,
                                           "XDG_DATA_DIRS",
                                           "/usr/local/share:/usr/share");
         }
+
       _srt_env_overlay_set (container_env, "VK_LAYER_PATH", NULL);
+      _srt_env_overlay_set (container_env, "XR_API_LAYER_PATH", NULL);
     }
 
   if (self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
@@ -8467,6 +8561,40 @@ pv_runtime_bind (PvRuntime *self,
                         "\" will be used instead",
                       dir, self->overrides_in_container);
               pv_exports_mask_or_log (exports, dir);
+            }
+        }
+    }
+
+  if ((self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_LAYERS)
+      && exports != NULL)
+    {
+      /* As above, but for OpenXR layers */
+      static const char * const layer_suffixes[] =
+        {
+          _SRT_GRAPHICS_OPENXR_1_EXPLICIT_LAYER_SUFFIX,
+          _SRT_GRAPHICS_OPENXR_1_IMPLICIT_LAYER_SUFFIX,
+        };
+      gsize i;
+
+      for (i = 0; i < G_N_ELEMENTS (layer_suffixes); i++)
+        {
+          g_auto(GStrv) search_path = NULL;
+          const char *suffix = layer_suffixes[i];
+          gsize j;
+
+          search_path = _srt_graphics_get_openxr_1_layer_search_paths (_srt_const_strv (self->original_environ),
+                                                                       suffix);
+
+          for (j = 0; search_path != NULL && search_path[j] != NULL; j++)
+            {
+              const char *dir = search_path[j];
+
+              if (should_mask_search_path_entry (dir))
+                {
+                  g_info ("Hiding \"%s\" from the container so that \"%s/share/%s\" will be used instead",
+                          dir, self->overrides_in_container, suffix);
+                  pv_exports_mask_or_log (exports, dir);
+                }
             }
         }
     }

@@ -1,3 +1,9 @@
+steam-runtime-tools (0.20260217.1) steamrt; urgency=medium
+
+  * Fix internal version numbering
+
+ -- Simon McVittie <smcv@collabora.com>  Tue, 17 Feb 2026 18:15:49 +0000
+
 steam-runtime-tools (0.20260217.0) steamrt; urgency=medium
 
   * pressure-vessel:

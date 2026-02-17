@@ -4,13 +4,20 @@ steam-runtime-tools (0.20260217.0) UNRELEASED; urgency=medium
     - Always use the Steam Runtime's time zone info /usr/share/zoneinfo,
       even if the host OS's glibc defaults to something non-FHS
       (steam-runtime#795)
+    - Optionally "capture" OpenXR layers from the graphics stack provider
+      into the container, similar to Vulkan layers. Like its equivalent
+      for OpenXR runtimes, this is considered experimental, and could
+      cause regressions by pulling in layers with non-trivial shared
+      library dependencies, so for now it is only done if requested by
+      setting environment variable PRESSURE_VESSEL_IMPORT_OPENXR_1_LAYERS
+      to 1. (steamrt/tasks#734)
   * Diagnostic tools:
     - List OpenXR layers (steamrt/tasks#733)
     - Documentation improvements
   * Developer tools:
     - build-aux/many-builds.py fixes
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 17 Feb 2026 15:17:48 +0000
+ -- Simon McVittie <smcv@collabora.com>  Tue, 17 Feb 2026 17:02:18 +0000
 
 steam-runtime-tools (0.20260213.0) steamrt; urgency=medium
 

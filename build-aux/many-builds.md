@@ -54,6 +54,7 @@ or their closest equivalents on other distributions:
 * libelf-dev (from elfutils, not to be confused with the older libelfg0-dev)
 * libgl-dev
 * libglib2.0-dev
+* libglx-mesa0:i386 (or mesa-vulkan-drivers:i386, or libglx-nvidia0:i386)
 * libjson-glib-dev
 * libva-dev
 * libvulkan-dev

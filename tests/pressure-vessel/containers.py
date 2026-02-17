@@ -94,6 +94,7 @@ import sys
 import tempfile
 import time
 import unittest
+from pathlib import Path
 
 try:
     import typing
@@ -323,6 +324,28 @@ class TestContainers(BaseTest):
 
             # We need both i386 and x86_64 helper utilities
             for multiarch in ('i386-linux-gnu', 'x86_64-linux-gnu'):
+                libdir = Path('/usr/lib/{}'.format(multiarch))
+
+                if libdir.exists():
+                    # We need at least one user-space graphics driver per
+                    # architecture tested, otherwise some of our assumptions
+                    # will be broken.
+                    for driver in (
+                        libdir / 'dri' / 'swrast_dri.so',
+                        libdir / 'libGLX_mesa.so.0',
+                        libdir / 'libGLX_nvidia.so.0',
+                        libdir / 'libVkLayer_MESA_device_select.so',
+                        libdir / 'libvulkan_lvp.so',
+                    ):
+                        if driver.exists():
+                            break
+                    else:
+                        raise AssertionError(
+                            'We need at least one {} graphics driver'.format(
+                                multiarch,
+                            )
+                        )
+
                 for tool in (
                     'capsule-capture-libs',
                     'detect-lib',

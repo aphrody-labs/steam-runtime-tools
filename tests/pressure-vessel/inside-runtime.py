@@ -211,7 +211,10 @@ class TestInsideRuntime(BaseTest):
                 self.assertIn(check_dir, search)
                 self.assertIn(check_dir + '/aliases', ldlp)
 
-            self.assertTrue(Path(check_dir).is_dir())
+            self.assertTrue(
+                Path(check_dir).is_dir(),
+                '{} should be a directory in container'.format(check_dir),
+            )
             self.assertTrue(Path(check_dir, 'aliases').is_dir())
 
             if check_dir not in search:
@@ -342,8 +345,13 @@ class TestInsideRuntime(BaseTest):
                     really_stat = Path(really).stat()
                     # Either it's a symlink to the same file, or the same file
                     # was mounted over it
-                    self.assertEqual(really_stat.st_dev, expected_stat.st_dev)
-                    self.assertEqual(really_stat.st_ino, expected_stat.st_ino)
+                    self.assertEqual(
+                        (expected_stat.st_dev, expected_stat.st_ino),
+                        (really_stat.st_dev, really_stat.st_ino),
+                        '{} and {} should be the same device/inode'.format(
+                            expected, really,
+                        ),
+                    )
 
             if (
                 'HOST_LD_LINUX_X86_64_SO_REALPATH' in os.environ

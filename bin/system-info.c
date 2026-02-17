@@ -1032,6 +1032,102 @@ print_layer_details (JsonBuilder *builder,
 }
 
 static void
+fill_openxr_layer (JsonBuilder *builder,
+                   SrtOpenXr1Layer *layer)
+{
+  g_autoptr(GError) error = NULL;
+  const char *json_path;
+  const char *json_origin;
+  SrtLoadableIssues loadable_issues = SRT_LOADABLE_ISSUES_NONE;
+
+  g_return_if_fail (SRT_IS_OPENXR_1_LAYER (layer));
+
+  json_path = srt_openxr_1_layer_get_json_path (layer);
+  json_builder_set_member_name (builder, "json_path");
+  json_builder_add_string_value (builder, json_path);
+  json_origin = srt_openxr_1_layer_get_json_origin (layer);
+
+  if (!g_str_equal (json_path, json_origin))
+    {
+      json_builder_set_member_name (builder, "json_origin");
+      json_builder_add_string_value (builder, json_origin);
+    }
+
+  if (srt_openxr_1_layer_check_error (layer, &error))
+    {
+      const char *library_path;
+
+      json_builder_set_member_name (builder, "name");
+      json_builder_add_string_value (builder,
+                                     srt_openxr_1_layer_get_name (layer));
+      json_builder_set_member_name (builder, "description");
+      json_builder_add_string_value (builder,
+                                     srt_openxr_1_layer_get_description (layer));
+      json_builder_set_member_name (builder, "api_version");
+      json_builder_add_string_value (builder,
+                                     srt_openxr_1_layer_get_api_version (layer));
+      json_builder_set_member_name (builder, "implementation_version");
+      json_builder_add_string_value (builder,
+                                     srt_openxr_1_layer_get_implementation_version (layer));
+
+      library_path = srt_openxr_1_layer_get_library_path (layer);
+
+      if (library_path != NULL)
+        {
+          g_autofree gchar *tmp = NULL;
+
+          json_builder_set_member_name (builder, "library_path");
+          json_builder_add_string_value (builder, library_path);
+
+          tmp = srt_openxr_1_layer_resolve_library_path (layer);
+
+          if (g_strcmp0 (library_path, tmp) != 0)
+            {
+              json_builder_set_member_name (builder, "dlopen");
+              json_builder_add_string_value (builder, tmp);
+            }
+        }
+    }
+  else
+    {
+      _srt_json_builder_add_error_members (builder, error);
+    }
+
+  loadable_issues = srt_openxr_1_layer_get_issues (layer);
+  json_builder_set_member_name (builder, "issues");
+  json_builder_begin_array (builder);
+  jsonify_loadable_issues (builder, loadable_issues);
+  json_builder_end_array (builder);
+}
+
+static void
+print_openxr_layer_array (JsonBuilder *builder,
+                          const GList *layer_list,
+                          gboolean explicit)
+{
+  const char *member_name;
+
+  if (explicit)
+    member_name = "explicit_layers";
+  else
+    member_name = "implicit_layers";
+
+  json_builder_set_member_name (builder, member_name);
+  json_builder_begin_array (builder);
+    {
+      const GList *iter;
+
+      for (iter = layer_list; iter != NULL; iter = iter->next)
+        {
+          json_builder_begin_object (builder);
+          fill_openxr_layer (builder, iter->data);
+          json_builder_end_object (builder);
+        }
+    }
+  json_builder_end_array (builder);
+}
+
+static void
 print_openxr_1_runtime_details (JsonBuilder *builder,
                                 SrtOpenXr1Runtime *rt)
 {
@@ -1775,6 +1871,19 @@ main (int argc,
   json_builder_end_array (builder);  // openxr-1.runtimes.inactive
 
   json_builder_end_object (builder);  // openxr-1.runtimes
+
+    {
+      g_autoptr(SrtObjectList) explicit = srt_system_info_list_explicit_openxr_1_layers (info);
+
+      print_openxr_layer_array (builder, explicit, TRUE);
+    }
+
+    {
+      g_autoptr(SrtObjectList) implicit = srt_system_info_list_implicit_openxr_1_layers (info);
+
+      print_openxr_layer_array (builder, implicit, FALSE);
+    }
+
   json_builder_end_object (builder);  // openxr-1
 
   json_builder_set_member_name (builder, "desktop-entries");

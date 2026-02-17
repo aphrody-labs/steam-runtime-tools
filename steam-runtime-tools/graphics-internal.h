@@ -336,6 +336,8 @@ GList *_srt_get_egl_from_json_report (GType type, JsonObject *json_obj);
 GList *_srt_get_vulkan_from_json_report (JsonObject *json_obj);
 GList *_srt_get_explicit_vulkan_layers_from_json_report (JsonObject *json_obj);
 GList *_srt_get_implicit_vulkan_layers_from_json_report (JsonObject *json_obj);
+GList *_srt_get_explicit_openxr_1_layers_from_json_report (JsonObject *json_obj);
+GList *_srt_get_implicit_openxr_1_layers_from_json_report (JsonObject *json_obj);
 GList *_srt_dri_driver_get_from_report (JsonObject *json_obj);
 GList *_srt_gbm_backend_get_from_report (JsonObject *json_obj);
 GList *_srt_va_api_driver_get_from_report (JsonObject *json_obj);
@@ -364,9 +366,12 @@ SrtVaApiVersion _srt_va_api_driver_version (int dfd,
 #define _SRT_GRAPHICS_IMPLICIT_VULKAN_LAYER_SUFFIX "vulkan/implicit_layer.d"
 #define _SRT_GRAPHICS_VULKAN_ICD_SUFFIX "vulkan/icd.d"
 
+#define _SRT_GRAPHICS_OPENXR_1_EXPLICIT_LAYER_SUFFIX "openxr/1/api_layers/explicit.d"
+#define _SRT_GRAPHICS_OPENXR_1_IMPLICIT_LAYER_SUFFIX "openxr/1/api_layers/implicit.d"
 #define _SRT_GRAPHICS_OPENXR_1_RUNTIME_SUFFIX "openxr/1"
 
 #define _SRT_GRAPHICS_MANIFEST_MEMBER_OPENXR_1_RUNTIME "runtime"
+#define _SRT_GRAPHICS_MANIFEST_MEMBER_OPENXR_1_API_LAYER "api_layer"
 
 SrtDriDriver *srt_dri_driver_new (const gchar *library_path,
                                   gboolean is_extra);
@@ -407,6 +412,23 @@ SrtOpenXr1Runtime *srt_openxr_1_runtime_load_json (const gchar *json_path,
                                                    const gchar *library_path,
                                                    JsonObject *runtime_object,
                                                    SrtLoadableIssues issues);
+SrtOpenXr1Layer *srt_openxr_1_layer_new (const char *json_path,
+                                         const char *json_origin,
+                                         const char *name,
+                                         const char *library_path,
+                                         const char *api_version,
+                                         const char *implementation_version,
+                                         const char *description,
+                                         SrtLoadableIssues issues);
+SrtOpenXr1Layer *srt_openxr_1_layer_new_error (const char *json_path,
+                                               const char *json_origin,
+                                               SrtLoadableIssues issues,
+                                               const GError *error);
+SrtOpenXr1Layer *srt_openxr_1_layer_load_json (const char *json_path,
+                                               const char *json_origin,
+                                               const char *library_path,
+                                               JsonObject *runtime_object,
+                                               SrtLoadableIssues issues);
 SrtVulkanIcd *srt_vulkan_icd_new_error (const gchar *json_path,
                                         SrtLoadableIssues issues,
                                         const GError *error);
@@ -433,3 +455,10 @@ SrtVulkanLayer *srt_vulkan_layer_new (const gchar *json_path,
                                       SrtLoadableIssues issues);
 void _srt_vulkan_layer_set_library_arch (SrtVulkanLayer *self,
                                          const char *library_arch);
+
+GList *_srt_load_openxr_1_layers (SrtSysroot *sysroot,
+                                  SrtSubprocessRunner *runner,
+                                  const GQuark *multiarch_tuples,
+                                  size_t n_multiarch_tuples,
+                                  gboolean explicit,
+                                  SrtCheckFlags check_flags);

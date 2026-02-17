@@ -517,6 +517,11 @@ split_into_search_paths (GPtrArray *search_paths,
 #define XDG_CONFIG_DIRS_VAR "XDG_CONFIG_DIRS"
 #define XDG_CONFIG_DIRS_DEFAULT "/etc/xdg"
 
+#define XDG_DATA_HOME_VAR "XDG_DATA_HOME"
+#define XDG_DATA_HOME_DEFAULT_SUBDIR ".local/share"
+#define XDG_DATA_DIRS_VAR "XDG_DATA_DIRS"
+#define XDG_DATA_DIRS_DEFAULT "/usr/local/share:/usr/share"
+
 /* By default, SYSCONFDIR defaults to /usr/local/etc:
    https://registry.khronos.org/OpenXR/specs/1.1/loader.html#linux-manifest-search-paths
    but in practice, it's generally configured to be "/etc" like EXTRASYSCONFDIR.
@@ -811,4 +816,843 @@ _srt_load_openxr_1_runtimes (SrtSysroot *sysroot,
 
   if (out_inactive != NULL)
     *out_inactive = g_list_reverse (*out_inactive);
+}
+
+/**
+ * SrtOpenXr1Layer:
+ *
+ * Opaque object representing an OpenXR 1 layer.
+ */
+
+struct _SrtOpenXr1LayerClass
+{
+  /*< private >*/
+  SrtBaseJsonGraphicsModuleClass parent;
+};
+
+enum
+{
+  OPENXR_1_LAYER_PROP_0,
+  OPENXR_1_LAYER_PROP_API_VERSION,
+  OPENXR_1_LAYER_PROP_DESCRIPTION,
+  OPENXR_1_LAYER_PROP_IMPLEMENTATION_VERSION,
+  OPENXR_1_LAYER_PROP_JSON_ORIGIN,
+  OPENXR_1_LAYER_PROP_NAME,
+  N_OPENXR_1_LAYER_PROPERTIES
+};
+
+G_DEFINE_TYPE (SrtOpenXr1Layer, srt_openxr_1_layer, SRT_TYPE_BASE_JSON_GRAPHICS_MODULE)
+
+static void
+srt_openxr_1_layer_init (SrtOpenXr1Layer *self)
+{
+}
+
+static void
+srt_openxr_1_layer_get_property (GObject *object,
+                                 guint prop_id,
+                                 GValue *value,
+                                 GParamSpec *pspec)
+{
+  SrtOpenXr1Layer *self = SRT_OPENXR_1_LAYER (object);
+
+  switch (prop_id)
+    {
+      case OPENXR_1_LAYER_PROP_API_VERSION:
+        g_value_set_string (value, self->parent.api_version);
+        break;
+
+      case OPENXR_1_LAYER_PROP_DESCRIPTION:
+        g_value_set_string (value, self->parent.description);
+        break;
+
+      case OPENXR_1_LAYER_PROP_IMPLEMENTATION_VERSION:
+        g_value_set_string (value, self->parent.implementation_version);
+        break;
+
+      case OPENXR_1_LAYER_PROP_JSON_ORIGIN:
+        g_value_set_string (value, self->json_origin);
+        break;
+
+      case OPENXR_1_LAYER_PROP_NAME:
+        g_value_set_string (value, self->parent.name);
+        break;
+
+      default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+    }
+}
+
+static void
+srt_openxr_1_layer_set_property (GObject *object,
+                                 guint prop_id,
+                                 const GValue *value,
+                                 GParamSpec *pspec)
+{
+  SrtOpenXr1Layer *self = SRT_OPENXR_1_LAYER (object);
+
+  switch (prop_id)
+    {
+      case OPENXR_1_LAYER_PROP_API_VERSION:
+        g_return_if_fail (self->parent.api_version == NULL);
+        self->parent.api_version = g_value_dup_string (value);
+        break;
+
+      case OPENXR_1_LAYER_PROP_DESCRIPTION:
+        g_return_if_fail (self->parent.description == NULL);
+        self->parent.description = g_value_dup_string (value);
+        break;
+
+      case OPENXR_1_LAYER_PROP_IMPLEMENTATION_VERSION:
+        g_return_if_fail (self->parent.implementation_version == NULL);
+        self->parent.implementation_version = g_value_dup_string (value);
+        break;
+
+      case OPENXR_1_LAYER_PROP_JSON_ORIGIN:
+        g_return_if_fail (self->json_origin == NULL);
+        self->json_origin = g_value_dup_string (value);
+        break;
+
+      case OPENXR_1_LAYER_PROP_NAME:
+        g_return_if_fail (self->parent.name == NULL);
+        self->parent.name = g_value_dup_string (value);
+        break;
+
+      default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+    }
+}
+
+static void
+srt_openxr_1_layer_constructed (GObject *object)
+{
+  SrtOpenXr1Layer *self = SRT_OPENXR_1_LAYER (object);
+  SrtBaseGraphicsModule *base = SRT_BASE_GRAPHICS_MODULE (object);
+
+  G_OBJECT_CLASS (srt_openxr_1_layer_parent_class)->constructed (object);
+
+  g_return_if_fail (self->json_origin != NULL);
+
+  if (base->error != NULL)
+    {
+      g_return_if_fail (self->parent.name == NULL);
+      g_return_if_fail (self->parent.api_version == NULL);
+      g_return_if_fail (self->parent.implementation_version == NULL);
+      g_return_if_fail (self->parent.description == NULL);
+      g_return_if_fail (base->library_path == NULL);
+    }
+  else
+    {
+      g_return_if_fail (self->parent.name != NULL);
+      g_return_if_fail (self->parent.api_version != NULL);
+      g_return_if_fail (self->parent.implementation_version != NULL);
+      g_return_if_fail (self->parent.description != NULL);
+      g_return_if_fail (base->library_path != NULL);
+    }
+}
+
+static void
+srt_openxr_1_layer_finalize (GObject *object)
+{
+  SrtOpenXr1Layer *self = SRT_OPENXR_1_LAYER (object);
+
+  g_free (self->json_origin);
+
+  G_OBJECT_CLASS (srt_openxr_1_layer_parent_class)->finalize (object);
+}
+
+static GParamSpec *openxr_1_layer_properties[N_OPENXR_1_LAYER_PROPERTIES] = { NULL };
+
+static void
+srt_openxr_1_layer_class_init (SrtOpenXr1LayerClass *cls)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (cls);
+
+  object_class->constructed = srt_openxr_1_layer_constructed;
+  object_class->get_property = srt_openxr_1_layer_get_property;
+  object_class->set_property = srt_openxr_1_layer_set_property;
+  object_class->finalize = srt_openxr_1_layer_finalize;
+
+  openxr_1_layer_properties[OPENXR_1_LAYER_PROP_API_VERSION] =
+    g_param_spec_string ("api-version", "API version",
+                         "The major.minor version of the OpenXR API that the "
+                         "shared library was built against.",
+                         NULL,
+                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS);
+
+  openxr_1_layer_properties[OPENXR_1_LAYER_PROP_DESCRIPTION] =
+    g_param_spec_string ("description", "Description",
+                         "Brief description of the layer.",
+                         NULL,
+                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS);
+
+  openxr_1_layer_properties[OPENXR_1_LAYER_PROP_IMPLEMENTATION_VERSION] =
+    g_param_spec_string ("implementation-version", "Implementation version",
+                         "Version of the implemented layer.",
+                         NULL,
+                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS);
+
+  openxr_1_layer_properties[OPENXR_1_LAYER_PROP_JSON_ORIGIN] =
+    g_param_spec_string ("json-origin", "JSON origin",
+                         "The original path to the JSON manifest as found"
+                         "  during lookup, before symlink resolution.",
+                         NULL,
+                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS);
+
+  openxr_1_layer_properties[OPENXR_1_LAYER_PROP_NAME] =
+    g_param_spec_string ("name", "name",
+                         "The name that uniquely identifies this layer to "
+                         "applications.",
+                         NULL,
+                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                         G_PARAM_STATIC_STRINGS);
+
+  g_object_class_install_properties (object_class, N_OPENXR_1_LAYER_PROPERTIES,
+                                     openxr_1_layer_properties);
+}
+
+/*
+ * srt_openxr_1_layer_new:
+ * @json_path: (transfer none): the canonicalized absolute path to
+ *  the JSON manifest
+ * @json_origin: (transfer none): the original path where the JSON manifest
+ *  was found, before canonicalization
+ * @name: (transfer none): the layer unique name
+ * @library_path: (transfer none): the path to the library
+ * @api_version: (transfer none): the API version
+ * @implementation_version: (transfer none): the version of the implemented
+ *  layer
+ * @description: (transfer none): the description of the layer
+ * @issues: problems with this layer
+ *
+ * Returns: (transfer full): a new SrtOpenXr1Layer
+ */
+SrtOpenXr1Layer *
+srt_openxr_1_layer_new (const char *json_path,
+                        const char *json_origin,
+                        const char *name,
+                        const char *library_path,
+                        const char *api_version,
+                        const char *implementation_version,
+                        const char *description,
+                        SrtLoadableIssues issues)
+{
+  g_return_val_if_fail (json_path != NULL, NULL);
+  g_return_val_if_fail (json_origin != NULL, NULL);
+  g_return_val_if_fail (name != NULL, NULL);
+  g_return_val_if_fail (library_path != NULL, NULL);
+  g_return_val_if_fail (api_version != NULL, NULL);
+  g_return_val_if_fail (implementation_version != NULL, NULL);
+  g_return_val_if_fail (description != NULL, NULL);
+
+  return g_object_new (SRT_TYPE_OPENXR_1_LAYER,
+                       "json-path", json_path,
+                       "json-origin", json_origin,
+                       "name", name,
+                       "library-path", library_path,
+                       "api-version", api_version,
+                       "implementation-version", implementation_version,
+                       "description", description,
+                       "issues", issues,
+                       NULL);
+}
+
+/*
+ * srt_openxr_1_layer_new_error:
+ * @json_path: (transfer none): the absolute path to the JSON file
+ * @issues: problems with this layer
+ * @error: (transfer none): Error that occurred when loading the layer
+ *
+ * Returns: (transfer full): a new SrtOpenXr1Layer
+ */
+SrtOpenXr1Layer *
+srt_openxr_1_layer_new_error (const char *json_path,
+                              const char *json_origin,
+                              SrtLoadableIssues issues,
+                              const GError *error)
+{
+  g_return_val_if_fail (json_path != NULL, NULL);
+  g_return_val_if_fail (json_origin != NULL, NULL);
+  g_return_val_if_fail (error != NULL, NULL);
+
+  return g_object_new (SRT_TYPE_OPENXR_1_LAYER,
+                       "error", error,
+                       "json-path", json_path,
+                       "json-origin", json_origin,
+                       "issues", issues,
+                       NULL);
+}
+
+SrtOpenXr1Layer *
+srt_openxr_1_layer_load_json (const char *path,
+                              const char *original_path,
+                              const char *library_path,
+                              JsonObject *api_layer,
+                              SrtLoadableIssues issues)
+{
+  const char *name = NULL;
+  const char *api_version = NULL;
+  const char *impl_version = NULL;
+  const char *description = NULL;
+  const char *s;
+  g_autoptr(SrtOpenXr1Layer) result = NULL;
+  g_autoptr(GError) error = NULL;
+  JsonArray *instance_json_array = NULL;
+  JsonNode *arr_node;
+  JsonObject *functions_obj = NULL;
+
+  g_return_val_if_fail (path != NULL, NULL);
+  g_return_val_if_fail (library_path != NULL, NULL);
+  g_return_val_if_fail (api_layer != NULL, NULL);
+
+  name = json_object_get_string_member_with_default (api_layer, "name", NULL);
+  api_version = json_object_get_string_member_with_default (api_layer,
+                                                            "api_version",
+                                                            NULL);
+  impl_version = json_object_get_string_member_with_default (api_layer,
+                                                             "implementation_version",
+                                                             NULL);
+  description = json_object_get_string_member_with_default (api_layer,
+                                                            "description",
+                                                            NULL);
+
+  if (name == NULL ||
+      api_version == NULL ||
+      impl_version == NULL ||
+      description == NULL)
+    {
+      g_debug ("A required field is missing from the JSON api_layer");
+      g_set_error (&error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                   "OpenXR layer in \"%s\" cannot be parsed because it is missing a required field",
+                   path);
+      return srt_openxr_1_layer_new_error (path,
+                                           original_path,
+                                           SRT_LOADABLE_ISSUES_CANNOT_LOAD,
+                                           error);
+    }
+
+  result = srt_openxr_1_layer_new (path,
+                                   original_path,
+                                   name,
+                                   library_path,
+                                   api_version,
+                                   impl_version,
+                                   description,
+                                   issues);
+
+  s = json_object_get_string_member_with_default (api_layer, "enable_environment", NULL);
+  result->parent.enable_env_var.name = g_strdup (s);
+
+  s = json_object_get_string_member_with_default (api_layer, "disable_environment", NULL);
+  result->parent.disable_env_var.name = g_strdup (s);
+
+  if (json_object_has_member (api_layer, "functions"))
+    functions_obj = json_object_get_object_member (api_layer, "functions");
+
+  if (functions_obj != NULL)
+    result->parent.functions = load_functions_from_json (functions_obj);
+
+  arr_node = json_object_get_member (api_layer, "instance_extensions");
+
+  if (arr_node != NULL && JSON_NODE_HOLDS_ARRAY (arr_node))
+    instance_json_array = json_node_get_array (arr_node);
+
+  if (instance_json_array != NULL)
+    {
+      size_t array_length = json_array_get_length (instance_json_array);
+
+      for (size_t i = 0; i < array_length; i++)
+        {
+          JsonObject *instance_extension = json_array_get_object_element (instance_json_array, i);
+          const char *ext_name;
+          const char *ext_version;
+
+          ext_name = json_object_get_string_member_with_default (instance_extension,
+                                                                 "name",
+                                                                 NULL);
+          ext_version = json_object_get_string_member_with_default (instance_extension,
+                                                                    "extension_version",
+                                                                    NULL);
+
+          if (ext_name == NULL || ext_version == NULL)
+            {
+              g_debug ("The OpenXR layer property 'instance_extensions' is "
+                       "missing some expected values, trying to continue...");
+            }
+          else
+            {
+              result->parent.instance_extensions =
+                g_list_prepend (result->parent.instance_extensions,
+                                instance_extension_new (ext_name,
+                                                        NULL,
+                                                        ext_version));
+            }
+        }
+
+      result->parent.instance_extensions = g_list_reverse (result->parent.instance_extensions);
+    }
+
+  return g_steal_pointer (&result);
+}
+
+static void
+openxr_1_layer_load_json_cb (SrtSysroot *sysroot,
+                             const char *filename,
+                             void *user_data)
+{
+  prepend_manifest_from_json (SRT_TYPE_OPENXR_1_LAYER, sysroot, filename,
+                              _SRT_GRAPHICS_MANIFEST_MEMBER_OPENXR_1_API_LAYER,
+                              user_data);
+}
+
+/* This follows:
+ * https://registry.khronos.org/OpenXR/specs/1.1/loader.html#linux-manifest-search-paths */
+static gchar **
+_srt_graphics_get_openxr_1_layer_search_paths (const char * const *envp,
+                                               const char *suffix)
+{
+  GPtrArray *search_paths = g_ptr_array_new_with_free_func (g_free);
+  const gchar *home;
+
+  home = _srt_environ_getenv (envp, "HOME") ?: g_get_home_dir();
+
+  /* XDG_CONFIG_HOME isn't actually documented in the spec or implemented
+   * in the loader, so we don't search it, contrary to normal expectations. */
+
+  /* XDG_CONFIG_DIRS */
+  split_env_path_into_search_paths (search_paths, envp,
+                                    XDG_CONFIG_DIRS_VAR,
+                                    XDG_CONFIG_DIRS_DEFAULT,
+                                    suffix);
+
+  /* We assume that the loader was built with SYSCONFDIR and
+   * EXTRASYSCONFDIR both set to /etc,
+   * which will normally be true for a distro-built loader */
+  g_ptr_array_add (search_paths,
+                   g_build_filename (SEARCH_DIR_SYSCONFDIR, suffix, NULL));
+
+  /* XDG_DATA_DIRS */
+  split_env_path_into_search_paths (search_paths, envp,
+                                    XDG_DATA_DIRS_VAR,
+                                    XDG_DATA_DIRS_DEFAULT,
+                                    suffix);
+
+  /* XDG_DATA_HOME.
+   * The OpenXR spec says this is/should be searched *after* XDG_DATA_DIRS,
+   * contrary to normal expectations */
+  add_xdg_home_dir_to_search_paths (search_paths, envp,
+                                    XDG_DATA_HOME_VAR, home,
+                                    XDG_DATA_HOME_DEFAULT_SUBDIR,
+                                    suffix);
+
+  g_ptr_array_add (search_paths, NULL);
+  return (char **) g_ptr_array_free (search_paths, FALSE);
+}
+
+/*
+ * _srt_load_openxr_1_layers:
+ * @sysroot: (not nullable): The root directory, usually `/`
+ * @runner: The execution environment
+ * @multiarch_tuples: (nullable): If not %NULL, duplicated
+ *  OpenXR layers are searched by their absolute path, obtained using
+ *  'inspect-library' in the provided multiarch tuples, instead of just their
+ *  resolved library path.
+ * @n_multiarch_tuples: Number of items in @multiarch_tuples
+ * @explicit: If %TRUE, load explicit layers, otherwise load implicit layers.
+ * @check_flags: Whether to check for problems
+ *
+ * Implementation of srt_system_info_list_explicit_openxr_1_layers() and
+ * srt_system_info_list_implicit_openxr_1_layers().
+ *
+ * Returns: (transfer full) (element-type SrtOpenXr1Layer): A list of OpenXR
+ *  layers, most-important first
+ */
+GList *
+_srt_load_openxr_1_layers (SrtSysroot *sysroot,
+                           SrtSubprocessRunner *runner,
+                           const GQuark *multiarch_tuples,
+                           size_t n_multiarch_tuples,
+                           gboolean explicit,
+                           SrtCheckFlags check_flags)
+{
+  GList *ret = NULL;
+  g_auto(GStrv) search_paths = NULL;
+  const char * const *envp;
+  const char *value;
+  const char *suffix;
+
+  g_return_val_if_fail (_srt_check_not_setuid (), NULL);
+  g_return_val_if_fail (SRT_IS_SYSROOT (sysroot), NULL);
+  g_return_val_if_fail (SRT_IS_SUBPROCESS_RUNNER (runner), NULL);
+
+  envp = _srt_subprocess_runner_get_environ (runner);
+
+  if (explicit)
+    {
+      suffix = _SRT_GRAPHICS_OPENXR_1_EXPLICIT_LAYER_SUFFIX;
+      value = _srt_environ_getenv (envp, "XR_API_LAYER_PATH");
+    }
+  else
+    {
+      suffix = _SRT_GRAPHICS_OPENXR_1_IMPLICIT_LAYER_SUFFIX;
+      /* Similar to Vulkan, there is no environment variable to override
+       * the search path for implicit layers */
+      value = NULL;
+    }
+
+  if (value != NULL)
+    {
+      g_auto(GStrv) dirs = g_strsplit (value, G_SEARCHPATH_SEPARATOR_S, -1);
+
+      g_debug ("OpenXR explicit layer search path overridden to: %s", value);
+      load_json_dirs (sysroot,
+                      _srt_const_strv (dirs),
+                      NULL,
+                      _srt_indirect_strcmp0,
+                      openxr_1_layer_load_json_cb,
+                      &ret);
+    }
+  else
+    {
+      search_paths = _srt_graphics_get_openxr_1_layer_search_paths (envp,
+                                                                    suffix);
+      g_debug ("Using normal OpenXR layer search path");
+      load_json_dirs (sysroot,
+                      _srt_const_strv (search_paths),
+                      NULL,
+                      _srt_indirect_strcmp0,
+                      openxr_1_layer_load_json_cb,
+                      &ret);
+    }
+
+  if (!(check_flags & SRT_CHECK_FLAGS_SKIP_SLOW_CHECKS))
+    _srt_loadable_flag_duplicates (SRT_TYPE_OPENXR_1_LAYER, runner,
+                                   multiarch_tuples,
+                                   n_multiarch_tuples,
+                                   ret);
+
+  return g_list_reverse (ret);
+}
+
+static SrtOpenXr1Layer *
+openxr_1_layer_dup (SrtOpenXr1Layer *self)
+{
+  SrtBaseGraphicsModule *base;
+  GHashTableIter iter;
+
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), NULL);
+
+  base = SRT_BASE_GRAPHICS_MODULE (self);
+
+  SrtOpenXr1Layer *ret = srt_openxr_1_layer_new (self->parent.json_path,
+                                                 self->json_origin,
+                                                 self->parent.name,
+                                                 base->library_path,
+                                                 self->parent.api_version,
+                                                 self->parent.implementation_version,
+                                                 self->parent.description,
+                                                 base->issues);
+
+  if (self->parent.functions != NULL)
+    {
+      gpointer key;
+      gpointer value;
+
+      ret->parent.functions = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
+      g_hash_table_iter_init (&iter, self->parent.functions);
+
+      while (g_hash_table_iter_next (&iter, &key, &value))
+        g_hash_table_insert (ret->parent.functions, g_strdup (key), g_strdup (value));
+    }
+
+  ret->parent.instance_extensions = instance_extension_list_copy (self->parent.instance_extensions);
+  ret->parent.enable_env_var.name = g_strdup (self->parent.enable_env_var.name);
+  ret->parent.disable_env_var.name = g_strdup (self->parent.disable_env_var.name);
+
+  return ret;
+}
+
+/**
+ * srt_openxr_1_layer_new_replace_library_path:
+ * @self: An OpenXR layer
+ * @path: (type filename) (transfer none): A path
+ *
+ * Return a copy of @self with the srt_openxr_1_layer_get_library_path()
+ * changed to @path. For example, this is useful when setting up a
+ * container where the underlying shared object will be made available
+ * at a different absolute path.
+ *
+ * If @self does not have #SrtOpenXr1Layer:library-path set, or if it
+ * is in an error state, this returns a new reference to @self.
+ *
+ * Returns: (transfer full): A new reference to a #SrtOpenXr1Layer. Free with
+ *  g_object_unref().
+ */
+SrtOpenXr1Layer *
+srt_openxr_1_layer_new_replace_library_path (SrtOpenXr1Layer *self,
+                                             const char *library_path)
+{
+  SrtBaseGraphicsModule *base;
+  SrtOpenXr1Layer *ret = NULL;
+
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), NULL);
+  g_return_val_if_fail (library_path != NULL, NULL);
+
+  base = SRT_BASE_GRAPHICS_MODULE (self);
+
+  if (base->error != NULL || base->library_path == NULL)
+    return g_object_ref (self);
+
+  ret = openxr_1_layer_dup (self);
+  g_return_val_if_fail (ret != NULL, NULL);
+
+  base = SRT_BASE_GRAPHICS_MODULE (ret);
+  g_free (base->library_path);
+  base->library_path = g_strdup (library_path);
+
+  return ret;
+}
+
+/**
+ * srt_openxr_1_layer_write_to_file:
+ * @self: The OpenXR layer
+ * @path: (type filename): A filename
+ * @error: Used to describe the error on failure
+ *
+ * Serialize @self to the given JSON file.
+ *
+ * Returns: %TRUE on success
+ */
+gboolean
+srt_openxr_1_layer_write_to_file (SrtOpenXr1Layer *self,
+                                  const char *path,
+                                  GError **error)
+{
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), FALSE);
+  g_return_val_if_fail (path != NULL, FALSE);
+  g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+
+  return _srt_base_json_graphics_module_write_to_file (&self->parent,
+                                                       path,
+                                                       SRT_TYPE_OPENXR_1_LAYER,
+                                                       error);
+}
+
+/**
+ * srt_openxr_1_layer_get_json_path:
+ * @self: The OpenXR layer
+ *
+ * Return the canonicalized path to the JSON manifest representing this
+ * layer.
+ *
+ * This is a path pointing to the same file as
+ * #SrtOpenXr1Layer:json-origin / srt_openxr_1_layer_get_json_origin(),
+ * but with symlinks expanded. For instance, if #SrtOpenXr1Layer:json-origin
+ * is `/etc/xdg/openxr/1/api_layers/explicit.d/layer.json` but that path
+ * is a symlink to
+ * `/opt/mylayer/layer.json`, then srt_openxr_1_layer_get_json_path()
+ * would return `/opt/mylayer/layer.json`.
+ *
+ * Relative filenames for the #SrtOpenXr1Layer:library-path are relative
+ * to this path.
+ *
+ * Returns: (type filename) (transfer none) (not nullable):
+ *  #SrtOpenXr1Layer:json-path
+ */
+const gchar *
+srt_openxr_1_layer_get_json_path (SrtOpenXr1Layer *self)
+{
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), NULL);
+
+  return self->parent.json_path;
+}
+
+/**
+ * srt_openxr_1_layer_get_json_origin:
+ * @self: The OpenXR layer
+ *
+ * Return the absolute path at which this layer was found,
+ * as a filename in one of the search path entries.
+ *
+ * For instance, if `/etc/xdg/openxr/1/api_layers/explicit.d/layer.json`
+ * is a symlink to
+ * `/opt/mylayer/layer.json`, then srt_openxr_1_layer_get_json_origin()
+ * would return `/etc/xdg/openxr/1/api_layers/explicit.d/layer.json`.
+ *
+ * Returns: (type filename) (transfer none) (not nullable):
+ *  #SrtOpenXr1Layer:json-origin
+ */
+const gchar *
+srt_openxr_1_layer_get_json_origin (SrtOpenXr1Layer *self)
+{
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), NULL);
+
+  return self->json_origin;
+}
+
+/**
+ * srt_openxr_1_layer_get_library_path:
+ * @self: The OpenXR layer
+ *
+ * Return the library path for this layer. It is either an absolute path,
+ * a path relative to srt_openxr_1_layer_get_json_path() containing at least one
+ * directory separator (slash), or a basename to be loaded from the
+ * shared library search path.
+ *
+ * If the JSON description for this layer could not be loaded,
+ * return %NULL instead.
+ *
+ * Returns: (type filename) (transfer none) (nullable): #SrtOpenXr1Layer:library-path
+ */
+const gchar *
+srt_openxr_1_layer_get_library_path (SrtOpenXr1Layer *self)
+{
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), NULL);
+
+  return SRT_BASE_GRAPHICS_MODULE (self)->library_path;
+}
+
+/**
+ * srt_openxr_1_layer_get_name:
+ * @self: The OpenXR layer
+ *
+ * Return the name that uniquely identifies this layer.
+ *
+ * If the JSON description for this layer could not be loaded, return %NULL
+ * instead.
+ *
+ * Returns: (type utf8) (transfer none) (nullable): #SrtOpenXr1Layer:name
+ */
+const gchar *
+srt_openxr_1_layer_get_name (SrtOpenXr1Layer *self)
+{
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), NULL);
+
+  return self->parent.name;
+}
+
+/**
+ * srt_openxr_1_layer_get_description:
+ * @self: The OpenXR layer
+ *
+ * Return the description of this layer.
+ *
+ * If the JSON description for this layer could not be loaded, return %NULL
+ * instead.
+ *
+ * Returns: (type utf8) (transfer none) (nullable): #SrtOpenXr1Layer:description
+ */
+const gchar *
+srt_openxr_1_layer_get_description (SrtOpenXr1Layer *self)
+{
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), NULL);
+
+  return self->parent.description;
+}
+
+/**
+ * srt_openxr_1_layer_get_api_version:
+ * @self: The OpenXR layer
+ *
+ * Return the major.minor API version of this layer, as a string.
+ *
+ * If the JSON description for this layer could not be loaded, return %NULL
+ * instead.
+ *
+ * Returns: (type utf8) (transfer none) (nullable): #SrtOpenXr1Layer:api_version
+ */
+const gchar *
+srt_openxr_1_layer_get_api_version (SrtOpenXr1Layer *self)
+{
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), NULL);
+
+  return self->parent.api_version;
+}
+
+/**
+ * srt_openxr_1_layer_get_implementation_version:
+ * @self: The OpenXR layer
+ *
+ * Return the version of the implemented layer, as a string.
+ *
+ * If the JSON description for this layer could not be loaded, return %NULL
+ * instead.
+ *
+ * Returns: (type utf8) (transfer none) (nullable):
+ *  #SrtOpenXr1Layer:implementation_version
+ */
+const gchar *
+srt_openxr_1_layer_get_implementation_version (SrtOpenXr1Layer *self)
+{
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), NULL);
+
+  return self->parent.implementation_version;
+}
+
+/**
+ * srt_openxr_1_layer_get_issues:
+ * @self: The OpenXR layer
+ *
+ * Return the problems found when parsing and loading @self.
+ *
+ * Returns: A bitfield containing problems, or %SRT_LOADABLE_ISSUES_NONE
+ *  if no problems were found
+ */
+SrtLoadableIssues
+srt_openxr_1_layer_get_issues (SrtOpenXr1Layer *self)
+{
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), SRT_LOADABLE_ISSUES_UNKNOWN);
+
+  return SRT_BASE_GRAPHICS_MODULE (self)->issues;
+}
+
+/**
+ * srt_openxr_1_layer_resolve_library_path:
+ * @self: The OpenXR layer
+ *
+ * Return the path that can be passed to `dlopen()` for this layer.
+ *
+ * If srt_openxr_1_layer_get_library_path() is a relative path, return the
+ * absolute path that is the result of interpreting it relative to
+ * srt_openxr_1_layer_get_json_path(). Otherwise return a copy of
+ * srt_openxr_1_layer_get_library_path().
+ *
+ * The result is either the basename of a shared library (to be found
+ * relative to some directory listed in `$LD_LIBRARY_PATH`, `/etc/ld.so.conf`,
+ * `/etc/ld.so.conf.d` or the hard-coded library search path), or an
+ * absolute path.
+ *
+ * Returns: (transfer full) (type filename) (nullable): The basename of a
+ *  shared library or an absolute path. Free with g_free().
+ */
+gchar *
+srt_openxr_1_layer_resolve_library_path (SrtOpenXr1Layer *self)
+{
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), NULL);
+
+  return _srt_base_graphics_module_resolve_library_path (SRT_BASE_GRAPHICS_MODULE (self));
+}
+
+/**
+ * srt_openxr_1_layer_check_error:
+ * @self: The OpenXR layer
+ * @error: Used to return details if the layer description could not be loaded
+ *
+ * Check whether we failed to load the JSON describing this OpenXR layer.
+ * Note that this does not actually `dlopen()` the layer itself.
+ *
+ * Returns: %TRUE if the JSON was loaded successfully
+ */
+gboolean
+srt_openxr_1_layer_check_error (const SrtOpenXr1Layer *self,
+                                GError **error)
+{
+  g_return_val_if_fail (SRT_IS_OPENXR_1_LAYER (self), FALSE);
+  g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+
+  return _srt_base_graphics_module_check_error (SRT_BASE_GRAPHICS_MODULE (self), error);
 }

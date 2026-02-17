@@ -421,6 +421,20 @@ test_null_sysroot (Fixture *f,
       g_assert_null (rt);
     }
 
+    {
+      g_autoptr(SrtObjectList) layers = NULL;
+
+      layers = srt_system_info_list_explicit_openxr_1_layers (info);
+      g_assert_null (layers);
+    }
+
+    {
+      g_autoptr(SrtObjectList) layers = NULL;
+
+      layers = srt_system_info_list_implicit_openxr_1_layers (info);
+      g_assert_null (layers);
+    }
+
   g_assert_cmpint (srt_system_info_get_container_type (info), ==,
                    SRT_CONTAINER_TYPE_UNKNOWN);
 
@@ -2983,6 +2997,8 @@ typedef struct
 typedef struct
 {
   const gchar *json_path;
+  /* Shorthand: if NULL, assume same as json_path */
+  const gchar *json_origin;
   const gchar *name;
   const gchar *description;
   const gchar *type;
@@ -2995,6 +3011,80 @@ typedef struct
   const gchar *error_message;
   int error_code;
 } LayerTest;
+
+static void
+assert_openxr_1_layer_matches (const LayerTest *expected,
+                               SrtOpenXr1Layer *got)
+{
+  g_autoptr(GError) error = NULL;
+
+  g_assert_true (SRT_IS_OPENXR_1_LAYER (got));
+  g_assert_cmpstr (expected->json_path, ==,
+                   srt_openxr_1_layer_get_json_path (got));
+
+  if (expected->json_origin != NULL)
+    g_assert_cmpstr (expected->json_origin, ==,
+                     srt_openxr_1_layer_get_json_origin (got));
+  else
+    g_assert_cmpstr (expected->json_path, ==,
+                     srt_openxr_1_layer_get_json_origin (got));
+
+  g_assert_cmpint (expected->issues, ==,
+                   srt_openxr_1_layer_get_issues (got));
+
+  if (srt_openxr_1_layer_check_error (got, &error))
+    {
+      g_test_message ("Layer is valid");
+      g_assert_cmpstr (expected->name, ==,
+                       srt_openxr_1_layer_get_name (got));
+      g_assert_cmpstr (expected->description, ==,
+                       srt_openxr_1_layer_get_description (got));
+      g_assert_cmpstr (expected->api_version, ==,
+                       srt_openxr_1_layer_get_api_version (got));
+      g_assert_cmpstr (expected->implementation_version, ==,
+                       srt_openxr_1_layer_get_implementation_version (got));
+      g_assert_cmpstr (expected->library_path, ==,
+                       srt_openxr_1_layer_get_library_path (got));
+    }
+  else
+    {
+      g_test_message ("Layer is in error state: %s #%d: %s",
+                      g_quark_to_string (error->domain),
+                      error->code,
+                      error->message);
+      g_assert_cmpstr (expected->error_domain, ==,
+                       g_quark_to_string (error->domain));
+      g_assert_cmpint (expected->error_code, ==, error->code);
+      g_assert_cmpstr (expected->error_message, ==, error->message);
+    }
+}
+
+/*
+ * @expected: (array zero-terminated=1):
+ * @got: (element-type SrtOpenXr1Layer):
+ */
+static void
+assert_openxr_1_layers_match (const LayerTest *expected,
+                              const GList *got)
+{
+  const GList *iter;
+  size_t i;
+
+  for (iter = got, i = 0;
+       iter != NULL;
+       iter = iter->next, i++)
+    {
+      /* If this assertion fails, we got more layers than we expected */
+      g_assert_nonnull (expected[i].json_path);
+
+      g_test_message ("Expecting OpenXR layer #%zu: %s",
+                      i, expected[i].json_path);
+      assert_openxr_1_layer_matches (&expected[i], iter->data);
+    }
+
+  /* If this assertion fails, we got fewer layers than we expected */
+  g_assert_cmpstr (expected[i].json_path, ==, NULL);
+}
 
 typedef struct
 {
@@ -3050,6 +3140,8 @@ typedef struct
   LayerTest vulkan_implicit_layer[3];
   IcdTest openxr_1_rt_fallback;
   IcdTest openxr_1_rt_inactive[3];
+  LayerTest openxr_1_explicit_layers[3];
+  LayerTest openxr_1_implicit_layers[3];
   DesktopEntryTest desktop_entry[3];
   DisplayInfoTest display_info;
   XdgPortalTest xdg_portal;
@@ -3355,6 +3447,38 @@ static JsonTest json_test[] =
         .json_origin = "/etc/xdg/openxr/1/active_runtime.m68k.json",
         .library_path = "/usr/lib/libopenxr_monado.so",
       }
+    },
+
+    .openxr_1_explicit_layers =
+    {
+      {
+        .json_path = "/usr/share/openxr/1/api_layers/explicit.d/XrApiLayer_api_dump.json",
+        .name = "XR_APILAYER_LUNARG_api_dump",
+        .library_path = "libXrApiLayer_api_dump.so",
+        .api_version = "1.1",
+        .implementation_version = "1",
+        .description = "API Layer to record api calls as they occur",
+      },
+    },
+
+    .openxr_1_implicit_layers =
+    {
+      {
+        .json_path = "/opt/openxr/example.json",
+        .json_origin = "/etc/xdg/openxr/1/api_layers/implicit.d/symlink.json",
+        .name = "XR_APILAYER_EXAMPLE_symlink",
+        .library_path = "./libXrApiLayer_example.so",
+        .api_version = "1.0",
+        .implementation_version = "1.2.3",
+        .description = "A fictitious API layer",
+      },
+      {
+        .json_path = "/etc/xdg/openxr/1/api_layers/implicit.d/broken.json",
+        .error_domain = "g-io-error-quark",
+        .error_code = 1,
+        .error_message = "This one is broken",
+        .issues = SRT_LOADABLE_ISSUES_CANNOT_LOAD,
+      },
     },
 
     .desktop_entry =
@@ -4553,6 +4677,22 @@ json_parsing (Fixture *f,
       openxr_1_rt_missing =
         srt_system_info_dup_openxr_1_runtime (info, "m68k-linux-gnu");
       g_assert_null (openxr_1_rt_missing);
+
+      {
+        g_autoptr(SrtObjectList) explicit_openxr = NULL;
+
+        explicit_openxr = srt_system_info_list_explicit_openxr_1_layers (info);
+        assert_openxr_1_layers_match (t->openxr_1_explicit_layers,
+                                      explicit_openxr);
+      }
+
+      {
+        g_autoptr(SrtObjectList) implicit_openxr = NULL;
+
+        implicit_openxr = srt_system_info_list_implicit_openxr_1_layers (info);
+        assert_openxr_1_layers_match (t->openxr_1_implicit_layers,
+                                      implicit_openxr);
+      }
 
       desktop_entries = srt_system_info_list_desktop_entries (info);
       for (j = 0, iter = desktop_entries; iter != NULL; iter = iter->next, j++)

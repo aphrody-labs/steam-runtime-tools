@@ -102,7 +102,7 @@ fake-icds/etc/vulkan/icd.d
 fake-icds/etc/xdg/vulkan/icd.d
 fake-icds/datadir/vulkan/icd.d
 fake-icds/egl1
-fake-icds/opt
+fake-icds/opt/openxr-layers/implicit
 fake-icds/datahome/vulkan/icd.d
 fake-icds/usr/lib/i386-mock-abi
 fake-icds/usr/lib/x86_64-mock-abi/vulkan/icd.d
@@ -112,6 +112,10 @@ fake-icds/usr/local/share/vulkan/icd.d
 fake-icds/usr/share/egl/egl_external_platform.d
 fake-icds/usr/share/glvnd/egl_vendor.d
 fake-icds/usr/share/openxr/1/link
+fake-icds/etc/xdg/openxr/1/api_layers/explicit.d
+fake-icds/etc/xdg/openxr/1/api_layers/implicit.d
+fake-icds/usr/share/openxr/1/api_layers/explicit.d
+fake-icds/usr/share/openxr/1/api_layers/implicit.d
 fake-icds/usr/share/vulkan/icd.d
 fake-icds-flatpak/etc/glvnd/egl_vendor.d
 fake-icds-flatpak/etc/vulkan/icd.d
@@ -566,6 +570,101 @@ with open(
       "description" : "Vulkan second layer"
     }
   ]
+}''')
+
+with open(
+    'fake-icds/opt/openxr-layers/invalid.json', 'w',
+) as writer:
+    writer.write('''\
+{
+  "file_format_version": "1.0.0",
+  "api_layer": {
+    "library_path": "libXrApiLayer_minimal.so",
+    "description": "Required fields are missing"
+  }
+}''')
+
+# This one is a symlink in the search path pointing to a real file
+# outside the search path, to test the handling of relative paths
+with open(
+    'fake-icds/opt/openxr-layers/implicit/minimal.json', 'w',
+) as writer:
+    writer.write('''\
+{
+  "file_format_version": "1.0.0",
+  "api_layer": {
+    "name": "XR_APILAYER_STEAMRT_minimal",
+    "library_path": "./libXrApiLayer_minimal.so",
+    "api_version": "1.0",
+    "implementation_version": "0",
+    "description": "Only the required fields",
+    "disable_environment": "DISABLE_MINIMAL_LAYER"
+  }
+}''')
+os.symlink('/opt/openxr-layers/implicit/minimal.json',
+           'fake-icds/etc/xdg/openxr/1/api_layers/implicit.d/minimal-symlink.json')
+
+with open(
+    'fake-icds/usr/share/openxr/1/api_layers/implicit.d/maximal.json', 'w',
+) as writer:
+    writer.write('''\
+{
+  "file_format_version": "1.0.0",
+  "api_layer": {
+    "name": "XR_APILAYER_STEAMRT_maximal",
+    "library_path": "libXrApiLayer_maximal.so",
+    "api_version": "1.0",
+    "implementation_version": "1.2.3",
+    "description": "All possible fields",
+    "enable_environment": "ENABLE_MAXIMAL_LAYER",
+    "disable_environment": "DISABLE_MAXIMAL_LAYER",
+    "functions": {
+      "xrNegotiateLoaderApiLayerInterface": "negotiate",
+      "foobar": "foobar"
+    },
+    "instance_extensions": [
+      { "name": "foo", "extension_version": "1.0" },
+      { "name": "bar", "extension_version": "1.2" }
+    ]
+  }
+}''')
+
+with open(
+    'fake-icds/etc/xdg/openxr/1/api_layers/explicit.d/minimal.json', 'w',
+) as writer:
+    writer.write('''\
+{
+  "file_format_version": "1.0.0",
+  "api_layer": {
+    "name": "XR_APILAYER_STEAMRT_minimal",
+    "library_path": "libXrApiLayer_minimal.so",
+    "api_version": "1.0",
+    "implementation_version": "123",
+    "description": "Only the required fields"
+  }
+}''')
+
+with open(
+    'fake-icds/usr/share/openxr/1/api_layers/explicit.d/maximal.json', 'w',
+) as writer:
+    writer.write('''\
+{
+  "file_format_version": "1.0.0",
+  "api_layer": {
+    "name": "XR_APILAYER_STEAMRT_maximal",
+    "library_path": "libXrApiLayer_maximal.so",
+    "api_version": "1.0",
+    "implementation_version": "123",
+    "description": "All possible fields",
+    "functions": {
+      "xrNegotiateLoaderApiLayerInterface": "negotiate",
+      "foobar": "foobar"
+    },
+    "instance_extensions": [
+      { "name": "foo", "extension_version": "1.0" },
+      { "name": "bar", "extension_version": "1.2" }
+    ]
+  }
 }''')
 
 with open(

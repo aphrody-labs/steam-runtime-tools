@@ -1,5 +1,5 @@
 /*
- * Copyright © 2019-2025 Collabora Ltd.
+ * Copyright © 2019-2026 Collabora Ltd.
  *
  * SPDX-License-Identifier: MIT
  *
@@ -74,3 +74,47 @@ gboolean srt_openxr_1_runtime_write_to_file (SrtOpenXr1Runtime *self,
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (SrtOpenXr1Runtime, g_object_unref)
 #endif
 
+typedef struct _SrtOpenXr1Layer SrtOpenXr1Layer;
+typedef struct _SrtOpenXr1LayerClass SrtOpenXr1LayerClass;
+
+#define SRT_TYPE_OPENXR_1_LAYER (srt_openxr_1_layer_get_type ())
+#define SRT_OPENXR_1_LAYER(obj) (G_TYPE_CHECK_INSTANCE_CAST ((obj), SRT_TYPE_OPENXR_1_LAYER, SrtOpenXr1Layer))
+#define SRT_OPENXR_1_LAYER_CLASS(cls) (G_TYPE_CHECK_CLASS_CAST ((cls), SRT_TYPE_OPENXR_1_LAYER, SrtOpenXr1LayerClass))
+#define SRT_IS_OPENXR_1_LAYER(obj) (G_TYPE_CHECK_INSTANCE_TYPE ((obj), SRT_TYPE_OPENXR_1_LAYER))
+#define SRT_IS_OPENXR_1_LAYER_CLASS(cls) (G_TYPE_CHECK_CLASS_TYPE ((cls), SRT_TYPE_OPENXR_1_LAYER))
+#define SRT_OPENXR_1_LAYER_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), SRT_TYPE_OPENXR_1_LAYER, SrtOpenXr1LayerClass)
+_SRT_PUBLIC
+GType srt_openxr_1_layer_get_type (void);
+
+_SRT_PUBLIC
+gboolean srt_openxr_1_layer_check_error (const SrtOpenXr1Layer *self,
+                                         GError **error);
+_SRT_PUBLIC
+const char *srt_openxr_1_layer_get_json_path (SrtOpenXr1Layer *self);
+_SRT_PUBLIC
+const char *srt_openxr_1_layer_get_json_origin (SrtOpenXr1Layer *self);
+_SRT_PUBLIC
+const char *srt_openxr_1_layer_get_library_path (SrtOpenXr1Layer *self);
+_SRT_PUBLIC
+const char *srt_openxr_1_layer_get_name (SrtOpenXr1Layer *self);
+_SRT_PUBLIC
+const char *srt_openxr_1_layer_get_description (SrtOpenXr1Layer *self);
+_SRT_PUBLIC
+const char *srt_openxr_1_layer_get_api_version (SrtOpenXr1Layer *self);
+_SRT_PUBLIC
+gchar *srt_openxr_1_layer_resolve_library_path (SrtOpenXr1Layer *self);
+_SRT_PUBLIC
+const char *srt_openxr_1_layer_get_implementation_version (SrtOpenXr1Layer *self);
+_SRT_PUBLIC
+SrtLoadableIssues srt_openxr_1_layer_get_issues (SrtOpenXr1Layer *self);
+_SRT_PUBLIC
+SrtOpenXr1Layer *srt_openxr_1_layer_new_replace_library_path (SrtOpenXr1Layer *self,
+                                                              const char *path);
+_SRT_PUBLIC
+gboolean srt_openxr_1_layer_write_to_file (SrtOpenXr1Layer *self,
+                                           const char *path,
+                                           GError **error);
+
+#ifdef G_DEFINE_AUTOPTR_CLEANUP_FUNC
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (SrtOpenXr1Layer, g_object_unref)
+#endif

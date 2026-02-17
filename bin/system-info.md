@@ -804,6 +804,35 @@ keys:
         **library_path**
         :   Absolute path to the library that imlements the **library_soname**.
 
+    **openxr-1-runtime**
+    :   Details of the active OpenXR runtime for this architecture.
+        Omitted from the report if there is no active OpenXR runtime.
+        If present, it is an object with the following keys:
+
+        **json_path**
+        :   Path to the JSON manifest describing the runtime,
+            for example `/usr/share/openxr/1/openxr_monado.json`
+
+        **json_origin**
+        :   Path at which the JSON manifest was discovered,
+            for example `/etc/xdg/openxr/1/active_runtime.json`.
+            Omitted if it would be the same as the **json_path**.
+
+        **issues**
+        :   An array of strings representing problems with the ICD,
+            in the same representation documented for EGL ICDs.
+
+        and additionally the following keys and values if the metadata was
+        loaded successfully:
+
+        **library_path**, **dlopen**
+        :   The same as documented for EGL ICDs.
+
+        or the following keys and values if the metadata failed to load:
+
+        **error-domain**, **error-code**, **error**
+        :   The same as documented for EGL ICDs.
+
 **locale-issues**
 :   An array of strings indicating locale-related issues.
     The array is empty if no problems were detected.
@@ -927,7 +956,7 @@ keys:
 
 **vulkan**
 :   An object describing Vulkan support. Currently the keys are **icds**,
-    **external_layers** and **internal_layers**. For **icds**, its value is an
+    **explicit_layers** and **implicit_layers**. For **icds**, its value is an
     array of objects describing ICDs, with the same keys and values as for EGL
     ICDs, plus the following extra keys:
 
@@ -943,9 +972,9 @@ keys:
         If this entry was not provided by the ICD, **library_arch** will be
         omitted.
 
-    Instead, the value of **external_layers**, and **internal_layers**, is an
-    array of objects, where the former describes external Vulkan layers and
-    the latter describes internal Vulkan layers. They have the same keys and
+    Instead, the value of **explicit_layers**, and **implicit_layers**, is an
+    array of objects, where the former describes explicit Vulkan layers and
+    the latter describes implicit Vulkan layers. They have the same keys and
     values as for Vulkan ICDs, with the differences that **library_path**
     might be omitted, if it is not present, and the **duplicated** issues
     signals that two layers not only have a **library_path** that points to
@@ -953,7 +982,7 @@ keys:
     And finally they also have the following extra keys:
 
     **name**
-    :   The name that uniquely identify this layer to applications
+    :   The name that uniquely identifies this layer to applications
 
     **description**
     :   Brief description of the layer
@@ -968,6 +997,59 @@ keys:
     :   An array of strings that identifies the component layer names that
         are part of a meta-layer. This will be omitted if **library_path**
         is used instead.
+
+**openxr-1**
+:   An object containing non-architecture-specific details of OpenXR 1
+    runtimes and layers.
+    It has the following keys:
+
+    **active-fallback**
+    :   The runtime that is active for unknown architectures,
+        if any.
+        Omitted from the report if there is no fallback.
+        If present,
+        the value is an object with the same keys and values as the
+        per-architecture **openxr-1-runtime**.
+
+    **inactive**
+    :   A list of additional OpenXR runtimes that were not already shown
+        as the active runtime in the per-architecture **openxr-1-runtime**
+        or the non-architecture-specific **active-fallback**.
+        Each item in the list is an object with the same keys and values
+        as the per-architecture **openxr-1-runtime**.
+
+    **explicit_layers**
+    :   A list of OpenXR 1 explicit layers.
+        Each item is an object with these members:
+
+        **json_path**, **json_origin**
+        :   The same as for OpenXR runtimes
+
+        If the manifest was loaded successfully,
+        the object has the following additional members:
+
+        **name**
+        :   The name that uniquely identifies this layer to applications,
+            as a string
+
+        **description**
+        :   A brief description of the layer as a string
+
+        **api_version**
+        :   The major.minor version of the OpenXR 1 API that is implemented,
+            as a string
+
+        **implementation_version**
+        :   The version of the layer implementation as a string
+
+        If the manifest was not loaded successfully,
+        instead it has **error-domain**, **error-code** and **error** members
+        in the same encoding documented above for EGL ICDs.
+
+    **implicit_layers**
+    :   A list of OpenXR 1 implicit layers.
+        Each item is an object with the same members documented above
+        for **explicit_layers**.
 
 **desktop-entries**
 :   An array of objects describing the Steam related desktop entries

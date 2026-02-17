@@ -62,6 +62,13 @@ SrtJsonGetBooleanResult _srt_json_object_get_boolean_strict (JsonObject *object,
                                                              const char *member_name,
                                                              GError **error);
 
+void _srt_json_builder_add_required_string_member (JsonBuilder *builder,
+                                                   const char *name,
+                                                   const char *value);
+void _srt_json_builder_add_optional_string_member (JsonBuilder *builder,
+                                                   const char *name,
+                                                   const char *value);
+
 void _srt_json_builder_add_array_of_lines (JsonBuilder *builder,
                                            const char *name,
                                            const char *value);

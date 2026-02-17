@@ -222,6 +222,55 @@ _srt_base_json_graphics_module_class_init (SrtBaseJsonGraphicsModuleClass *cls)
                                      base_properties);
 }
 
+/*
+ * emit_instance_extensions:
+ * @builder: must have called json_builder_begin_object()
+ * @instance_extensions: (element-type InstanceExtension):
+ *
+ * If @instance_extensions is non-empty, add a member named
+ * `instance_extensions` to the JSON builder and populate it from
+ * the list.
+ */
+static void
+maybe_emit_instance_extensions (JsonBuilder *builder,
+                                GList *instance_extensions)
+{
+  const GList *l;
+
+  if (instance_extensions == NULL)
+    return;
+
+  json_builder_set_member_name (builder, "instance_extensions");
+  json_builder_begin_array (builder);
+    {
+      for (l = instance_extensions; l != NULL; l = l->next)
+        {
+          InstanceExtension *ie = l->data;
+
+          json_builder_begin_object (builder);
+            {
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "name",
+                                                            ie->name);
+
+              /* Vulkan layers have a spec_version, while OpenXR layers have
+               * an extension_version instead. Here we accept either one. */
+              g_warn_if_fail (((ie->spec_version != NULL)
+                               + (ie->extension_version != NULL))
+                              == 1);
+              _srt_json_builder_add_optional_string_member (builder,
+                                                            "spec_version",
+                                                            ie->spec_version);
+              _srt_json_builder_add_optional_string_member (builder,
+                                                            "extension_version",
+                                                            ie->extension_version);
+            }
+          json_builder_end_object (builder);
+        }
+    }
+  json_builder_end_array (builder);
+}
+
 /* See srt_egl_icd_write_to_file(), srt_vulkan_icd_write_to_file() and
  * srt_vulkan_layer_write_to_file() */
 gboolean
@@ -251,6 +300,8 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
     member = "layer";
   else if (which == SRT_TYPE_OPENXR_1_RUNTIME)
     member = _SRT_GRAPHICS_MANIFEST_MEMBER_OPENXR_1_RUNTIME;
+  else if (which == SRT_TYPE_OPENXR_1_LAYER)
+    member = _SRT_GRAPHICS_MANIFEST_MEMBER_OPENXR_1_API_LAYER;
   else
     g_return_val_if_reached (FALSE);
 
@@ -292,17 +343,15 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
            json_builder_set_member_name (builder, member);
            json_builder_begin_object (builder);
             {
-              json_builder_set_member_name (builder, "library_path");
-              json_builder_add_string_value (builder, base->library_path);
-
-              json_builder_set_member_name (builder, "api_version");
-              json_builder_add_string_value (builder, self->api_version);
-
-              if (self->library_arch)
-                {
-                  json_builder_set_member_name (builder, "library_arch");
-                  json_builder_add_string_value (builder, self->library_arch);
-                }
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "library_path",
+                                                            base->library_path);
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "api_version",
+                                                            self->api_version);
+              _srt_json_builder_add_optional_string_member (builder,
+                                                            "library_arch",
+                                                            self->library_arch);
 
               if (self->portability_driver)
                 {
@@ -318,14 +367,16 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
           /* We parse and store all the information defined in file format
            * version 1.0.0, but nothing beyond that, so we use this version
            * in our output instead of quoting whatever was in the input. */
-          json_builder_set_member_name (builder, "file_format_version");
-          json_builder_add_string_value (builder, "1.0.0");
+          _srt_json_builder_add_required_string_member (builder,
+                                                        "file_format_version",
+                                                        "1.0.0");
 
            json_builder_set_member_name (builder, member);
            json_builder_begin_object (builder);
             {
-              json_builder_set_member_name (builder, "library_path");
-              json_builder_add_string_value (builder, base->library_path);
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "library_path",
+                                                            base->library_path);
             }
            json_builder_end_object (builder);
         }
@@ -356,32 +407,27 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
           json_builder_set_member_name (builder, "layer");
           json_builder_begin_object (builder);
             {
-              json_builder_set_member_name (builder, "name");
-              json_builder_add_string_value (builder, self->name);
-
-              json_builder_set_member_name (builder, "type");
-              json_builder_add_string_value (builder, self->type);
-
-              if (base->library_path != NULL)
-                {
-                  json_builder_set_member_name (builder, "library_path");
-                  json_builder_add_string_value (builder, base->library_path);
-                }
-
-              if (self->library_arch != NULL)
-                {
-                  json_builder_set_member_name (builder, "library_arch");
-                  json_builder_add_string_value (builder, self->library_arch);
-                }
-
-              json_builder_set_member_name (builder, "api_version");
-              json_builder_add_string_value (builder, self->api_version);
-
-              json_builder_set_member_name (builder, "implementation_version");
-              json_builder_add_string_value (builder, self->implementation_version);
-
-              json_builder_set_member_name (builder, "description");
-              json_builder_add_string_value (builder, self->description);
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "name",
+                                                            self->name);
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "type",
+                                                            self->type);
+              _srt_json_builder_add_optional_string_member (builder,
+                                                            "library_path",
+                                                            base->library_path);
+              _srt_json_builder_add_optional_string_member (builder,
+                                                            "library_arch",
+                                                            self->library_arch);
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "api_version",
+                                                            self->api_version);
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "implementation_version",
+                                                            self->implementation_version);
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "description",
+                                                            self->description);
 
               _srt_json_builder_add_strv_value (builder, "component_layers",
                                                 (const gchar * const *) self->component_layers,
@@ -421,22 +467,8 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
                   json_builder_end_object (builder);
                 }
 
-              if (self->instance_extensions != NULL)
-                {
-                  json_builder_set_member_name (builder, "instance_extensions");
-                  json_builder_begin_array (builder);
-                  for (l = self->instance_extensions; l != NULL; l = l->next)
-                    {
-                      InstanceExtension *ie = l->data;
-                      json_builder_begin_object (builder);
-                      json_builder_set_member_name (builder, "name");
-                      json_builder_add_string_value (builder, ie->name);
-                      json_builder_set_member_name (builder, "spec_version");
-                      json_builder_add_string_value (builder, ie->spec_version);
-                      json_builder_end_object (builder);
-                    }
-                  json_builder_end_array (builder);
-                }
+              maybe_emit_instance_extensions (builder,
+                                              self->instance_extensions);
 
               if (self->device_extensions != NULL)
                 {
@@ -478,7 +510,8 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
             }
           json_builder_end_object (builder);
         }
-      else if (which == SRT_TYPE_OPENXR_1_RUNTIME)
+      else if (which == SRT_TYPE_OPENXR_1_RUNTIME
+               || which == SRT_TYPE_OPENXR_1_LAYER)
         {
           /* We parse and store all the information defined in file format
            * version 1.0.0, but nothing beyond that, so we use this version
@@ -489,13 +522,45 @@ _srt_base_json_graphics_module_write_to_file (SrtBaseJsonGraphicsModule *self,
           json_builder_set_member_name (builder, member);
           json_builder_begin_object (builder);
             {
-              json_builder_set_member_name (builder, "library_path");
-              json_builder_add_string_value (builder, base->library_path);
+              /* Required, per the spec */
+              _srt_json_builder_add_required_string_member (builder,
+                                                            "library_path",
+                                                            base->library_path);
+              /* Required per the spec, but for whatever reason we
+               * historically treated this as optional, so let's not
+               * regress */
+              _srt_json_builder_add_optional_string_member (builder,
+                                                            "name",
+                                                            self->name);
 
-              if (self->name != NULL)
+              if (which == SRT_TYPE_OPENXR_1_LAYER)
                 {
-                  json_builder_set_member_name (builder, "name");
-                  json_builder_add_string_value (builder, self->name);
+                  _srt_json_builder_add_required_string_member (builder,
+                                                                "api_version",
+                                                                self->api_version);
+                  _srt_json_builder_add_required_string_member (builder,
+                                                                "implementation_version",
+                                                                self->implementation_version);
+                  _srt_json_builder_add_required_string_member (builder,
+                                                                "description",
+                                                                self->description);
+
+                  /* Unlike Vulkan layers, the enable_environment and
+                   * disable_environment for OpenXR layers are simple strings,
+                   * distinguishing between only two states: "set to anything"
+                   * (possibly empty!) and "unset" */
+                  _srt_json_builder_add_optional_string_member (builder,
+                                                                "enable_environment",
+                                                                self->enable_env_var.name);
+                  g_warn_if_fail (self->enable_env_var.value == NULL);
+
+                  _srt_json_builder_add_optional_string_member (builder,
+                                                                "disable_environment",
+                                                                self->disable_env_var.name);
+                  g_warn_if_fail (self->disable_env_var.value == NULL);
+
+                  maybe_emit_instance_extensions (builder,
+                                                  self->instance_extensions);
                 }
 
               if (self->functions != NULL)
@@ -614,7 +679,8 @@ _srt_loadable_flag_duplicates (GType which,
                     || which == SRT_TYPE_EGL_ICD
                     || which == SRT_TYPE_EGL_EXTERNAL_PLATFORM
                     || which == SRT_TYPE_VULKAN_LAYER
-                    || which == SRT_TYPE_OPENXR_1_RUNTIME);
+                    || which == SRT_TYPE_OPENXR_1_RUNTIME
+                    || which == SRT_TYPE_OPENXR_1_LAYER);
 
   loadable_seen = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
 
@@ -662,9 +728,12 @@ _srt_loadable_flag_duplicates (GType which,
                 }
             }
         }
-      else if (which == SRT_TYPE_VULKAN_LAYER)
+      else if (which == SRT_TYPE_VULKAN_LAYER
+               || which == SRT_TYPE_OPENXR_1_LAYER)
         {
-          name = srt_vulkan_layer_get_name (l->data);
+          SrtBaseJsonGraphicsModule *json = l->data;
+
+          name = json->name;
 
           if (resolved_path == NULL && name == NULL)
             continue;
@@ -876,7 +945,11 @@ load_json_dirs (SrtSysroot *sysroot,
 
 /*
  * load_manifest_from_json:
- * @type: %SRT_TYPE_EGL_ICD or %SRT_TYPE_EGL_EXTERNAL_PLATFORM or %SRT_TYPE_VULKAN_ICD
+ * @type: %SRT_TYPE_EGL_ICD
+ *  or %SRT_TYPE_EGL_EXTERNAL_PLATFORM
+ *  or %SRT_TYPE_VULKAN_ICD
+ *  or %SRT_TYPE_OPENXR_1_RUNTIME
+ *  or %SRT_TYPE_OPENXR_1_LAYER
  * @sysroot: (not nullable): The root directory, usually `/`
  * @filename: The filename of the metadata
  * @json_member_name: Name of the JSON object beneath the root, containing the
@@ -907,15 +980,21 @@ load_manifest_from_json (GType type,
   const char *library_path = NULL;
   const char *library_arch = NULL;
   gboolean portability_driver = FALSE;
+  gboolean is_openxr = FALSE;
   SrtLoadableIssues issues = SRT_LOADABLE_ISSUES_NONE;
   gsize len = 0;
 
   g_return_val_if_fail (type == SRT_TYPE_VULKAN_ICD
                         || type == SRT_TYPE_EGL_ICD
                         || type == SRT_TYPE_EGL_EXTERNAL_PLATFORM
-                        || type == SRT_TYPE_OPENXR_1_RUNTIME,
+                        || type == SRT_TYPE_OPENXR_1_RUNTIME
+                        || type == SRT_TYPE_OPENXR_1_LAYER,
                         NULL);
   g_return_val_if_fail (SRT_IS_SYSROOT (sysroot), NULL);
+
+  if (type == SRT_TYPE_OPENXR_1_RUNTIME
+      || type == SRT_TYPE_OPENXR_1_LAYER)
+    is_openxr = TRUE;
 
   if (!g_path_is_absolute (filename))
     {
@@ -929,11 +1008,9 @@ load_manifest_from_json (GType type,
   if (!_srt_sysroot_load (sysroot, filename,
                           SRT_RESOLVE_FLAGS_RETURN_ABSOLUTE,
                           /* Make sure to get a fully resolved path for OpenXR
-                             runtimes, because that's the path used to resolve
+                             manifests, because that's the path used to resolve
                              relative library paths. */
-                          type == SRT_TYPE_OPENXR_1_RUNTIME
-                            ? &resolved_filename
-                            : NULL,
+                          is_openxr ? &resolved_filename : NULL,
                           &contents, &len, &error))
     {
       issues |= SRT_LOADABLE_ISSUES_CANNOT_LOAD;
@@ -1035,12 +1112,13 @@ load_manifest_from_json (GType type,
           goto out;
         }
     }
-  else if (type == SRT_TYPE_OPENXR_1_RUNTIME)
+  else if (is_openxr)
     {
       /*
        * Currently, the OpenXR loader rejects all versions other than 1.0.0:
        * https://github.com/KhronosGroup/OpenXR-SDK/blob/release-1.1.43/src/loader/manifest_file.cpp#L479-L487
        * so for now we follow that behavior.
+       * The same is true for runtimes and layers.
        */
       if (!g_str_equal (file_format_version, "1.0.0"))
         {
@@ -1172,6 +1250,24 @@ out:
 
       return G_OBJECT (rt);
     }
+  else if (type == SRT_TYPE_OPENXR_1_LAYER)
+    {
+      SrtOpenXr1Layer *layer;
+
+      if (error == NULL)
+        layer = srt_openxr_1_layer_load_json (resolved_filename,
+                                              filename,
+                                              library_path,
+                                              member_object,
+                                              issues);
+      else
+        layer = srt_openxr_1_layer_new_error (resolved_filename ?: filename,
+                                              filename,
+                                              issues,
+                                              error);
+
+      return G_OBJECT (layer);
+    }
   else
     {
       g_return_val_if_reached (NULL);
@@ -1180,7 +1276,11 @@ out:
 
 /*
  * prepend_manifest_from_json:
- * @type: %SRT_TYPE_EGL_ICD or %SRT_TYPE_EGL_EXTERNAL_PLATFORM or %SRT_TYPE_VULKAN_ICD
+ * @type: %SRT_TYPE_EGL_ICD
+ *  or %SRT_TYPE_EGL_EXTERNAL_PLATFORM
+ *  or %SRT_TYPE_VULKAN_ICD
+ *  or %SRT_TYPE_OPENXR_1_RUNTIME
+ *  or %SRT_TYPE_OPENXR_1_LAYER
  * @sysroot: (not nullable): The root directory, usually `/`
  * @filename: The filename of the metadata
  * @json_member_name: Name of the JSON object beneath the root, containing the

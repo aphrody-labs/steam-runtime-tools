@@ -270,8 +270,12 @@ out:
  * @json_obj: (not nullable): A JSON Object used to search for Icd or Layer
  *  properties
  * @which: Used to choose which loadable to search, it can be
- *  %SRT_TYPE_EGL_ICD, %SRT_TYPE_VULKAN_ICD, %SRT_TYPE_VULKAN_LAYER,
- *  %SRT_TYPE_EGL_EXTERNAL_PLATFORM, or %SRT_TYPE_OPENXR_1_RUNTIME
+ *  %SRT_TYPE_EGL_ICD,
+ *  %SRT_TYPE_VULKAN_ICD,
+ *  %SRT_TYPE_VULKAN_LAYER,
+ *  %SRT_TYPE_EGL_EXTERNAL_PLATFORM,
+ *  %SRT_TYPE_OPENXR_1_LAYER
+ *  or %SRT_TYPE_OPENXR_1_RUNTIME
  * @debug_member: The name of the parent containing @json_obj, for debugging
  *  purposes
  *
@@ -311,14 +315,7 @@ get_driver_loadable_from_json_report (JsonObject *json_obj,
 
   if (which == SRT_TYPE_VULKAN_LAYER)
     {
-      name = json_object_get_string_member_with_default (json_obj, "name", NULL);
       type = json_object_get_string_member_with_default (json_obj, "type", NULL);
-      implementation_version = json_object_get_string_member_with_default (json_obj,
-                                                                           "implementation_version",
-                                                                           NULL);
-      description = json_object_get_string_member_with_default (json_obj,
-                                                                "description",
-                                                                NULL);
 
       component_layers = _srt_json_object_dup_strv_member (json_obj,
                                                            "component_layers",
@@ -328,20 +325,23 @@ get_driver_loadable_from_json_report (JsonObject *json_obj,
       if (component_layers != NULL && component_layers[0] == NULL)
         g_clear_pointer (&component_layers, g_free);
     }
-  else if (which == SRT_TYPE_OPENXR_1_RUNTIME)
-    {
-      name = json_object_get_string_member_with_default (json_obj, "name", NULL);
-      json_origin = json_object_get_string_member_with_default (json_obj,
-                                                                "json_origin",
-                                                                json_path);
-    }
 
+  description = json_object_get_string_member_with_default (json_obj,
+                                                            "description",
+                                                            NULL);
+  implementation_version = json_object_get_string_member_with_default (json_obj,
+                                                                       "implementation_version",
+                                                                       NULL);
+  json_origin = json_object_get_string_member_with_default (json_obj,
+                                                            "json_origin",
+                                                            json_path);
   library_path = json_object_get_string_member_with_default (json_obj,
                                                              "library_path",
                                                              NULL);
   library_arch = json_object_get_string_member_with_default (json_obj,
                                                              "library_arch",
                                                              NULL);
+  name = json_object_get_string_member_with_default (json_obj, "name", NULL);
   api_version = json_object_get_string_member_with_default (json_obj,
                                                             "api_version",
                                                             NULL);
@@ -374,6 +374,22 @@ get_driver_loadable_from_json_report (JsonObject *json_obj,
                                                api_version, implementation_version,
                                                description, component_layers,
                                                issues);
+    }
+  else if (which == SRT_TYPE_OPENXR_1_LAYER
+           && name != NULL
+           && api_version != NULL
+           && implementation_version != NULL
+           && description != NULL
+           && library_path != NULL)
+    {
+      return (GObject *) srt_openxr_1_layer_new (json_path,
+                                                 json_origin,
+                                                 name,
+                                                 library_path,
+                                                 api_version,
+                                                 implementation_version,
+                                                 description,
+                                                 issues);
     }
   else if ((which == SRT_TYPE_EGL_ICD
             || which == SRT_TYPE_OPENXR_1_RUNTIME
@@ -426,6 +442,9 @@ get_driver_loadable_from_json_report (JsonObject *json_obj,
       else if (which == SRT_TYPE_OPENXR_1_RUNTIME)
         return (GObject *) srt_openxr_1_runtime_new_error (json_path, json_origin,
                                                            issues, error);
+      else if (which == SRT_TYPE_OPENXR_1_LAYER)
+        return (GObject *) srt_openxr_1_layer_new_error (json_path, json_origin,
+                                                         issues, error);
       else
         g_return_val_if_reached (NULL);
     }
@@ -436,8 +455,12 @@ get_driver_loadable_from_json_report (JsonObject *json_obj,
  * @json_obj: (not nullable): A JSON Object used to search for Icd or Layer
  *  properties
  * @which: Used to choose which loadable to search, it can be
- *  %SRT_TYPE_EGL_ICD, %SRT_TYPE_VULKAN_ICD, %SRT_TYPE_VULKAN_LAYER,
- *  %SRT_TYPE_EGL_EXTERNAL_PLATFORM, or %SRT_TYPE_OPENXR_1_RUNTIME
+ *  %SRT_TYPE_EGL_ICD,
+ *  %SRT_TYPE_VULKAN_ICD,
+ *  %SRT_TYPE_VULKAN_LAYER,
+ *  %SRT_TYPE_EGL_EXTERNAL_PLATFORM,
+ *  %SRT_TYPE_OPENXR_1_LAYER
+ *  or %SRT_TYPE_OPENXR_1_RUNTIME
  * @member: The name of the member of @json_obj that contains @sub_member.
  * @sub_member: The name of the member of @member that contains the array of
  *  loadables.
@@ -641,4 +664,34 @@ _srt_openxr_1_runtimes_get_from_report (JsonObject *json_obj,
                                                          SRT_TYPE_OPENXR_1_RUNTIME,
                                                          "runtimes",
                                                          "inactive");
+}
+
+/*
+ * _srt_get_explicit_openxr_1_layers_from_json_report:
+ * @json_obj: (not nullable): A JSON Object used to search for
+ *  "explicit_layers" property in "openxr-1"
+ *
+ * Returns: A list of explicit #SrtOpenXr1Layer that have been found, or %NULL
+ *  if none has been found.
+ */
+GList *
+_srt_get_explicit_openxr_1_layers_from_json_report (JsonObject *json_obj)
+{
+  return get_driver_loadables_from_json_report (json_obj, SRT_TYPE_OPENXR_1_LAYER,
+                                                "openxr-1", "explicit_layers");
+}
+
+/*
+ * _srt_get_implicit_openxr_1_layers_from_json_report:
+ * @json_obj: (not nullable): A JSON Object used to search for
+ *  "implicit_layers" property in "openxr-1"
+ *
+ * Returns: A list of implicit #SrtOpenXr1Layer that have been found, or %NULL
+ *  if none has been found.
+ */
+GList *
+_srt_get_implicit_openxr_1_layers_from_json_report (JsonObject *json_obj)
+{
+  return get_driver_loadables_from_json_report (json_obj, SRT_TYPE_OPENXR_1_LAYER,
+                                                "openxr-1", "implicit_layers");
 }

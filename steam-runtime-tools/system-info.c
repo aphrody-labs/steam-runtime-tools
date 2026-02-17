@@ -109,6 +109,20 @@ typedef struct
   gchar *path;
 } FromReport;
 
+typedef struct
+{
+  GList *explicit;
+  GList *implicit;
+} OpenXr1Layers;
+
+static void
+openxr_1_layers_free (OpenXr1Layers *self)
+{
+  g_list_free_full (self->explicit, g_object_unref);
+  g_list_free_full (self->implicit, g_object_unref);
+  g_free (self);
+}
+
 struct _SrtSystemInfo
 {
   /*< private >*/
@@ -169,6 +183,8 @@ struct _SrtSystemInfo
     /* list of owned SrtOpenXr1Runtime */
     GList *inactive;
   } openxr_1_runtimes;
+  /* NULL if cache not yet populated */
+  OpenXr1Layers *openxr_1_layers;
   struct
   {
     gchar **values;
@@ -513,6 +529,7 @@ forget_drivers (SrtSystemInfo *self)
   g_clear_pointer (&self->openxr_1_runtimes.active, g_hash_table_unref);
   g_clear_object (&self->openxr_1_runtimes.active_fallback);
   g_list_free_full (g_steal_pointer (&self->openxr_1_runtimes.inactive), g_object_unref);
+  g_clear_pointer (&self->openxr_1_layers, openxr_1_layers_free);
 
   self->layers.have_vulkan_explicit = FALSE;
   self->layers.have_vulkan_implicit = FALSE;
@@ -1113,6 +1130,10 @@ srt_system_info_new_from_json (const char *path,
 
   info->icds.have_vulkan = TRUE;
   info->icds.vulkan = _srt_get_vulkan_from_json_report (json_obj);
+
+  info->openxr_1_layers = g_new0 (OpenXr1Layers, 1);
+  info->openxr_1_layers->explicit = _srt_get_explicit_openxr_1_layers_from_json_report (json_obj);
+  info->openxr_1_layers->implicit = _srt_get_implicit_openxr_1_layers_from_json_report (json_obj);
 
   info->layers.have_vulkan_explicit = TRUE;
   info->layers.vulkan_explicit = _srt_get_explicit_vulkan_layers_from_json_report (json_obj);
@@ -2290,6 +2311,12 @@ _srt_system_info_get_sysroot_path (SrtSystemInfo *self)
     return NULL;
 
   return self->sysroot->path;
+}
+
+SrtSysroot *
+_srt_system_info_get_sysroot (SrtSystemInfo *self)
+{
+  return self->sysroot;
 }
 
 /**
@@ -4178,6 +4205,84 @@ srt_system_info_list_inactive_openxr_1_runtimes (SrtSystemInfo *self,
     ret = g_list_prepend (ret, g_object_ref (inactive_iter->data));
 
   return g_list_reverse (ret);
+}
+
+static gboolean
+srt_system_info_load_openxr_1_layers (SrtSystemInfo *self)
+{
+  OpenXr1Layers *cache;
+
+  g_return_val_if_fail (SRT_IS_SYSTEM_INFO (self), FALSE);
+
+  if (self->openxr_1_layers != NULL)
+    return TRUE;
+  else if (self->from_report != NULL || self->sysroot == NULL)
+    return FALSE;
+
+  cache = g_new0 (OpenXr1Layers, 1);
+  cache->explicit = _srt_load_openxr_1_layers (self->sysroot,
+                                               self->runner,
+                                               (const GQuark *) self->multiarch_tuples->data,
+                                               self->multiarch_tuples->len,
+                                               TRUE,
+                                               self->check_flags);
+  cache->implicit = _srt_load_openxr_1_layers (self->sysroot,
+                                               self->runner,
+                                               (const GQuark *) self->multiarch_tuples->data,
+                                               self->multiarch_tuples->len,
+                                               FALSE,
+                                               self->check_flags);
+  self->openxr_1_layers = cache;
+
+  return TRUE;
+}
+
+/**
+ * srt_system_info_list_explicit_openxr_1_layers:
+ * @self: The #SrtSystemInfo object
+ *
+ * List the available explicit OpenXR 1 layers, using the same search paths as
+ * the reference OpenXR loader.
+ *
+ * Like srt_system_info_list_explicit_vulkan_layers(),
+ * this function is not architecture-specific and may return a mixture
+ * of layers for more than one architecture or ABI.
+ *
+ * Returns: (transfer full) (element-type SrtOpenXr1Layer): A list of
+ *  opaque #SrtOpenXr1Layer objects. Free with
+ *  `g_list_free_full (layers, g_object_unref)`.
+ */
+GList *
+srt_system_info_list_explicit_openxr_1_layers (SrtSystemInfo *self)
+{
+  if (!srt_system_info_load_openxr_1_layers (self))
+    return NULL;
+
+  return _srt_object_list_copy (self->openxr_1_layers->explicit);
+}
+
+/**
+ * srt_system_info_list_implicit_openxr_1_layers:
+ * @self: The #SrtSystemInfo object
+ *
+ * List the available explicit OpenXR 1 layers, using the same search paths as
+ * the reference OpenXR loader.
+ *
+ * Like srt_system_info_list_implicit_vulkan_layers(),
+ * this function is not architecture-specific and may return a mixture
+ * of layers for more than one architecture or ABI.
+ *
+ * Returns: (transfer full) (element-type SrtOpenXr1Layer): A list of
+ *  opaque #SrtOpenXr1Layer objects. Free with
+ *  `g_list_free_full (layers, g_object_unref)`.
+ */
+GList *
+srt_system_info_list_implicit_openxr_1_layers (SrtSystemInfo *self)
+{
+  if (!srt_system_info_load_openxr_1_layers (self))
+    return NULL;
+
+  return _srt_object_list_copy (self->openxr_1_layers->implicit);
 }
 
 static void

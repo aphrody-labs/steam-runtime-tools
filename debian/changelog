@@ -1,5 +1,13 @@
 steam-runtime-tools (0.20260218.0) UNRELEASED; urgency=medium
 
+  [ Antonio Ospite ]
+  * pressure-vessel:
+    - Capture GBM backend modules from the graphics provider.
+      These are needed for accelerated EGL in some Nvidia driver versions,
+      and for some streaming-related use-cases.
+      (steamrt/tasks#900, steam-runtime#797)
+
+  [ Simon McVittie ]
   * Tests and developer tools:
     - If configured with non-empty -Dtest_containers_dir, try to fail
       early if there are no i386 graphics drivers. We assume
@@ -9,7 +17,7 @@ steam-runtime-tools (0.20260218.0) UNRELEASED; urgency=medium
     - Improve diagnostics when some in-container checks fail
     - build-aux/many-builds.py documentation improvements
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 18 Feb 2026 13:03:08 +0000
+ -- Simon McVittie <smcv@collabora.com>  Wed, 18 Feb 2026 19:07:20 +0000
 
 steam-runtime-tools (0.20260217.1) steamrt; urgency=medium
 

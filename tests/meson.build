@@ -500,6 +500,7 @@ install_data(
 test_scripts = [
   {'name': 'check-python.py'},
   {'name': 'check-sh.sh'},
+  {'name': 'test-testutils.py'},
   {'name': 'test-utils.py'},
 ]
 

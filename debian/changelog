@@ -1,3 +1,16 @@
+steam-runtime-tools (0.20260218.0) UNRELEASED; urgency=medium
+
+  * Tests and developer tools:
+    - If configured with non-empty -Dtest_containers_dir, try to fail
+      early if there are no i386 graphics drivers. We assume
+      that developers who will run the full test suite have at
+      least one user-space graphics driver each for x86_64 and
+      i386. (steamrt/tasks#921)
+    - Improve diagnostics when some in-container checks fail
+    - build-aux/many-builds.py documentation improvements
+
+ -- Simon McVittie <smcv@collabora.com>  Wed, 18 Feb 2026 13:03:08 +0000
+
 steam-runtime-tools (0.20260217.1) steamrt; urgency=medium
 
   * Fix internal version numbering

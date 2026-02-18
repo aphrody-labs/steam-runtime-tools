@@ -6342,6 +6342,27 @@ typedef enum
  *  the library to be located, e.g. `/dri`, or %NULL if none
  * @flags: Flags
  * @data_in_provider: Collection of data directories to update
+ *
+ * Populate @data_in_provider with paths to data directories,
+ * either in the hard-coded path `/usr/share` or located by constructing
+ * a path relative to @lib_in_provider.
+ *
+ * Given a library in the graphics provider, use its target to guess what
+ * the installation `${prefix}` would probably have been, then use that to
+ * guess a corresponding `${datadir}`. Fill @data_in_provider with the
+ * location of `${datadir}/@dir_basename`, if found.
+ *
+ * To guess the `${prefix}`, this function is aware of several common
+ * conventions for how `${libdir}` is formed: Debian-style multiarch,
+ * FHS multilib and so on.
+ *
+ * If @extra_suffix is %NULL, assume that @lib_in_provider was installed
+ * directly inside the `${libdir}`, like `${libdir}/libGLX_mesa.so.0`.
+ *
+ * If @extra_suffix is non-%NULL, instead assume that @lib_in_provider
+ * was installed in a subdirectory of `${libdir}`, for example
+ * `${libdir}/dri/swrast_dri.so` with `extra_suffix = "/dri"`,
+ * or `${libdir}/gbm/dri_gbm.so` with `extra_suffix = "/gbm"`.
  */
 static void
 pv_runtime_collect_lib_data (PvRuntime *self,
@@ -6508,6 +6529,10 @@ pv_runtime_collect_lib_data (PvRuntime *self,
  * @flags: Flags
  * @data_in_provider: Collection of data directories to update
  *
+ * Given a symlink in `/overrides`, use its target to determine what
+ * the path in the graphics provider is, then fill @data_in_provider
+ * as for pv_runtime_collect_lib_data().
+ *
  * Returns: %TRUE if @lib_symlink exists and is a symlink
  */
 static gboolean
@@ -6568,6 +6593,9 @@ pv_runtime_collect_lib_symlink_data (PvRuntime *self,
 /*
  * @details_arch: must be non-%NULL and of a kind that could be returned
  *  by icd_details_get_architecture().
+ *
+ * Helper for collect_mesa_drirc(), see that function for details of how
+ * this works
  */
 static void
 collect_one_mesa_drirc (PvRuntime *self,
@@ -6619,6 +6647,8 @@ collect_one_mesa_drirc (PvRuntime *self,
 }
 
 /*
+ * collect_mesa_drirc:
+ *
  * For each driver provided by Mesa, other than GLX which is handled
  * elsewhere, look for share/drirc.d nearby.
  *
@@ -6627,6 +6657,20 @@ collect_one_mesa_drirc (PvRuntime *self,
  *   to be in ${libdir}
  * - All Vulkan ICDs (we cannot tell which ones came from Mesa!)
  * - All DRI drivers (which are all implicitly from Mesa)
+ *
+ * In reality Mesa libraries find their drirc.d via a path that gets
+ * hard-coded at Mesa build-time, but we have no way to discover what
+ * that hard-coded path really is. The best we can do is to assume that
+ * the library itself and its data are installed in a conventional layout
+ * with a FHS-style common prefix, for example:
+ *
+ * - EGL ICD: `${prefix}/${LIB}/libEGL_mesa.so.0`
+ * - Vulkan: `${prefix}/${LIB}/libvulkan_lvp.so`, etc.
+ * - DRI: `${prefix}/${LIB}/dri/swrast_dri.so`, etc.
+ * - GBM: `${prefix}/${LIB}/gbm/dri_gbm.so`
+ * - data: `${prefix}/share/drirc.d`
+ *
+ * where `${LIB}` could typically be `lib64` or `lib/x86_64-linux-gnu`.
  */
 static void
 collect_mesa_drirc (PvRuntime *self,
@@ -7961,8 +8005,10 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                           "libGLX_mesa.so.0", NULL);
 
           /* If we have libGLX_mesa.so.0 in overrides we also want to mount
-           * ${prefix}/share/drirc.d from the provider. ${prefix} is derived from
-           * the absolute path of libGLX_mesa.so.0 */
+           * ${prefix}/share/drirc.d from the provider.
+           * Similar to collect_mesa_drirc(), we can't know the hard-coded
+           * path, so the best we can do is to assume that it's in a
+           * conventional layout relative to the actual library. */
           if (!pv_runtime_collect_lib_symlink_data (self, arch, "drirc.d",
                                                     libglx_mesa,
                                                     PV_RUNTIME_DATA_FLAGS_NONE,

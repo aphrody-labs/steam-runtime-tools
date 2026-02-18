@@ -1068,55 +1068,72 @@ class BaseContainersTest(BaseTest):
                         'libudev.so.0',
                     ):
                         with self.subTest(soname=soname):
-                            if (
-                                not os.path.exists(
-                                    os.path.join(host_usr_libdir, soname)
-                                )
-                                and not os.path.exists(
-                                    os.path.join(host_root_libdir, soname)
-                                )
+                            for host_path in (
+                                os.path.join(host_usr_libdir, soname),
+                                os.path.join(host_root_libdir, soname),
                             ):
+                                if os.path.exists(host_path):
+                                    break
+                            else:
+                                logger.info(
+                                    '%s not found in host $LIB or /usr/$LIB',
+                                    soname,
+                                )
                                 self.assertTrue(
                                     os.path.exists(
                                         os.path.join(usr_libdir, soname)
                                     )
                                     or os.path.exists(
                                         os.path.join(root_libdir, soname)
+                                    ),
+                                    '{} not found in host $LIB or /usr/$LIB'
+                                    ' but it should exist in scout'
+                                    ' container'.format(
+                                        soname,
                                     )
                                 )
                                 continue
 
+                            logger.info(
+                                '%s found in host $LIB or /usr/$LIB at %s',
+                                soname, host_path,
+                            )
+
                             devlib = soname.split('.so.', 1)[0] + '.so'
+                            logger.info('devlib: %s', devlib)
                             pattern = soname + '.*'
 
                             target = self.assertSymlink(
                                 os.path.join(overrides_libdir, soname),
+                                '{} found at {} so it should have been '
+                                ' added to {}'.format(
+                                    soname,
+                                    host_path,
+                                    overrides_libdir,
+                                )
                             )
                             self.assertRegex(target, r'^/run/host/')
 
-                            # It was deleted from /lib, if present...
-                            self.assertNoFile(
-                                os.path.join(root_libdir, soname),
-                            )
-                            self.assertNoFile(
-                                os.path.join(root_libdir, devlib),
-                            )
-                            self.assertEqual(
-                                glob.glob(os.path.join(root_libdir, pattern)),
-                                [],
-                            )
+                            for libdir in (
+                                root_libdir,
+                                usr_libdir,
+                            ):
+                                for base in (soname, devlib):
+                                    path = os.path.join(libdir, base)
+                                    self.assertNoFile(
+                                        path,
+                                        '{} found at {} so it should have been'
+                                        ' deleted from {}'.format(
+                                            soname,
+                                            host_path,
+                                            path,
+                                        ),
+                                    )
 
-                            # ... and /usr/lib, if present
-                            self.assertNoFile(
-                                os.path.join(usr_libdir, soname),
-                            )
-                            self.assertNoFile(
-                                os.path.join(usr_libdir, devlib),
-                            )
-                            self.assertEqual(
-                                glob.glob(os.path.join(usr_libdir, pattern)),
-                                [],
-                            )
+                                self.assertEqual(
+                                    glob.glob(os.path.join(libdir, pattern)),
+                                    [],
+                                )
 
                     for soname in (
                         'libSDL-1.2.so.0',

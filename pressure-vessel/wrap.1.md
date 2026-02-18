@@ -633,6 +633,16 @@ Flatpak environment.
 </dd>
 <dt>
 
+`GBM_BACKENDS_PATH`
+
+</dt><dd>
+
+Used to locate Mesa GBM backends to be made available in the container
+if `--runtime` and `--graphics-provider` are active.
+
+</dd>
+<dt>
+
 `LIBGL_DRIVERS_PATH`
 
 </dt><dd>
@@ -1486,6 +1496,16 @@ Set to a search path for shared libraries if `--runtime` is active.
 
 Set according to `--ld-preload`, `--keep-game-overlay`,
 `--remove-game-overlay`.
+
+</dd>
+<dt>
+
+`GBM_BACKENDS_PATH`
+
+</dt><dd>
+
+Set to a search path for Mesa GBM backends
+if `--runtime` and `--graphics-provider` are active.
 
 </dd>
 <dt>

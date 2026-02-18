@@ -57,7 +57,7 @@ pv_module_per_arch_check (const PvModulePerArch *self,
                           const IcdDetails *details,
                           gboolean is_json_based)
 {
-  /* DRI, VA-API, VDPAU drivers are always ABSOLUTE or an error state,
+  /* DRI, GBM, VA-API, VDPAU drivers are always ABSOLUTE or an error state,
    * never SONAME. */
   g_return_val_if_fail (is_json_based || self->kind != ICD_KIND_SONAME,
                         FALSE);
@@ -203,6 +203,7 @@ icd_details_new (PvGraphicsProvider *provider,
         g_return_val_if_fail (base->library_path != NULL, NULL);
     }
   else if (SRT_IS_DRI_DRIVER (icd)
+           || SRT_IS_GBM_BACKEND (icd)
            || SRT_IS_VA_API_DRIVER (icd)
            || SRT_IS_VDPAU_DRIVER (icd))
     {
@@ -467,7 +468,7 @@ icd_details_get_architecture (IcdDetails *self,
  *  as returned by icd_details_array_sized_new()
  * @tuple: Interned string representing a multiarch tuple
  * @drivers: (element-type SrtBaseGraphicsModule): The drivers as discovered
- *  by #SrtSystemInfo, which must be DRI, VA-API or VDPAU
+ *  by #SrtSystemInfo, which must be DRI, GBM, VA-API or VDPAU
  * @known: (nullable): Information about the architecture
  *
  * Build an array of #IcdDetails, and populate the architecture-specific
@@ -494,6 +495,7 @@ icd_details_fill_array_single_arch (GPtrArray *details_arr,
       g_autoptr(IcdDetails) details = icd_details_new (provider, module);
 
       g_assert (SRT_IS_DRI_DRIVER (module)
+                || SRT_IS_GBM_BACKEND (module)
                 || SRT_IS_VA_API_DRIVER (module)
                 || SRT_IS_VDPAU_DRIVER (module));
       g_assert (!SRT_IS_BASE_JSON_GRAPHICS_MODULE (module));

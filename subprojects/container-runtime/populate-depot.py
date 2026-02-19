@@ -523,8 +523,6 @@ class Main:
 
         self.runtime = self.new_runtime(name, details)
 
-        self.versions: List[ComponentVersion] = []
-
         if self.layered:
             self.pressure_vessel_path: Path | None = None
         elif pressure_vessel_archive:
@@ -632,6 +630,7 @@ class Main:
         )
 
         runtime = self.runtime
+        versions: List[ComponentVersion] = []
 
         if runtime.path:
             logger.info('Using runtime from local directory %r', runtime.path)
@@ -645,7 +644,7 @@ class Main:
             local_version.runtime = 'scout'
             local_version.runtime_version = extracted_version
             local_version.comment = 'steam-runtime/'
-            self.versions.append(local_version)
+            versions.append(local_version)
         elif runtime.version:
             logger.info('Downloading runtime from %s', runtime)
             self.unpack_ld_library_path = self.depot
@@ -657,7 +656,7 @@ class Main:
             local_version.runtime = 'scout'
             local_version.runtime_version = version
             local_version.comment = 'steam-runtime/'
-            self.versions.append(local_version)
+            versions.append(local_version)
         else:
             unspecified_version = ComponentVersion('LD_LIBRARY_PATH')
             unspecified_version.version = '-'
@@ -666,9 +665,9 @@ class Main:
             unspecified_version.comment = (
                 'see ~/.steam/root/ubuntu12_32/steam-runtime/version.txt'
             )
-            self.versions.append(unspecified_version)
+            versions.append(unspecified_version)
 
-        self.write_component_versions()
+        self.write_component_versions(versions, self.depot)
 
     def prune_runtime(self, directory: Path) -> None:
         """
@@ -735,6 +734,8 @@ class Main:
             return stdout.decode('utf-8').strip()
 
     def do_container_runtime(self) -> None:
+        versions: List[ComponentVersion] = []
+
         pv_version = ComponentVersion('pressure-vessel')
 
         self.merge_dir_into_depot(self.source_dir / 'common', self.depot)
@@ -772,7 +773,7 @@ class Main:
 
                 break
 
-        self.versions.append(pv_version)
+        versions.append(pv_version)
 
         if self.add_bin_directory:
             bin_dir = os.path.join(self.depot, 'bin')
@@ -939,7 +940,7 @@ class Main:
         component_version.runtime = runtime.suite
         component_version.runtime_version = version
         component_version.comment = comment
-        self.versions.append(component_version)
+        versions.append(component_version)
 
         if self.toolmanifest:
 
@@ -1011,9 +1012,13 @@ class Main:
 
                 vdf.dump(content, writer, pretty=True, escaped=True)
 
-        self.write_component_versions()
+        self.write_component_versions(versions, self.depot)
 
-    def write_component_versions(self) -> None:
+    def write_component_versions(
+        self,
+        versions: Sequence[ComponentVersion],
+        dest: Path,
+    ) -> None:
         try:
             with subprocess.Popen(
                 [
@@ -1040,6 +1045,8 @@ class Main:
         except OSError:
             pass
 
+        editable_versions = list(versions)
+
         if self.scripts_version:
             version = self.scripts_version
 
@@ -1047,19 +1054,22 @@ class Main:
             component_version = ComponentVersion('depot', sort_weight=-1)
             component_version.version = self.depot_version
             component_version.comment = 'Overall version number'
-            self.versions.append(component_version)
+            editable_versions.append(component_version)
 
         component_version = ComponentVersion('scripts')
         component_version.version = version or 'unknown'
         component_version.comment = 'from steam-runtime-tools'
-        self.versions.append(component_version)
+        editable_versions.append(component_version)
 
-        with open(os.path.join(self.depot, 'VERSIONS.txt'), 'w') as writer:
+        with open(dest / 'VERSIONS.txt', 'w') as writer:
             writer.write(
                 '#Name\tVersion\t\tRuntime\tRuntime_Version\tComment\n'
             )
 
-            for entry in sorted(self.versions, key=lambda v: v.to_sort_key()):
+            for entry in sorted(
+                editable_versions,
+                key=lambda v: v.to_sort_key(),
+            ):
                 logger.info('Component version: %s', entry)
                 writer.write(entry.to_tsv())
 

@@ -1,3 +1,12 @@
+steam-runtime-tools (0.20260219.0) UNRELEASED; urgency=medium
+
+  [ Antonio Ospite ]
+  * pressure-vessel:
+    - Append host GBM backends to GBM_BACKENDS_PATH when running PV
+      inside FEX, making them available for thunks (steamrt/tasks#900)
+
+ -- Simon McVittie <smcv@collabora.com>  Thu, 19 Feb 2026 17:40:52 +0000
+
 steam-runtime-tools (0.20260218.0) steamrt; urgency=medium
 
   [ Antonio Ospite ]

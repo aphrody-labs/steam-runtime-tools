@@ -7611,7 +7611,6 @@ pv_append_host_dri_library_paths (PvRuntime *self,
   const GList *icd_iter;
   g_auto(SrtHashTableIter) iter = SRT_HASH_TABLE_ITER_CLEARED;
   const gchar *drivers_path = NULL;
-  gsize i;
 
   g_return_if_fail (search_path != NULL);
 
@@ -7627,7 +7626,7 @@ pv_append_host_dri_library_paths (PvRuntime *self,
                                                     SRT_DRIVER_FLAGS_NONE);
   }
 
-  for (icd_iter = dri_drivers, i = 0; icd_iter != NULL; icd_iter = icd_iter->next, i++)
+  for (icd_iter = dri_drivers; icd_iter != NULL; icd_iter = icd_iter->next)
     {
       g_assert (SRT_IS_DRI_DRIVER (icd_iter->data));
       SrtDriDriver *driver = icd_iter->data;
@@ -7650,7 +7649,7 @@ pv_append_host_dri_library_paths (PvRuntime *self,
                                                             SRT_DRIVER_FLAGS_NONE);
     }
 
-  for (icd_iter = va_api_drivers, i = 0; icd_iter != NULL; icd_iter = icd_iter->next, i++)
+  for (icd_iter = va_api_drivers; icd_iter != NULL; icd_iter = icd_iter->next)
     {
       g_assert (SRT_IS_VA_API_DRIVER (icd_iter->data));
       SrtVaApiDriver *driver = icd_iter->data;
@@ -7731,7 +7730,6 @@ pv_append_host_gbm_library_paths (PvRuntime *self,
   const GList *icd_iter;
   g_auto(SrtHashTableIter) iter = SRT_HASH_TABLE_ITER_CLEARED;
   const gchar *backends_path = NULL;
-  gsize i;
 
   g_return_if_fail (search_path != NULL);
 
@@ -7747,7 +7745,7 @@ pv_append_host_gbm_library_paths (PvRuntime *self,
                                                       SRT_DRIVER_FLAGS_NONE);
   }
 
-  for (icd_iter = gbm_backends, i = 0; icd_iter != NULL; icd_iter = icd_iter->next, i++)
+  for (icd_iter = gbm_backends; icd_iter != NULL; icd_iter = icd_iter->next)
     {
       g_assert (SRT_IS_GBM_BACKEND (icd_iter->data));
       SrtGbmBackend *backend = icd_iter->data;

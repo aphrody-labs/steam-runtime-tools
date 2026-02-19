@@ -3985,6 +3985,47 @@ check_paths_are_relative (const GList *list,
     }
 }
 
+/*
+ * Assert that @dri_driver is internally consistent.
+ */
+static void
+assert_dri_driver_consistent (SrtDriDriver *dri_driver)
+{
+  gboolean is_extra = FALSE;
+  g_autofree gchar *library_path = NULL;
+  g_autofree gchar *resolved = NULL;
+  g_autofree gchar *resolved_property = NULL;
+
+  g_assert_true (SRT_IS_DRI_DRIVER (dri_driver));
+
+  g_object_get (dri_driver,
+                "is_extra", &is_extra,
+                "library_path", &library_path,
+                "resolved-library-path", &resolved_property,
+                NULL);
+
+  resolved = srt_dri_driver_resolve_library_path (dri_driver);
+
+  g_assert_cmpint (is_extra, ==, srt_dri_driver_is_extra (dri_driver));
+
+  /* These are invariants, even if they're NULL */
+  g_assert_cmpstr (library_path, ==, srt_dri_driver_get_library_path (dri_driver));
+  g_assert_cmpstr (resolved_property, ==, resolved);
+}
+
+static void
+assert_dri_drivers (const SrtObjectList *dri_drivers)
+{
+  const GList *iter;
+
+  for (iter = dri_drivers; iter != NULL; iter = iter->next)
+    {
+      g_test_message ("DRI library: %s",
+                      srt_dri_driver_get_library_path (iter->data));
+      assert_dri_driver_consistent (iter->data);
+    }
+}
+
 static void
 test_dri_debian10 (Fixture *f,
                    gconstpointer context)
@@ -4028,12 +4069,14 @@ test_dri_debian10 (Fixture *f,
   /* The output is guaranteed to be in aphabetical order */
   g_test_message ("i386 DRI drivers...");
   dri = srt_system_info_list_dri_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_dri_drivers (dri);
   check_list_suffixes (dri, dri_suffixes_i386, SRT_GRAPHICS_DRI_MODULE);
   check_paths_are_absolute (dri, SRT_GRAPHICS_DRI_MODULE);
   g_list_free_full (dri, g_object_unref);
 
   g_test_message ("x86_64 DRI drivers...");
   dri = srt_system_info_list_dri_drivers (info, multiarch_tuples[1], SRT_DRIVER_FLAGS_NONE);
+  assert_dri_drivers (dri);
   check_list_suffixes (dri, dri_suffixes_x86_64, SRT_GRAPHICS_DRI_MODULE);
   check_paths_are_absolute (dri, SRT_GRAPHICS_DRI_MODULE);
   g_list_free_full (dri, g_object_unref);
@@ -4061,11 +4104,13 @@ test_dri_debian10 (Fixture *f,
    * using (e.g. libGL.so.1) are just empty files, so `elf_begin` would fail. */
   g_test_message ("i386 DRI drivers, from cache, with extras...");
   dri = srt_system_info_list_dri_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  assert_dri_drivers (dri);
   check_list_suffixes (dri, dri_suffixes_i386, SRT_GRAPHICS_DRI_MODULE);
   g_list_free_full (dri, g_object_unref);
 
   g_test_message ("x86_64 DRI drivers, from cache, with extras...");
   dri = srt_system_info_list_dri_drivers (info, multiarch_tuples[1], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  assert_dri_drivers (dri);
   check_list_suffixes (dri, dri_suffixes_x86_64, SRT_GRAPHICS_DRI_MODULE);
   g_list_free_full (dri, g_object_unref);
 
@@ -4122,11 +4167,13 @@ test_dri_fedora (Fixture *f,
 
   g_test_message ("i386 DRI drivers...");
   dri = srt_system_info_list_dri_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_dri_drivers (dri);
   check_list_suffixes (dri, dri_suffixes_32, SRT_GRAPHICS_DRI_MODULE);
   g_list_free_full (dri, g_object_unref);
 
   g_test_message ("x86_64 DRI drivers...");
   dri = srt_system_info_list_dri_drivers (info, multiarch_tuples[1], SRT_DRIVER_FLAGS_NONE);
+  assert_dri_drivers (dri);
   check_list_suffixes (dri, dri_suffixes_64, SRT_GRAPHICS_DRI_MODULE);
   g_list_free_full (dri, g_object_unref);
 
@@ -4178,11 +4225,13 @@ test_dri_ubuntu16 (Fixture *f,
 
   g_test_message ("DRI drivers...");
   dri = srt_system_info_list_dri_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_dri_drivers (dri);
   check_list_suffixes (dri, dri_suffixes, SRT_GRAPHICS_DRI_MODULE);
   g_list_free_full (dri, g_object_unref);
 
   g_test_message ("DRI drivers (all)...");
   dri = srt_system_info_list_dri_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  assert_dri_drivers (dri);
   check_list_suffixes (dri, dri_suffixes_extra, SRT_GRAPHICS_DRI_MODULE);
   g_list_free_full (dri, g_object_unref);
 
@@ -4273,6 +4322,7 @@ test_dri_with_env (Fixture *f,
   /* The output is guaranteed to be in aphabetical order */
   g_test_message ("DRI drivers...");
   dri = srt_system_info_list_dri_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_dri_drivers (dri);
   check_list_suffixes (dri, dri_suffixes, SRT_GRAPHICS_DRI_MODULE);
   check_paths_are_absolute (dri, SRT_GRAPHICS_DRI_MODULE);
   g_list_free_full (dri, g_object_unref);
@@ -4287,6 +4337,7 @@ test_dri_with_env (Fixture *f,
   /* Do it again, this time including the extras */
   g_test_message ("DRI drivers (all)...");
   dri = srt_system_info_list_dri_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  assert_dri_drivers (dri);
   check_list_suffixes (dri, dri_suffixes_with_extras, SRT_GRAPHICS_DRI_MODULE);
   /* Minus one to not count the NULL terminator */
   check_list_extra (dri, G_N_ELEMENTS(dri_suffixes)-1, SRT_GRAPHICS_DRI_MODULE);
@@ -4317,6 +4368,7 @@ test_dri_with_env (Fixture *f,
 
   g_test_message ("DRI drivers (with relative path)...");
   dri = srt_system_info_list_dri_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_dri_drivers (dri);
   check_list_suffixes (dri, dri_suffixes, SRT_GRAPHICS_DRI_MODULE);
   check_paths_are_relative (dri, SRT_GRAPHICS_DRI_MODULE);
   g_list_free_full (dri, g_object_unref);
@@ -4363,6 +4415,7 @@ test_dri_flatpak (Fixture *f,
 
   g_test_message ("DRI drivers...");
   dri = srt_system_info_list_dri_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_dri_drivers (dri);
   check_list_suffixes (dri, dri_suffixes, SRT_GRAPHICS_DRI_MODULE);
 
   g_test_message ("VA-API drivers...");

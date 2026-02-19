@@ -7717,6 +7717,56 @@ collect_gbm_backends (PvRuntime *self,
   return TRUE;
 }
 
+/*
+ * @search_path: (inout):
+ */
+static void
+pv_append_host_gbm_library_paths (PvRuntime *self,
+                                  SrtSystemInfo *system_info,
+                                  const char *multiarch_tuple,
+                                  GString *search_path)
+{
+  g_autoptr(SrtObjectList) gbm_backends = NULL;
+  g_autoptr(GHashTable) backends_set = NULL;
+  const GList *icd_iter;
+  g_auto(SrtHashTableIter) iter = SRT_HASH_TABLE_ITER_CLEARED;
+  const gchar *backends_path = NULL;
+  gsize i;
+
+  g_return_if_fail (search_path != NULL);
+
+  backends_set = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
+
+  g_debug ("Enumerating %s GBM backends on host...", multiarch_tuple);
+  {
+    G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) enum_timer =
+      _srt_profiling_start ("Enumerating host GBM backends");
+
+    gbm_backends = srt_system_info_list_gbm_backends (system_info,
+                                                      multiarch_tuple,
+                                                      SRT_DRIVER_FLAGS_NONE);
+  }
+
+  for (icd_iter = gbm_backends, i = 0; icd_iter != NULL; icd_iter = icd_iter->next, i++)
+    {
+      g_assert (SRT_IS_GBM_BACKEND (icd_iter->data));
+      SrtGbmBackend *backend = icd_iter->data;
+      g_autofree gchar *backend_path = NULL;
+      const gchar *lib_path = srt_gbm_backend_get_library_path (backend);
+
+      g_debug ("Found GBM backend: %s", lib_path);
+      backend_path = g_path_get_dirname (lib_path);
+      if (!g_hash_table_contains (backends_set, backend_path))
+        g_hash_table_add (backends_set, g_steal_pointer (&backend_path));
+    }
+
+  _srt_hash_table_iter_init_sorted (&iter, backends_set,
+                                    self->arbitrary_str_order);
+
+  while (_srt_hash_table_iter_next (&iter, &backends_path, NULL))
+    _srt_search_path_append (search_path, backends_path);
+}
+
 /* Prepend the given @new_entry to the colon-delimited directory list in the
  * original environment variable @var (in turn defaulting that to @default_)
  * if not given.
@@ -8170,6 +8220,10 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                             arch_system_info,
                                             tuple,
                                             dri_path);
+          pv_append_host_gbm_library_paths (self,
+                                            arch_system_info,
+                                            tuple,
+                                            gbm_path);
         }
     }
 

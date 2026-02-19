@@ -8726,9 +8726,8 @@ pv_runtime_bind (PvRuntime *self,
        * by the container. */
       g_auto(GStrv) search_path =
         _srt_graphics_get_openxr_1_runtime_search_paths (_srt_const_strv (self->original_environ));
-      gint i;
 
-      for (i = 0; search_path != NULL && search_path[i] != NULL; i++)
+      for (size_t i = 0; search_path != NULL && search_path[i] != NULL; i++)
         {
           const char *dir = search_path[i];
 

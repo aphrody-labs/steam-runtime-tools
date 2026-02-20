@@ -1075,8 +1075,8 @@ class BaseContainersTest(BaseTest):
                         # expect the host version to be newer (or possibly
                         # absent if the host graphics stack doesn't use
                         # them, for example static linking or something).
+                        'libXau.so.6',
                         'libdrm.so.2',
-                        'libudev.so.0',
                     ):
                         with self.subTest(soname=soname):
                             for host_path in (

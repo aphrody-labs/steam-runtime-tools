@@ -4423,6 +4423,47 @@ test_dri_flatpak (Fixture *f,
   check_list_suffixes (va_api, va_api_suffixes, SRT_GRAPHICS_VAAPI_MODULE);
 }
 
+/*
+ * Assert that @gbm_backend is internally consistent.
+ */
+static void
+assert_gbm_backend_consistent (SrtGbmBackend *gbm_backend)
+{
+  gboolean is_extra = FALSE;
+  g_autofree gchar *library_path = NULL;
+  g_autofree gchar *resolved = NULL;
+  g_autofree gchar *resolved_property = NULL;
+
+  g_assert_true (SRT_IS_GBM_BACKEND (gbm_backend));
+
+  g_object_get (gbm_backend,
+                "is_extra", &is_extra,
+                "library_path", &library_path,
+                "resolved-library-path", &resolved_property,
+                NULL);
+
+  resolved = srt_gbm_backend_resolve_library_path (gbm_backend);
+
+  g_assert_cmpint (is_extra, ==, srt_gbm_backend_is_extra (gbm_backend));
+
+  /* These are invariants, even if they're NULL */
+  g_assert_cmpstr (library_path, ==, srt_gbm_backend_get_library_path (gbm_backend));
+  g_assert_cmpstr (resolved_property, ==, resolved);
+}
+
+static void
+assert_gbm_backends (const SrtObjectList *gbm_backends)
+{
+  const GList *iter;
+
+  for (iter = gbm_backends; iter != NULL; iter = iter->next)
+    {
+      g_test_message ("GBM backend library: %s",
+                      srt_gbm_backend_get_library_path (iter->data));
+      assert_gbm_backend_consistent (iter->data);
+    }
+}
+
 static void
 test_gbm_debian10 (Fixture *f,
                    gconstpointer context)
@@ -4455,12 +4496,14 @@ test_gbm_debian10 (Fixture *f,
   /* The output is guaranteed to be in aphabetical order */
   g_test_message ("i386 GBM backends...");
   gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_gbm_backends (gbm);
   check_list_suffixes (gbm, gbm_suffixes_i386, SRT_GRAPHICS_GBM_MODULE);
   check_paths_are_absolute (gbm, SRT_GRAPHICS_GBM_MODULE);
   g_list_free_full (gbm, g_object_unref);
 
   g_test_message ("x86_64 GBM backends...");
   gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[1], SRT_DRIVER_FLAGS_NONE);
+  assert_gbm_backends (gbm);
   check_list_suffixes (gbm, gbm_suffixes_x86_64, SRT_GRAPHICS_GBM_MODULE);
   check_paths_are_absolute (gbm, SRT_GRAPHICS_GBM_MODULE);
   g_list_free_full (gbm, g_object_unref);
@@ -4475,11 +4518,13 @@ test_gbm_debian10 (Fixture *f,
    * using (e.g. libGL.so.1) are just empty files, so `elf_begin` would fail. */
   g_test_message ("i386 GBM backends, from cache, with extras...");
   gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  assert_gbm_backends (gbm);
   check_list_suffixes (gbm, gbm_suffixes_i386, SRT_GRAPHICS_GBM_MODULE);
   g_list_free_full (gbm, g_object_unref);
 
   g_test_message ("x86_64 GBM backends, from cache, with extras...");
   gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[1], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  assert_gbm_backends (gbm);
   check_list_suffixes (gbm, gbm_suffixes_x86_64, SRT_GRAPHICS_GBM_MODULE);
   g_list_free_full (gbm, g_object_unref);
 }
@@ -4515,11 +4560,13 @@ test_gbm_fedora (Fixture *f,
 
   g_test_message ("i386 GBM backends...");
   gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_gbm_backends (gbm);
   check_list_suffixes (gbm, gbm_suffixes_32, SRT_GRAPHICS_GBM_MODULE);
   g_list_free_full (gbm, g_object_unref);
 
   g_test_message ("x86_64 GBM backends...");
   gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[1], SRT_DRIVER_FLAGS_NONE);
+  assert_gbm_backends (gbm);
   check_list_suffixes (gbm, gbm_suffixes_64, SRT_GRAPHICS_GBM_MODULE);
   g_list_free_full (gbm, g_object_unref);
 }
@@ -4555,11 +4602,13 @@ test_gbm_ubuntu16 (Fixture *f,
 
   g_test_message ("GBM backends...");
   gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_gbm_backends (gbm);
   check_list_suffixes (gbm, gbm_suffixes, SRT_GRAPHICS_GBM_MODULE);
   g_list_free_full (gbm, g_object_unref);
 
   g_test_message ("GBM backends (all)...");
   gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  assert_gbm_backends (gbm);
   check_list_suffixes (gbm, gbm_suffixes_extra, SRT_GRAPHICS_GBM_MODULE);
   g_list_free_full (gbm, g_object_unref);
 }
@@ -4618,6 +4667,7 @@ test_gbm_with_env (Fixture *f,
   /* The output is guaranteed to be in aphabetical order */
   g_test_message ("GBM backends...");
   gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_gbm_backends (gbm);
   check_list_suffixes (gbm, gbm_suffixes, SRT_GRAPHICS_GBM_MODULE);
   check_paths_are_absolute (gbm, SRT_GRAPHICS_GBM_MODULE);
   g_list_free_full (gbm, g_object_unref);
@@ -4625,6 +4675,7 @@ test_gbm_with_env (Fixture *f,
   /* Do it again, this time including the extras */
   g_test_message ("GBM backends (all)...");
   gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  assert_gbm_backends (gbm);
   check_list_suffixes (gbm, gbm_suffixes_with_extras, SRT_GRAPHICS_GBM_MODULE);
   /* Minus one to not count the NULL terminator */
   check_list_extra (gbm, G_N_ELEMENTS(gbm_suffixes)-1, SRT_GRAPHICS_GBM_MODULE);
@@ -4644,6 +4695,7 @@ test_gbm_with_env (Fixture *f,
 
   g_test_message ("GBM backends (with relative path)...");
   gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_gbm_backends (gbm);
   check_list_suffixes (gbm, gbm_suffixes, SRT_GRAPHICS_GBM_MODULE);
   check_paths_are_relative (gbm, SRT_GRAPHICS_GBM_MODULE);
   g_list_free_full (gbm, g_object_unref);
@@ -4678,6 +4730,7 @@ test_gbm_flatpak (Fixture *f,
 
   g_test_message ("GBM backends...");
   gbm = srt_system_info_list_gbm_backends (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_gbm_backends (gbm);
   check_list_suffixes (gbm, gbm_suffixes, SRT_GRAPHICS_GBM_MODULE);
 }
 

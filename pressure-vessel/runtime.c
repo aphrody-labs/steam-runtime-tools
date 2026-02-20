@@ -210,18 +210,17 @@ path_mutable_in_container_namespace (const char *path)
     "tmp",
     "var",
   };
-  gsize i;
 
   while (path[0] == '/')
     path++;
 
-  for (i = 0; i < G_N_ELEMENTS (no); i++)
+  for (size_t i = 0; i < G_N_ELEMENTS (no); i++)
     {
       if (_srt_get_path_after (path, no[i]) != NULL)
         return FALSE;
     }
 
-  for (i = 0; i < G_N_ELEMENTS (yes); i++)
+  for (size_t i = 0; i < G_N_ELEMENTS (yes); i++)
     {
       if (_srt_get_path_after (path, yes[i]) != NULL)
         return TRUE;
@@ -291,12 +290,11 @@ pv_runtime_path_belongs_in_interpreter_root (PvRuntime *self,
     "usr",
     "var",
   };
-  gsize i;
 
   while (path[0] == '/')
     path++;
 
-  for (i = 0; i < G_N_ELEMENTS (yes); i++)
+  for (size_t i = 0; i < G_N_ELEMENTS (yes); i++)
     {
       if (_srt_get_path_after (path, yes[i]) != NULL)
         return TRUE;
@@ -322,12 +320,10 @@ path_visible_in_container_namespace (PvRuntimeFlags flags,
                                      PvWorkaroundFlags workarounds,
                                      const char *path)
 {
-  gsize i;
-
   if (flags & PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX)
     return FALSE;
 
-  for (i = 0; framework_paths[i].path != NULL; i++)
+  for (size_t i = 0; framework_paths[i].path != NULL; i++)
     {
       if ((workarounds & framework_paths[i].ignore_if) == 0
           && _srt_get_path_after (path, framework_paths[i].path) != NULL)
@@ -678,15 +674,13 @@ static PvGraphicsProvider *
 pv_runtime_get_graphics_provider (PvRuntime *self,
                                   GQuark multiarch_tuple)
 {
-  gsize i;
-
   if (self->providers == NULL)
     return NULL;
 
   if (multiarch_tuple == SRT_ARCHITECTURE_QUARK_NONE)
     return NULL;
 
-  for (i = 0; i < self->providers->len; i++)
+  for (size_t i = 0; i < self->providers->len; i++)
     {
       PvGraphicsProvider *provider = g_ptr_array_index (self->providers, i);
 
@@ -1419,7 +1413,6 @@ pv_runtime_initable_init (GInitable *initable,
   gsize len;
   PvMtreeApplyFlags mtree_flags = PV_MTREE_APPLY_FLAGS_NONE;
   struct stat ignore;
-  gsize i;
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
@@ -1440,7 +1433,7 @@ pv_runtime_initable_init (GInitable *initable,
   if (self->tuples == NULL || self->tuples->len == 0)
     return glnx_throw (error, "No architectures configured");
 
-  for (i = 0; i < self->tuples->len; i++)
+  for (size_t i = 0; i < self->tuples->len; i++)
     {
       GQuark q = g_array_index (self->tuples, GQuark, i);
       const char *tuple = g_quark_to_string (q);
@@ -1737,7 +1730,7 @@ pv_runtime_initable_init (GInitable *initable,
       g_autofree gchar *version_id = NULL;
       char *beginning_of_line = contents;
 
-      for (i = 0; i < len; i++)
+      for (size_t i = 0; i < len; i++)
         {
           if (contents[i] == '\n')
             {
@@ -2103,7 +2096,6 @@ pv_runtime_adverb_regenerate_ld_so_cache (PvRuntime *self,
   g_autoptr(GString) ldlp_after_regen = g_string_new ("");
   g_autofree gchar *regen_dir = NULL;
   SrtEmulator *emulator;
-  gsize i;
 
   /* This directory was set up in bind_runtime_ld_so() */
   if (self->is_flatpak_env)
@@ -2142,7 +2134,7 @@ pv_runtime_adverb_regenerate_ld_so_cache (PvRuntime *self,
    * pv_runtime_set_search_paths(), except that here, we split them up:
    * the directories containing SONAMEs go in ld.so.conf, and only the
    * directories containing aliases go in LD_LIBRARY_PATH. */
-  for (i = 0; i < self->tuples->len; i++)
+  for (size_t i = 0; i < self->tuples->len; i++)
     {
       GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
       const char *tuple = g_quark_to_string (tuple_quark);
@@ -2407,7 +2399,6 @@ pv_runtime_provide_container_access (PvRuntime *self,
         "lib",
         "sbin",
       };
-      gsize i;
 
       /* If we are working with a runtime that has a root directory containing
        * /etc and /usr, we can just access it via its path - that's "the same
@@ -2433,7 +2424,7 @@ pv_runtime_provide_container_access (PvRuntime *self,
        * In practice we also need /lib64 for 64-bit-capable runtimes,
        * but a pure 32-bit runtime would legitimately not have that,
        * so we don't check for it. */
-      for (i = 0; i < G_N_ELEMENTS (need_top_level); i++)
+      for (size_t i = 0; i < G_N_ELEMENTS (need_top_level); i++)
         {
           g_autofree gchar *path = g_build_filename (self->runtime_files,
                                                      need_top_level[i],
@@ -2684,7 +2675,6 @@ pv_runtime_capture_libraries (PvRuntime *self,
 {
   g_autoptr(FlatpakBwrap) temp_bwrap = NULL;
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer = NULL;
-  gsize i;
 
   g_return_val_if_fail (runtime_architecture_check_valid (arch), FALSE);
   g_return_val_if_fail (destination != NULL, FALSE);
@@ -2723,7 +2713,7 @@ pv_runtime_capture_libraries (PvRuntime *self,
       flatpak_bwrap_add_fd (temp_bwrap, g_steal_fd (&fd));
     }
 
-  for (i = 0; i < n_patterns; i++)
+  for (size_t i = 0; i < n_patterns; i++)
     flatpak_bwrap_add_arg (temp_bwrap, patterns[i]);
 
   flatpak_bwrap_finish (temp_bwrap);
@@ -2783,7 +2773,6 @@ bind_icds (PvRuntime *self,
   g_autofree gsize *captured_instead = NULL;
   g_autofree gchar *subdir_relative_to_overrides = NULL;
   glnx_autofd int subdir_fd = -1;
-  gsize i;
   int digits = pv_count_decimal_digits (n_details);
 
   g_return_val_if_fail (runtime_architecture_check_valid (arch), FALSE);
@@ -2794,7 +2783,7 @@ bind_icds (PvRuntime *self,
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
   /* Iterate through the drivers adding the SONAMEs to @patterns. */
-  for (i = 0; i < n_details; i++)
+  for (size_t i = 0; i < n_details; i++)
     {
       IcdDetails *details = details_arr[i];
       PvModulePerArch *details_arch;
@@ -2863,7 +2852,7 @@ bind_icds (PvRuntime *self,
   basename_set = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, NULL);
   basenames = g_new0 (const char *, n_details);
 
-  for (i = 0; i < n_details && !*use_numbered_subdirs; i++)
+  for (size_t i = 0; i < n_details && !*use_numbered_subdirs; i++)
     {
       IcdDetails *details = details_arr[i];
       const PvModulePerArch *details_arch;
@@ -2917,10 +2906,10 @@ bind_icds (PvRuntime *self,
                                               NULL);
       captured_instead = g_new (gsize, n_details);
 
-      for (i = 0; i < n_details; i++)
+      for (size_t i = 0; i < n_details; i++)
         captured_instead[i] = G_MAXSIZE;
 
-      for (i = 0; i < n_details; i++)
+      for (size_t i = 0; i < n_details; i++)
         {
           IcdDetails *details = details_arr[i];
           const PvModulePerArch *details_arch;
@@ -2986,7 +2975,7 @@ bind_icds (PvRuntime *self,
   /* Finish the per-driver processing. If we're using numbered
    * subdirectories, this includes the actual captures; if not, this
    * is just cleanup. */
-  for (i = 0; i < n_details; i++)
+  for (size_t i = 0; i < n_details; i++)
     {
       IcdDetails *details = details_arr[i];
       PvModulePerArch *details_arch;
@@ -3162,7 +3151,7 @@ bind_icds (PvRuntime *self,
     }
 
 success:
-  for (i = 0; i < n_details; i++)
+  for (size_t i = 0; i < n_details; i++)
     {
       IcdDetails *details = details_arr[i];
       const PvModulePerArch *details_arch;
@@ -3271,7 +3260,6 @@ pv_runtime_import_ca_certs (PvRuntime *self,
   g_auto(SrtDirIter) iter = SRT_DIR_ITER_CLEARED;
   glnx_autofd int dirfd = -1;
   struct dirent *dent;
-  size_t i;
 
   flatpak_bwrap_add_args (bwrap,
                           "--tmpfs", ca_path,
@@ -3334,7 +3322,7 @@ pv_runtime_import_ca_certs (PvRuntime *self,
                                                error))
             return NULL;
 
-          for (i = 0; i < G_N_ELEMENTS (required_names); i++)
+          for (size_t i = 0; i < G_N_ELEMENTS (required_names); i++)
             {
               if (g_str_equal (member, required_names[i]))
                 found[i] = TRUE;
@@ -3342,7 +3330,7 @@ pv_runtime_import_ca_certs (PvRuntime *self,
         }
     }
 
-  for (i = 0; i < G_N_ELEMENTS (required_names); i++)
+  for (size_t i = 0; i < G_N_ELEMENTS (required_names); i++)
     {
       if (!found[i])
         return glnx_null_throw (error, "Required filename %s/%s not found",
@@ -3402,7 +3390,6 @@ bind_runtime_base (PvRuntime *self,
     NULL
   };
   g_autofree gchar *xrd = g_strdup_printf ("/run/user/%ld", (long) geteuid ());
-  gsize i;
   gboolean have_machine_id = FALSE;
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
@@ -3432,7 +3419,7 @@ bind_runtime_base (PvRuntime *self,
        * and so on. For now, we only support host OSs that use the
        * interoperable path; OS-specific variant paths like the ones in
        * ClearLinux and Exherbo could be added later if required. */
-      for (i = 0; i < G_N_ELEMENTS (needed_in_real_root); i++)
+      for (size_t i = 0; i < G_N_ELEMENTS (needed_in_real_root); i++)
         {
           const char *path = needed_in_real_root[i];
           g_autofree char *target = g_build_filename ("/run/interpreter-host",
@@ -3523,7 +3510,7 @@ bind_runtime_base (PvRuntime *self,
 
   if (self->providers != NULL)
     {
-      for (i = 0; i < self->providers->len; i++)
+      for (size_t i = 0; i < self->providers->len; i++)
         {
           PvGraphicsProvider *provider = g_ptr_array_index (self->providers, i);
 
@@ -3554,7 +3541,7 @@ bind_runtime_base (PvRuntime *self,
         }
     }
 
-  for (i = 0; i < G_N_ELEMENTS (bind_mutable); i++)
+  for (size_t i = 0; i < G_N_ELEMENTS (bind_mutable); i++)
     {
       g_autofree gchar *path = g_build_filename (self->runtime_files,
                                                  bind_mutable[i],
@@ -3665,7 +3652,7 @@ bind_runtime_base (PvRuntime *self,
                                                 error))
     g_return_val_if_reached (FALSE);
 
-  for (i = 0; from_host[i] != NULL; i++)
+  for (size_t i = 0; from_host[i] != NULL; i++)
     {
       const char *item = from_host[i];
 
@@ -3709,7 +3696,7 @@ bind_runtime_base (PvRuntime *self,
 
   if (self->providers != NULL)
     {
-      for (i = 0; from_provider[i] != NULL; i++)
+      for (size_t i = 0; from_provider[i] != NULL; i++)
         {
           const char *item = from_provider[i];
           gsize provider_index;
@@ -3861,8 +3848,6 @@ bind_runtime_ld_so (PvRuntime *self,
                     SrtEnvOverlay *container_env,
                     GError **error)
 {
-  gsize i;
-
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
   g_return_val_if_fail (bwrap == NULL || !pv_bwrap_was_finished (bwrap), FALSE);
   g_return_val_if_fail (self->is_flatpak_env || bwrap != NULL, FALSE);
@@ -4055,7 +4040,7 @@ bind_runtime_ld_so (PvRuntime *self,
           { ld_so_conf_on_host, runtime_conf_path },
       };
 
-      for (i = 0; i < G_N_ELEMENTS (symlinks); i++)
+      for (size_t i = 0; i < G_N_ELEMENTS (symlinks); i++)
         {
           if (!pv_runtime_make_symlink_in_container (self, bwrap,
                                                      symlinks[i].target,
@@ -4065,7 +4050,7 @@ bind_runtime_ld_so (PvRuntime *self,
             return FALSE;
         }
 
-      for (i = 0; i < G_N_ELEMENTS (binds); i++)
+      for (size_t i = 0; i < G_N_ELEMENTS (binds); i++)
         {
           if (!pv_runtime_bind_into_container (self, bwrap,
                                                binds[i].host_path, NULL, 0,
@@ -4097,7 +4082,7 @@ bind_runtime_ld_so (PvRuntime *self,
        * does this. Again, for simplicity we direct all these to the same path:
        * it's OK to mix multiple architectures' libraries into one cache,
        * as done in upstream glibc (and Debian, Arch, etc.). */
-      for (i = 0; i < self->tuples->len; i++)
+      for (size_t i = 0; i < self->tuples->len; i++)
         {
           GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
           const char *tuple = g_quark_to_string (tuple_quark);
@@ -4680,7 +4665,6 @@ pv_runtime_remove_overridden_libraries (PvRuntime *self,
   GHashTable **delete = NULL;
   SrtDirIter *iters = NULL;
   gboolean ret = FALSE;
-  gsize i;
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
   g_return_val_if_fail (arch != NULL, FALSE);
@@ -4698,13 +4682,13 @@ pv_runtime_remove_overridden_libraries (PvRuntime *self,
   delete = g_new0 (GHashTable *, dirs->len);
   iters = g_new0 (SrtDirIter, dirs->len);
 
-  for (i = 0; i < dirs->len; i++)
+  for (size_t i = 0; i < dirs->len; i++)
     g_assert (g_path_is_absolute (g_ptr_array_index (dirs, i)));
 
   /* We have to figure out what we want to delete before we delete anything,
    * because we can't tell whether a symlink points to a library of a
    * particular SONAME if we already deleted the library. */
-  for (i = 0; i < dirs->len; i++)
+  for (size_t i = 0; i < dirs->len; i++)
     {
       const char *libdir = g_ptr_array_index (dirs, i);
       glnx_autofd int libdir_fd = -1;
@@ -4985,7 +4969,7 @@ pv_runtime_remove_overridden_libraries (PvRuntime *self,
         }
     }
 
-  for (i = 0; i < dirs->len; i++)
+  for (size_t i = 0; i < dirs->len; i++)
     {
       g_auto(SrtHashTableIter) iter = SRT_HASH_TABLE_ITER_CLEARED;
       const char *libdir = g_ptr_array_index (dirs, i);
@@ -5026,7 +5010,7 @@ out:
       g_assert (delete != NULL);
       g_assert (iters != NULL);
 
-      for (i = 0; i < dirs->len; i++)
+      for (size_t i = 0; i < dirs->len; i++)
         {
           g_clear_pointer (&delete[i], g_hash_table_unref);
           _srt_dir_iter_clear (&iters[i]);
@@ -5208,7 +5192,6 @@ setup_json_manifest (PvRuntime *self,
   g_autofree gchar *json_basename = NULL;
   const char *json_in_provider = NULL;
   const char *library_arch = NULL;
-  gsize i;
 
   g_return_val_if_fail (details->provider != NULL, FALSE);
   g_return_val_if_fail (bwrap != NULL || self->mutable_sysroot != NULL, FALSE);
@@ -5255,7 +5238,7 @@ setup_json_manifest (PvRuntime *self,
   g_debug ("Setting up JSON manifest for \"%s\" loadable module \"%s\": \"%s\"",
            sub_dir, json_basename, details->debug_name);
 
-  for (i = 0; i < self->tuples->len; i++)
+  for (size_t i = 0; i < self->tuples->len; i++)
     {
       GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
       const char *tuple = g_quark_to_string (tuple_quark);
@@ -5496,7 +5479,6 @@ setup_each_json_manifest (PvRuntime *self,
                           GString *search_path,
                           GError **error)
 {
-  gsize j;
   g_autoptr(GHashTable) json_set = NULL;
   g_auto(PvManifestDeduplicator) deduplicator = PV_MANIFEST_DEDUPLICATOR_INIT;
   int digits = pv_count_decimal_digits (details->len);
@@ -5528,7 +5510,7 @@ setup_each_json_manifest (PvRuntime *self,
                                      (IcdDetails **) details->pdata,
                                      details->len);
 
-  for (j = 0; j < details->len; j++)
+  for (size_t j = 0; j < details->len; j++)
     {
       IcdDetails *d = g_ptr_array_index (details, j);
 
@@ -5561,7 +5543,6 @@ collect_json_based_drivers (PvRuntime *self,
    * (this is true for all the JSON-based driver families we currently
    * support). */
   gboolean use_numbered_subdirs = FALSE;
-  gsize j;
   G_GNUC_UNUSED g_autoptr(SrtProfilingTimer) timer =
     _srt_profiling_start ("Collecting %s", description);
 
@@ -5572,7 +5553,7 @@ collect_json_based_drivers (PvRuntime *self,
 
   g_debug ("Collecting %s %s from provider...", arch->tuple, description);
 
-  for (j = 0; j < details_arr->len; j++)
+  for (size_t j = 0; j < details_arr->len; j++)
     {
       IcdDetails *details = g_ptr_array_index (details_arr, j);
 
@@ -5909,7 +5890,6 @@ collect_graphics_libraries_patterns (PvRuntime *self,
     "tls",
     "vulkan-producer",
   };
-  gsize i;
   g_autofree gchar *nvidia_version = NULL;
 
   g_return_if_fail (patterns != NULL);
@@ -5917,17 +5897,17 @@ collect_graphics_libraries_patterns (PvRuntime *self,
   /* Mesa GLX, etc. */
   g_ptr_array_add (patterns, g_strdup ("gl:"));
 
-  for (i = 0; i < G_N_ELEMENTS (sonames); i++)
+  for (size_t i = 0; i < G_N_ELEMENTS (sonames); i++)
     g_ptr_array_add (patterns,
                      g_strdup_printf ("if-exists:if-same-abi:soname:%s",
                                       sonames[i]));
 
-  for (i = 0; i < G_N_ELEMENTS (sonames_even_if_older); i++)
+  for (size_t i = 0; i < G_N_ELEMENTS (sonames_even_if_older); i++)
     g_ptr_array_add (patterns,
                      g_strdup_printf ("if-exists:even-if-older:if-same-abi:soname:%s",
                                       sonames_even_if_older[i]));
 
-  for (i = 0; i < G_N_ELEMENTS (soname_globs_even_if_older); i++)
+  for (size_t i = 0; i < G_N_ELEMENTS (soname_globs_even_if_older); i++)
     g_ptr_array_add (patterns,
                      g_strdup_printf ("if-exists:even-if-older:soname-match:%s",
                                       soname_globs_even_if_older[i]));
@@ -5937,7 +5917,7 @@ collect_graphics_libraries_patterns (PvRuntime *self,
     {
       g_strstrip (nvidia_version);
 
-      for (i = 0; i < G_N_ELEMENTS (nvidia_private); i++)
+      for (size_t i = 0; i < G_N_ELEMENTS (nvidia_private); i++)
         g_ptr_array_add (patterns,
                          g_strdup_printf ("if-exists:even-if-older:soname:libnvidia-%s.so.%s",
                                           nvidia_private[i], nvidia_version));
@@ -7608,10 +7588,8 @@ pv_append_host_dri_library_paths (PvRuntime *self,
   g_autoptr(SrtObjectList) dri_drivers = NULL;
   g_autoptr(SrtObjectList) va_api_drivers = NULL;
   g_autoptr(GHashTable) drivers_set = NULL;
-  const GList *icd_iter;
   g_auto(SrtHashTableIter) iter = SRT_HASH_TABLE_ITER_CLEARED;
   const gchar *drivers_path = NULL;
-  gsize i;
 
   g_return_if_fail (search_path != NULL);
 
@@ -7627,7 +7605,9 @@ pv_append_host_dri_library_paths (PvRuntime *self,
                                                     SRT_DRIVER_FLAGS_NONE);
   }
 
-  for (icd_iter = dri_drivers, i = 0; icd_iter != NULL; icd_iter = icd_iter->next, i++)
+  for (const GList *icd_iter = dri_drivers;
+       icd_iter != NULL;
+       icd_iter = icd_iter->next)
     {
       g_assert (SRT_IS_DRI_DRIVER (icd_iter->data));
       SrtDriDriver *driver = icd_iter->data;
@@ -7650,7 +7630,9 @@ pv_append_host_dri_library_paths (PvRuntime *self,
                                                             SRT_DRIVER_FLAGS_NONE);
     }
 
-  for (icd_iter = va_api_drivers, i = 0; icd_iter != NULL; icd_iter = icd_iter->next, i++)
+  for (const GList *icd_iter = va_api_drivers;
+       icd_iter != NULL;
+       icd_iter = icd_iter->next)
     {
       g_assert (SRT_IS_VA_API_DRIVER (icd_iter->data));
       SrtVaApiDriver *driver = icd_iter->data;
@@ -7728,10 +7710,8 @@ pv_append_host_gbm_library_paths (PvRuntime *self,
 {
   g_autoptr(SrtObjectList) gbm_backends = NULL;
   g_autoptr(GHashTable) backends_set = NULL;
-  const GList *icd_iter;
   g_auto(SrtHashTableIter) iter = SRT_HASH_TABLE_ITER_CLEARED;
   const gchar *backends_path = NULL;
-  gsize i;
 
   g_return_if_fail (search_path != NULL);
 
@@ -7747,7 +7727,9 @@ pv_append_host_gbm_library_paths (PvRuntime *self,
                                                       SRT_DRIVER_FLAGS_NONE);
   }
 
-  for (icd_iter = gbm_backends, i = 0; icd_iter != NULL; icd_iter = icd_iter->next, i++)
+  for (const GList *icd_iter = gbm_backends;
+       icd_iter != NULL;
+       icd_iter = icd_iter->next)
     {
       g_assert (SRT_IS_GBM_BACKEND (icd_iter->data));
       SrtGbmBackend *backend = icd_iter->data;
@@ -7798,7 +7780,6 @@ check_path_entries_all_in_dir (const char *path,
 {
   g_autofree char *dir = g_build_filename (prefix, suffix, NULL);
   g_auto(GStrv) entries = NULL;
-  gsize i;
 
   if (path == NULL || *path == '\0')
     return;
@@ -7808,7 +7789,7 @@ check_path_entries_all_in_dir (const char *path,
   if (entries == NULL)
     return;
 
-  for (i = 0; entries[i] != NULL; i++)
+  for (size_t i = 0; entries[i] != NULL; i++)
     {
       const char *after = _srt_get_path_after (entries[i], dir);
 
@@ -7826,7 +7807,6 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                         SrtEnvOverlay *container_env,
                                         GError **error)
 {
-  gsize i, j;
   g_autoptr(GString) dri_path = g_string_new ("");
   g_autoptr(GString) gbm_path = g_string_new ("");
   g_autoptr(GString) egl_path = g_string_new ("");
@@ -7866,7 +7846,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
   provider_stack = icd_stack_new ();
 
-  for (i = 0; i < self->providers->len; i++)
+  for (size_t i = 0; i < self->providers->len; i++)
     {
       PvGraphicsProvider *provider = g_ptr_array_index (self->providers, i);
 
@@ -7904,7 +7884,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   pv_runtime_library_data_init (&nvidia_data_in_provider);
   pv_runtime_library_data_init (&gconv_in_provider);
 
-  for (i = 0; i < self->tuples->len; i++)
+  for (size_t i = 0; i < self->tuples->len; i++)
     {
       GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
       const char *tuple = g_quark_to_string (tuple_quark);
@@ -8077,7 +8057,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                              patterns->len, error))
             return FALSE;
 
-          for (j = 0; j < G_N_ELEMENTS (library_families); j++)
+          for (size_t j = 0; j < G_N_ELEMENTS (library_families); j++)
             {
               g_autofree gchar *soname_symlink = NULL;
               gboolean was_captured = FALSE;
@@ -8164,7 +8144,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                                       arch->known_arch,
                                                       SRT_LIBDIRS_FLAGS_NONE);
 
-          for (j = 0; j < dirs->len; j++)
+          for (size_t j = 0; j < dirs->len; j++)
             {
               if (!collect_s2tc (self, arch,
                                  g_ptr_array_index (dirs, j),
@@ -8197,7 +8177,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
   /* In practice we will only have one graphics stack provider for the
    * interpreter host, but for completeness, iterate through 0 or more */
-  for (j = 0; j < self->providers->len; j++)
+  for (size_t j = 0; j < self->providers->len; j++)
     {
       PvGraphicsProvider *provider = g_ptr_array_index (self->providers, j);
       gsize n;
@@ -8208,7 +8188,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
 
       host_tuples = pv_graphics_provider_get_architectures (provider, &n);
 
-      for (i = 0; i < n; i++)
+      for (size_t i = 0; i < n; i++)
         {
           GQuark arch_quark = host_tuples[i];
           SrtSystemInfo *arch_system_info;
@@ -8233,7 +8213,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
     {
       g_autoptr(GString) archs = g_string_new ("");
 
-      for (i = 0; i < self->tuples->len; i++)
+      for (size_t i = 0; i < self->tuples->len; i++)
         {
           GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
 
@@ -8279,7 +8259,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   if (host_stack != NULL
       && host_stack->egl_icd_details != NULL)
     {
-      for (i = 0; i < host_stack->egl_icd_details->len; i++)
+      for (size_t i = 0; i < host_stack->egl_icd_details->len; i++)
         {
           IcdDetails *details = g_ptr_array_index (host_stack->egl_icd_details, i);
           SrtEglIcd *icd = SRT_EGL_ICD (details->icd);
@@ -8295,7 +8275,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   if (host_stack != NULL
       && host_stack->egl_ext_platform_details != NULL)
     {
-      for (i = 0; i < host_stack->egl_ext_platform_details->len; i++)
+      for (size_t i = 0; i < host_stack->egl_ext_platform_details->len; i++)
         {
           IcdDetails *details = g_ptr_array_index (host_stack->egl_ext_platform_details, i);
           SrtEglExternalPlatform *ext_platform = SRT_EGL_EXTERNAL_PLATFORM (details->icd);
@@ -8312,7 +8292,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   if (host_stack != NULL
       && host_stack->vulkan_icd_details != NULL)
     {
-      for (i = 0; i < host_stack->vulkan_icd_details->len; i++)
+      for (size_t i = 0; i < host_stack->vulkan_icd_details->len; i++)
         {
           IcdDetails *details = g_ptr_array_index (host_stack->vulkan_icd_details, i);
           SrtVulkanIcd *icd = SRT_VULKAN_ICD (details->icd);
@@ -8331,7 +8311,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
       if (host_stack != NULL
           && host_stack->vulkan_exp_layer_details != NULL)
         {
-          for (i = 0; i < host_stack->vulkan_exp_layer_details->len; i++)
+          for (size_t i = 0; i < host_stack->vulkan_exp_layer_details->len; i++)
             {
               IcdDetails *details = g_ptr_array_index (host_stack->vulkan_exp_layer_details, i);
               SrtVulkanLayer *layer = SRT_VULKAN_LAYER (details->icd);
@@ -8348,7 +8328,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
       if (host_stack != NULL
           && host_stack->vulkan_imp_layer_details != NULL)
         {
-          for (i = 0; i < host_stack->vulkan_imp_layer_details->len; i++)
+          for (size_t i = 0; i < host_stack->vulkan_imp_layer_details->len; i++)
             {
               IcdDetails *details = g_ptr_array_index (host_stack->vulkan_imp_layer_details, i);
               SrtVulkanLayer *layer = SRT_VULKAN_LAYER (details->icd);
@@ -8391,7 +8371,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
       if (host_stack != NULL
           && host_stack->openxr_1_exp_layer_details != NULL)
         {
-          for (i = 0; i < host_stack->openxr_1_exp_layer_details->len; i++)
+          for (size_t i = 0; i < host_stack->openxr_1_exp_layer_details->len; i++)
             {
               IcdDetails *details = g_ptr_array_index (host_stack->openxr_1_exp_layer_details, i);
               SrtOpenXr1Layer *layer = SRT_OPENXR_1_LAYER (details->icd);
@@ -8409,7 +8389,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
       if (host_stack != NULL
           && host_stack->openxr_1_imp_layer_details != NULL)
         {
-          for (i = 0; i < host_stack->openxr_1_imp_layer_details->len; i++)
+          for (size_t i = 0; i < host_stack->openxr_1_imp_layer_details->len; i++)
             {
               IcdDetails *details = g_ptr_array_index (host_stack->openxr_1_imp_layer_details, i);
               SrtOpenXr1Layer *layer = SRT_OPENXR_1_LAYER (details->icd);
@@ -8692,13 +8672,11 @@ pv_runtime_bind (PvRuntime *self,
           _SRT_GRAPHICS_EXPLICIT_VULKAN_LAYER_SUFFIX,
           _SRT_GRAPHICS_IMPLICIT_VULKAN_LAYER_SUFFIX,
         };
-      gsize i;
 
-      for (i = 0; i < G_N_ELEMENTS (layer_suffixes); i++)
+      for (size_t i = 0; i < G_N_ELEMENTS (layer_suffixes); i++)
         {
           g_auto(GStrv) search_path = NULL;
           const char *suffix = layer_suffixes[i];
-          gsize j;
 
           search_path = _srt_graphics_get_vulkan_search_paths (self->real_root,
                                                                _srt_const_strv (self->original_environ),
@@ -8706,7 +8684,7 @@ pv_runtime_bind (PvRuntime *self,
                                                                self->tuples->len,
                                                                suffix);
 
-          for (j = 0; search_path != NULL && search_path[j] != NULL; j++)
+          for (size_t j = 0; search_path != NULL && search_path[j] != NULL; j++)
             {
               const char *dir = search_path[j];
 
@@ -8728,9 +8706,8 @@ pv_runtime_bind (PvRuntime *self,
        * by the container. */
       g_auto(GStrv) search_path =
         _srt_graphics_get_openxr_1_runtime_search_paths (_srt_const_strv (self->original_environ));
-      gint i;
 
-      for (i = 0; search_path != NULL && search_path[i] != NULL; i++)
+      for (size_t i = 0; search_path != NULL && search_path[i] != NULL; i++)
         {
           const char *dir = search_path[i];
 
@@ -8755,18 +8732,16 @@ pv_runtime_bind (PvRuntime *self,
           _SRT_GRAPHICS_OPENXR_1_EXPLICIT_LAYER_SUFFIX,
           _SRT_GRAPHICS_OPENXR_1_IMPLICIT_LAYER_SUFFIX,
         };
-      gsize i;
 
-      for (i = 0; i < G_N_ELEMENTS (layer_suffixes); i++)
+      for (size_t i = 0; i < G_N_ELEMENTS (layer_suffixes); i++)
         {
           g_auto(GStrv) search_path = NULL;
           const char *suffix = layer_suffixes[i];
-          gsize j;
 
           search_path = _srt_graphics_get_openxr_1_layer_search_paths (_srt_const_strv (self->original_environ),
                                                                        suffix);
 
-          for (j = 0; search_path != NULL && search_path[j] != NULL; j++)
+          for (size_t j = 0; search_path != NULL && search_path[j] != NULL; j++)
             {
               const char *dir = search_path[j];
 
@@ -8866,9 +8841,8 @@ static gchar *
 pv_runtime_get_ld_library_path (PvRuntime *self)
 {
   g_autoptr(GString) ld_library_path = g_string_new ("");
-  gsize i;
 
-  for (i = 0; i < self->tuples->len; i++)
+  for (size_t i = 0; i < self->tuples->len; i++)
     {
       GQuark tuple_quark = g_array_index (self->tuples, GQuark, i);
       const char *tuple = g_quark_to_string (tuple_quark);
@@ -9009,27 +8983,25 @@ pv_runtime_has_library (PvRuntime *self,
                         const char *library)
 {
   glnx_autofd int source_files_fd = -1;
-  gsize i;
 
   g_return_val_if_fail (PV_IS_RUNTIME (self), FALSE);
   g_return_val_if_fail (library != NULL, FALSE);
 
   g_debug ("Checking whether runtime has library: %s", library);
 
-  for (i = 0; i < self->tuples->len; i++)
+  for (size_t i = 0; i < self->tuples->len; i++)
     {
       GQuark arch_quark = g_array_index (self->tuples, GQuark, i);
       const char *tuple = g_quark_to_string (arch_quark);
       g_autoptr(GPtrArray) dirs = NULL;
       const SrtKnownArchitecture *known;
-      gsize j;
 
       known = _srt_architecture_get_by_tuple (tuple);
       dirs = _srt_known_architecture_get_libdirs (tuple,
                                                   known,
                                                   SRT_LIBDIRS_FLAGS_NONE);
 
-      for (j = 0; j < dirs->len; j++)
+      for (size_t j = 0; j < dirs->len; j++)
         {
           const char *libdir = g_ptr_array_index (dirs, j);
           g_autofree gchar *path = g_build_filename (libdir, library, NULL);
@@ -9105,13 +9077,12 @@ void
 pv_runtime_log_overrides (PvRuntime *self)
 {
   g_auto(GStrv) listing = NULL;
-  gsize i;
 
   g_debug ("Overrides in %s:", self->overrides_in_container);
   listing = _srt_recursive_list_content (self->overrides, -1, ".", -1,
                                          _srt_peek_environ_nonnull (), NULL);
 
-  for (i = 0; listing[i] != NULL; i++)
+  for (size_t i = 0; listing[i] != NULL; i++)
     g_debug ("\t%s", listing[i]);
 
   g_debug ("End of overrides in %s", self->overrides_in_container);
@@ -9124,13 +9095,12 @@ void
 pv_runtime_log_container (PvRuntime *self)
 {
   g_auto(GStrv) listing = NULL;
-  gsize i;
 
   g_debug ("All files in container, excluding any extra bind mounts:");
   listing = _srt_recursive_list_content (self->runtime_files, -1, ".", -1,
                                          _srt_peek_environ_nonnull (), NULL);
 
-  for (i = 0; listing[i] != NULL; i++)
+  for (size_t i = 0; listing[i] != NULL; i++)
     g_debug ("\t%s", listing[i]);
 
   g_debug ("End of files in container");

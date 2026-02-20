@@ -4922,6 +4922,46 @@ static const VdpauTest vdpau_test[] =
   },
 };
 
+/*
+ * Assert that @vdpau_driver is internally consistent.
+ */
+static void
+assert_vdpau_driver_consistent (SrtVdpauDriver *vdpau_driver)
+{
+  gboolean is_extra = FALSE;
+  g_autofree gchar *library_path = NULL;
+  g_autofree gchar *resolved = NULL;
+  g_autofree gchar *resolved_property = NULL;
+
+  g_assert_true (SRT_IS_VDPAU_DRIVER (vdpau_driver));
+
+  g_object_get (vdpau_driver,
+                "is_extra", &is_extra,
+                "library_path", &library_path,
+                "resolved-library-path", &resolved_property,
+                NULL);
+
+  resolved = srt_vdpau_driver_resolve_library_path (vdpau_driver);
+
+  g_assert_cmpint (is_extra, ==, srt_vdpau_driver_is_extra (vdpau_driver));
+
+  /* These are invariants, even if they're NULL */
+  g_assert_cmpstr (library_path, ==, srt_vdpau_driver_get_library_path (vdpau_driver));
+  g_assert_cmpstr (resolved_property, ==, resolved);
+}
+
+static void
+assert_vdpau_drivers (const SrtObjectList *vdpau_drivers)
+{
+  const GList *iter;
+
+  for (iter = vdpau_drivers; iter != NULL; iter = iter->next)
+    {
+      g_test_message ("VDPAU library: %s", srt_vdpau_driver_get_library_path (iter->data));
+      assert_vdpau_driver_consistent (iter->data);
+    }
+}
+
 static void
 test_vdpau (Fixture *f,
             gconstpointer context)
@@ -4975,6 +5015,7 @@ test_vdpau (Fixture *f,
 
       /* The output is guaranteed to be in aphabetical order */
       vdpau = srt_system_info_list_vdpau_drivers (info, test->multiarch_tuple, SRT_DRIVER_FLAGS_NONE);
+      assert_vdpau_drivers (vdpau);
       check_list_suffixes (vdpau, test->vdpau_suffixes, SRT_GRAPHICS_VDPAU_MODULE);
       check_list_links (vdpau, test->vdpau_links, SRT_GRAPHICS_VDPAU_MODULE);
       check_paths_are_absolute (vdpau, SRT_GRAPHICS_VDPAU_MODULE);
@@ -4984,6 +5025,7 @@ test_vdpau (Fixture *f,
         {
           /* Do it again, this time including the extras */
           vdpau = srt_system_info_list_vdpau_drivers (info, test->multiarch_tuple, SRT_DRIVER_FLAGS_INCLUDE_ALL);
+          assert_vdpau_drivers (vdpau);
           check_list_suffixes (vdpau, test->vdpau_suffixes_extra, SRT_GRAPHICS_VDPAU_MODULE);
           check_paths_are_absolute (vdpau, SRT_GRAPHICS_VDPAU_MODULE);
           gulong non_extras = 0;
@@ -5002,6 +5044,7 @@ test_vdpau (Fixture *f,
 
           srt_system_info_set_environ (info, envp);
           vdpau = srt_system_info_list_vdpau_drivers (info, test->multiarch_tuple, SRT_DRIVER_FLAGS_NONE);
+          assert_vdpau_drivers (vdpau);
           check_list_suffixes (vdpau, test->vdpau_suffixes, SRT_GRAPHICS_VDPAU_MODULE);
           check_list_links (vdpau, test->vdpau_links, SRT_GRAPHICS_VDPAU_MODULE);
           check_paths_are_relative (vdpau, SRT_GRAPHICS_VDPAU_MODULE);

@@ -4026,6 +4026,47 @@ assert_dri_drivers (const SrtObjectList *dri_drivers)
     }
 }
 
+/*
+ * Assert that @va_api_driver is internally consistent.
+ */
+static void
+assert_va_api_driver_consistent (SrtVaApiDriver *va_api_driver)
+{
+  gboolean is_extra = FALSE;
+  g_autofree gchar *library_path = NULL;
+  g_autofree gchar *resolved = NULL;
+  g_autofree gchar *resolved_property = NULL;
+
+  g_assert_true (SRT_IS_VA_API_DRIVER (va_api_driver));
+
+  g_object_get (va_api_driver,
+                "is_extra", &is_extra,
+                "library_path", &library_path,
+                "resolved-library-path", &resolved_property,
+                NULL);
+
+  resolved = srt_va_api_driver_resolve_library_path (va_api_driver);
+
+  g_assert_cmpint (is_extra, ==, srt_va_api_driver_is_extra (va_api_driver));
+
+  /* These are invariants, even if they're NULL */
+  g_assert_cmpstr (library_path, ==, srt_va_api_driver_get_library_path (va_api_driver));
+  g_assert_cmpstr (resolved_property, ==, resolved);
+}
+
+static void
+assert_va_api_drivers (const SrtObjectList *va_api_drivers)
+{
+  const GList *iter;
+
+  for (iter = va_api_drivers; iter != NULL; iter = iter->next)
+    {
+      g_test_message ("VA-API library: %s",
+                      srt_va_api_driver_get_library_path (iter->data));
+      assert_va_api_driver_consistent (iter->data);
+    }
+}
+
 static void
 test_dri_debian10 (Fixture *f,
                    gconstpointer context)
@@ -4084,12 +4125,14 @@ test_dri_debian10 (Fixture *f,
   /* The output is guaranteed to be in aphabetical order */
   g_test_message ("i386 VA-API drivers...");
   va_api = srt_system_info_list_va_api_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_va_api_drivers (va_api);
   check_list_suffixes (va_api, va_api_suffixes_i386, SRT_GRAPHICS_VAAPI_MODULE);
   check_paths_are_absolute (va_api, SRT_GRAPHICS_VAAPI_MODULE);
   g_list_free_full (va_api, g_object_unref);
 
   g_test_message ("x86_64 VA-API drivers...");
   va_api = srt_system_info_list_va_api_drivers (info, multiarch_tuples[1], SRT_DRIVER_FLAGS_NONE);
+  assert_va_api_drivers (va_api);
   check_list_suffixes (va_api, va_api_suffixes_x86_64, SRT_GRAPHICS_VAAPI_MODULE);
   check_paths_are_absolute (va_api, SRT_GRAPHICS_VAAPI_MODULE);
   g_list_free_full (va_api, g_object_unref);
@@ -4116,11 +4159,13 @@ test_dri_debian10 (Fixture *f,
 
   g_test_message ("i386 VA-API drivers, from cache, with extras...");
   va_api = srt_system_info_list_va_api_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  assert_va_api_drivers (va_api);
   check_list_suffixes (va_api, va_api_suffixes_i386, SRT_GRAPHICS_VAAPI_MODULE);
   g_list_free_full (va_api, g_object_unref);
 
   g_test_message ("x86_64 VA-API drivers, from cache, with extras...");
   va_api = srt_system_info_list_va_api_drivers (info, multiarch_tuples[1], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  assert_va_api_drivers (va_api);
   check_list_suffixes (va_api, va_api_suffixes_x86_64, SRT_GRAPHICS_VAAPI_MODULE);
   g_list_free_full (va_api, g_object_unref);
 }
@@ -4179,11 +4224,13 @@ test_dri_fedora (Fixture *f,
 
   g_test_message ("i386 VA-API drivers...");
   va_api = srt_system_info_list_va_api_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_va_api_drivers (va_api);
   check_list_suffixes (va_api, va_api_suffixes_32, SRT_GRAPHICS_VAAPI_MODULE);
   g_list_free_full (va_api, g_object_unref);
 
   g_test_message ("x86_64 VA-API drivers...");
   va_api = srt_system_info_list_va_api_drivers (info, multiarch_tuples[1], SRT_DRIVER_FLAGS_NONE);
+  assert_va_api_drivers (va_api);
   check_list_suffixes (va_api, va_api_suffixes_64, SRT_GRAPHICS_VAAPI_MODULE);
   g_list_free_full (va_api, g_object_unref);
 }
@@ -4237,11 +4284,13 @@ test_dri_ubuntu16 (Fixture *f,
 
   g_test_message ("VA-API drivers...");
   va_api = srt_system_info_list_va_api_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_va_api_drivers (va_api);
   check_list_suffixes (va_api, va_api_suffixes, SRT_GRAPHICS_VAAPI_MODULE);
   g_list_free_full (va_api, g_object_unref);
 
   g_test_message ("VA-API drivers (all)...");
   va_api = srt_system_info_list_va_api_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  assert_va_api_drivers (va_api);
   check_list_suffixes (va_api, va_api_suffixes, SRT_GRAPHICS_VAAPI_MODULE);
   g_list_free_full (va_api, g_object_unref);
 }
@@ -4330,6 +4379,7 @@ test_dri_with_env (Fixture *f,
   /* The output is guaranteed to be in aphabetical order */
   g_test_message ("VA-API drivers...");
   va_api = srt_system_info_list_va_api_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_va_api_drivers (va_api);
   check_list_suffixes (va_api, va_api_suffixes, SRT_GRAPHICS_VAAPI_MODULE);
   check_paths_are_absolute (va_api, SRT_GRAPHICS_VAAPI_MODULE);
   g_list_free_full (va_api, g_object_unref);
@@ -4346,6 +4396,7 @@ test_dri_with_env (Fixture *f,
 
   g_test_message ("VA-API drivers (all)...");
   va_api = srt_system_info_list_va_api_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_INCLUDE_ALL);
+  assert_va_api_drivers (va_api);
   check_list_suffixes (va_api, va_api_suffixes_with_extras, SRT_GRAPHICS_VAAPI_MODULE);
   /* Minus one to not count the NULL terminator */
   check_list_extra (va_api, G_N_ELEMENTS(va_api_suffixes)-1, SRT_GRAPHICS_VAAPI_MODULE);
@@ -4375,6 +4426,7 @@ test_dri_with_env (Fixture *f,
 
   g_test_message ("VA-API drivers (with relative path)...");
   va_api = srt_system_info_list_va_api_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_va_api_drivers (va_api);
   check_list_suffixes (va_api, va_api_suffixes, SRT_GRAPHICS_VAAPI_MODULE);
   check_paths_are_relative (va_api, SRT_GRAPHICS_VAAPI_MODULE);
   g_list_free_full (va_api, g_object_unref);
@@ -4420,6 +4472,7 @@ test_dri_flatpak (Fixture *f,
 
   g_test_message ("VA-API drivers...");
   va_api = srt_system_info_list_va_api_drivers (info, multiarch_tuples[0], SRT_DRIVER_FLAGS_NONE);
+  assert_va_api_drivers (va_api);
   check_list_suffixes (va_api, va_api_suffixes, SRT_GRAPHICS_VAAPI_MODULE);
 }
 

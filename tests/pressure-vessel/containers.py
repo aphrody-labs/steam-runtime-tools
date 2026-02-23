@@ -1199,63 +1199,12 @@ class BaseContainersTest(BaseTest):
                                 os.path.join(overrides_libdir, soname),
                             )
 
-                cls = self.__class__
-
-                # Keys are the basename of a DRI driver.
-                # Values are lists of paths to DRI drivers of that name
-                # on the host. We assert that for each name, an arbitrary
-                # one of the DRI drivers of that name appears in the
-                # container.
-                expect_symlinks = {
-                }    # type: typing.Dict[str, typing.List[str]]
-
-                for dri in arch_info.get('dri_drivers', ()):
-                    path = dri['library_path']
-
-                    if path.startswith((    # any of:
-                        '/usr/lib/dri/',
-                        '/usr/lib32/dri/',
-                        '/usr/lib64/dri/',
-                        '/usr/lib/{}/dri/'.format(multiarch),
-                    )) and not dri.get('is_extra', False):
-                        # We don't make any assertion about the search
-                        # order here.
-
-                        if cls.run_inside_runtime:
-                            host_path = '/run/host/' + path
-                        else:
-                            host_path = path
-
-                        # Take the realpath() because `path` might be a symlink
-                        # itself, and it will be followed when creating links
-                        # in the `overrides/` dir inside the container.
-                        host_path = os.path.realpath(host_path)
-
-                        expect_symlinks.setdefault(
-                            os.path.basename(host_path), []
-                        ).append(host_path)
-
-                for k, vs in expect_symlinks.items():
-                    with self.subTest(dri_symlink=k):
-                        link = os.path.join(overrides_libdir, 'dri', k)
-
-                        logger.info('Target of %s should be in %s', link, vs)
-                        target = self.assertSymlink(link)
-
-                        if not cls.run_inside_runtime:
-                            self.assertEqual(target[:10], '/run/host/')
-                            target = target[9:]     # includes the / after host/
-
-                        # Take the realpath() on non-Debian-derived hosts,
-                        # because on Arch Linux, we find drivers in
-                        # /usr/lib64 that are physically in /usr/lib.
-                        # Be more strict on Debian because we know more
-                        # about the canonical paths there.
-                        if not self.host_is_debian_derived:
-                            with contextlib.suppress(OSError):
-                                target = os.path.realpath(target)
-
-                        self.assertIn(target, vs)
+                self.assertGraphicsModulesOverrides(
+                    modules=arch_info.get('dri_drivers', ()),
+                    module_type='dri',
+                    multiarch=multiarch,
+                    overrides_libdir=overrides_libdir,
+                )
 
                 if is_scout:
                     if self.host_is_debian_derived:

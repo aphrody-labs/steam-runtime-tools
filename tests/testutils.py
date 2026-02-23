@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
+import contextlib
 import logging
 import os
 import stat
@@ -19,6 +20,8 @@ except ImportError:
 else:
     Path        # placate pyflakes
     typing      # placate pyflakes
+
+logger = logging.getLogger('testutils')
 
 
 class MyCompletedProcess:
@@ -375,6 +378,80 @@ class BaseTest(unittest.TestCase):
             msg = '{} should not have existed'.format(path)
 
         raise AssertionError('{}, but: {}'.format(msg, result))
+
+    def assertGraphicsModulesOverrides(
+        self,
+        modules,            # type: typing.Iterable[typing.Dict[str, str]]
+        module_type,        # type: str
+        multiarch,          # type: str
+        overrides_libdir,   # type: str
+    ):
+        # type: (...) -> None
+        '''
+        Assert that the graphics modules `modules` of type `module_type`
+        are represented as as expected as symlinks
+        in the runtime `overrides` dir.
+
+        `modules` is part of the steam-runtime-system-info report
+        from the host system, a list of dicts with at least a
+        library_path member.
+        '''
+        cls = self.__class__
+
+        # Keys are the basename of a graphics module.
+        # Values are lists of paths to graphics modules of that name
+        # on the host. We assert that for each name, an arbitrary
+        # one of the graphics modules of that name appears in the
+        # container.
+        expect_symlinks = {
+        }    # type: typing.Dict[str, typing.List[str]]
+        for module in modules:
+            path = module['library_path']
+
+            if path.startswith((    # any of:
+                '/usr/lib/{}/'.format(module_type),
+                '/usr/lib32/{}/'.format(module_type),
+                '/usr/lib64/{}/'.format(module_type),
+                '/usr/lib/{}/{}/'.format(multiarch, module_type),
+            )) and not module.get('is_extra', False):
+                # We don't make any assertion about the search
+                # order here.
+
+                if cls.run_inside_runtime:
+                    host_path = '/run/host/' + path
+                else:
+                    host_path = path
+
+                # Take the realpath() because `path` might be a symlink
+                # itself, and it will be followed when creating links
+                # in the `overrides/` dir inside the container.
+                host_path = os.path.realpath(host_path)
+
+                expect_symlinks.setdefault(
+                    os.path.basename(host_path), []
+                ).append(host_path)
+
+        for k, vs in expect_symlinks.items():
+            with self.subTest(modules_symlink=k):
+                link = os.path.join(overrides_libdir, module_type, k)
+
+                logger.info('Target of %s should be in %s', link, vs)
+                target = self.assertSymlink(link)
+
+                if not cls.run_inside_runtime:
+                    self.assertEqual(target[:10], '/run/host/')
+                    target = target[9:]     # includes the / after host/
+
+                # Take the realpath() on non-Debian-derived hosts,
+                # because on Arch Linux, we find modules in
+                # /usr/lib64 that are physically in /usr/lib.
+                # Be more strict on Debian because we know more
+                # about the canonical paths there.
+                if not self.host_is_debian_derived:
+                    with contextlib.suppress(OSError):
+                        target = os.path.realpath(target)
+
+                self.assertIn(target, vs)
 
     def tearDown(self) -> None:
         pass

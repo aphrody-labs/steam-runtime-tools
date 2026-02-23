@@ -802,6 +802,11 @@ class TestInsideRuntime(BaseTest):
                     )
 
             if host_info:
+                run_inside_runtime = True
+                overrides_libdir = '{}/lib/{}'.format(
+                    overrides, multiarch
+                )
+
                 expect_symlinks = {
                 }    # type: typing.Dict[str, typing.List[str]]
                 for dri in host_info.get('dri_drivers', ()):
@@ -815,7 +820,11 @@ class TestInsideRuntime(BaseTest):
                     )) and not dri.get('is_extra', False):
                         # We don't make any assertion about the search
                         # order here.
-                        host_path = '/run/host' + path
+
+                        if run_inside_runtime:
+                            host_path = '/run/host/' + path
+                        else:
+                            host_path = path
 
                         # Take the realpath() because `path` might be a symlink
                         # itself, and it will be followed when creating links
@@ -828,11 +837,14 @@ class TestInsideRuntime(BaseTest):
 
                 for k, vs in expect_symlinks.items():
                     with self.subTest(dri_symlink=k):
-                        link = '{}/lib/{}/dri/{}'.format(
-                            overrides, multiarch, k,
-                        )
+                        link = os.path.join(overrides_libdir, 'dri', k)
+
                         logger.info('Target of %s should be in %s', link, vs)
                         target = self.assertSymlink(link)
+
+                        if not run_inside_runtime:
+                            self.assertEqual(target[:10], '/run/host/')
+                            target = target[9:]     # includes the / after host/
 
                         # Take the realpath() on non-Debian-derived hosts,
                         # because on Arch Linux, we find drivers in
@@ -841,7 +853,7 @@ class TestInsideRuntime(BaseTest):
                         # about the canonical paths there.
                         if not host_is_debian_derived:
                             with contextlib.suppress(OSError):
-                                target = os.path.realpath(link)
+                                target = os.path.realpath(target)
 
                         self.assertIn(target, vs)
 

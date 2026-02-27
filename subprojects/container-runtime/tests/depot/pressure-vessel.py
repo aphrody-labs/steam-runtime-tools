@@ -506,6 +506,7 @@ class TestPressureVessel(unittest.TestCase):
             self.assertNotIn('not-using-newer-host-libraries', issues)
             self.assertNotIn('unexpected-location', issues)
             self.assertNotIn('unexpected-version', issues)
+            self.assertNotIn('unknown', issues)
             # Don't assert whether it contains 'unofficial':
             # we want to be able to test unofficial runtimes too
 

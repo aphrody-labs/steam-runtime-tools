@@ -128,7 +128,7 @@ keys:
     :   An array of strings representing problems with the Steam
         installation. If empty, no problems were found.
 
-        **internal-error**
+        **unknown** (or **internal-error** in older reports)
         :   An error occurred while checking the Steam installation.
 
         **cannot-find**
@@ -169,7 +169,7 @@ keys:
     :   An array of strings representing problems with the Steam
         Runtime. If empty, no problems were found.
 
-        **internal-error**
+        **unknown** (or **internal-error** in older reports)
         :   An error occurred while checking the Steam Runtime.
 
         **disabled**
@@ -547,7 +547,7 @@ keys:
     :   A summary of issues found when loading the expected libraries,
         as an array of strings. If empty, no problems were found.
 
-        **internal-error**
+        **unknown** (or **internal-error** in older reports)
         :   There was an internal error while checking libraries.
 
         **cannot-load**
@@ -646,7 +646,7 @@ keys:
         :   Problems with this graphics stack, represented as an array
             of strings. The array is empty if no problems were detected.
 
-            **internal-error**
+            **unknown** (or **internal-error** in older reports)
             :   There was an internal error while checking graphics support.
 
             **cannot-load**
@@ -837,7 +837,7 @@ keys:
 :   An array of strings indicating locale-related issues.
     The array is empty if no problems were detected.
 
-    **internal-error**
+    **unknown** (or **internal-error** in older reports)
     :   There was an internal error while checking locale support.
 
     **default-missing**

@@ -4450,6 +4450,8 @@ json_parsing (Fixture *f,
                                srt_openxr_1_runtime_get_library_path (openxr_1_rt));
               g_assert_cmpstr (openxr_1_rt_expected->name, ==,
                                srt_openxr_1_runtime_get_name (openxr_1_rt));
+              g_assert_cmpint (openxr_1_rt_expected->issues, ==,
+                               srt_openxr_1_runtime_get_issues (openxr_1_rt));
             }
           else
             {
@@ -4516,6 +4518,7 @@ json_parsing (Fixture *f,
         {
           error = NULL;
           g_assert_cmpstr (t->egl_icd[j].json_path, ==, srt_egl_icd_get_json_path (iter->data));
+          g_assert_cmpint (t->egl_icd[j].issues, ==, srt_egl_icd_get_issues (iter->data));
           if (srt_egl_icd_check_error (iter->data, &error))
             {
               g_assert_cmpstr (t->egl_icd[j].library_path, ==, srt_egl_icd_get_library_path (iter->data));
@@ -4536,6 +4539,7 @@ json_parsing (Fixture *f,
         {
           error = NULL;
           g_assert_cmpstr (t->egl_ext_platform[j].json_path, ==, srt_egl_external_platform_get_json_path (iter->data));
+          g_assert_cmpint (t->egl_ext_platform[j].issues, ==, srt_egl_external_platform_get_issues (iter->data));
           if (srt_egl_external_platform_check_error (iter->data, &error))
             {
               g_assert_cmpstr (t->egl_ext_platform[j].library_path, ==, srt_egl_external_platform_get_library_path (iter->data));
@@ -4668,6 +4672,8 @@ json_parsing (Fixture *f,
                            srt_openxr_1_runtime_get_library_path (openxr_1_rt_fallback));
           g_assert_cmpstr (t->openxr_1_rt_fallback.name, ==,
                            srt_openxr_1_runtime_get_name (openxr_1_rt_fallback));
+          g_assert_cmpint (t->openxr_1_rt_fallback.issues, ==,
+                           srt_openxr_1_runtime_get_issues (openxr_1_rt_fallback));
         }
       else
         {
@@ -4686,6 +4692,8 @@ json_parsing (Fixture *f,
                            srt_openxr_1_runtime_get_library_path (iter->data));
           g_assert_cmpstr (t->openxr_1_rt_inactive[j].name, ==,
                            srt_openxr_1_runtime_get_name (iter->data));
+          g_assert_cmpint (t->openxr_1_rt_fallback.issues, ==,
+                           srt_openxr_1_runtime_get_issues (openxr_1_rt_fallback));
         }
       g_assert_cmpstr (t->openxr_1_rt_inactive[j].json_path, ==, NULL);
 

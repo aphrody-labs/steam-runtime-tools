@@ -4662,16 +4662,6 @@ json_parsing (Fixture *f,
                            srt_openxr_1_runtime_get_library_path (openxr_1_rt_fallback));
           g_assert_cmpstr (t->openxr_1_rt_fallback.name, ==,
                            srt_openxr_1_runtime_get_name (openxr_1_rt_fallback));
-
-          g_assert_nonnull (openxr_1_rt_fallback);
-          g_assert_cmpstr (t->openxr_1_rt_fallback.json_path, ==,
-                           srt_openxr_1_runtime_get_json_path (openxr_1_rt_fallback));
-          g_assert_cmpstr (t->openxr_1_rt_fallback.json_origin, ==,
-                           srt_openxr_1_runtime_get_json_origin (openxr_1_rt_fallback));
-          g_assert_cmpstr (t->openxr_1_rt_fallback.library_path, ==,
-                           srt_openxr_1_runtime_get_library_path (openxr_1_rt_fallback));
-          g_assert_cmpstr (t->openxr_1_rt_fallback.name, ==,
-                           srt_openxr_1_runtime_get_name (openxr_1_rt_fallback));
           g_assert_cmpint (t->openxr_1_rt_fallback.issues, ==,
                            srt_openxr_1_runtime_get_issues (openxr_1_rt_fallback));
         }

@@ -5,8 +5,14 @@
   "container" : {
     "type" : "flatpak",
     "flatpak_issues" : [
+      "unknown",
       "too-old",
-      "subsandbox-not-checked"
+      "subsandbox-not-checked",
+      "subsandbox-unavailable",
+      "subsandbox-timed-out",
+      "subsandbox-limited-by-setuid-bwrap",
+      "subsandbox-did-not-inherit-display",
+      "subsandbox-output-corrupted"
     ],
     "flatpak_version" : "1.10.2",
     "host" : {

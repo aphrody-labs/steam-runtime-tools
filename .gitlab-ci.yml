@@ -531,13 +531,13 @@ test:debian-11:
     extends: .test_deb
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian/eol:bullseye-slim
 
-test:debian-12:
-    extends: .test_deb
-    image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian:bookworm-slim
-
 test:debian-13:
     extends: .test_deb
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian:trixie-slim
+
+test:debian-14:
+    extends: .test_deb
+    image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian:forky-slim
 
 # TODO: Steam officially requires glibc ≥ 2.31, but we are continuing to
 # test on this older OS until there's a public Steam client release that

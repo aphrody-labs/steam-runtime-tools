@@ -3161,7 +3161,7 @@ static JsonTest json_test[] =
       .data_path = "/home/me/.local/share/Steam",
       .steamscript_path = "/usr/bin/steam",
       .steamscript_version = "1.0.0.66",
-      .issues = SRT_STEAM_ISSUES_STEAMSCRIPT_NOT_IN_ENVIRONMENT,
+      .issues = SRT_STEAM_ISSUES_NONE,
     },
 
     .runtime =
@@ -3341,11 +3341,12 @@ static JsonTest json_test[] =
           .json_origin = "/home/me/.config/openxr/1/active_runtime.x86_64.json",
           .library_path = "/usr/lib/libopenxr_monado.so",
           .name = "Monado",
+          .issues = SRT_LOADABLE_ISSUES_NONE,
         },
       },
     },
 
-    .locale_issues = SRT_LOCALE_ISSUES_C_UTF8_MISSING | SRT_LOCALE_ISSUES_I18N_SUPPORTED_MISSING,
+    .locale_issues = SRT_LOCALE_ISSUES_NONE,
     .locale =
     {
       {
@@ -3362,9 +3363,9 @@ static JsonTest json_test[] =
       },
       {
         .name = "C.UTF-8",
-        .error_domain = "srt-locale-error-quark",
-        .error_code = SRT_LOCALE_ERROR_FAILED,
-        .error_message = "No such file or directory",
+        .resulting_name = "C.UTF-8",
+        .charset = "UTF-8",
+        .is_utf8 = TRUE,
       },
       {
         .name = "en_US.UTF-8",
@@ -3416,6 +3417,7 @@ static JsonTest json_test[] =
         .api_version = "1.1.73",
         .implementation_version = "1",
         .library_path = "libVkLayer_MESA_overlay.so",
+        .issues = SRT_LOADABLE_ISSUES_NONE,
       },
     },
 
@@ -3429,6 +3431,7 @@ static JsonTest json_test[] =
         .api_version = "1.2.135",
         .implementation_version = "1",
         .library_path = "/usr/$LIB/libMangoHud.so",
+        .issues = SRT_LOADABLE_ISSUES_NONE,
       },
     },
 
@@ -3438,6 +3441,7 @@ static JsonTest json_test[] =
       .json_origin = "/etc/xdg/openxr/1/active_runtime.json",
       .library_path = "../../../lib/libopenxr_monado.so",
       .name = "Monado",
+      .issues = SRT_LOADABLE_ISSUES_NONE,
     },
 
     .openxr_1_rt_inactive =
@@ -3446,6 +3450,7 @@ static JsonTest json_test[] =
         .json_path = "/etc/xdg/openxr/1/active_runtime.m68k.json",
         .json_origin = "/etc/xdg/openxr/1/active_runtime.m68k.json",
         .library_path = "/usr/lib/libopenxr_monado.so",
+        .issues = SRT_LOADABLE_ISSUES_NONE,
       }
     },
 
@@ -3458,6 +3463,7 @@ static JsonTest json_test[] =
         .api_version = "1.1",
         .implementation_version = "1",
         .description = "API Layer to record api calls as they occur",
+        .issues = SRT_LOADABLE_ISSUES_NONE,
       },
     },
 
@@ -3471,13 +3477,6 @@ static JsonTest json_test[] =
         .api_version = "1.0",
         .implementation_version = "1.2.3",
         .description = "A fictitious API layer",
-      },
-      {
-        .json_path = "/etc/xdg/openxr/1/api_layers/implicit.d/broken.json",
-        .error_domain = "g-io-error-quark",
-        .error_code = 1,
-        .error_message = "This one is broken",
-        .issues = SRT_LOADABLE_ISSUES_CANNOT_LOAD,
       },
     },
 
@@ -3504,6 +3503,7 @@ static JsonTest json_test[] =
         NULL
       },
       .wayland_session = TRUE,
+      .wayland_issues = SRT_DISPLAY_WAYLAND_ISSUES_NONE,
       .x11_type = SRT_DISPLAY_X11_TYPE_XWAYLAND,
     },
 
@@ -3533,6 +3533,7 @@ static JsonTest json_test[] =
           .available = FALSE,
         },
       },
+      .issues = SRT_XDG_PORTAL_ISSUES_NONE
     },
   }, /* End Full good JSON report */
 

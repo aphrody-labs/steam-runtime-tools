@@ -107,7 +107,6 @@ except ImportError:
 from testutils import (
     BaseTest,
     run_subprocess,
-    tee_file_and_stderr,
     test_main,
 )
 
@@ -462,6 +461,17 @@ class TestContainers(BaseTest):
                         'w',
                     )
                 )
+
+                if not cls.artifacts_persist:
+                    log = sys.stderr        # type: typing.TextIO
+                else:
+                    log_path = os.path.join(cls.artifacts, 'host-srsi.log')
+                    logger.info(
+                        'Writing host s-r-s-i diagnostics to %s',
+                        log_path,
+                    )
+                    log = stack.enter_context(open(log_path, 'w'))
+
                 run_subprocess(
                     [
                         'env',
@@ -471,7 +481,7 @@ class TestContainers(BaseTest):
                     ],
                     cwd=cls.artifacts,
                     stdout=writer,
-                    stderr=2,
+                    stderr=log,
                     universal_newlines=True,
                 )
 
@@ -779,11 +789,13 @@ class TestContainers(BaseTest):
             wlock_writer = stack.enter_context(
                 open(os.path.join(temp, 'tmp-wlock', '.ref'), 'w'),
             )
-            tee = stack.enter_context(
-                tee_file_and_stderr(
-                    os.path.join(artifacts, 'pressure-vessel.log'),
-                )
-            )
+
+            if not self.artifacts_persist:
+                log = sys.stderr        # type: typing.TextIO
+            else:
+                log_path = os.path.join(artifacts, 'pressure-vessel.log')
+                logger.info('Writing pressure-vessel output to %s', log_path)
+                log = stack.enter_context(open(log_path, 'w'))
 
             lockdata = struct.pack('hhlli', fcntl.F_RDLCK, 0, 0, 0, 0)
             fcntl.fcntl(rlock_writer.fileno(), fcntl.F_SETLKW, lockdata)
@@ -797,8 +809,8 @@ class TestContainers(BaseTest):
                     argv,
                     cwd=self.artifacts,
                     env=env,
-                    stdout=tee.stdin,
-                    stderr=tee.stdin,
+                    stdout=log,
+                    stderr=log,
                     universal_newlines=True,
                 )
                 self.assertEqual(completed.returncode, 0)
@@ -1450,6 +1462,14 @@ class TestContainers(BaseTest):
             writer = stack.enter_context(
                 open(os.path.join(artifacts, 'srsi.json'), 'w'),
             )
+
+            if not self.artifacts_persist:
+                log = sys.stderr        # type: typing.TextIO
+            else:
+                log_path = os.path.join(artifacts, 'srsi.log')
+                logger.info('Writing s-r-s-i diagnostics to %s', log_path)
+                log = stack.enter_context(open(log_path, 'w'))
+
             completed = self.run_subprocess(
                 argv + [
                     '--',
@@ -1460,7 +1480,7 @@ class TestContainers(BaseTest):
                 ],
                 cwd=artifacts,
                 stdout=writer,
-                stderr=2,
+                stderr=log,
                 universal_newlines=True,
             )
 

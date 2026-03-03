@@ -1412,7 +1412,11 @@ class TestContainers(BaseTest):
         )
         os.makedirs(artifacts, exist_ok=True)
 
-        final_argv_path = os.path.join(self.artifacts, 'final-argv')
+        final_argv_path = os.path.join(
+            self.artifacts,
+            'no-runtime',
+            'final-argv',
+        )
 
         argv = [
             self.pv_wrap,

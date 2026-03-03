@@ -195,6 +195,11 @@ class TestContainers(BaseTest):
             # We can only do tests that just do setup and don't actually
             # try to run the container.
             cls.bwrap = None
+
+            if cls.getenv_tristate('ASSERT_BWRAP_WORKS'):
+                raise AssertionError(
+                    'bwrap executable {!r} did not work'.format(bwrap),
+                )
         else:
             cls.bwrap = bwrap
 

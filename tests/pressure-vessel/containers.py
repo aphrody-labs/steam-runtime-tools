@@ -454,10 +454,14 @@ class TestContainers(BaseTest):
 
         if host_srsi is not None:
             logger.info("We have the host srsi %s", host_srsi)
-            with open(
-                os.path.join(cls.artifacts, 'host-srsi.json'),
-                'w',
-            ) as writer:
+
+            with contextlib.ExitStack() as stack:
+                writer = stack.enter_context(
+                    open(
+                        os.path.join(cls.artifacts, 'host-srsi.json'),
+                        'w',
+                    )
+                )
                 run_subprocess(
                     [
                         'env',
@@ -692,13 +696,23 @@ class TestContainers(BaseTest):
         if not locales:
             argv.append('--no-generate-locales')
 
-        with tempfile.TemporaryDirectory(
-            prefix='test-', dir=var_dir
-        ) as temp, tempfile.TemporaryDirectory(
-            prefix='test-mock-base-', dir=var_dir
-        ) as mock_base, tempfile.TemporaryDirectory(
-            prefix='test-fake-home-', dir=var_dir
-        ) as fake_home_temp:
+        with contextlib.ExitStack() as stack:
+            temp = stack.enter_context(
+                tempfile.TemporaryDirectory(
+                    prefix='test-', dir=var_dir
+                ),
+            )
+            mock_base = stack.enter_context(
+                tempfile.TemporaryDirectory(
+                    prefix='test-mock-base-', dir=var_dir
+                ),
+            )
+            fake_home_temp = stack.enter_context(
+                tempfile.TemporaryDirectory(
+                    prefix='test-fake-home-', dir=var_dir
+                ),
+            )
+
             argv.extend(['--runtime-base', mock_base])
             argv.extend(['--variable-dir', temp])
 
@@ -759,13 +773,19 @@ class TestContainers(BaseTest):
             # Do not delete because we will write-lock .ref
             os.makedirs(os.path.join(temp, 'tmp-wlock'), exist_ok=True)
 
-            with open(
-                os.path.join(temp, 'tmp-rlock', '.ref'), 'w+'
-            ) as rlock_writer, open(
-                os.path.join(temp, 'tmp-wlock', '.ref'), 'w'
-            ) as wlock_writer, tee_file_and_stderr(
-                os.path.join(artifacts, 'pressure-vessel.log')
-            ) as tee:
+            rlock_writer = stack.enter_context(
+                open(os.path.join(temp, 'tmp-rlock', '.ref'), 'w+'),
+            )
+            wlock_writer = stack.enter_context(
+                open(os.path.join(temp, 'tmp-wlock', '.ref'), 'w'),
+            )
+            tee = stack.enter_context(
+                tee_file_and_stderr(
+                    os.path.join(artifacts, 'pressure-vessel.log'),
+                )
+            )
+
+            with contextlib.ExitStack():        # unused now
                 lockdata = struct.pack('hhlli', fcntl.F_RDLCK, 0, 0, 0, 0)
                 fcntl.fcntl(rlock_writer.fileno(), fcntl.F_SETLKW, lockdata)
                 lockdata = struct.pack('hhlli', fcntl.F_WRLCK, 0, 0, 0, 0)
@@ -1427,7 +1447,10 @@ class TestContainers(BaseTest):
         var = os.path.join(self.containers_dir, 'var')
         os.makedirs(var, exist_ok=True)
 
-        with open(os.path.join(artifacts, 'srsi.json'), 'w') as writer:
+        with contextlib.ExitStack() as stack:
+            writer = stack.enter_context(
+                open(os.path.join(artifacts, 'srsi.json'), 'w'),
+            )
             completed = self.run_subprocess(
                 argv + [
                     '--',

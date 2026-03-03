@@ -439,6 +439,8 @@ relocatable-install:arm64,amd64,i386:
             - _build/pressure-vessel-arm64+amd64+i386+src.tar.gz
         when: on_success
 
+# TODO: Will be replaced by relocatable-install:x86-steamrt3c
+# when the Steam client depends on glibc 2.31
 relocatable-install:
     extends: .relocatable_install
     needs:
@@ -517,10 +519,14 @@ relocatable-install:x86-steamrt3c:
 
         - *run_test
 
+# TODO: Steam officially requires glibc ≥ 2.31, but we are continuing to
+# test on this older OS until there's a public Steam client release that
+# genuinely has that dependency.
 test:debian-10:
     extends: .test_deb
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian/eol:buster-slim
 
+# Oldest Debian still supportable after the glibc ≥ 2.31 dependency
 test:debian-11:
     extends: .test_deb
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian/eol:bullseye-slim
@@ -533,10 +539,14 @@ test:debian-13:
     extends: .test_deb
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian:trixie-slim
 
+# TODO: Steam officially requires glibc ≥ 2.31, but we are continuing to
+# test on this older OS until there's a public Steam client release that
+# genuinely has that dependency.
 test:ubuntu-18.04:
     extends: .test_deb
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/ubuntu:18.04
 
+# Oldest Ubuntu still supportable after the glibc ≥ 2.31 dependency
 test:ubuntu-20.04:
     extends: .test_deb
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/ubuntu:20.04

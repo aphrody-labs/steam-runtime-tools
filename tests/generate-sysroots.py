@@ -601,8 +601,10 @@ with open(
     "disable_environment": "DISABLE_MINIMAL_LAYER"
   }
 }''')
-os.symlink('/opt/openxr-layers/implicit/minimal.json',
-           'fake-icds/etc/xdg/openxr/1/api_layers/implicit.d/minimal-symlink.json')
+os.symlink(
+    '/opt/openxr-layers/implicit/minimal.json',
+    'fake-icds/etc/xdg/openxr/1/api_layers/implicit.d/minimal-symlink.json',
+)
 
 with open(
     'fake-icds/usr/share/openxr/1/api_layers/implicit.d/maximal.json', 'w',

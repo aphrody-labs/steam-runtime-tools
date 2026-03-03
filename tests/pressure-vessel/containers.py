@@ -785,24 +785,23 @@ class TestContainers(BaseTest):
                 )
             )
 
-            with contextlib.ExitStack():        # unused now
-                lockdata = struct.pack('hhlli', fcntl.F_RDLCK, 0, 0, 0, 0)
-                fcntl.fcntl(rlock_writer.fileno(), fcntl.F_SETLKW, lockdata)
-                lockdata = struct.pack('hhlli', fcntl.F_WRLCK, 0, 0, 0, 0)
-                fcntl.fcntl(wlock_writer.fileno(), fcntl.F_SETLKW, lockdata)
+            lockdata = struct.pack('hhlli', fcntl.F_RDLCK, 0, 0, 0, 0)
+            fcntl.fcntl(rlock_writer.fileno(), fcntl.F_SETLKW, lockdata)
+            lockdata = struct.pack('hhlli', fcntl.F_WRLCK, 0, 0, 0, 0)
+            fcntl.fcntl(wlock_writer.fileno(), fcntl.F_SETLKW, lockdata)
 
-                # Put this in a subtest so that if it fails, we still get
-                # to inspect the copied sysroot
-                with self.subTest('run', copy=copy, runtime=runtime):
-                    completed = self.run_subprocess(
-                        argv,
-                        cwd=self.artifacts,
-                        env=env,
-                        stdout=tee.stdin,
-                        stderr=tee.stdin,
-                        universal_newlines=True,
-                    )
-                    self.assertEqual(completed.returncode, 0)
+            # Put this in a subtest so that if it fails, we still get
+            # to inspect the copied sysroot
+            with self.subTest('run', copy=copy, runtime=runtime):
+                completed = self.run_subprocess(
+                    argv,
+                    cwd=self.artifacts,
+                    env=env,
+                    stdout=tee.stdin,
+                    stderr=tee.stdin,
+                    universal_newlines=True,
+                )
+                self.assertEqual(completed.returncode, 0)
 
             with open(final_argv_path, 'r') as reader:
                 final_argv = reader.read()

@@ -10,6 +10,7 @@
 set -eux
 
 cwd="$(pwd)"
+export ASSERT_BWRAP_WORKS=1
 export AUTOPKGTEST_ARTIFACTS="$cwd/_build/artifacts"
 export PRESSURE_VESSEL_TEST_CONTAINERS="$cwd/_build/depot"
 pkgtestdir="$(pwd)/_build/installed-tests/steam-runtime-tools-0"

@@ -483,6 +483,8 @@ relocatable-install:x86-steamrt3c:
     needs:
         - relocatable-install
     stage: test
+    tags:
+        - x86_64-linux-kvm-docker-privileged
     artifacts:
         paths:
             - _build/artifacts

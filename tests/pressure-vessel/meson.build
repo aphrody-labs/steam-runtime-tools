@@ -59,7 +59,8 @@ foreach helper : helpers
       pressure_vessel_utils,
     ],
     include_directories : pv_include_dirs,
-    install : false,
+    install : get_option('installed_tests'),
+    install_dir : pv_tests_dir,
   )
 endforeach
 
@@ -114,7 +115,8 @@ foreach test_info : compiled_tests
       test_utils_static_libsteamrt_dep,
     ],
     include_directories : pv_include_dirs,
-    install : false,
+    install : get_option('installed_tests'),
+    install_dir : pv_tests_dir,
   )
   test(
     test_name, exe,
@@ -159,6 +161,17 @@ foreach test_name : tests + containers_tests
 endforeach
 
 if get_option('installed_tests')
+  install_data(
+    'containers.py',
+    'inside-runtime.py',
+    'prepare-test-depots.sh',
+    'pressure-vessel.supp',
+    'relocatable-install.py',
+    containers_tests,
+    tests,
+    install_dir: pv_tests_dir,
+  )
+
   # This file is used in .gitlab-ci.yml to enumerate the available tests
   # without having to rebuild all of steam-runtime-tools on each host OS
   test_conf = configuration_data()

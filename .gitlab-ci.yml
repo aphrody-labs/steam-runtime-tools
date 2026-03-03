@@ -477,7 +477,7 @@ relocatable-install:x86-steamrt3c:
             - _build/pressure-vessel-bin+src.tar.gz
         when: on_success
 
-.test_template:
+.test_x86:
     needs:
         - relocatable-install
     stage: test
@@ -497,8 +497,8 @@ relocatable-install:x86-steamrt3c:
         PYTHONPATH=$(pwd)/tests \
         python3 tests/pressure-vessel/containers.py
 
-.test_deb:
-    extends: .test_template
+.test_deb_x86:
+    extends: .test_x86
     script:
         - |
             set -eux
@@ -523,36 +523,36 @@ relocatable-install:x86-steamrt3c:
 # test on this older OS until there's a public Steam client release that
 # genuinely has that dependency.
 test:debian-10:
-    extends: .test_deb
+    extends: .test_deb_x86
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian/eol:buster-slim
 
 # Oldest Debian still supportable after the glibc ≥ 2.31 dependency
 test:debian-11:
-    extends: .test_deb
+    extends: .test_deb_x86
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian/eol:bullseye-slim
 
 test:debian-13:
-    extends: .test_deb
+    extends: .test_deb_x86
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian:trixie-slim
 
 test:debian-14:
-    extends: .test_deb
+    extends: .test_deb_x86
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian:forky-slim
 
 # TODO: Steam officially requires glibc ≥ 2.31, but we are continuing to
 # test on this older OS until there's a public Steam client release that
 # genuinely has that dependency.
 test:ubuntu-18.04:
-    extends: .test_deb
+    extends: .test_deb_x86
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/ubuntu:18.04
 
 # Oldest Ubuntu still supportable after the glibc ≥ 2.31 dependency
 test:ubuntu-20.04:
-    extends: .test_deb
+    extends: .test_deb_x86
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/ubuntu:20.04
 
 test:archlinux:
-    extends: .test_template
+    extends: .test_x86
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/archlinux:multilib-devel
     script:
         - ./ci/prepare-arch.sh

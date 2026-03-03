@@ -60,7 +60,9 @@ Influential environment variables:
     autopkgtest framework) instead of a temporary directory. This makes
     debugging easier.
 * BWRAP:
-    A bubblewrap executable
+    A bubblewrap executable.
+    Only set this if a setuid bwrap is required,
+    or if not running from a just-built version of steam-runtime-tools.
 * G_TEST_SRCDIR:
     The ./tests/pressure-vessel subdirectory of the source root,
     typically $(pwd)/tests/pressure-vessel
@@ -184,19 +186,6 @@ class TestContainers(BaseTest):
 
         if not os.environ.get('PRESSURE_VESSEL_TEST_CONTAINERS', ''):
             raise unittest.SkipTest('Containers not available')
-
-        bwrap = os.environ.get('BWRAP', shutil.which('bwrap'))
-
-        if bwrap is not None and run_subprocess(
-            [bwrap, '--dev-bind', '/', '/', 'sh', '-c', 'true'],
-            stdout=2,
-            stderr=2,
-        ).returncode != 0:
-            # We can only do tests that just do setup and don't actually
-            # try to run the container.
-            cls.bwrap = None
-        else:
-            cls.bwrap = bwrap
 
         cls.containers_dir = os.path.abspath(
             os.environ['PRESSURE_VESSEL_TEST_CONTAINERS']
@@ -418,6 +407,29 @@ class TestContainers(BaseTest):
 
             if not os.path.isdir(cls.pv_dir):
                 raise unittest.SkipTest('{} not found'.format(cls.pv_dir))
+
+        bwrap = os.environ.get(
+            'BWRAP',
+            os.path.join(
+                cls.pv_dir, 'libexec', 'steam-runtime-tools-0', 'srt-bwrap',
+            ),
+        )
+
+        if run_subprocess(
+            [bwrap, '--dev-bind', '/', '/', 'sh', '-c', 'true'],
+            stdout=2,
+            stderr=2,
+        ).returncode != 0:
+            # We can only do tests that just do setup and don't actually
+            # try to run the container.
+            cls.bwrap = None
+
+            if cls.getenv_tristate('ASSERT_BWRAP_WORKS'):
+                raise AssertionError(
+                    'bwrap executable {!r} did not work'.format(bwrap),
+                )
+        else:
+            cls.bwrap = bwrap
 
         cls.pv_wrap = os.path.join(cls.pv_dir, 'bin', 'pressure-vessel-wrap')
 

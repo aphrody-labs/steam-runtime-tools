@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import warnings
 
 try:
     import typing
@@ -93,6 +94,35 @@ class BaseTest(unittest.TestCase):
     is_i386 = False
     is_x86 = False
     is_x86_64 = False
+
+    @staticmethod
+    def getenv_tristate(
+        variable,
+    ):
+        # type: (str) -> typing.Optional[bool]
+        '''
+        Interpret an environment variable as a tristate,
+        returning a boolean if set, None if unset or empty.
+        Unrecognised values are treated as unset, with a warning.
+        '''
+
+        value = os.getenv(variable, '')
+
+        if value == '0':
+            return False
+
+        if value == '1':
+            return True
+
+        if value == '':
+            return None
+
+        warnings.warn(
+            '${} should be unset, empty, 0 or 1, not {!r}'.format(
+                variable, value,
+            )
+        )
+        return None
 
     @classmethod
     def setUpClass(cls) -> None:

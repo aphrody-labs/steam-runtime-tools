@@ -150,7 +150,10 @@ class BaseTest(unittest.TestCase):
         artifacts = os.getenv('AUTOPKGTEST_ARTIFACTS')
 
         if artifacts is not None:
-            cls.artifacts = os.path.abspath(artifacts)
+            cls.artifacts = os.path.join(
+                os.path.abspath(artifacts),
+                cls.__name__,
+            )
         else:
             cls.artifacts = cls.tmpdir.name
 

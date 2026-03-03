@@ -637,6 +637,7 @@ keys:
         **issues**
         :   Problems with the library, as arrays of the same strings
             described in **library-issues-summary** above.
+            Only printed if any issue has been found.
 
         **missing-symbols**
         :   If the library has missing symbols they are listed here.
@@ -696,7 +697,7 @@ keys:
 
         **issues**
         :   Problems with this graphics stack, represented as an array
-            of strings. The array is empty if no problems were detected.
+            of strings. Only printed if any issue has been found.
 
             **unknown** (or **internal-error** in older reports)
             :   There was an internal error while checking graphics support.
@@ -755,7 +756,7 @@ keys:
 
             **issues**
             :   Problems with this graphics device, represented as an array
-                of strings. The array is empty if no problems were detected.
+                of strings. Only printed if any issue has been found.
                 The possible values are the same as the ones in the **issues**
                 of **graphics-details**.
 

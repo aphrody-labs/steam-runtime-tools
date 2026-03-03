@@ -46,12 +46,12 @@ that was built against scout:
         --output="$PRESSURE_VESSEL_TEST_CONTAINERS/pressure-vessel" \
         --check-source-directory="$PRESSURE_VESSEL_TEST_CONTAINERS" \
         --allow-missing-sources
-    ./tests/pressure-vessel/containers.py
+    ./tests/pressure-vessel/soldier-usr.py  # etc.
 
 or against the SteamLinuxRuntime depot that gets uploaded to the Steam CDN:
 
     export PRESSURE_VESSEL_TEST_CONTAINERS=../SteamLinuxRuntime/depot
-    ./tests/pressure-vessel/containers.py
+    ./tests/pressure-vessel/soldier-usr.py  # etc.
 
 Influential environment variables:
 
@@ -107,7 +107,6 @@ except ImportError:
 from testutils import (
     BaseTest,
     run_subprocess,
-    test_main,
 )
 
 
@@ -150,7 +149,7 @@ FILESYSTEM_ENV_VARS = [
 ]
 
 
-class TestContainers(BaseTest):
+class BaseContainersTest(BaseTest):
     bwrap = None            # type: typing.Optional[str]
     containers_dir = ''
     host_srsi = None        # type: typing.Optional[str]
@@ -1289,208 +1288,9 @@ class TestContainers(BaseTest):
                     target = os.readlink(link)
                     self.assertEqual(target, '/run/host' + host_path)
 
-    def test_scout_sysroot(self) -> None:
-        scout = os.path.join(self.containers_dir, 'scout_sysroot')
-
-        with self.subTest('only-prepare'):
-            self._test_scout(
-                'scout_sysroot_prep', scout,
-                copy=True, only_prepare=True,
-            )
-
-        with self.subTest('copy'):
-            self._test_scout('scout_sysroot_copy', scout, copy=True, gc=False)
-
-        with self.subTest('fake-home'):
-            self._test_scout(
-                'scout_sysroot_fake_home', scout, copy=True, fake_home=True,
-            )
-
-        with self.subTest('transient'):
-            self._test_scout('scout_sysroot', scout, locales=True)
-
-    def test_scout_sysroot_usrmerge(self) -> None:
-        scout = os.path.join(self.containers_dir, 'scout_sysroot_usrmerge')
-
-        with self.subTest('only-prepare'):
-            self._test_scout(
-                'scout_sysroot_prep_usrmerge', scout,
-                copy=True, only_prepare=True,
-            )
-
-        with self.subTest('copy'):
-            self._test_scout(
-                'scout_sysroot_copy_usrmerge', scout,
-                copy=True, gc=False,
-            )
-
-        with self.subTest('fake-home'):
-            self._test_scout(
-                'scout_sysroot_fake_home', scout, copy=True, fake_home=True,
-            )
-
-        with self.subTest('transient'):
-            self._test_scout('scout_sysroot_usrmerge', scout, locales=True)
-
-    def test_scout_usr(self) -> None:
-        scout = os.path.join(self.containers_dir, 'scout')
-
-        with self.subTest('only-prepare'):
-            self._test_scout('scout_prep', scout, copy=True, only_prepare=True)
-
-        with self.subTest('copy'):
-            self._test_scout('scout_copy', scout, copy=True, locales=True)
-
-        with self.subTest('fake-home'):
-            self._test_scout(
-                'scout_fake_home', scout, copy=True, fake_home=True,
-            )
-
-        with self.subTest('transient'):
-            self._test_scout('scout', scout)
-
-    def test_soldier_sysroot(self) -> None:
-        soldier = os.path.join(self.containers_dir, 'soldier_sysroot')
-
-        with self.subTest('only-prepare'):
-            self._test_soldier(
-                'soldier_sysroot_prep', soldier,
-                copy=True, only_prepare=True,
-            )
-
-        with self.subTest('copy'):
-            self._test_soldier(
-                'soldier_sysroot_copy', soldier, copy=True, gc=False,
-            )
-
-        with self.subTest('fake-home'):
-            self._test_soldier(
-                'soldier_sysroot_fake_home', soldier, copy=True,
-                fake_home=True,
-            )
-
-        with self.subTest('transient'):
-            self._test_soldier('soldier_sysroot', soldier, locales=True)
-
-    def test_soldier_usr(self) -> None:
-        soldier = os.path.join(self.containers_dir, 'soldier')
-
-        with self.subTest('only-prepare'):
-            self._test_soldier(
-                'soldier_prep', soldier, copy=True, only_prepare=True,
-            )
-
-        with self.subTest('copy'):
-            self._test_soldier(
-                'soldier_copy', soldier, copy=True, locales=True,
-            )
-
-        cls = self.__class__
-        if cls.is_x86:
-            with self.subTest('prepare-mock-emulator-usr'):
-                self._test_soldier(
-                    'soldier_prepare_mock_emulator_usr', soldier,
-                    copy=True,
-                    locales=True,
-                    mock_emulator='env.json',
-                    only_prepare=True,
-                )
-
-            with self.subTest('prepare-mock-emulator-local'):
-                self._test_soldier(
-                    'soldier_prepare_mock_emulator_local', soldier,
-                    copy=True,
-                    locales=True,
-                    mock_emulator='sh.json',
-                    only_prepare=True,
-                )
-
-            with self.subTest('mock-emulator-usr'):
-                self._test_soldier(
-                    'soldier_mock_emulator_usr', soldier,
-                    copy=True,
-                    locales=True,
-                    mock_emulator='env.json',
-                )
-
-            with self.subTest('mock-emulator-local'):
-                self._test_soldier(
-                    'soldier_mock_emulator_local', soldier,
-                    copy=True,
-                    locales=True,
-                    mock_emulator='sh.json',
-                )
-
-        with self.subTest('fake-home,bwrap-setuid'):
-            self._test_soldier(
-                'soldier_fake_home',
-                soldier,
-                copy=True,
-                fake_home=True,
-                workarounds=['+bwrap-setuid'],
-            )
-
-        with self.subTest('transient'):
-            self._test_soldier('soldier', soldier)
-
-    def test_no_runtime(self) -> None:
-        if self.bwrap is None:
-            self.skipTest('Unable to run bwrap (in a container?)')
-
-        artifacts = os.path.join(
-            self.artifacts,
-            'no-runtime',
-        )
-        os.makedirs(artifacts, exist_ok=True)
-
-        final_argv_path = os.path.join(
-            self.artifacts,
-            'no-runtime',
-            'final-argv',
-        )
-
-        argv = [
-            self.pv_wrap,
-            '--verbose',
-            '--write-final-argv', final_argv_path,
-        ]
-
-        var = os.path.join(self.containers_dir, 'var')
-        os.makedirs(var, exist_ok=True)
-
-        with contextlib.ExitStack() as stack:
-            writer = stack.enter_context(
-                open(os.path.join(artifacts, 'srsi.json'), 'w'),
-            )
-
-            if not self.artifacts_persist:
-                log = sys.stderr        # type: typing.TextIO
-            else:
-                log_path = os.path.join(artifacts, 'srsi.log')
-                logger.info('Writing s-r-s-i diagnostics to %s', log_path)
-                log = stack.enter_context(open(log_path, 'w'))
-
-            completed = self.run_subprocess(
-                argv + [
-                    '--',
-                    'env',
-                    'LD_BIND_NOW=1',
-                    self.host_srsi or 'true',
-                    '--verbose',
-                ],
-                cwd=artifacts,
-                stdout=writer,
-                stderr=log,
-                universal_newlines=True,
-            )
-
-        self.assertEqual(completed.returncode, 0)
-
 
 if __name__ == '__main__':
     assert sys.version_info >= (3, 4), \
         'Python 3.4+ is required'
-
-    test_main()
 
 # vi: set sw=4 sts=4 et:

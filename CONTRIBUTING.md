@@ -290,8 +290,8 @@ several things have to be pulled together:
     using the `test_containers_dir` Meson option. `build-aux/many-builds.py`
     does this for the `_build/host` build by default.
 
-After putting all that together, we can run
-`tests/pressure-vessel/containers.py` as an ordinary automated test.
+After putting all that together, we can run the tests that are based on
+`tests/pressure-vessel/containers.py` as ordinary automated tests.
 `build-aux/many-builds.py test` will do that for you.
 
 ## Manual testing for pressure-vessel

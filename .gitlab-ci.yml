@@ -454,6 +454,7 @@ relocatable-install:
         paths:
             - _build/pressure-vessel-bin.tar.gz
             - _build/pressure-vessel-bin+src.tar.gz
+            - _build/containers-tests.txt
         when: on_success
 
 # This will replace the scout relocatable-install build (above)
@@ -475,6 +476,7 @@ relocatable-install:x86-steamrt3c:
         paths:
             - _build/pressure-vessel-bin.tar.gz
             - _build/pressure-vessel-bin+src.tar.gz
+            - _build/containers-tests.txt
         when: on_success
 
 .test_x86:
@@ -489,13 +491,8 @@ relocatable-install:x86-steamrt3c:
 .run_test: &run_test
     - |
         set -eux
-
         ./tests/pressure-vessel/prepare-test-depots.sh
-
-        export AUTOPKGTEST_ARTIFACTS="$(pwd)/_build/artifacts"
-        export PRESSURE_VESSEL_TEST_CONTAINERS="$(pwd)/_build/depot"
-        PYTHONPATH=$(pwd)/tests \
-        python3 tests/pressure-vessel/containers.py
+        ./ci/run-container-tests.sh
 
 .test_deb_x86:
     extends: .test_x86

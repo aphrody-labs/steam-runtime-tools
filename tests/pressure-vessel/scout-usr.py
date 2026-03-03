@@ -22,18 +22,18 @@ class TestScoutUsr(BaseContainersTest):
         scout = os.path.join(self.containers_dir, 'scout')
 
         with self.subTest('only-prepare'):
-            self._test_scout('scout_prep', scout, copy=True, only_prepare=True)
-
-        with self.subTest('copy'):
-            self._test_scout('scout_copy', scout, copy=True, locales=True)
-
-        with self.subTest('fake-home'):
             self._test_scout(
-                'scout_fake_home', scout, copy=True, fake_home=True,
+                'only-prepare', scout, copy=True, only_prepare=True,
             )
 
+        with self.subTest('copy'):
+            self._test_scout('copy', scout, copy=True, locales=True)
+
+        with self.subTest('fake-home'):
+            self._test_scout('fake-home', scout, copy=True, fake_home=True)
+
         with self.subTest('transient'):
-            self._test_scout('scout', scout)
+            self._test_scout('transient', scout)
 
 
 if __name__ == '__main__':

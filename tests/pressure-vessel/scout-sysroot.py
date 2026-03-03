@@ -23,43 +23,41 @@ class TestScoutSysroot(BaseContainersTest):
 
         with self.subTest('only-prepare'):
             self._test_scout(
-                'scout_sysroot_prep', scout,
+                'only-prepare', scout,
                 copy=True, only_prepare=True,
             )
 
         with self.subTest('copy'):
-            self._test_scout('scout_sysroot_copy', scout, copy=True, gc=False)
+            self._test_scout('copy', scout, copy=True, gc=False)
 
         with self.subTest('fake-home'):
-            self._test_scout(
-                'scout_sysroot_fake_home', scout, copy=True, fake_home=True,
-            )
+            self._test_scout('fake-home', scout, copy=True, fake_home=True)
 
         with self.subTest('transient'):
-            self._test_scout('scout_sysroot', scout, locales=True)
+            self._test_scout('transient', scout, locales=True)
 
     def test_scout_sysroot_usrmerge(self) -> None:
         scout = os.path.join(self.containers_dir, 'scout_sysroot_usrmerge')
 
         with self.subTest('only-prepare'):
             self._test_scout(
-                'scout_sysroot_prep_usrmerge', scout,
+                'usrmerge-only-prepare', scout,
                 copy=True, only_prepare=True,
             )
 
         with self.subTest('copy'):
             self._test_scout(
-                'scout_sysroot_copy_usrmerge', scout,
+                'usrmerge-copy', scout,
                 copy=True, gc=False,
             )
 
         with self.subTest('fake-home'):
             self._test_scout(
-                'scout_sysroot_fake_home', scout, copy=True, fake_home=True,
+                'usrmerge-fake-home', scout, copy=True, fake_home=True,
             )
 
         with self.subTest('transient'):
-            self._test_scout('scout_sysroot_usrmerge', scout, locales=True)
+            self._test_scout('usrmerge-transient', scout, locales=True)
 
 
 if __name__ == '__main__':

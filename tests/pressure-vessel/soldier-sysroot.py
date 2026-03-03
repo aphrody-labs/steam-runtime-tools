@@ -23,23 +23,23 @@ class TestSoldierSysroot(BaseContainersTest):
 
         with self.subTest('only-prepare'):
             self._test_soldier(
-                'soldier_sysroot_prep', soldier,
+                'only-prepare', soldier,
                 copy=True, only_prepare=True,
             )
 
         with self.subTest('copy'):
             self._test_soldier(
-                'soldier_sysroot_copy', soldier, copy=True, gc=False,
+                'copy', soldier, copy=True, gc=False,
             )
 
         with self.subTest('fake-home'):
             self._test_soldier(
-                'soldier_sysroot_fake_home', soldier, copy=True,
+                'fake-home', soldier, copy=True,
                 fake_home=True,
             )
 
         with self.subTest('transient'):
-            self._test_soldier('soldier_sysroot', soldier, locales=True)
+            self._test_soldier('transient', soldier, locales=True)
 
 
 if __name__ == '__main__':

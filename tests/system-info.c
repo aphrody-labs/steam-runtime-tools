@@ -3794,6 +3794,7 @@ static JsonTest json_test[] =
     {
       .type = SRT_CONTAINER_TYPE_UNKNOWN,
       .flatpak_issues = SRT_FLATPAK_ISSUES_NONE,
+      .bwrap_issues = SRT_BWRAP_ISSUES_UNKNOWN,
     },
     .architecture =
     {
@@ -3841,6 +3842,7 @@ static JsonTest json_test[] =
     {
       .type = SRT_CONTAINER_TYPE_UNKNOWN,
       .flatpak_issues = SRT_FLATPAK_ISSUES_NONE,
+      .bwrap_issues = SRT_BWRAP_ISSUES_UNKNOWN,
     },
     .architecture =
     {
@@ -4270,8 +4272,14 @@ json_parsing (Fixture *f,
       host_directory = srt_system_info_dup_container_host_directory (info);
       g_assert_cmpint (t->container.type, ==, srt_system_info_get_container_type (info));
       g_assert_cmpstr (t->container.host_path, ==, host_directory);
+      g_assert_cmpstr (t->container.bwrap_messages, ==,
+                       srt_container_info_get_bwrap_messages (container));
+      g_assert_cmpstr (t->container.bwrap_path, ==,
+                       srt_container_info_get_bwrap_path (container));
       g_assert_cmpstr (t->container.flatpak_version, ==,
                        srt_container_info_get_flatpak_version (container));
+      g_assert_cmpuint (t->container.bwrap_issues, ==,
+                        srt_container_info_get_bwrap_issues (container));
       g_assert_cmpuint (t->container.flatpak_issues, ==,
                         srt_container_info_get_flatpak_issues (container));
 

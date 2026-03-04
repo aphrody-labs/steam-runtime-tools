@@ -18,6 +18,8 @@ logger = logging.getLogger('test-scout-sysroot')
 
 
 class TestScoutSysroot(BaseContainersTest):
+    runtime_is_sdk = True
+
     def test_scout_sysroot(self) -> None:
         scout = os.path.join(self.containers_dir, 'scout_sysroot')
 

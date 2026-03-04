@@ -100,6 +100,9 @@ class TestInsideRuntime(BaseTest):
         self.runtime_is_scout = bool(
             os.environ.get('TEST_INSIDE_RUNTIME_IS_SCOUT'),
         )
+        self.runtime_is_sdk = bool(
+            os.environ.get('TEST_INSIDE_RUNTIME_IS_SDK'),
+        )
         self.runtime_is_soldier = bool(
             os.environ.get('TEST_INSIDE_RUNTIME_IS_SOLDIER'),
         )

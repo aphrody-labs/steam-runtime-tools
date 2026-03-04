@@ -156,6 +156,7 @@ class BaseContainersTest(BaseTest):
     host_srsi_parsed = {}   # type: typing.Dict[str, typing.Any]
     pv_dir = ''
     pv_wrap = ''
+    runtime_is_sdk = False
 
     @staticmethod
     def copy2(src, dest):
@@ -521,6 +522,7 @@ class BaseContainersTest(BaseTest):
         self.host_srsi_parsed = cls.host_srsi_parsed
         self.pv_dir = cls.pv_dir
         self.pv_wrap = cls.pv_wrap
+        self.runtime_is_sdk = cls.runtime_is_sdk
 
         os.makedirs(os.path.join(cls.artifacts, 'tmp'), exist_ok=True)
 
@@ -652,6 +654,8 @@ class BaseContainersTest(BaseTest):
         start_time = time.time()
         logger.info('Testing: %s', test_name)
 
+        is_sdk = self.runtime_is_sdk
+
         artifacts = os.path.join(
             self.artifacts,
             test_name,
@@ -758,6 +762,9 @@ class BaseContainersTest(BaseTest):
                     ),
                     'TEST_INSIDE_RUNTIME_IS_SCOUT=' + (
                         '1' if is_scout else ''
+                    ),
+                    'TEST_INSIDE_RUNTIME_IS_SDK=' + (
+                        '1' if is_sdk else ''
                     ),
                     'TEST_INSIDE_RUNTIME_IS_SOLDIER=' + (
                         '1' if is_soldier else ''

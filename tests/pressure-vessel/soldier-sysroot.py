@@ -18,6 +18,8 @@ logger = logging.getLogger('test-soldier-sysroot')
 
 
 class TestSoldierSysroot(BaseContainersTest):
+    runtime_is_sdk = True
+
     def test_soldier_sysroot(self) -> None:
         soldier = os.path.join(self.containers_dir, 'soldier_sysroot')
 

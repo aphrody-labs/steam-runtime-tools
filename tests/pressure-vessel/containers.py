@@ -1027,47 +1027,21 @@ class BaseContainersTest(BaseTest):
                             devlib = soname.split('.so.', 1)[0] + '.so'
 
                             # It was deleted from /lib, if present...
-                            with self.assertRaises(FileNotFoundError):
-                                print(
-                                    '#',
-                                    os.path.join(root_libdir, soname),
-                                    '->',
-                                    os.readlink(
-                                        os.path.join(root_libdir, soname)
-                                    ),
-                                )
+                            self.assertNoFile(
+                                os.path.join(root_libdir, soname),
+                            )
                             # ... and /usr/lib, if present...
-                            with self.assertRaises(FileNotFoundError):
-                                print(
-                                    '#',
-                                    os.path.join(usr_libdir, soname),
-                                    '->',
-                                    os.readlink(
-                                        os.path.join(usr_libdir, soname)
-                                    ),
-                                )
+                            self.assertNoFile(
+                                os.path.join(usr_libdir, soname),
+                            )
                             # ... and /libQUAL and /usr/libQUAL, if present
                             if libqualdir:
-                                with self.assertRaises(FileNotFoundError):
-                                    print(
-                                        '#',
-                                        os.path.join(libqualdir, soname),
-                                        '->',
-                                        os.readlink(
-                                            os.path.join(libqualdir, soname)
-                                        ),
-                                    )
-                                with self.assertRaises(FileNotFoundError):
-                                    print(
-                                        '#',
-                                        os.path.join(usr_libqualdir, soname),
-                                        '->',
-                                        os.readlink(
-                                            os.path.join(
-                                                usr_libqualdir, soname,
-                                            )
-                                        ),
-                                    )
+                                self.assertNoFile(
+                                    os.path.join(libqualdir, soname),
+                                )
+                                self.assertNoFile(
+                                    os.path.join(usr_libqualdir, soname),
+                                )
 
                             # In most cases we expect the development
                             # symlink to be removed, too - but some of
@@ -1077,24 +1051,12 @@ class BaseContainersTest(BaseTest):
                                 'libc.so.6',
                                 'libpthread.so.0',
                             ):
-                                with self.assertRaises(FileNotFoundError):
-                                    print(
-                                        '#',
-                                        os.path.join(usr_libdir, devlib),
-                                        '->',
-                                        os.readlink(
-                                            os.path.join(usr_libdir, devlib)
-                                        ),
-                                    )
-                                with self.assertRaises(FileNotFoundError):
-                                    print(
-                                        '#',
-                                        os.path.join(root_libdir, devlib),
-                                        '->',
-                                        os.readlink(
-                                            os.path.join(root_libdir, devlib)
-                                        ),
-                                    )
+                                self.assertNoFile(
+                                    os.path.join(usr_libdir, devlib),
+                                )
+                                self.assertNoFile(
+                                    os.path.join(root_libdir, devlib),
+                                )
 
                     for soname in (
                         # These are some examples of libraries in the
@@ -1133,28 +1095,24 @@ class BaseContainersTest(BaseTest):
                             self.assertRegex(target, r'^/run/host/')
 
                             # It was deleted from /lib, if present...
-                            with self.assertRaises(FileNotFoundError):
-                                os.readlink(
-                                    os.path.join(root_libdir, soname)
-                                )
-                            with self.assertRaises(FileNotFoundError):
-                                os.readlink(
-                                    os.path.join(root_libdir, devlib)
-                                )
+                            self.assertNoFile(
+                                os.path.join(root_libdir, soname),
+                            )
+                            self.assertNoFile(
+                                os.path.join(root_libdir, devlib),
+                            )
                             self.assertEqual(
                                 glob.glob(os.path.join(root_libdir, pattern)),
                                 [],
                             )
 
                             # ... and /usr/lib, if present
-                            with self.assertRaises(FileNotFoundError):
-                                os.readlink(
-                                    os.path.join(usr_libdir, soname)
-                                )
-                            with self.assertRaises(FileNotFoundError):
-                                os.readlink(
-                                    os.path.join(usr_libdir, devlib)
-                                )
+                            self.assertNoFile(
+                                os.path.join(usr_libdir, soname),
+                            )
+                            self.assertNoFile(
+                                os.path.join(usr_libdir, devlib),
+                            )
                             self.assertEqual(
                                 glob.glob(os.path.join(usr_libdir, pattern)),
                                 [],
@@ -1165,10 +1123,9 @@ class BaseContainersTest(BaseTest):
                         'libfltk.so.1.1',
                     ):
                         with self.subTest(soname=soname):
-                            with self.assertRaises(FileNotFoundError):
-                                os.readlink(
-                                    os.path.join(overrides_libdir, soname),
-                                )
+                            self.assertNoFile(
+                                os.path.join(overrides_libdir, soname),
+                            )
 
                 # Keys are the basename of a DRI driver.
                 # Values are lists of paths to DRI drivers of that name

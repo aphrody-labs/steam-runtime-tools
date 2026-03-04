@@ -882,9 +882,27 @@ class TestInsideRuntime(BaseTest):
                             'library-vendor',
                         ):
                             with self.subTest(key=key):
-                                if key in host_details:
+                                host_value = host_details.get(key)
+
+                                # An unknown library vendor or a missing
+                                # library is represented as "unknown",
+                                # whereas an unknown or non-functioning
+                                # renderer is represented as null (None).
+                                # Normalize to None.
+                                if (
+                                    key == 'library-vendor'
+                                    and host_value == 'unknown'
+                                ):
+                                    host_value = None
+
+                                # If the host library can't be loaded or
+                                # identified, we can't assert that the same
+                                # will be true in the container:
+                                # SLR has a fallback copy of Mesa,
+                                # with at least software rendering available.
+                                if host_value is not None:
                                     self.assertEqual(
-                                        host_details[key],
+                                        host_value,
                                         details.get(key),
                                     )
 

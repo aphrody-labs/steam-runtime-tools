@@ -10,8 +10,15 @@ steam-runtime-tools (0.20260220.0) UNRELEASED; urgency=medium
   [ Simon McVittie ]
   * pressure-vessel:
     - Refactoring
+  * Tests:
+    - Replace tests/pressure-vessel/containers.py with smaller tests that
+      can run in parallel (the total coverage is the same)
+    - Don't write pressure-vessel debug logs to top-level CI log since
+      this can result in limits being exceeded
+    - Align artifacts subdirectory names with subTest names
+    (steamrt/tasks#919)
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 20 Feb 2026 14:53:16 +0000
+ -- Simon McVittie <smcv@collabora.com>  Wed, 04 Mar 2026 11:11:24 +0000
 
 steam-runtime-tools (0.20260218.0) steamrt; urgency=medium
 

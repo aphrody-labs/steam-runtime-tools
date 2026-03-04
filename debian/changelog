@@ -4,8 +4,10 @@ steam-runtime-tools (0.20260220.0) UNRELEASED; urgency=medium
   * pressure-vessel:
     - Append host GBM backends to GBM_BACKENDS_PATH when running PV
       inside FEX, making them available for thunks (steamrt/tasks#900)
+  * s-r-system-info:
+    - Improve documentation (steamrt/tasks#837)
   * Tests:
-    - Improve coverage
+    - Improve coverage (steamrt/tasks#837)
 
   [ Simon McVittie ]
   * pressure-vessel:
@@ -16,9 +18,11 @@ steam-runtime-tools (0.20260220.0) UNRELEASED; urgency=medium
     - Don't write pressure-vessel debug logs to top-level CI log since
       this can result in limits being exceeded
     - Align artifacts subdirectory names with subTest names
+    - In CI, produce TAP output via python3-tap if possible
+    - Remove dead code
     (steamrt/tasks#919)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 04 Mar 2026 11:11:24 +0000
+ -- Simon McVittie <smcv@collabora.com>  Wed, 04 Mar 2026 15:43:40 +0000
 
 steam-runtime-tools (0.20260218.0) steamrt; urgency=medium
 

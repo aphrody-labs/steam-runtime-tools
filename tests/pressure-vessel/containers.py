@@ -1086,25 +1086,35 @@ class BaseContainersTest(BaseTest):
                                 if os.path.exists(host_path):
                                     break
                             else:
-                                logger.info(
-                                    '%s not found in host $LIB or /usr/$LIB',
-                                    soname,
-                                )
+                                # We didn't find /{,usr/}lib/MULTIARCH/SONAME,
+                                # but in general we can't know whether that's
+                                # because the host doesn't have it, or
+                                # because the host uses a different library
+                                # directory like /usr/lib{,32,64}.
+                                # Make the weaker assertion that the library
+                                # exists either in the runtime's /usr,
+                                # or captured from the host.
                                 self.assertTrue(
                                     os.path.exists(
                                         os.path.join(usr_libdir, soname)
                                     )
                                     or os.path.exists(
                                         os.path.join(root_libdir, soname)
+                                    )
+                                    or os.path.islink(
+                                        os.path.join(overrides_libdir, soname)
                                     ),
-                                    '{} not found in host $LIB or /usr/$LIB'
-                                    ' but it should exist in scout'
-                                    ' container'.format(
+                                    '{} should exist in container'
+                                    ' or overrides'.format(
                                         soname,
                                     )
                                 )
                                 continue
 
+                            # On multiarch systems like Debian,
+                            # we can be confident that any library that
+                            # can be found in the multiarch library directory
+                            # is the one that we'll want to be using.
                             logger.info(
                                 '%s found in host $LIB or /usr/$LIB at %s',
                                 soname, host_path,

@@ -12,23 +12,26 @@ set -eux
 cwd="$(pwd)"
 export AUTOPKGTEST_ARTIFACTS="$cwd/_build/artifacts"
 export PRESSURE_VESSEL_TEST_CONTAINERS="$cwd/_build/depot"
-export PYTHONPATH="$cwd/tests"
+pkgtestdir="$(pwd)/_build/installed-tests/steam-runtime-tools-0"
+export PYTHONPATH="$pkgtestdir"
 
 : > _build/tests-ok.txt
 : > _build/tests-failed.txt
+
+tail -v -n+0 "$pkgtestdir/pressure-vessel/containers-tests.txt"
 
 while read -r line; do
     # Delete comments, filter blank lines
     line="${line%%"#"*}"
 
     if [ -n "$line" ]; then
-        if python3 "tests/pressure-vessel/$line" >&2; then
+        if python3 "$pkgtestdir/pressure-vessel/$line" >&2; then
             echo "$line" >> _build/tests-ok.txt
         else
             echo "$line" >> _build/tests-failed.txt
         fi
     fi
-done < _build/containers-tests.txt
+done < "$pkgtestdir/pressure-vessel/containers-tests.txt"
 
 tail -v -n+0 _build/tests-*.txt
 

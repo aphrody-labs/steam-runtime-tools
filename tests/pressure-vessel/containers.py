@@ -862,6 +862,9 @@ class BaseContainersTest(BaseTest):
                     self.assertTrue(
                         final_argv.endswith(
                             '\0/run/host/usr/bin/env\0'
+                        ),
+                        '{!r} should end with /run/host/usr/bin/env'.format(
+                            final_argv,
                         )
                     )
                 elif mock_emulator == 'sh.json':
@@ -870,6 +873,9 @@ class BaseContainersTest(BaseTest):
                             'tests/pressure-vessel/mock-emulators/wrapper.sh\0'
                             '--main\0'
                             '--\0'
+                        ),
+                        '{!r} should end with wrapper.sh --main --'.format(
+                            final_argv,
                         )
                     )
 

@@ -199,7 +199,10 @@ class TestInsideRuntime(BaseTest):
             # Only the aliases directories get into the LD_LIBRARY_PATH,
             # not the directories containing SONAMEs
             for path in ldlp:
-                self.assertTrue(path.endswith('/aliases'))
+                self.assertTrue(
+                    path.endswith('/aliases'),
+                    '{!r} should end with /aliases'.format(path),
+                )
 
         if (
             'HOST_LD_LINUX_SO_REALPATH' in os.environ

@@ -996,9 +996,9 @@ class BaseContainersTest(BaseTest):
 
             with self.subTest(arch=multiarch):
 
-                self.assertTrue(os.path.isdir(overrides_libdir))
-                self.assertTrue(os.path.isdir(root_libdir))
-                self.assertTrue(os.path.isdir(usr_libdir))
+                self.assertDirectory(overrides_libdir)
+                self.assertDirectory(root_libdir)
+                self.assertDirectory(usr_libdir)
 
                 if is_scout:
                     for soname in (

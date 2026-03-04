@@ -66,11 +66,18 @@ endforeach
 tests = [
   'adverb.py',
   'cheap-copy.py',
-  'containers.py',
   'invocation.py',
   'mtree-apply.py',
   'test-locale-gen.sh',
   'verify.py',
+]
+
+containers_tests = [
+  'no-runtime.py',
+  'scout-sysroot.py',
+  'scout-usr.py',
+  'soldier-sysroot.py',
+  'soldier-usr.py',
 ]
 
 compiled_tests = [
@@ -119,22 +126,24 @@ foreach test_info : compiled_tests
   )
 endforeach
 
-foreach test_name : tests
+foreach test_name : tests + containers_tests
   program = files(test_name)
+  suites = ['pressure-vessel']
   test_argv = []
   timeout = 30
 
   if test_name.endswith('.py')
+    suites += 'python'
     test_argv = ['-S', program] + test_argv
     program = python
   endif
 
-  if test_name in ['test-locale-gen.sh']
+  if test_name in ['test-locale-gen.sh'] + containers_tests
     timeout = 90
   endif
 
-  if test_name in ['containers.py']
-    timeout = 300
+  if test_name in containers_tests
+    suites += 'containers'
   endif
 
   test(
@@ -143,10 +152,23 @@ foreach test_name : tests
     depends : test_depends,
     env : test_env,
     protocol : 'tap',
-    suite : ['pressure-vessel'],
+    suite : suites,
     timeout : timeout,
   )
 
 endforeach
+
+if get_option('installed_tests')
+  # This file is used in .gitlab-ci.yml to enumerate the available tests
+  # without having to rebuild all of steam-runtime-tools on each host OS
+  test_conf = configuration_data()
+  test_conf.set('TESTS', '\n'.join(containers_tests))
+  configure_file(
+    input: files('containers-tests.txt.in'),
+    output: 'containers-tests.txt',
+    install_dir: pv_tests_dir,
+    configuration: test_conf,
+  )
+endif
 
 # vim:set sw=2 sts=2 et:

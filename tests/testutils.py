@@ -85,6 +85,7 @@ class BaseTest(unittest.TestCase):
 
     G_TEST_BUILDDIR = ''
     G_TEST_SRCDIR = ''
+    artifacts_persist = False
     artifacts = ''
     tmpdir = None       # type: tempfile.TemporaryDirectory
     top_builddir = ''
@@ -150,8 +151,13 @@ class BaseTest(unittest.TestCase):
         artifacts = os.getenv('AUTOPKGTEST_ARTIFACTS')
 
         if artifacts is not None:
-            cls.artifacts = os.path.abspath(artifacts)
+            cls.artifacts_persist = True
+            cls.artifacts = os.path.join(
+                os.path.abspath(artifacts),
+                cls.__name__,
+            )
         else:
+            cls.artifacts_persist = False
             cls.artifacts = cls.tmpdir.name
 
         cpu = os.uname().machine
@@ -173,6 +179,7 @@ class BaseTest(unittest.TestCase):
         cls = self.__class__
         self.G_TEST_BUILDDIR = cls.G_TEST_BUILDDIR
         self.G_TEST_SRCDIR = cls.G_TEST_SRCDIR
+        self.artifacts_persist = cls.artifacts_persist
         self.artifacts = cls.artifacts
         self.top_builddir = cls.top_builddir
         self.top_srcdir = cls.top_srcdir

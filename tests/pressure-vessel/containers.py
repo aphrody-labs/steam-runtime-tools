@@ -1019,7 +1019,7 @@ class BaseContainersTest(BaseTest):
                         # Mesa, and is at least as new as scout's version
                         # in every supported version of the Steam Runtime.
                         with self.subTest(soname=soname):
-                            target = os.readlink(
+                            target = self.assertSymlink(
                                 os.path.join(overrides_libdir, soname)
                             )
                             self.assertRegex(target, r'^/run/host/')
@@ -1127,8 +1127,8 @@ class BaseContainersTest(BaseTest):
                             devlib = soname.split('.so.', 1)[0] + '.so'
                             pattern = soname + '.*'
 
-                            target = os.readlink(
-                                os.path.join(overrides_libdir, soname)
+                            target = self.assertSymlink(
+                                os.path.join(overrides_libdir, soname),
                             )
                             self.assertRegex(target, r'^/run/host/')
 
@@ -1206,7 +1206,7 @@ class BaseContainersTest(BaseTest):
                 for k, vs in expect_symlinks.items():
                     with self.subTest(dri_symlink=k):
                         link = os.path.join(overrides_libdir, 'dri', k)
-                        target = os.readlink(link)
+                        target = self.assertSymlink(link)
                         self.assertEqual(target[:10], '/run/host/')
                         target = target[9:]     # includes the / after host/
 
@@ -1223,7 +1223,7 @@ class BaseContainersTest(BaseTest):
                         link = os.path.join(
                             tree, 'usr', 'lib', multiarch, 'gconv',
                         )
-                        target = os.readlink(link)
+                        target = self.assertSymlink(link)
                         self.assertEqual(
                             target,
                             '/run/host/usr/lib/{}/gconv'.format(multiarch),
@@ -1233,34 +1233,34 @@ class BaseContainersTest(BaseTest):
                         link = os.path.join(
                             tree, 'usr', 'share', 'libdrm',
                         )
-                        target = os.readlink(link)
+                        target = self.assertSymlink(link)
                         self.assertEqual(target, '/run/host/usr/share/libdrm')
 
         if is_scout:
             if os.path.isdir('/usr/lib/locale'):
                 link = os.path.join(tree, 'usr', 'lib', 'locale')
-                target = os.readlink(link)
+                target = self.assertSymlink(link)
                 self.assertEqual(target, '/run/host/usr/lib/locale')
 
             if os.path.isdir('/usr/share/i18n'):
                 link = os.path.join(tree, 'usr', 'share', 'i18n')
-                target = os.readlink(link)
+                target = self.assertSymlink(link)
                 self.assertEqual(target, '/run/host/usr/share/i18n')
 
             link = os.path.join(tree, 'sbin', 'ldconfig')
-            target = os.readlink(link)
+            target = self.assertSymlink(link)
             # Might not be /sbin/ldconfig, for example on non-Debian hosts
             self.assertRegex(target, r'^/run/host/')
 
             if os.path.isfile('/usr/bin/locale'):
                 link = os.path.join(tree, 'usr', 'bin', 'locale')
-                target = os.readlink(link)
+                target = self.assertSymlink(link)
                 # Might be either /usr/bin/locale or /usr/sbin/locale
                 self.assertRegex(target, r'^/run/host/usr/')
 
             if os.path.isfile('/usr/bin/localedef'):
                 link = os.path.join(tree, 'usr', 'bin', 'localedef')
-                target = os.readlink(link)
+                target = self.assertSymlink(link)
                 # Might be either /usr/bin/localedef or /usr/sbin/localedef
                 self.assertRegex(target, r'^/run/host/usr/')
 
@@ -1280,10 +1280,10 @@ class BaseContainersTest(BaseTest):
                     pass
                 else:
                     link = os.path.join(tree, './' + ldso)
-                    target = os.readlink(link)
+                    target = self.assertSymlink(link)
                     self.assertEqual(target, '/run/host' + host_path)
                     link = os.path.join(tree, './' + scout_impl)
-                    target = os.readlink(link)
+                    target = self.assertSymlink(link)
                     self.assertEqual(target, '/run/host' + host_path)
 
 

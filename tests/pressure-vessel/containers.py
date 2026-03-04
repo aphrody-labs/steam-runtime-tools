@@ -655,6 +655,29 @@ class BaseContainersTest(BaseTest):
         if not os.path.isdir(runtime):
             self.skipTest('{} not found'.format(runtime))
 
+        is_minimized = Path(runtime, 'usr-mtree.txt.gz').exists()
+
+        # The --no-copy-runtime code path is rather fragile, and won't
+        # work reliably on older Ubuntu, which is one of the reasons we
+        # stopped using it in production
+        if (
+            # In practice it works on e.g. Arch, modern Debian, or
+            # Ubuntu 26.04 (see
+            # https://bugs.launchpad.net/ubuntu/+source/glibc/+bug/2127856)
+            # but not on older Ubuntu, because we can't bind-mount
+            # /sbin/ldconfig.real onto a nonexistent mount point in a
+            # read-only directory
+            Path('/sbin/ldconfig.real').exists()
+            # The --copy-runtime code path is immune to this problem.
+            # We always use that code path if the runtime is "minimized"
+            # (reconstitutes its content from a mtree manifest).
+            and not (copy or is_minimized)
+            # We don't need to skip this for scout sysroots, because scout
+            # happens to contain a /sbin/ldconfig.real itself.
+            and not is_scout
+        ):
+            self.skipTest('steamrt/tasks#934')
+
         start_time = time.time()
         logger.info('Testing: %s', test_name)
 

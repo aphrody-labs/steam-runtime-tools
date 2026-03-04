@@ -3151,8 +3151,8 @@ typedef struct
 
 static JsonTest json_test[] =
 {
-  { /* Begin Full JSON report */
-    .description = "full JSON parsing",
+  { /* Begin Full good JSON report */
+    .description = "full good JSON parsing",
     .input_name = "full-good-report.json",
     .can_write_uinput = TRUE,
     .steam_installation =
@@ -3161,7 +3161,7 @@ static JsonTest json_test[] =
       .data_path = "/home/me/.local/share/Steam",
       .steamscript_path = "/usr/bin/steam",
       .steamscript_version = "1.0.0.66",
-      .issues = SRT_STEAM_ISSUES_STEAMSCRIPT_NOT_IN_ENVIRONMENT,
+      .issues = SRT_STEAM_ISSUES_NONE,
     },
 
     .runtime =
@@ -3341,11 +3341,12 @@ static JsonTest json_test[] =
           .json_origin = "/home/me/.config/openxr/1/active_runtime.x86_64.json",
           .library_path = "/usr/lib/libopenxr_monado.so",
           .name = "Monado",
+          .issues = SRT_LOADABLE_ISSUES_NONE,
         },
       },
     },
 
-    .locale_issues = SRT_LOCALE_ISSUES_C_UTF8_MISSING | SRT_LOCALE_ISSUES_I18N_SUPPORTED_MISSING,
+    .locale_issues = SRT_LOCALE_ISSUES_NONE,
     .locale =
     {
       {
@@ -3362,9 +3363,9 @@ static JsonTest json_test[] =
       },
       {
         .name = "C.UTF-8",
-        .error_domain = "srt-locale-error-quark",
-        .error_code = SRT_LOCALE_ERROR_FAILED,
-        .error_message = "No such file or directory",
+        .resulting_name = "C.UTF-8",
+        .charset = "UTF-8",
+        .is_utf8 = TRUE,
       },
       {
         .name = "en_US.UTF-8",
@@ -3416,6 +3417,7 @@ static JsonTest json_test[] =
         .api_version = "1.1.73",
         .implementation_version = "1",
         .library_path = "libVkLayer_MESA_overlay.so",
+        .issues = SRT_LOADABLE_ISSUES_NONE,
       },
     },
 
@@ -3429,6 +3431,7 @@ static JsonTest json_test[] =
         .api_version = "1.2.135",
         .implementation_version = "1",
         .library_path = "/usr/$LIB/libMangoHud.so",
+        .issues = SRT_LOADABLE_ISSUES_NONE,
       },
     },
 
@@ -3438,6 +3441,7 @@ static JsonTest json_test[] =
       .json_origin = "/etc/xdg/openxr/1/active_runtime.json",
       .library_path = "../../../lib/libopenxr_monado.so",
       .name = "Monado",
+      .issues = SRT_LOADABLE_ISSUES_NONE,
     },
 
     .openxr_1_rt_inactive =
@@ -3446,6 +3450,7 @@ static JsonTest json_test[] =
         .json_path = "/etc/xdg/openxr/1/active_runtime.m68k.json",
         .json_origin = "/etc/xdg/openxr/1/active_runtime.m68k.json",
         .library_path = "/usr/lib/libopenxr_monado.so",
+        .issues = SRT_LOADABLE_ISSUES_NONE,
       }
     },
 
@@ -3458,6 +3463,7 @@ static JsonTest json_test[] =
         .api_version = "1.1",
         .implementation_version = "1",
         .description = "API Layer to record api calls as they occur",
+        .issues = SRT_LOADABLE_ISSUES_NONE,
       },
     },
 
@@ -3471,6 +3477,477 @@ static JsonTest json_test[] =
         .api_version = "1.0",
         .implementation_version = "1.2.3",
         .description = "A fictitious API layer",
+      },
+    },
+
+    .desktop_entry =
+    {
+      {
+        .id = "steam.desktop",
+        .commandline = "/usr/bin/steam-runtime %U",
+        .filename = "/usr/share/applications/steam.desktop",
+        .default_handler = TRUE,
+        .steam_handler = TRUE,
+      },
+    },
+
+    .display_info =
+    {
+      .environment =
+      {
+        "DISPLAY=:0",
+        "XDG_CURRENT_DESKTOP=GNOME",
+        "XDG_RUNTIME_DIR=/run/user/1000",
+        "XDG_SESSION_TYPE=wayland",
+        "WAYLAND_DISPLAY=wayland-0",
+        NULL
+      },
+      .wayland_session = TRUE,
+      .wayland_issues = SRT_DISPLAY_WAYLAND_ISSUES_NONE,
+      .x11_type = SRT_DISPLAY_X11_TYPE_XWAYLAND,
+    },
+
+    .xdg_portal =
+    {
+      .interfaces =
+      {
+        {
+          .name = "org.freedesktop.portal.OpenURI",
+          .available = TRUE,
+          .version = 3,
+        },
+        {
+          .name = "org.freedesktop.portal.Email",
+          .available = TRUE,
+          .version = 2,
+        },
+      },
+      .backends =
+      {
+        {
+          .name = "org.freedesktop.impl.portal.desktop.gtk",
+          .available = TRUE,
+        },
+        {
+          .name = "org.freedesktop.impl.portal.desktop.kde",
+          .available = FALSE,
+        },
+      },
+      .issues = SRT_XDG_PORTAL_ISSUES_NONE
+    },
+  }, /* End Full good JSON report */
+
+  { /* Begin Full bad JSON report */
+    .description = "full bad JSON parsing",
+    .input_name = "full-bad-report.json",
+    .can_write_uinput = TRUE,
+    .steam_installation =
+    {
+      .path = "/home/me/.local/share/Steam",
+      .data_path = "/home/me/.local/share/Steam",
+      .steamscript_path = "/usr/bin/steam",
+      .steamscript_version = "1.0.0.66",
+      .issues =
+        SRT_STEAM_ISSUES_UNKNOWN |
+        SRT_STEAM_ISSUES_CANNOT_FIND |
+        SRT_STEAM_ISSUES_DOT_STEAM_STEAM_NOT_SYMLINK |
+        SRT_STEAM_ISSUES_CANNOT_FIND_DATA |
+        SRT_STEAM_ISSUES_DOT_STEAM_STEAM_NOT_DIRECTORY |
+        SRT_STEAM_ISSUES_DOT_STEAM_ROOT_NOT_SYMLINK |
+        SRT_STEAM_ISSUES_DOT_STEAM_ROOT_NOT_DIRECTORY |
+        SRT_STEAM_ISSUES_STEAMSCRIPT_NOT_IN_ENVIRONMENT |
+        SRT_STEAM_ISSUES_MISSING_STEAM_URI_HANDLER |
+        SRT_STEAM_ISSUES_UNEXPECTED_STEAM_URI_HANDLER |
+        SRT_STEAM_ISSUES_UNEXPECTED_STEAM_DESKTOP_ID |
+        SRT_STEAM_ISSUES_UNEXPECTED_STEAM_COMPAT_CLIENT_INSTALL_PATH |
+        SRT_STEAM_ISSUES_INSTALLED_IN_USR,
+    },
+
+    .runtime =
+    {
+      .path = "/home/me/.steam/root/ubuntu12_32/steam-runtime",
+      .version = "0.20200123.4",
+      .issues =
+        SRT_RUNTIME_ISSUES_UNKNOWN |
+        SRT_RUNTIME_ISSUES_DISABLED |
+        SRT_RUNTIME_ISSUES_NOT_RUNTIME |
+        SRT_RUNTIME_ISSUES_UNOFFICIAL |
+        SRT_RUNTIME_ISSUES_UNEXPECTED_LOCATION |
+        SRT_RUNTIME_ISSUES_UNEXPECTED_VERSION |
+        SRT_RUNTIME_ISSUES_NOT_IN_LD_PATH |
+        SRT_RUNTIME_ISSUES_NOT_IN_PATH |
+        SRT_RUNTIME_ISSUES_NOT_IN_ENVIRONMENT |
+        SRT_RUNTIME_ISSUES_NOT_USING_NEWER_HOST_LIBRARIES |
+        SRT_RUNTIME_ISSUES_ON_NON_UNIX_FILESYSTEM |
+        SRT_RUNTIME_ISSUES_ON_NETWORK_FILESYSTEM |
+        SRT_RUNTIME_ISSUES_ON_UNKNOWN_FILESYSTEM,
+      .pinned_libs_64 =
+      {
+        "pinned_libs_64/has_pins",
+        "pinned_libs_64/libjack.so.0",
+        "pinned_libs_64/system_libGLU.so.1",
+        NULL,
+      },
+    },
+
+    .os_release =
+    {
+      .id = "arch",
+      .id_like = {"ubuntu", "debian", NULL},
+      .name = "Arch Linux",
+      .pretty_name = "Arch Linux",
+      .build_id = "rolling",
+    },
+
+    .virt =
+    {
+      .host_machine = SRT_MACHINE_TYPE_AARCH64,
+      .interpreter_root = "/home/me/rootfs",
+      .type = SRT_VIRTUALIZATION_TYPE_FEX_EMU,
+    },
+
+    .container =
+    {
+      .type = SRT_CONTAINER_TYPE_DOCKER,
+      .host_path = "/the/host/path",
+      .bwrap_issues =
+        SRT_BWRAP_ISSUES_UNKNOWN |
+        SRT_BWRAP_ISSUES_NOT_TESTED |
+        SRT_BWRAP_ISSUES_CANNOT_RUN |
+        SRT_BWRAP_ISSUES_SETUID |
+        SRT_BWRAP_ISSUES_SYSTEM |
+        SRT_BWRAP_ISSUES_NO_UNPRIVILEGED_USERNS_CLONE |
+        SRT_BWRAP_ISSUES_MAX_USER_NAMESPACES_ZERO,
+    },
+
+    .architecture =
+    {
+      /* NOTE: .architecture[0] gets ovewritten by i386_architecture_full */
+      {
+        .can_run = TRUE,
+        .libdl =
+        {
+          {
+            .libdl_token = LIBDL_TOKEN_LIB,
+            .expansion_value = "lib",
+          },
+          {
+            .libdl_token = LIBDL_TOKEN_PLATFORM,
+            .expansion_value = "mock",
+          },
+        },
+        .runtime_linker =
+        {
+          .path = "/lib64/ld-linux-mock.so.2",
+          .resolved = "/usr/lib/ld-2.31.so",
+        },
+        .issues =
+          SRT_LIBRARY_ISSUES_CANNOT_LOAD |
+          SRT_LIBRARY_ISSUES_MISSING_SYMBOLS |
+          SRT_LIBRARY_ISSUES_MISVERSIONED_SYMBOLS |
+          SRT_LIBRARY_ISSUES_UNKNOWN |
+          SRT_LIBRARY_ISSUES_UNKNOWN_EXPECTATIONS |
+          SRT_LIBRARY_ISSUES_TIMEOUT |
+          SRT_LIBRARY_ISSUES_MISSING_VERSIONS |
+          SRT_LIBRARY_ISSUES_UNVERSIONED,
+        .graphics =
+        {
+          {
+            .window_system = SRT_WINDOW_SYSTEM_X11,
+            .rendering_interface = SRT_RENDERING_INTERFACE_VULKAN,
+            .renderer = SRT_TEST_GOOD_GRAPHICS_RENDERER,
+            .version = SRT_TEST_GOOD_VULKAN_VERSION,
+            .is_available = TRUE,
+            .devices =
+            {
+              {
+                .name = SRT_TEST_GOOD_GRAPHICS_RENDERER,
+                .api_version = SRT_TEST_GOOD_GRAPHICS_API_VERSION,
+                .vulkan_driver_id = SRT_TEST_GOOD_GRAPHICS_DRIVER_ID,
+                .driver_name = SRT_TEST_GOOD_GRAPHICS_DRIVER_NAME,
+                .driver_version = SRT_TEST_GOOD_GRAPHICS_DRIVER_VERSION,
+                .vendor_id = SRT_TEST_GOOD_GRAPHICS_VENDOR_ID,
+                .device_id = SRT_TEST_GOOD_GRAPHICS_DEVICE_ID,
+                .type = SRT_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
+              },
+              {
+                .name = SRT_TEST_SOFTWARE_GRAPHICS_RENDERER,
+                .api_version = SRT_TEST_SOFTWARE_GRAPHICS_API_VERSION,
+                .driver_version = SRT_TEST_SOFTWARE_GRAPHICS_DRIVER_VERSION,
+                .vendor_id = SRT_TEST_SOFTWARE_GRAPHICS_VENDOR_ID,
+                .device_id = SRT_TEST_SOFTWARE_GRAPHICS_DEVICE_ID,
+                .type = SRT_VK_PHYSICAL_DEVICE_TYPE_CPU,
+                .issues =
+                  SRT_GRAPHICS_ISSUES_UNKNOWN |
+                  SRT_GRAPHICS_ISSUES_CANNOT_LOAD |
+                  SRT_GRAPHICS_ISSUES_SOFTWARE_RENDERING |
+                  SRT_GRAPHICS_ISSUES_TIMEOUT |
+                  SRT_GRAPHICS_ISSUES_CANNOT_DRAW,
+              },
+            },
+          },
+          {
+            .window_system = SRT_WINDOW_SYSTEM_X11,
+            .rendering_interface = SRT_RENDERING_INTERFACE_VDPAU,
+            .renderer = "G3DVL VDPAU Driver Shared Library version 1.0\n",
+            .is_available = TRUE,
+          },
+          {
+            .window_system = SRT_WINDOW_SYSTEM_X11,
+            .rendering_interface = SRT_RENDERING_INTERFACE_VAAPI,
+            .renderer = "Mesa Gallium driver 20.0.5 for AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)\n",
+            .is_available = TRUE,
+          },
+          {
+            .window_system = SRT_WINDOW_SYSTEM_GLX,
+            .rendering_interface = SRT_RENDERING_INTERFACE_GL,
+            .messages = "libGL: Can't open configuration file /etc/drirc: No such file or directory.\n/usr/share/libdrm/amdgpu.ids version: 1.0.0\nlibGL: Using DRI3 for screen 0\n",
+            .renderer = "AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)",
+            .version = "4.6 (Compatibility Profile) Mesa 20.0.5",
+            .library_vendor = SRT_GRAPHICS_LIBRARY_VENDOR_GLVND,
+            .issues =
+              SRT_GRAPHICS_ISSUES_UNKNOWN |
+              SRT_GRAPHICS_ISSUES_CANNOT_LOAD |
+              SRT_GRAPHICS_ISSUES_SOFTWARE_RENDERING |
+              SRT_GRAPHICS_ISSUES_TIMEOUT |
+              SRT_GRAPHICS_ISSUES_CANNOT_DRAW,
+            .terminating_signal = 6,
+            .is_available = TRUE,
+          },
+          {
+            .window_system = SRT_WINDOW_SYSTEM_EGL_X11,
+            .rendering_interface = SRT_RENDERING_INTERFACE_GL,
+            .renderer = "AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)",
+            .version = "4.6 (Compatibility Profile) Mesa 20.0.5",
+            .library_vendor = SRT_GRAPHICS_LIBRARY_VENDOR_GLVND,
+            .is_available = TRUE,
+          },
+          {
+            .window_system = SRT_WINDOW_SYSTEM_EGL_X11,
+            .rendering_interface = SRT_RENDERING_INTERFACE_GLESV2,
+            .renderer = "AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)",
+            .version = "OpenGL ES 3.2 Mesa 20.0.5",
+            .library_vendor = SRT_GRAPHICS_LIBRARY_VENDOR_GLVND,
+            .is_available = TRUE,
+          },
+        },
+        .dri_drivers =
+        {
+        },
+        .gbm_backends =
+        {
+        },
+        .va_api_drivers =
+        {
+        },
+        .vdpau_drivers =
+        {
+        },
+        .glx_drivers =
+        {
+        },
+        .openxr_1_rt =
+        {
+          .json_path = "/usr/share/openxr/1/openxr_monado.json",
+          .json_origin = "/home/me/.config/openxr/1/active_runtime.x86_64.json",
+          .library_path = "/usr/lib/libopenxr_monado.so",
+          .name = "Monado",
+          .issues =
+            SRT_LOADABLE_ISSUES_UNKNOWN |
+            SRT_LOADABLE_ISSUES_UNSUPPORTED |
+            SRT_LOADABLE_ISSUES_CANNOT_LOAD |
+            SRT_LOADABLE_ISSUES_DUPLICATED |
+            SRT_LOADABLE_ISSUES_API_SUBSET,
+        },
+      },
+    },
+    .locale_issues =
+      SRT_LOCALE_ISSUES_UNKNOWN |
+      SRT_LOCALE_ISSUES_DEFAULT_MISSING |
+      SRT_LOCALE_ISSUES_DEFAULT_NOT_UTF8 |
+      SRT_LOCALE_ISSUES_C_UTF8_MISSING |
+      SRT_LOCALE_ISSUES_EN_US_UTF8_MISSING |
+      SRT_LOCALE_ISSUES_I18N_SUPPORTED_MISSING |
+      SRT_LOCALE_ISSUES_I18N_LOCALES_EN_US_MISSING,
+    .locale =
+    {
+      {
+        .name = "", // <default>
+        .resulting_name = "en_US.UTF-8",
+        .charset = "UTF-8",
+        .is_utf8 = TRUE,
+      },
+      {
+        .name = "C",
+        .resulting_name = "C",
+        .charset = "ANSI_X3.4-1968",
+        .is_utf8 = FALSE,
+      },
+      {
+        .name = "C.UTF-8",
+        .error_domain = "srt-locale-error-quark",
+        .error_code = SRT_LOCALE_ERROR_FAILED,
+        .error_message = "No such file or directory",
+      },
+      {
+        .name = "en_US.UTF-8",
+        .resulting_name = "en_US.UTF-8",
+        .charset = "UTF-8",
+        .is_utf8 = TRUE,
+      },
+    },
+
+    .egl_icd =
+    {
+      {
+        .json_path = "/usr/share/glvnd/egl_vendor.d/51_mesa.json",
+        .library_path = "libEGL_mesa.so.0",
+        .issues =
+          SRT_LOADABLE_ISSUES_UNKNOWN |
+          SRT_LOADABLE_ISSUES_UNSUPPORTED |
+          SRT_LOADABLE_ISSUES_CANNOT_LOAD |
+          SRT_LOADABLE_ISSUES_DUPLICATED |
+          SRT_LOADABLE_ISSUES_API_SUBSET,
+      },
+    },
+
+    .egl_ext_platform =
+    {
+      {
+        .json_path = "/usr/share/egl/egl_external_platform.d/10_nvidia_wayland.json",
+        .library_path = "libnvidia-egl-wayland.so.1",
+        .issues =
+          SRT_LOADABLE_ISSUES_UNKNOWN |
+          SRT_LOADABLE_ISSUES_UNSUPPORTED |
+          SRT_LOADABLE_ISSUES_CANNOT_LOAD |
+          SRT_LOADABLE_ISSUES_DUPLICATED |
+          SRT_LOADABLE_ISSUES_API_SUBSET,
+      },
+    },
+
+    .vulkan_icd =
+    {
+      {
+        .json_path = "/usr/share/vulkan/icd.d/amd_icd64.json",
+        .library_path = "/usr/lib/amdvlk64.so",
+        .library_arch = "64",
+        .api_version = "1.2.136",
+        .issues =
+          SRT_LOADABLE_ISSUES_UNKNOWN |
+          SRT_LOADABLE_ISSUES_UNSUPPORTED |
+          SRT_LOADABLE_ISSUES_CANNOT_LOAD |
+          SRT_LOADABLE_ISSUES_DUPLICATED |
+          SRT_LOADABLE_ISSUES_API_SUBSET,
+      },
+      {
+        .json_path = "/usr/share/vulkan/icd.d/amd_icd_partial.json",
+        .library_path = "/usr/lib/amdicdpartial.so",
+        .api_version = "1.1.130",
+        .issues = SRT_LOADABLE_ISSUES_API_SUBSET,
+      },
+    },
+
+    .vulkan_explicit_layer =
+    {
+      {
+        .json_path = "/usr/share/vulkan/explicit_layer.d/VkLayer_MESA_overlay.json",
+        .name = "VK_LAYER_MESA_overlay",
+        .description = "Mesa Overlay layer",
+        .type = "GLOBAL",
+        .api_version = "1.1.73",
+        .implementation_version = "1",
+        .library_path = "libVkLayer_MESA_overlay.so",
+        .issues =
+          SRT_LOADABLE_ISSUES_UNKNOWN |
+          SRT_LOADABLE_ISSUES_UNSUPPORTED |
+          SRT_LOADABLE_ISSUES_CANNOT_LOAD |
+          SRT_LOADABLE_ISSUES_DUPLICATED |
+          SRT_LOADABLE_ISSUES_API_SUBSET,
+      },
+    },
+
+    .vulkan_implicit_layer =
+    {
+      {
+        .json_path = "/usr/share/vulkan/implicit_layer.d/MangoHud.json",
+        .name = "VK_LAYER_MANGOHUD_overlay",
+        .description = "Vulkan Hud Overlay",
+        .type = "GLOBAL",
+        .api_version = "1.2.135",
+        .implementation_version = "1",
+        .library_path = "/usr/$LIB/libMangoHud.so",
+        .issues =
+          SRT_LOADABLE_ISSUES_UNKNOWN |
+          SRT_LOADABLE_ISSUES_UNSUPPORTED |
+          SRT_LOADABLE_ISSUES_CANNOT_LOAD |
+          SRT_LOADABLE_ISSUES_DUPLICATED |
+          SRT_LOADABLE_ISSUES_API_SUBSET,
+      },
+    },
+
+    .openxr_1_rt_fallback =
+    {
+      .json_path = "/usr/share/openxr/1/openxr_monado.json",
+      .json_origin = "/etc/xdg/openxr/1/active_runtime.json",
+      .library_path = "../../../lib/libopenxr_monado.so",
+      .name = "Monado",
+      .issues =
+        SRT_LOADABLE_ISSUES_UNKNOWN |
+        SRT_LOADABLE_ISSUES_UNSUPPORTED |
+        SRT_LOADABLE_ISSUES_CANNOT_LOAD |
+        SRT_LOADABLE_ISSUES_DUPLICATED |
+        SRT_LOADABLE_ISSUES_API_SUBSET,
+    },
+
+    .openxr_1_rt_inactive =
+    {
+      {
+        .json_path = "/etc/xdg/openxr/1/active_runtime.m68k.json",
+        .json_origin = "/etc/xdg/openxr/1/active_runtime.m68k.json",
+        .library_path = "/usr/lib/libopenxr_monado.so",
+        .issues =
+          SRT_LOADABLE_ISSUES_UNKNOWN |
+          SRT_LOADABLE_ISSUES_UNSUPPORTED |
+          SRT_LOADABLE_ISSUES_CANNOT_LOAD |
+          SRT_LOADABLE_ISSUES_DUPLICATED |
+          SRT_LOADABLE_ISSUES_API_SUBSET,
+      },
+    },
+
+    .openxr_1_explicit_layers =
+    {
+      {
+        .json_path = "/usr/share/openxr/1/api_layers/explicit.d/XrApiLayer_api_dump.json",
+        .name = "XR_APILAYER_LUNARG_api_dump",
+        .library_path = "libXrApiLayer_api_dump.so",
+        .api_version = "1.1",
+        .implementation_version = "1",
+        .description = "API Layer to record api calls as they occur",
+        .issues =
+          SRT_LOADABLE_ISSUES_UNKNOWN |
+          SRT_LOADABLE_ISSUES_UNSUPPORTED |
+          SRT_LOADABLE_ISSUES_CANNOT_LOAD |
+          SRT_LOADABLE_ISSUES_DUPLICATED |
+          SRT_LOADABLE_ISSUES_API_SUBSET,
+      },
+    },
+
+    .openxr_1_implicit_layers =
+    {
+      {
+        .json_path = "/opt/openxr/example.json",
+        .json_origin = "/etc/xdg/openxr/1/api_layers/implicit.d/symlink.json",
+        .name = "XR_APILAYER_EXAMPLE_symlink",
+        .library_path = "./libXrApiLayer_example.so",
+        .api_version = "1.0",
+        .implementation_version = "1.2.3",
+        .description = "A fictitious API layer",
+        .issues =
+          SRT_LOADABLE_ISSUES_UNKNOWN |
+          SRT_LOADABLE_ISSUES_UNSUPPORTED |
+          SRT_LOADABLE_ISSUES_CANNOT_LOAD |
+          SRT_LOADABLE_ISSUES_DUPLICATED |
+          SRT_LOADABLE_ISSUES_API_SUBSET,
       },
       {
         .json_path = "/etc/xdg/openxr/1/api_layers/implicit.d/broken.json",
@@ -3505,6 +3982,9 @@ static JsonTest json_test[] =
       },
       .wayland_session = TRUE,
       .x11_type = SRT_DISPLAY_X11_TYPE_XWAYLAND,
+      .wayland_issues =
+        SRT_DISPLAY_WAYLAND_ISSUES_UNKNOWN |
+        SRT_DISPLAY_WAYLAND_ISSUES_MISSING_SOCKET,
     },
 
     .xdg_portal =
@@ -3533,8 +4013,13 @@ static JsonTest json_test[] =
           .available = FALSE,
         },
       },
+      .issues =
+        SRT_XDG_PORTAL_ISSUES_UNKNOWN |
+        SRT_XDG_PORTAL_ISSUES_TIMEOUT |
+        SRT_XDG_PORTAL_ISSUES_MISSING_INTERFACE |
+        SRT_XDG_PORTAL_ISSUES_NO_IMPLEMENTATION,
     },
-  }, /* End Full JSON report */
+  }, /* End Full bad JSON report */
 
   { /* Begin Partial JSON report */
     .description = "partial JSON parsing",
@@ -3559,8 +4044,15 @@ static JsonTest json_test[] =
       .flatpak_version = "1.10.2",
       .bwrap_issues = (SRT_BWRAP_ISSUES_CANNOT_RUN
                        | SRT_BWRAP_ISSUES_NOT_TESTED),
-      .flatpak_issues = (SRT_FLATPAK_ISSUES_TOO_OLD
-                         | SRT_FLATPAK_ISSUES_SUBSANDBOX_NOT_CHECKED),
+      .flatpak_issues =
+        SRT_FLATPAK_ISSUES_UNKNOWN |
+        SRT_FLATPAK_ISSUES_TOO_OLD |
+        SRT_FLATPAK_ISSUES_SUBSANDBOX_NOT_CHECKED |
+        SRT_FLATPAK_ISSUES_SUBSANDBOX_UNAVAILABLE |
+        SRT_FLATPAK_ISSUES_SUBSANDBOX_TIMED_OUT |
+        SRT_FLATPAK_ISSUES_SUBSANDBOX_LIMITED_BY_SETUID_BWRAP |
+        SRT_FLATPAK_ISSUES_SUBSANDBOX_DID_NOT_INHERIT_DISPLAY |
+        SRT_FLATPAK_ISSUES_SUBSANDBOX_OUTPUT_CORRUPTED,
     },
     .driver_environment =
     {
@@ -3787,6 +4279,7 @@ static JsonTest json_test[] =
     {
       .type = SRT_CONTAINER_TYPE_UNKNOWN,
       .flatpak_issues = SRT_FLATPAK_ISSUES_NONE,
+      .bwrap_issues = SRT_BWRAP_ISSUES_UNKNOWN,
     },
     .architecture =
     {
@@ -3834,6 +4327,7 @@ static JsonTest json_test[] =
     {
       .type = SRT_CONTAINER_TYPE_UNKNOWN,
       .flatpak_issues = SRT_FLATPAK_ISSUES_NONE,
+      .bwrap_issues = SRT_BWRAP_ISSUES_UNKNOWN,
     },
     .architecture =
     {
@@ -4111,7 +4605,7 @@ json_parsing (Fixture *f,
   /* Keep this in sync with the json_test declared above. These are the
    * architecture-specific changes compared to the general json_test defined
    * before. */
-  g_assert_cmpint (G_N_ELEMENTS (json_test), ==, 5);
+  g_assert_cmpint (G_N_ELEMENTS (json_test), ==, 6);
 #if defined(__i386__) || defined(__x86_64__) || !defined(_SRT_MULTIARCH)
   JsonTest *jt = &json_test[0];  /* full good report */
   jt->runtime.pinned_libs_32[0] = "pinned_libs_32/has_pins";
@@ -4129,25 +4623,49 @@ json_parsing (Fixture *f,
   jt->x86_features = SRT_X86_FEATURE_X86_64 | SRT_X86_FEATURE_CMPXCHG16B;
   jt->x86_known = SRT_X86_FEATURE_X86_64 | SRT_X86_FEATURE_SSE3 | SRT_X86_FEATURE_CMPXCHG16B;
 
-  jt = &json_test[1];  /* partial report */
+  jt = &json_test[1];  /* full bad report */
+  jt->runtime.pinned_libs_32[0] = "pinned_libs_32/has_pins";
+  jt->runtime.pinned_libs_32[1] = "pinned_libs_32/libdbusmenu-gtk.so.4 -> "
+                                  "/home/me/.local/share/Steam/ubuntu12_32/steam-runtime/usr/lib/i386-linux-gnu/libdbusmenu-gtk.so.4.0.13";
+  jt->runtime.pinned_libs_32[2] = "pinned_libs_32/system_libGLU.so.1";
+  jt->runtime.pinned_libs_64[1] = "pinned_libs_64/libjack.so.0 -> "
+                                  "/home/me/.local/share/Steam/ubuntu12_32/steam-runtime/usr/lib/x86_64-linux-gnu/libjack.so.0.1.0";
+  jt->architecture[1] = jt->architecture[0];
+  jt->architecture[0] = i386_architecture_full;
+  /* Set openxr_1_rt issues for the overridden architecture too */
+  jt->architecture[0].openxr_1_rt.issues =
+    SRT_LOADABLE_ISSUES_UNKNOWN |
+    SRT_LOADABLE_ISSUES_UNSUPPORTED |
+    SRT_LOADABLE_ISSUES_CANNOT_LOAD |
+    SRT_LOADABLE_ISSUES_DUPLICATED |
+    SRT_LOADABLE_ISSUES_API_SUBSET,
+  jt->architecture[1].libdl[1].expansion_value = "x86_64";
+  jt->architecture[1].runtime_linker.path = "/lib64/ld-linux-x86-64.so.2";
+  jt->architecture[1].runtime_linker.resolved = "/lib/x86_64-linux-gnu/ld-2.31.so";
+  jt->architecture[1].va_api_drivers[1].library_path = "/home/me/.local/share/Steam/ubuntu12_32/steam-runtime/usr/lib/x86_64-linux-gnu/dri/dummy_drv_video.so";
+  jt->x86_features = SRT_X86_FEATURE_X86_64 | SRT_X86_FEATURE_CMPXCHG16B;
+  jt->x86_known = SRT_X86_FEATURE_X86_64 | SRT_X86_FEATURE_SSE3 | SRT_X86_FEATURE_CMPXCHG16B;
+
+
+  jt = &json_test[2];  /* partial report */
   jt->architecture[1] = jt->architecture[0];
   jt->architecture[0] = i386_architecture_partial;
   jt->architecture[1].runtime_linker.path = "/lib64/ld-linux-x86-64.so.2";
-  jt->xdg_portal.messages = "timeout: failed to run command ‘x86_64-linux-gnu-check-xdg-portal’: No such file or directory\n",
+  jt->xdg_portal.messages = "timeout: failed to run command ‘x86_64-linux-gnu-check-xdg-portal’: No such file or directory\n";
 
-  jt = &json_test[2];  /* partial-2 report */
+  jt = &json_test[3];  /* partial-2 report */
   jt->architecture[1] = jt->architecture[0];
   jt->architecture[0] = i386_architecture_missing;
   jt->architecture[1].runtime_linker.path = "/lib64/ld-linux-x86-64.so.2";
-  jt->architecture[1].runtime_linker.error_message = "Expected \"/lib64/ld-linux-x86-64.so.2\" in report, but got \"/foobar\"",
+  jt->architecture[1].runtime_linker.error_message = "Expected \"/lib64/ld-linux-x86-64.so.2\" in report, but got \"/foobar\"";
 
-  jt = &json_test[3];  /* empty report */
+  jt = &json_test[4];  /* empty report */
   jt->architecture[1] = jt->architecture[0];
   jt->architecture[0] = i386_architecture_missing;
   jt->architecture[1].runtime_linker.path = "/lib64/ld-linux-x86-64.so.2";
   jt->architecture[1].runtime_linker.error_message = "ABI \"x86_64-linux-gnu\" not included in report";
 
-  jt = &json_test[4];  /* newer report */
+  jt = &json_test[5];  /* newer report */
   jt->architecture[1] = jt->architecture[0];
   jt->architecture[0] = i386_architecture_missing;
   jt->x86_features = SRT_X86_FEATURE_X86_64 | SRT_X86_FEATURE_SSE3 | SRT_X86_FEATURE_UNKNOWN;
@@ -4159,15 +4677,26 @@ json_parsing (Fixture *f,
   jt->architecture[0].runtime_linker.path = "/lib/ld-linux-aarch64.so.1";
   jt->architecture[0].dri_drivers[0].library_path = "/usr/lib/dri/mediatek_dri.so";
 
-  jt = &json_test[1];  /* partial report */
+  jt = &json_test[1];  /* full bad report */
+  jt->architecture[0].libdl[1].expansion_value = "aarch64";
+  jt->architecture[0].runtime_linker.path = "/lib/ld-linux-aarch64.so.1";
+  /* Set issues for the overridden architecture too */
+  jt->architecture[0].openxr_1_rt.issues =
+    SRT_LOADABLE_ISSUES_UNKNOWN |
+    SRT_LOADABLE_ISSUES_UNSUPPORTED |
+    SRT_LOADABLE_ISSUES_CANNOT_LOAD |
+    SRT_LOADABLE_ISSUES_DUPLICATED |
+    SRT_LOADABLE_ISSUES_API_SUBSET,
+
+  jt = &json_test[2];  /* partial report */
   jt->architecture[0].runtime_linker.path = "/lib/ld-linux-aarch64.so.1";
   jt->xdg_portal.messages = "timeout: failed to run command ‘aarch64-linux-gnu-check-xdg-portal’: No such file or directory\n";
 
-  jt = &json_test[2];  /* partial-2 report */
+  jt = &json_test[3];  /* partial-2 report */
   jt->architecture[0].runtime_linker.path = "/lib/ld-linux-aarch64.so.1";
   jt->architecture[0].runtime_linker.error_message = "Expected \"/lib/ld-linux-aarch64.so.1\" in report, but got \"/foobar\"";
 
-  jt = &json_test[3];  /* empty report */
+  jt = &json_test[4];  /* empty report */
   jt->architecture[0].runtime_linker.path = "/lib/ld-linux-aarch64.so.1";
   jt->architecture[0].runtime_linker.error_message = "ABI \"aarch64-linux-gnu\" not included in report";
 #endif
@@ -4263,8 +4792,14 @@ json_parsing (Fixture *f,
       host_directory = srt_system_info_dup_container_host_directory (info);
       g_assert_cmpint (t->container.type, ==, srt_system_info_get_container_type (info));
       g_assert_cmpstr (t->container.host_path, ==, host_directory);
+      g_assert_cmpstr (t->container.bwrap_messages, ==,
+                       srt_container_info_get_bwrap_messages (container));
+      g_assert_cmpstr (t->container.bwrap_path, ==,
+                       srt_container_info_get_bwrap_path (container));
       g_assert_cmpstr (t->container.flatpak_version, ==,
                        srt_container_info_get_flatpak_version (container));
+      g_assert_cmpuint (t->container.bwrap_issues, ==,
+                        srt_container_info_get_bwrap_issues (container));
       g_assert_cmpuint (t->container.flatpak_issues, ==,
                         srt_container_info_get_flatpak_issues (container));
 
@@ -4435,6 +4970,8 @@ json_parsing (Fixture *f,
                                srt_openxr_1_runtime_get_library_path (openxr_1_rt));
               g_assert_cmpstr (openxr_1_rt_expected->name, ==,
                                srt_openxr_1_runtime_get_name (openxr_1_rt));
+              g_assert_cmpint (openxr_1_rt_expected->issues, ==,
+                               srt_openxr_1_runtime_get_issues (openxr_1_rt));
             }
           else
             {
@@ -4501,6 +5038,7 @@ json_parsing (Fixture *f,
         {
           error = NULL;
           g_assert_cmpstr (t->egl_icd[j].json_path, ==, srt_egl_icd_get_json_path (iter->data));
+          g_assert_cmpint (t->egl_icd[j].issues, ==, srt_egl_icd_get_issues (iter->data));
           if (srt_egl_icd_check_error (iter->data, &error))
             {
               g_assert_cmpstr (t->egl_icd[j].library_path, ==, srt_egl_icd_get_library_path (iter->data));
@@ -4521,6 +5059,7 @@ json_parsing (Fixture *f,
         {
           error = NULL;
           g_assert_cmpstr (t->egl_ext_platform[j].json_path, ==, srt_egl_external_platform_get_json_path (iter->data));
+          g_assert_cmpint (t->egl_ext_platform[j].issues, ==, srt_egl_external_platform_get_issues (iter->data));
           if (srt_egl_external_platform_check_error (iter->data, &error))
             {
               g_assert_cmpstr (t->egl_ext_platform[j].library_path, ==, srt_egl_external_platform_get_library_path (iter->data));
@@ -4643,16 +5182,8 @@ json_parsing (Fixture *f,
                            srt_openxr_1_runtime_get_library_path (openxr_1_rt_fallback));
           g_assert_cmpstr (t->openxr_1_rt_fallback.name, ==,
                            srt_openxr_1_runtime_get_name (openxr_1_rt_fallback));
-
-          g_assert_nonnull (openxr_1_rt_fallback);
-          g_assert_cmpstr (t->openxr_1_rt_fallback.json_path, ==,
-                           srt_openxr_1_runtime_get_json_path (openxr_1_rt_fallback));
-          g_assert_cmpstr (t->openxr_1_rt_fallback.json_origin, ==,
-                           srt_openxr_1_runtime_get_json_origin (openxr_1_rt_fallback));
-          g_assert_cmpstr (t->openxr_1_rt_fallback.library_path, ==,
-                           srt_openxr_1_runtime_get_library_path (openxr_1_rt_fallback));
-          g_assert_cmpstr (t->openxr_1_rt_fallback.name, ==,
-                           srt_openxr_1_runtime_get_name (openxr_1_rt_fallback));
+          g_assert_cmpint (t->openxr_1_rt_fallback.issues, ==,
+                           srt_openxr_1_runtime_get_issues (openxr_1_rt_fallback));
         }
       else
         {
@@ -4671,6 +5202,8 @@ json_parsing (Fixture *f,
                            srt_openxr_1_runtime_get_library_path (iter->data));
           g_assert_cmpstr (t->openxr_1_rt_inactive[j].name, ==,
                            srt_openxr_1_runtime_get_name (iter->data));
+          g_assert_cmpint (t->openxr_1_rt_fallback.issues, ==,
+                           srt_openxr_1_runtime_get_issues (openxr_1_rt_fallback));
         }
       g_assert_cmpstr (t->openxr_1_rt_inactive[j].json_path, ==, NULL);
 

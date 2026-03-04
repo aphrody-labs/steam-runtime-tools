@@ -10,15 +10,12 @@
     "bin32_path" : "/home/me/.local/share/Steam/ubuntu12_32",
     "steamscript_path" : "/usr/bin/steam",
     "steamscript_version" : "1.0.0.66",
-    "issues" : [
-      "steamscript-not-in-environment"
-    ]
+    "issues" : []
   },
   "runtime" : {
     "path" : "/home/me/.steam/root/ubuntu12_32/steam-runtime",
     "version" : "0.20200123.4",
-    "issues" : [
-    ],
+    "issues" : [],
     "pinned_libs_32" : {
       "list" : [
         "pinned_libs_32/has_pins",
@@ -66,8 +63,7 @@
   },
   "container" : {
     "type" : "docker",
-    "bubblewrap_issues" : [
-    ],
+    "bubblewrap_issues" : [],
     "host" : {
       "path" : "/the/host/path",
       "os-release" : {
@@ -85,8 +81,7 @@
         "path" : "/lib64/ld-linux-x86-64.so.2",
         "resolved" : "/lib/x86_64-linux-gnu/ld-2.31.so"
       },
-      "library-issues-summary" : [
-      ],
+      "library-issues-summary" : [],
       "graphics-details" : {
         "x11/vulkan" : {
           "renderer" : "AMD RADV NAVI10 (ACO)",
@@ -292,10 +287,7 @@
       }
     }
   },
-  "locale-issues" : [
-    "c-utf8-missing",
-    "i18n-supported-missing"
-  ],
+  "locale-issues" : [],
   "locales" : {
     "<default>" : {
       "resulting-name" : "en_US.UTF-8",
@@ -308,9 +300,9 @@
       "is_utf8" : false
     },
     "C.UTF-8" : {
-      "error-domain" : "srt-locale-error-quark",
-      "error-code" : 0,
-      "error" : "No such file or directory"
+      "resulting-name" : "C.UTF-8",
+      "charset" : "UTF-8",
+      "is_utf8" : true
     },
     "en_US.UTF-8" : {
       "resulting-name" : "en_US.UTF-8",
@@ -417,13 +409,6 @@
         "library_path": "./libXrApiLayer_example.so",
         "dlopen": "/opt/openxr/./libXrApiLayer_example.so",
         "issues" : []
-      },
-      {
-        "json_path": "/etc/xdg/openxr/1/api_layers/implicit.d/broken.json",
-        "error-domain" : "g-io-error-quark",
-        "error-code" : 1,
-        "error" : "This one is broken",
-        "issues" : ["cannot-load"]
       }
     ]
   },

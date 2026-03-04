@@ -536,8 +536,13 @@ class TestInsideRuntime(BaseTest):
             self.assertNotIn('not-in-path', issues)
             self.assertNotIn('not-runtime', issues)
             self.assertNotIn('not-using-newer-host-libraries', issues)
+            self.assertNotIn('on-network-filesystem', issues)
+            self.assertNotIn('on-non-unix-filesystem', issues)
+            self.assertNotIn('on-unknown-filesystem', issues)
             self.assertNotIn('unexpected-location', issues)
             self.assertNotIn('unexpected-version', issues)
+            self.assertNotIn('unofficial', issues)
+            self.assertNotIn('unknown', issues)
             # Don't assert whether it contains 'unofficial':
             # we want to be able to test unofficial runtimes too
 

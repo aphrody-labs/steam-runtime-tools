@@ -128,7 +128,7 @@ keys:
     :   An array of strings representing problems with the Steam
         installation. If empty, no problems were found.
 
-        **internal-error**
+        **unknown** (or **internal-error** in older reports)
         :   An error occurred while checking the Steam installation.
 
         **cannot-find**
@@ -154,6 +154,33 @@ keys:
             for example due to
             [Debian bug #916303](https://bugs.debian.org/916303).
 
+        **installed-in-usr**
+        :   The Steam installation is under `/usr` which is not recommended.
+            It must be outside `/usr` for the container runtime to work
+            as intended.
+
+        **missing-steam-uri-handler**
+        :   There isn't a default desktop application that
+            can handle `steam:` URIs.
+
+        **steamscript-not-in-environment**
+        :   The environment variable `STEAMSCRIPT` is not set.
+            This is likely to be harmless,
+            but indicates that the user has not run Steam via either
+            Valve's `/usr/bin/steam`
+            or a third-party script that identifies itself to the
+            diagnostic tool by setting `STEAMSCRIPT`.
+
+        **unexpected-steam-uri-handler**
+        :   The default Steam desktop application ID is not what we expected.
+
+        **unexpected-steam-desktop-id**
+        :   The default Steam desktop application ID is not what we expected.
+
+        **unexpected-steam-compat-client-install-path**
+        :   If the environment `STEAM_COMPAT_CLIENT_INSTALL_PATH` is set,
+            its realpath() is not the equivalent of `~/.steam/root`.
+
 **runtime**
 :   An object describing the `LD_LIBRARY_PATH`-based Steam Runtime.
     The keys are strings:
@@ -169,7 +196,7 @@ keys:
     :   An array of strings representing problems with the Steam
         Runtime. If empty, no problems were found.
 
-        **internal-error**
+        **unknown** (or **internal-error** in older reports)
         :   An error occurred while checking the Steam Runtime.
 
         **disabled**
@@ -210,6 +237,20 @@ keys:
             their intended places in the **LD_LIBRARY_PATH**. This is
             likely to break the use of libraries from the host system,
             in particular the Mesa graphics drivers.
+
+        **on-network-filesystem**
+        :   The Steam Runtime is stored on a networked filesystem,
+            which might make metadata operations unexpectedly slow.
+
+        **on-non-unix-filesystem**
+        :   The Steam Runtime is stored on a non-Unix filesystem
+            which might not preserve permissions, ownership and other metadata.
+
+        **on-unknown-filesystem**
+        :   The Steam Runtime is stored on a filesystem not known
+            to the diagnostic tool, or a virtual filesystem
+            such as FUSE or overlayfs which could be backed
+            by an unknown underlying filesystem.
 
     **overrides**
     :   An object representing the libraries that have been
@@ -547,7 +588,7 @@ keys:
     :   A summary of issues found when loading the expected libraries,
         as an array of strings. If empty, no problems were found.
 
-        **internal-error**
+        **unknown** (or **internal-error** in older reports)
         :   There was an internal error while checking libraries.
 
         **cannot-load**
@@ -565,6 +606,17 @@ keys:
 
         **unknown-expectations**
         :   Details of the expected libraries were not found.
+
+        **timeout**
+        :   Helper timed out when executing.
+
+        **missing-versions**
+        :   Some of the expected version definitions were not present.
+
+        **unversioned**
+        :   The library was expected to have at least one version definition,
+            but has no version definitions at all.
+            Implies **missing-versions**.
 
     **library-details**
     :   An object representing shared libraries. If the **--verbose**
@@ -585,6 +637,7 @@ keys:
         **issues**
         :   Problems with the library, as arrays of the same strings
             described in **library-issues-summary** above.
+            Only printed if any issue has been found.
 
         **missing-symbols**
         :   If the library has missing symbols they are listed here.
@@ -644,10 +697,14 @@ keys:
 
         **issues**
         :   Problems with this graphics stack, represented as an array
-            of strings. The array is empty if no problems were detected.
+            of strings. Only printed if any issue has been found.
 
-            **internal-error**
+            **unknown** (or **internal-error** in older reports)
             :   There was an internal error while checking graphics support.
+
+            **cannot-draw**
+            :   The test to see if drawing works for the given graphics mode
+                had an error and was unable to draw.
 
             **cannot-load**
             :   The necessary libraries could not be loaded, or a rendering
@@ -659,10 +716,6 @@ keys:
 
             **timeout**
             :   The test to check the given graphics mode timed out.
-
-            **cannot-draw**
-            :   The test to see if drawing works for the given graphics mode
-                had an error and was unable to draw.
 
         **messages**
         :   Human-readable array of diagnostic messages.
@@ -703,7 +756,7 @@ keys:
 
             **issues**
             :   Problems with this graphics device, represented as an array
-                of strings. The array is empty if no problems were detected.
+                of strings. Only printed if any issue has been found.
                 The possible values are the same as the ones in the **issues**
                 of **graphics-details**.
 
@@ -837,7 +890,7 @@ keys:
 :   An array of strings indicating locale-related issues.
     The array is empty if no problems were detected.
 
-    **internal-error**
+    **unknown** (or **internal-error** in older reports)
     :   There was an internal error while checking locale support.
 
     **default-missing**
@@ -924,6 +977,10 @@ keys:
         **duplicated**
         :   This ICD, and another one, have a **library_path** that points to
             the same library.
+
+        **api-subset**
+        :   This driver is not fully compliant with the API spec,
+            like for example a portability driver.
 
     and additionally the following keys and values if the metadata was
     loaded successfully:

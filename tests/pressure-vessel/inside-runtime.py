@@ -625,7 +625,22 @@ class TestInsideRuntime(BaseTest):
                     # Every locale that worked on the host works in the
                     # container
                     if 'resulting-name' in host_details:
-                        self.assertEqual(host_details, details)
+                        if (
+                            locale == '<default>'
+                            and host_details['resulting-name'] == 'C'
+                            and host_details != details
+                        ):
+                            # Newer versions of Python force LC_CTYPE
+                            # to be C.UTF-8 as a result of PEP-0538,
+                            # and this is a Python script, so we can't
+                            # assert that the default locale is still C:
+                            # it could be something more useful now
+                            self.assertIn('resulting-name', details)
+                            self.assertEqual(details.get('charset'), 'UTF-8')
+                            self.assertEqual(details.get('error'), None)
+                            self.assertEqual(details.get('is_utf8'), True)
+                        else:
+                            self.assertEqual(host_details, details)
 
                     # en_US.UTF-8 should also work in the container, because we
                     # make sure to generate it

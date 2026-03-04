@@ -937,33 +937,25 @@ class BaseContainersTest(BaseTest):
                 '-ls',
             ], cwd=tree, stderr=2, stdout=writer)
 
-        self.assertTrue(os.path.isdir(os.path.join(tree, 'bin')))
-        self.assertTrue(os.path.isdir(os.path.join(tree, 'etc')))
-        self.assertTrue(os.path.isdir(os.path.join(tree, 'lib')))
-        self.assertTrue(os.path.isdir(os.path.join(tree, 'usr')))
-        self.assertFalse(
-            os.path.isdir(os.path.join(tree, 'usr', 'usr'))
-        )
-        self.assertTrue(os.path.isdir(os.path.join(tree, 'sbin')))
+        self.assertDirectory(os.path.join(tree, 'bin'))
+        self.assertDirectory(os.path.join(tree, 'etc'))
+        self.assertDirectory(os.path.join(tree, 'lib'))
+        self.assertDirectory(os.path.join(tree, 'usr'))
+        self.assertNoFile(os.path.join(tree, 'usr', 'usr'))
+        self.assertDirectory(os.path.join(tree, 'sbin'))
 
-        target = os.readlink(os.path.join(tree, 'overrides'))
+        target = self.assertSymlink(os.path.join(tree, 'overrides'))
         self.assertEqual(target, 'usr/lib/pressure-vessel/overrides')
-        self.assertTrue(
-            os.path.isdir(os.path.join(tree, 'overrides', 'lib')),
-        )
-        self.assertTrue(
-            os.path.isfile(
-                os.path.join(
-                    tree, 'usr', 'lib', 'pressure-vessel', 'from-host',
-                    'libexec', 'steam-runtime-tools-0', 'pv-adverb',
-                )
+        self.assertDirectory(os.path.join(tree, 'overrides', 'lib'))
+        self.assertFile(
+            os.path.join(
+                tree, 'usr', 'lib', 'pressure-vessel', 'from-host',
+                'libexec', 'steam-runtime-tools-0', 'pv-adverb',
             )
         )
-        self.assertTrue(
-            os.path.isdir(
-                os.path.join(
-                    tree, 'usr', 'lib', 'pressure-vessel', 'overrides', 'lib',
-                )
+        self.assertDirectory(
+            os.path.join(
+                tree, 'usr', 'lib', 'pressure-vessel', 'overrides', 'lib',
             )
         )
 

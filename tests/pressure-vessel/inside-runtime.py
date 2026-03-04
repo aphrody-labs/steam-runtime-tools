@@ -714,6 +714,20 @@ class TestInsideRuntime(BaseTest):
                         expect_library_issues |= set(details.get('issues', []))
                         continue
 
+                    if (
+                        soname == 'libcrypt.so.1'
+                        and self.runtime_is_scout
+                        and self.runtime_is_sdk
+                        and os.path.exists('/lib32/libcrypt.so.1')
+                        and multiarch == 'i386-linux-gnu'
+                    ):
+                        # Even though we prefer to use libxcrypt's libcrypt
+                        # implementation, gcc-*-multilib pulls in
+                        # libc6{,-dev}-i386 which includes
+                        # /lib32/libcrypt.so.1 which has a smaller ABI.
+                        expect_library_issues |= set(details.get('issues', []))
+                        continue
+
                     self.assertIn('path', details)
                     self.assertEqual(
                         [],

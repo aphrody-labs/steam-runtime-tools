@@ -211,17 +211,17 @@ class TestInsideRuntime(BaseTest):
                 self.assertIn(check_dir, search)
                 self.assertIn(check_dir + '/aliases', ldlp)
 
-            self.assertTrue(
-                Path(check_dir).is_dir(),
+            self.assertDirectory(
+                check_dir,
                 '{} should be a directory in container'.format(check_dir),
             )
-            self.assertTrue(Path(check_dir, 'aliases').is_dir())
+            self.assertDirectory(Path(check_dir, 'aliases'))
 
             if check_dir not in search:
                 check_dir = '/usr/lib/pressure-vessel' + check_dir
 
-            self.assertTrue(Path(check_dir).is_dir())
-            self.assertTrue(Path(check_dir, 'aliases').is_dir())
+            self.assertDirectory(check_dir)
+            self.assertDirectory(Path(check_dir, 'aliases'))
             self.assertIn(check_dir, search)
             self.assertIn(check_dir + '/aliases', ldlp)
 
@@ -235,51 +235,51 @@ class TestInsideRuntime(BaseTest):
                 self.assertIn(check_dir, search)
                 self.assertIn(check_dir + '/aliases', ldlp)
 
-            self.assertTrue(Path(check_dir).is_dir())
-            self.assertTrue(Path(check_dir, 'aliases').is_dir())
+            self.assertDirectory(check_dir)
+            self.assertDirectory(Path(check_dir, 'aliases'))
 
             if check_dir not in search:
                 check_dir = '/usr/lib/pressure-vessel' + check_dir
 
-            self.assertTrue(Path(check_dir).is_dir())
-            self.assertTrue(Path(check_dir, 'aliases').is_dir())
+            self.assertDirectory(check_dir)
+            self.assertDirectory(Path(check_dir, 'aliases'))
             self.assertIn(check_dir, search)
             self.assertIn(check_dir + '/aliases', ldlp)
 
     def test_overrides(self) -> None:
         if os.getenv('TEST_INSIDE_RUNTIME_IS_COPY'):
-            target = os.readlink('/overrides')
+            target = self.assertSymlink('/overrides')
             self.assertEqual(target, 'usr/lib/pressure-vessel/overrides')
 
-        self.assertTrue(Path('/overrides').is_dir())
-        self.assertTrue(Path('/overrides/lib').is_dir())
+        self.assertDirectory('/overrides')
+        self.assertDirectory('/overrides/lib')
 
         if (
             'HOST_LD_LINUX_SO_REALPATH' in os.environ
             and Path('/usr/lib/i386-linux-gnu').is_dir()
         ):
-            self.assertTrue(Path('/overrides/lib/i386-linux-gnu').is_dir())
+            self.assertDirectory('/overrides/lib/i386-linux-gnu')
 
         if (
             'HOST_LD_LINUX_X86_64_SO_REALPATH' in os.environ
             and Path('/usr/lib/x86_64-linux-gnu').is_dir()
         ):
-            self.assertTrue(Path('/overrides/lib/x86_64-linux-gnu').is_dir())
+            self.assertDirectory('/overrides/lib/x86_64-linux-gnu')
 
         if os.getenv('TEST_INSIDE_RUNTIME_IS_COPY'):
             # /etc/ld.so.* are symlinks to the mutable version
-            target = os.readlink('/etc/ld.so.cache')
+            target = self.assertSymlink('/etc/ld.so.cache')
             self.assertEqual(target, '/var/pressure-vessel/ldso/ld.so.cache')
-            target = os.readlink('/etc/ld.so.conf')
+            target = self.assertSymlink('/etc/ld.so.conf')
             self.assertEqual(target, '/var/pressure-vessel/ldso/ld.so.conf')
 
             # Exherbo compatibility symlinks also exist
-            target = os.readlink('/etc/ld-i686-pc-linux-gnu.cache')
+            target = self.assertSymlink('/etc/ld-i686-pc-linux-gnu.cache')
             self.assertEqual(target, '/var/pressure-vessel/ldso/ld.so.cache')
-            target = os.readlink('/etc/ld-x86_64-pc-linux-gnu.cache')
+            target = self.assertSymlink('/etc/ld-x86_64-pc-linux-gnu.cache')
             self.assertEqual(target, '/var/pressure-vessel/ldso/ld.so.cache')
             # Clear Linux compatibility symlinks, too
-            target = os.readlink('/var/cache/ldconfig/ld.so.cache')
+            target = self.assertSymlink('/var/cache/ldconfig/ld.so.cache')
             self.assertEqual(target, '/var/pressure-vessel/ldso/ld.so.cache')
 
             with open(
@@ -784,7 +784,7 @@ class TestInsideRuntime(BaseTest):
                             overrides, multiarch, k,
                         )
                         logger.info('Target of %s should be in %s', link, vs)
-                        target = os.readlink(link)
+                        target = self.assertSymlink(link)
 
                         # Again, take the realpath() on non-Debian-derived
                         # hosts, but be more strict on Debian.

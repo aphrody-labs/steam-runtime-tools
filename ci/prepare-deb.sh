@@ -122,4 +122,5 @@ apt-get install -y --no-install-recommends \
     "$@"
 # Optional
 apt-get install -y --no-install-recommends eatmydata || :
+apt-get install -y --no-install-recommends python3-tap || :
 dbus-uuidgen --ensure || :

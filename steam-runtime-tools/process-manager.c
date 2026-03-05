@@ -753,10 +753,18 @@ _srt_process_manager_options_take_original_stdout_stderr (SrtProcessManagerOptio
           AssignFd *pair = &g_array_index (self->assign_fds, AssignFd, i);
 
           if (pair->target == STDOUT_FILENO)
-            glnx_close_fd (&original_stdout);
+            {
+              if (!g_clear_fd (&original_stdout, NULL))
+                g_warning ("Unable to close original stdout: %s",
+                           g_strerror (errno));
+            }
 
           if (pair->target == STDERR_FILENO)
-            glnx_close_fd (&original_stderr);
+            {
+              if (!g_clear_fd (&original_stdout, NULL))
+                g_warning ("Unable to close original stderr: %s",
+                           g_strerror (errno));
+            }
         }
     }
 

@@ -624,7 +624,8 @@ test_fds_open (Fixture *f,
    * so that should be fine */
   g_assert_no_errno (glnx_loop_write (pipe_fds.fds[_SRT_PIPE_END_WRITE],
                                       "hello", strlen ("hello")));
-  glnx_close_fd (&pipe_fds.fds[_SRT_PIPE_END_WRITE]);
+  g_clear_fd (&pipe_fds.fds[_SRT_PIPE_END_WRITE], &f->error);
+  g_assert_no_error (f->error);
 
   /* Verify that the read end of the pipe was left open in the child
    * process, by reading from it and checking for the intended bytes */

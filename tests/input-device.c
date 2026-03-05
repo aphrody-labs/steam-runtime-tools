@@ -3262,8 +3262,9 @@ device_added_cb (SrtInputDeviceMonitor *monitor,
       g_assert_cmpint (fd, <, 0);
     }
 
-  glnx_close_fd (&fd);
   g_clear_error (&error);
+  g_clear_fd (&fd, &error);
+  g_assert_no_error (error);
 
   fd = srt_input_device_open (device, O_RDWR | O_NONBLOCK, &error);
 
@@ -3278,15 +3279,17 @@ device_added_cb (SrtInputDeviceMonitor *monitor,
       g_assert_cmpint (fd, <, 0);
     }
 
-  glnx_close_fd (&fd);
   g_clear_error (&error);
+  g_clear_fd (&fd, &error);
+  g_assert_no_error (error);
 
   /* Unsupported flags (currently everything except O_NONBLOCK) are
    * not allowed */
   fd = srt_input_device_open (device, O_RDONLY | O_SYNC, &error);
   g_assert_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT);
-  glnx_close_fd (&fd);
   g_clear_error (&error);
+  g_clear_fd (&fd, &error);
+  g_assert_no_error (error);
 
   /* For the mock device monitor, we know exactly what to expect, so
    * we can compare the expected log with what actually happened. For

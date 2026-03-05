@@ -242,6 +242,7 @@ test_describe_fd (Fixture *f,
 
     {
       int socks[2];
+      g_autoptr(GError) local_error = NULL;
       g_autofree gchar *desc = NULL;
 
       g_assert_no_errno (socketpair (AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, socks));
@@ -249,8 +250,10 @@ test_describe_fd (Fixture *f,
       g_assert_nonnull (desc);
       g_test_message ("Description of half of a socketpair: %s", desc);
       g_assert_nonnull (strstr (desc, "AF_UNIX"));
-      glnx_close_fd (&socks[0]);
-      glnx_close_fd (&socks[1]);
+      g_clear_fd (&socks[0], &local_error);
+      g_assert_no_error (local_error);
+      g_clear_fd (&socks[1], &local_error);
+      g_assert_no_error (local_error);
     }
 
     {
@@ -1768,7 +1771,8 @@ test_string_read_fd_until_eof (Fixture *f,
   g_assert_no_error (error);
 
   g_assert_no_errno (glnx_loop_write (p.fds[_SRT_PIPE_END_WRITE], "bar\0baz", 7));
-  glnx_close_fd (&p.fds[_SRT_PIPE_END_WRITE]);
+  g_clear_fd (&p.fds[_SRT_PIPE_END_WRITE], &error);
+  g_assert_no_error (error);
 
   buf = g_string_new ("foo");
   result = _srt_string_read_fd_until_eof (buf, p.fds[_SRT_PIPE_END_READ], &error);

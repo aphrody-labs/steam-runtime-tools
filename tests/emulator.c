@@ -843,7 +843,8 @@ test_relative (Fixture *f,
       g_assert_cmpint (exit_fd, >=, 0);
 
       g_assert_true (g_file_test (flag, G_FILE_TEST_IS_DIR));
-      glnx_close_fd (&exit_fd);
+      g_clear_fd (&exit_fd, &f->error);
+      g_assert_no_error (f->error);
 
       /* Poll for up to 10 seconds until the server cleans up its
        * flag directory and exits */

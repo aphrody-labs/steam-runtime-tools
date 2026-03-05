@@ -12,6 +12,8 @@ build-aux/many-builds.py - build steam-runtime-tools and pressure-vessel
 
 **build-aux/many-builds.py** [*OPTIONS*] **install** [*NINJA OPTIONS*]
 
+**build-aux/many-builds.py** [*OPTIONS*] **lint** [*MESON TEST OPTIONS*]
+
 **build-aux/many-builds.py** [*OPTIONS*] **test** [*MESON TEST OPTIONS*]
 
 **build-aux/many-builds.py** [*OPTIONS*] **clean** [*NINJA OPTIONS*]
@@ -196,10 +198,29 @@ found in `_build/scout-relocatable`, and is also copied into
 
 The other builds are not installed.
 
+## lint
+
+The **lint** step runs lint checks such as **pyflakes**(1)
+and **shellcheck**(1).
+
+Unlike the **test** step,
+in this mode any failing lint check is configured to be treated as an error,
+and detailed results are shown (**meson test -v** is used).
+
 ## test
 
 The **test** step runs unit tests, with as comprehensive a test coverage
 as possible. This will take a while.
+
+Lint checks such as **pyflakes**(1) and **shellcheck**(1) are run if
+available,
+but by default any lint failures are treated as an "expected failure"
+which does not cause the overall test step to fail.
+This is because lint tools often produce new false-positives when upgraded,
+which should not usually be treated as urgent to fix.
+To have lint failures reported as errors,
+either use the **lint** step (`build-aux/many-builds.py lint`),
+or set environment variable **LINT_WARNINGS_ARE_ERRORS=1**.
 
 ## clean
 

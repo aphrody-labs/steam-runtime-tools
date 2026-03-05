@@ -384,13 +384,20 @@ _srt_subprocess_read (SrtSubprocess *self,
       if (self->error == NULL)
         self->error = g_steal_pointer (&error);
 
-      glnx_close_fd (fd_p);
+      if (!g_clear_fd (fd_p, NULL))
+        g_debug ("Error closing subprocess %d %s: %s",
+                 self->pid, label, g_strerror (errno));
+
       return G_SOURCE_REMOVE;   /* Destroys the source */
     }
   else if (len == 0)
     {
       trace ("EOF reading from subprocess %d %s", self->pid, label);
-      glnx_close_fd (fd_p);
+
+      if (!g_clear_fd (fd_p, NULL))
+        g_debug ("Error closing subprocess %d %s: %s",
+                 self->pid, label, g_strerror (errno));
+
       return G_SOURCE_REMOVE;   /* Destroys the source */
     }
   else

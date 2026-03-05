@@ -231,6 +231,7 @@ _srt_emulator_server_wait_for_ready (SrtEmulatorServer *self,
       else
         {
           g_autoptr(GString) buf = g_string_new (NULL);
+          gboolean closed_ok;
 
           g_debug ("Waiting for emulator server to be ready...");
           ret = _srt_string_read_fd_until_eof (buf, self->ready_fd, error);
@@ -245,7 +246,15 @@ _srt_emulator_server_wait_for_ready (SrtEmulatorServer *self,
                 ret = glnx_throw (error,
                                   "Last output line from emulator server was not READY=1\\n");
 
-              glnx_close_fd (&self->ready_fd);
+              /* We want to close the fd even if the output is not what
+               * we wanted, but avoid overwriting @error if we already
+               * set it. g_clear_fd() guarantees to set errno on failure,
+               * so this is most straightforward to achieve by using that. */
+              closed_ok = g_clear_fd (&self->ready_fd, NULL);
+
+              if (ret && !closed_ok)
+                ret = glnx_throw_errno_prefix (error,
+                                               "Unable to close pipe from emulator server");
             }
         }
     }

@@ -139,7 +139,13 @@ copy_regular_file (const char *source,
   times[1] = source_stat->st_mtim;
   (void) futimens (dest_fd, times);
 
-  glnx_close_fd (&dest_fd);
+  if (!g_clear_fd (&dest_fd, error))
+    {
+      glnx_prefix_error (error,
+                         "Unable to close temporary destination file \"%s\"",
+                         temp);
+      goto cleanup;
+    }
 
   if (rename (temp, dest) != 0)
     {

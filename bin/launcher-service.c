@@ -1261,33 +1261,22 @@ avoid_stdin (int fd,
       old_stdin = dup (STDIN_FILENO);
 
       if (old_stdin < 0)
-        {
-          glnx_throw_errno_prefix (error,
-                                   "Unable to duplicate standard input");
-          return -1;
-        }
+        return glnx_fd_throw_errno_prefix (error,
+                                           "Unable to duplicate standard input");
 
       if (_srt_fd_set_close_on_exec (old_stdin) < 0)
-        {
-          glnx_throw_errno_prefix (error, "Unable to set flags on fd %d",
-                                   old_stdin);
-          return -1;
-        }
+        return glnx_fd_throw_errno_prefix (error,
+                                           "Unable to set flags on fd %d",
+                                           old_stdin);
 
       new_stdin = open ("/dev/null", O_RDONLY | O_CLOEXEC);
 
       if (new_stdin < 0)
-        {
-          glnx_throw_errno_prefix (error, "Unable to open /dev/null");
-          return -1;
-        }
+        return glnx_fd_throw_errno_prefix (error, "Unable to open /dev/null");
 
       if (dup2 (new_stdin, STDIN_FILENO) != STDIN_FILENO)
-        {
-          glnx_throw_errno_prefix (error,
-                                   "Unable to make stdin point to /dev/null");
-          return -1;
-        }
+        return glnx_fd_throw_errno_prefix (error,
+                                           "Unable to make stdin point to /dev/null");
 
       fd = g_steal_fd (&old_stdin);
     }

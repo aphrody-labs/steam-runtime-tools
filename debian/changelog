@@ -7,7 +7,9 @@ steam-runtime-tools (0.20260305.0) UNRELEASED; urgency=medium
   * s-r-system-info:
     - Improve documentation (steamrt/tasks#837)
   * Tests:
-    - Improve coverage (steamrt/tasks#837)
+    - Improve coverage (steamrt/tasks#837, steamrt/tasks#919)
+    - Fix assertions that can fail on newer systems
+      (steamrt/tasks#919)
 
   [ Simon McVittie ]
   * pressure-vessel:
@@ -17,15 +19,19 @@ steam-runtime-tools (0.20260305.0) UNRELEASED; urgency=medium
     - Replace tests/pressure-vessel/containers.py with smaller tests that
       can run in parallel (the total coverage is the same)
     - Fix assertions that can fail on newer systems
+      (steamrt/tasks#919, steamrt/tasks#313)
+    - Skip a problematic test-case on older Ubuntu, testing a mode that we
+      don't use in production
+      (steamrt/tasks#824, steamrt/tasks#919, steamrt/tasks#934)
     - Don't write pressure-vessel debug logs to top-level CI log since
       this can result in limits being exceeded
     - Align artifacts subdirectory names with subTest names
     - Install pressure-vessel tests into /usr/libexec/installed-tests
+    - Remove dead code (steamrt/tasks#824)
     - In CI, produce TAP output via python3-tap if possible
-    - Remove dead code
-    (steamrt/tasks#824, steamrt/tasks#919)
+    - In CI, use new CI runners for better coverage (steamrt/tasks#919)
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 05 Mar 2026 11:03:15 +0000
+ -- Simon McVittie <smcv@collabora.com>  Thu, 05 Mar 2026 12:21:12 +0000
 
 steam-runtime-tools (0.20260218.0) steamrt; urgency=medium
 

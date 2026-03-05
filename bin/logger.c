@@ -366,7 +366,9 @@ run (int argc,
           _srt_log_failure ("Falling back to just running the program");
         }
 
-      glnx_close_fd (&original_stdout);
+      if (!g_clear_fd (&original_stdout, NULL))
+        g_warning ("Unable to close original stdout: %s",
+                   g_strerror (errno));
 
       if (consume_stdin)
         return TRUE;
@@ -392,7 +394,10 @@ run (int argc,
                         local_error->message);
       _srt_log_failure ("Falling back to the equivalent of cat >&2");
 
-      glnx_close_fd (&original_stdout);
+      if (!g_clear_fd (&original_stdout, NULL))
+        g_warning ("Unable to close original stdout: %s",
+                   g_strerror (errno));
+
       execvpe_wrapper ((char **) cat, subproc_environ, error);
       return FALSE;
     }

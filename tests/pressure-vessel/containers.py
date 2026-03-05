@@ -65,10 +65,14 @@ Influential environment variables:
     or if not running from a just-built version of steam-runtime-tools.
 * G_TEST_SRCDIR:
     The ./tests/pressure-vessel subdirectory of the source root,
-    typically $(pwd)/tests/pressure-vessel
+    typically $(pwd)/tests/pressure-vessel,
+    or the pressure-vessel subdirectory of the "as-installed" tests,
+    ${libexecdir}/installed-tests/steam-runtime-tools-0/pressure-vessel
 * G_TEST_BUILDDIR:
     The ./tests/pressure-vessel subdirectory of the build root,
-    typically $(pwd)/_build/tests/pressure-vessel
+    typically $(pwd)/_build/tests/pressure-vessel,
+    or the pressure-vessel subdirectory of the "as-installed" tests,
+    ${libexecdir}/installed-tests/steam-runtime-tools-0/pressure-vessel
 * PRESSURE_VESSEL_LIBCAPSULE_TOOLS:
     Override the location of capsule-capture-libs etc.
 * PRESSURE_VESSEL_TEST_CONTAINERS:
@@ -877,7 +881,7 @@ class BaseContainersTest(BaseTest):
                 elif mock_emulator == 'sh.json':
                     self.assertTrue(
                         final_argv.endswith(
-                            'tests/pressure-vessel/mock-emulators/wrapper.sh\0'
+                            '/pressure-vessel/mock-emulators/wrapper.sh\0'
                             '--main\0'
                             '--\0'
                         ),

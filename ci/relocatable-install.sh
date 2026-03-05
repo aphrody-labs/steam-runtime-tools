@@ -146,5 +146,7 @@ PYTHONPATH="$(pwd)/tests" "$PYTHON" \
     "$@" \
     "$(pwd)/$dir/relocatable-install"
 
-pv_testdir=/usr/libexec/installed-tests/steam-runtime-tools-0/pressure-vessel
-install -m644 "$pv_testdir/containers-tests.txt" "$dir/"
+# Required during testing
+pkgtestdir=/usr/libexec/installed-tests/steam-runtime-tools-0
+install -d "$dir/installed-tests/"
+cp -a "$pkgtestdir" "$dir/installed-tests/"

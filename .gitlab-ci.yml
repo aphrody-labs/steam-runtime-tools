@@ -454,7 +454,7 @@ relocatable-install:
         paths:
             - _build/pressure-vessel-bin.tar.gz
             - _build/pressure-vessel-bin+src.tar.gz
-            - _build/containers-tests.txt
+            - _build/installed-tests
         when: on_success
 
 # This will replace the scout relocatable-install build (above)
@@ -476,7 +476,7 @@ relocatable-install:x86-steamrt3c:
         paths:
             - _build/pressure-vessel-bin.tar.gz
             - _build/pressure-vessel-bin+src.tar.gz
-            - _build/containers-tests.txt
+            - _build/installed-tests
         when: on_success
 
 .test_x86:

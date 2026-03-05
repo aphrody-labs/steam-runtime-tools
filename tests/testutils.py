@@ -1,9 +1,10 @@
-# Copyright 2020 Collabora Ltd.
+# Copyright 2020-2026 Collabora Ltd.
 #
 # SPDX-License-Identifier: MIT
 
 import logging
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -12,9 +13,11 @@ import warnings
 
 try:
     import typing
+    from pathlib import Path
 except ImportError:
     pass
 else:
+    Path        # placate pyflakes
     typing      # placate pyflakes
 
 
@@ -213,6 +216,151 @@ class BaseTest(unittest.TestCase):
                     )
         else:
             self.command_prefix = []
+
+    def assertFile(
+        self,
+        path,
+        msg=None,
+    ):
+        # type: (typing.Union[Path, str], typing.Optional[str]) -> None
+        '''
+        Assert that `path` is a regular file, or a symlink to one.
+        '''
+
+        try:
+            st_buf = os.stat(str(path))
+        except OSError as e:
+            # Fall through to raising an exception outside try/except,
+            # to make the traceback shown by Python less verbose
+            result = e      # type: typing.Any
+        else:
+            if stat.S_ISREG(st_buf.st_mode):
+                # As expected it's a regular file, or a symlink to one
+                return
+            elif stat.S_ISDIR(st_buf.st_mode):
+                result = 'Found a directory'
+            else:
+                # A fifo or device or something
+                result = 'Found an unexpected type 0o%o' % st_buf.st_mode
+
+        if isinstance(result, FileNotFoundError):
+            # Could be either nonexistent or a dangling symlink
+            try:
+                result = 'Found a dangling symlink to {}'.format(
+                    os.readlink(str(path))
+                )
+            except OSError:
+                pass
+
+        if not msg:
+            msg = '{} should have been a regular file'.format(path)
+
+        raise AssertionError('{}, but: {}'.format(msg, result))
+
+    def assertDirectory(
+        self,
+        path,
+        msg=None,
+    ):
+        # type: (typing.Union[Path, str], typing.Optional[str]) -> None
+        '''
+        Assert that `path` is a directory, or a symlink to one.
+        '''
+
+        try:
+            st_buf = os.stat(str(path))
+        except OSError as e:
+            # Fall through to raising an exception outside try/except,
+            # to make the traceback shown by Python less verbose
+            result = e      # type: typing.Any
+        else:
+            if stat.S_ISDIR(st_buf.st_mode):
+                # As expected it's a directory, or a symlink to directory
+                return
+            elif stat.S_ISREG(st_buf.st_mode):
+                result = 'Found a regular file'
+            else:
+                # A fifo or device or something
+                result = 'Found an unexpected type 0o%o' % st_buf.st_mode
+
+        if isinstance(result, FileNotFoundError):
+            # Could be either nonexistent or a dangling symlink
+            try:
+                result = 'Found a dangling symlink to {}'.format(
+                    os.readlink(str(path))
+                )
+            except OSError:
+                pass
+
+        if not msg:
+            msg = '{} should have been a directory'.format(path)
+
+        raise AssertionError('{}, but: {}'.format(msg, result))
+
+    def assertSymlink(
+        self,
+        path,
+        msg=None,
+    ):
+        # type: (typing.Union[Path, str], typing.Optional[str]) -> str
+        '''
+        Assert that `path` is a symlink, returning its target.
+        '''
+
+        try:
+            return os.readlink(str(path))
+        except OSError as e:
+            # Fall through to raising an exception outside try/except,
+            # to make the traceback shown by Python less verbose
+            result = e
+
+        if not msg:
+            msg = '{} should have been a symlink'.format(path)
+
+        raise AssertionError('{}, but: {}'.format(msg, result))
+
+    def assertNoFile(
+        self,
+        path,
+        msg=None,
+    ):
+        # type: (typing.Union[Path, str], typing.Optional[str]) -> None
+        '''
+        Assert that `path` does not exist.
+        If it does exist, the assertion message mentions the symlink
+        target, if any.
+        '''
+
+        try:
+            st_buf = os.lstat(str(path))
+        except FileNotFoundError:
+            # Good: it doesn't exist, as expected
+            return
+        except OSError as e:
+            # Fall through to raising an exception outside try/except,
+            # to make the traceback shown by Python less verbose
+            result = e      # type: typing.Any
+        else:
+            if stat.S_ISDIR(st_buf.st_mode):
+                result = 'Found a directory'
+            elif stat.S_ISREG(st_buf.st_mode):
+                result = 'Found a regular file'
+            elif stat.S_ISLNK(st_buf.st_mode):
+                # It's a symlink, try to report where it points
+                try:
+                    result = 'Found a symlink to {}'.format(
+                        os.readlink(str(path)),
+                    )
+                except OSError as e:
+                    result = e
+            else:
+                # It's a fifo or device or something (unexpected)
+                result = 'Found an unexpected type 0o%o' % st_buf.st_mode
+
+        if not msg:
+            msg = '{} should not have existed'.format(path)
+
+        raise AssertionError('{}, but: {}'.format(msg, result))
 
     def tearDown(self) -> None:
         pass

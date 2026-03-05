@@ -87,6 +87,26 @@ class TestInsideRuntime(BaseTest):
         self.artifacts.mkdir(exist_ok=True)
         logger.info('Artifacts will be in %s', self.artifacts)
 
+        self.home_is_unshared = bool(
+            os.environ.get('TEST_INSIDE_RUNTIME_IS_HOME_UNSHARED'),
+        )
+        self.locales_configured = bool(
+            os.environ.get('TEST_INSIDE_RUNTIME_LOCALES'),
+        )
+
+        self.runtime_is_copy = bool(
+            os.environ.get('TEST_INSIDE_RUNTIME_IS_COPY'),
+        )
+        self.runtime_is_scout = bool(
+            os.environ.get('TEST_INSIDE_RUNTIME_IS_SCOUT'),
+        )
+        self.runtime_is_sdk = bool(
+            os.environ.get('TEST_INSIDE_RUNTIME_IS_SDK'),
+        )
+        self.runtime_is_soldier = bool(
+            os.environ.get('TEST_INSIDE_RUNTIME_IS_SOLDIER'),
+        )
+
     def tearDown(self) -> None:
         super().tearDown()
 
@@ -138,12 +158,12 @@ class TestInsideRuntime(BaseTest):
                     assert len(tokens) == 1, tokens
                     data[key] = tokens[0]
 
-            if os.environ.get('TEST_INSIDE_RUNTIME_IS_SCOUT'):
+            if self.runtime_is_scout:
                 self.assertEqual(data.get('VERSION_ID'), '1')
                 self.assertEqual(data.get('ID'), 'steamrt')
                 self.assertEqual(data.get('ID_LIKE'), 'ubuntu')
 
-            elif os.environ.get('TEST_INSIDE_RUNTIME_IS_SOLDIER'):
+            elif self.runtime_is_soldier:
                 self.assertEqual(data.get('VERSION_ID'), '2')
                 self.assertEqual(data.get('ID'), 'steamrt')
                 self.assertEqual(data.get('ID_LIKE'), 'debian')
@@ -151,17 +171,17 @@ class TestInsideRuntime(BaseTest):
             self.assertIsNotNone(data.get('BUILD_ID'))
 
     def test_environ(self) -> None:
-        if os.getenv('TEST_INSIDE_RUNTIME_IS_COPY'):
+        if self.runtime_is_copy:
             logger.info('Runtime is a copy')
         else:
             logger.info('Runtime is not a copy')
 
-        if os.getenv('TEST_INSIDE_RUNTIME_IS_SCOUT'):
+        if self.runtime_is_scout:
             logger.info('Runtime is scout')
         else:
             logger.info('Runtime is not scout')
 
-        if os.getenv('TEST_INSIDE_RUNTIME_IS_SOLDIER'):
+        if self.runtime_is_soldier:
             logger.info('Runtime is soldier')
         else:
             logger.info('Runtime is not soldier')
@@ -180,9 +200,9 @@ class TestInsideRuntime(BaseTest):
 
                 logger.info('/etc/ld.so.conf: %r', line)
 
-        if os.environ.get('TEST_INSIDE_RUNTIME_IS_SCOUT'):
+        if self.runtime_is_scout:
             self.assertEqual(os.environ.get('STEAM_RUNTIME'), '/')
-        elif os.environ.get('TEST_INSIDE_RUNTIME_IS_SOLDIER'):
+        elif self.runtime_is_soldier:
             self.assertEqual(os.environ.get('STEAM_RUNTIME'), None)
 
         self.assertEqual(os.environ.get('container'), 'pressure-vessel')
@@ -195,11 +215,14 @@ class TestInsideRuntime(BaseTest):
         ldlp = os.environ.get('LD_LIBRARY_PATH', '').split(':')
         search |= set(ldlp)
 
-        if os.getenv('TEST_INSIDE_RUNTIME_IS_COPY'):
+        if self.runtime_is_copy:
             # Only the aliases directories get into the LD_LIBRARY_PATH,
             # not the directories containing SONAMEs
             for path in ldlp:
-                self.assertTrue(path.endswith('/aliases'))
+                self.assertTrue(
+                    path.endswith('/aliases'),
+                    '{!r} should end with /aliases'.format(path),
+                )
 
         if (
             'HOST_LD_LINUX_SO_REALPATH' in os.environ
@@ -211,17 +234,17 @@ class TestInsideRuntime(BaseTest):
                 self.assertIn(check_dir, search)
                 self.assertIn(check_dir + '/aliases', ldlp)
 
-            self.assertTrue(
-                Path(check_dir).is_dir(),
+            self.assertDirectory(
+                check_dir,
                 '{} should be a directory in container'.format(check_dir),
             )
-            self.assertTrue(Path(check_dir, 'aliases').is_dir())
+            self.assertDirectory(Path(check_dir, 'aliases'))
 
             if check_dir not in search:
                 check_dir = '/usr/lib/pressure-vessel' + check_dir
 
-            self.assertTrue(Path(check_dir).is_dir())
-            self.assertTrue(Path(check_dir, 'aliases').is_dir())
+            self.assertDirectory(check_dir)
+            self.assertDirectory(Path(check_dir, 'aliases'))
             self.assertIn(check_dir, search)
             self.assertIn(check_dir + '/aliases', ldlp)
 
@@ -235,51 +258,51 @@ class TestInsideRuntime(BaseTest):
                 self.assertIn(check_dir, search)
                 self.assertIn(check_dir + '/aliases', ldlp)
 
-            self.assertTrue(Path(check_dir).is_dir())
-            self.assertTrue(Path(check_dir, 'aliases').is_dir())
+            self.assertDirectory(check_dir)
+            self.assertDirectory(Path(check_dir, 'aliases'))
 
             if check_dir not in search:
                 check_dir = '/usr/lib/pressure-vessel' + check_dir
 
-            self.assertTrue(Path(check_dir).is_dir())
-            self.assertTrue(Path(check_dir, 'aliases').is_dir())
+            self.assertDirectory(check_dir)
+            self.assertDirectory(Path(check_dir, 'aliases'))
             self.assertIn(check_dir, search)
             self.assertIn(check_dir + '/aliases', ldlp)
 
     def test_overrides(self) -> None:
-        if os.getenv('TEST_INSIDE_RUNTIME_IS_COPY'):
-            target = os.readlink('/overrides')
+        if self.runtime_is_copy:
+            target = self.assertSymlink('/overrides')
             self.assertEqual(target, 'usr/lib/pressure-vessel/overrides')
 
-        self.assertTrue(Path('/overrides').is_dir())
-        self.assertTrue(Path('/overrides/lib').is_dir())
+        self.assertDirectory('/overrides')
+        self.assertDirectory('/overrides/lib')
 
         if (
             'HOST_LD_LINUX_SO_REALPATH' in os.environ
             and Path('/usr/lib/i386-linux-gnu').is_dir()
         ):
-            self.assertTrue(Path('/overrides/lib/i386-linux-gnu').is_dir())
+            self.assertDirectory('/overrides/lib/i386-linux-gnu')
 
         if (
             'HOST_LD_LINUX_X86_64_SO_REALPATH' in os.environ
             and Path('/usr/lib/x86_64-linux-gnu').is_dir()
         ):
-            self.assertTrue(Path('/overrides/lib/x86_64-linux-gnu').is_dir())
+            self.assertDirectory('/overrides/lib/x86_64-linux-gnu')
 
-        if os.getenv('TEST_INSIDE_RUNTIME_IS_COPY'):
+        if self.runtime_is_copy:
             # /etc/ld.so.* are symlinks to the mutable version
-            target = os.readlink('/etc/ld.so.cache')
+            target = self.assertSymlink('/etc/ld.so.cache')
             self.assertEqual(target, '/var/pressure-vessel/ldso/ld.so.cache')
-            target = os.readlink('/etc/ld.so.conf')
+            target = self.assertSymlink('/etc/ld.so.conf')
             self.assertEqual(target, '/var/pressure-vessel/ldso/ld.so.conf')
 
             # Exherbo compatibility symlinks also exist
-            target = os.readlink('/etc/ld-i686-pc-linux-gnu.cache')
+            target = self.assertSymlink('/etc/ld-i686-pc-linux-gnu.cache')
             self.assertEqual(target, '/var/pressure-vessel/ldso/ld.so.cache')
-            target = os.readlink('/etc/ld-x86_64-pc-linux-gnu.cache')
+            target = self.assertSymlink('/etc/ld-x86_64-pc-linux-gnu.cache')
             self.assertEqual(target, '/var/pressure-vessel/ldso/ld.so.cache')
             # Clear Linux compatibility symlinks, too
-            target = os.readlink('/var/cache/ldconfig/ld.so.cache')
+            target = self.assertSymlink('/var/cache/ldconfig/ld.so.cache')
             self.assertEqual(target, '/var/pressure-vessel/ldso/ld.so.cache')
 
             with open(
@@ -320,7 +343,7 @@ class TestInsideRuntime(BaseTest):
         logger.info('glibc version in use: %s', glibc_version)
         major, minor, *rest = glibc_version.split('.')
 
-        if os.environ.get('TEST_INSIDE_RUNTIME_IS_SCOUT'):
+        if self.runtime_is_scout:
             # Assert that we took the glibc version from the host OS.
             #
             # We assume this will always be true for scout, because scout
@@ -371,7 +394,7 @@ class TestInsideRuntime(BaseTest):
                     self.assertEqual(really_stat.st_dev, expected_stat.st_dev)
                     self.assertEqual(really_stat.st_ino, expected_stat.st_ino)
 
-        elif os.environ.get('TEST_INSIDE_RUNTIME_IS_SOLDIER'):
+        elif self.runtime_is_soldier:
             # We don't know whether it's soldier's glibc 2.28 or something
             # newer from the host, but it should definitely be at least
             # soldier's version
@@ -400,7 +423,7 @@ class TestInsideRuntime(BaseTest):
         conf = Path('/etc/ld.so.conf').resolve()
 
         # Solus
-        if os.getenv('TEST_INSIDE_RUNTIME_IS_COPY'):
+        if self.runtime_is_copy:
             self.assertEqual(
                 conf, Path('/usr/share/defaults/etc/ld.so.conf').resolve()
             )
@@ -417,7 +440,7 @@ class TestInsideRuntime(BaseTest):
         return False
 
     def test_home_directory(self) -> None:
-        if os.environ.get('TEST_INSIDE_RUNTIME_IS_HOME_UNSHARED'):
+        if self.home_is_unshared:
             # If we unshared the real home there are a few directories that
             # we always expect to have
             home_path = os.environ.get('HOME')
@@ -565,13 +588,13 @@ class TestInsideRuntime(BaseTest):
             self.assertIn('version_id', parsed['os-release'])
             self.assertIn('build_id', parsed['os-release'])
 
-            if os.environ.get('TEST_INSIDE_RUNTIME_IS_SCOUT'):
+            if self.runtime_is_scout:
                 self.assertEqual('1', parsed['os-release']['version_id'])
                 self.assertEqual(
                     'scout',
                     parsed['os-release']['version_codename'],
                 )
-            elif os.environ.get('TEST_INSIDE_RUNTIME_IS_SOLDIER'):
+            elif self.runtime_is_soldier:
                 self.assertEqual('2', parsed['os-release']['version_id'])
                 self.assertEqual(
                     'soldier',
@@ -592,7 +615,7 @@ class TestInsideRuntime(BaseTest):
                 host_parsed['os-release'],
             )
 
-            if os.environ.get('TEST_INSIDE_RUNTIME_LOCALES'):
+            if self.locales_configured:
                 for locale, host_details in host_parsed.get(
                     'locales', {}
                 ).items():
@@ -691,6 +714,20 @@ class TestInsideRuntime(BaseTest):
                         expect_library_issues |= set(details.get('issues', []))
                         continue
 
+                    if (
+                        soname == 'libcrypt.so.1'
+                        and self.runtime_is_scout
+                        and self.runtime_is_sdk
+                        and os.path.exists('/lib32/libcrypt.so.1')
+                        and multiarch == 'i386-linux-gnu'
+                    ):
+                        # Even though we prefer to use libxcrypt's libcrypt
+                        # implementation, gcc-*-multilib pulls in
+                        # libc6{,-dev}-i386 which includes
+                        # /lib32/libcrypt.so.1 which has a smaller ABI.
+                        expect_library_issues |= set(details.get('issues', []))
+                        continue
+
                     self.assertIn('path', details)
                     self.assertEqual(
                         [],
@@ -702,7 +739,7 @@ class TestInsideRuntime(BaseTest):
                     )
                     self.assertEqual([], details.get('issues', []))
 
-            if os.environ.get('TEST_INSIDE_RUNTIME_IS_SCOUT'):
+            if self.runtime_is_scout:
                 for soname in (
                     'libBrokenLocale.so.1',
                     'libanl.so.1',
@@ -723,12 +760,12 @@ class TestInsideRuntime(BaseTest):
                         '{}/lib/{}/{}'.format(overrides, multiarch, soname),
                     )
 
-            if os.environ.get('TEST_INSIDE_RUNTIME_IS_SCOUT'):
+            if self.runtime_is_scout:
                 not_graphics_drivers = [
                     'libSDL-1.2.so.0',
                     'libfltk.so.1.1',
                 ]
-            elif os.environ.get('TEST_INSIDE_RUNTIME_IS_SOLDIER'):
+            elif self.runtime_is_soldier:
                 not_graphics_drivers = [
                     'libfltk.so.1.1',
                     'libgdk-3.so.0',
@@ -784,7 +821,7 @@ class TestInsideRuntime(BaseTest):
                             overrides, multiarch, k,
                         )
                         logger.info('Target of %s should be in %s', link, vs)
-                        target = os.readlink(link)
+                        target = self.assertSymlink(link)
 
                         # Again, take the realpath() on non-Debian-derived
                         # hosts, but be more strict on Debian.
@@ -886,7 +923,7 @@ class TestInsideRuntime(BaseTest):
             with self.subTest(read_only_place):
                 if (
                     read_only_place.startswith('/overrides')
-                    and not os.getenv('TEST_INSIDE_RUNTIME_IS_COPY')
+                    and not self.runtime_is_copy
                 ):
                     # If we aren't working from a temporary copy of the
                     # runtime, /overrides is on a tmpfs

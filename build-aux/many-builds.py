@@ -484,6 +484,18 @@ class Environment:
             check=True,
         )
 
+    def lint(self, args: List[str]) -> None:
+        subprocess.run(
+            [
+                'env', 'LINT_WARNINGS_ARE_ERRORS=1',
+                'meson', 'test',
+                '-C', str(self.builddir_parent / 'host'),
+                '--suite=lint',
+                '--verbose',
+            ] + args,
+            check=True,
+        )
+
     def install(self, args: List[str]) -> None:
         self.run_scout_builds('install', args)
 
@@ -538,6 +550,7 @@ def main() -> int:
             'clean',
             'build',
             'test',
+            'lint',
             'install',
             'all',
         ),
@@ -561,6 +574,8 @@ def main() -> int:
         env.build(args.args)
     elif args.command == 'test':
         env.test(args.args)
+    elif args.command == 'lint':
+        env.lint(args.args)
     elif args.command == 'install':
         env.install(args.args)
     elif args.command == 'all':

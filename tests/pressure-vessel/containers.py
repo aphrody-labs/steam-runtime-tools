@@ -156,6 +156,7 @@ class BaseContainersTest(BaseTest):
     host_srsi_parsed = {}   # type: typing.Dict[str, typing.Any]
     pv_dir = ''
     pv_wrap = ''
+    runtime_is_sdk = False
 
     @staticmethod
     def copy2(src, dest):
@@ -521,6 +522,7 @@ class BaseContainersTest(BaseTest):
         self.host_srsi_parsed = cls.host_srsi_parsed
         self.pv_dir = cls.pv_dir
         self.pv_wrap = cls.pv_wrap
+        self.runtime_is_sdk = cls.runtime_is_sdk
 
         os.makedirs(os.path.join(cls.artifacts, 'tmp'), exist_ok=True)
 
@@ -652,6 +654,8 @@ class BaseContainersTest(BaseTest):
         start_time = time.time()
         logger.info('Testing: %s', test_name)
 
+        is_sdk = self.runtime_is_sdk
+
         artifacts = os.path.join(
             self.artifacts,
             test_name,
@@ -759,6 +763,9 @@ class BaseContainersTest(BaseTest):
                     'TEST_INSIDE_RUNTIME_IS_SCOUT=' + (
                         '1' if is_scout else ''
                     ),
+                    'TEST_INSIDE_RUNTIME_IS_SDK=' + (
+                        '1' if is_sdk else ''
+                    ),
                     'TEST_INSIDE_RUNTIME_IS_SOLDIER=' + (
                         '1' if is_soldier else ''
                     ),
@@ -862,6 +869,9 @@ class BaseContainersTest(BaseTest):
                     self.assertTrue(
                         final_argv.endswith(
                             '\0/run/host/usr/bin/env\0'
+                        ),
+                        '{!r} should end with /run/host/usr/bin/env'.format(
+                            final_argv,
                         )
                     )
                 elif mock_emulator == 'sh.json':
@@ -870,6 +880,9 @@ class BaseContainersTest(BaseTest):
                             'tests/pressure-vessel/mock-emulators/wrapper.sh\0'
                             '--main\0'
                             '--\0'
+                        ),
+                        '{!r} should end with wrapper.sh --main --'.format(
+                            final_argv,
                         )
                     )
 
@@ -937,33 +950,25 @@ class BaseContainersTest(BaseTest):
                 '-ls',
             ], cwd=tree, stderr=2, stdout=writer)
 
-        self.assertTrue(os.path.isdir(os.path.join(tree, 'bin')))
-        self.assertTrue(os.path.isdir(os.path.join(tree, 'etc')))
-        self.assertTrue(os.path.isdir(os.path.join(tree, 'lib')))
-        self.assertTrue(os.path.isdir(os.path.join(tree, 'usr')))
-        self.assertFalse(
-            os.path.isdir(os.path.join(tree, 'usr', 'usr'))
-        )
-        self.assertTrue(os.path.isdir(os.path.join(tree, 'sbin')))
+        self.assertDirectory(os.path.join(tree, 'bin'))
+        self.assertDirectory(os.path.join(tree, 'etc'))
+        self.assertDirectory(os.path.join(tree, 'lib'))
+        self.assertDirectory(os.path.join(tree, 'usr'))
+        self.assertNoFile(os.path.join(tree, 'usr', 'usr'))
+        self.assertDirectory(os.path.join(tree, 'sbin'))
 
-        target = os.readlink(os.path.join(tree, 'overrides'))
+        target = self.assertSymlink(os.path.join(tree, 'overrides'))
         self.assertEqual(target, 'usr/lib/pressure-vessel/overrides')
-        self.assertTrue(
-            os.path.isdir(os.path.join(tree, 'overrides', 'lib')),
-        )
-        self.assertTrue(
-            os.path.isfile(
-                os.path.join(
-                    tree, 'usr', 'lib', 'pressure-vessel', 'from-host',
-                    'libexec', 'steam-runtime-tools-0', 'pv-adverb',
-                )
+        self.assertDirectory(os.path.join(tree, 'overrides', 'lib'))
+        self.assertFile(
+            os.path.join(
+                tree, 'usr', 'lib', 'pressure-vessel', 'from-host',
+                'libexec', 'steam-runtime-tools-0', 'pv-adverb',
             )
         )
-        self.assertTrue(
-            os.path.isdir(
-                os.path.join(
-                    tree, 'usr', 'lib', 'pressure-vessel', 'overrides', 'lib',
-                )
+        self.assertDirectory(
+            os.path.join(
+                tree, 'usr', 'lib', 'pressure-vessel', 'overrides', 'lib',
             )
         )
 
@@ -998,9 +1003,9 @@ class BaseContainersTest(BaseTest):
 
             with self.subTest(arch=multiarch):
 
-                self.assertTrue(os.path.isdir(overrides_libdir))
-                self.assertTrue(os.path.isdir(root_libdir))
-                self.assertTrue(os.path.isdir(usr_libdir))
+                self.assertDirectory(overrides_libdir)
+                self.assertDirectory(root_libdir)
+                self.assertDirectory(usr_libdir)
 
                 if is_scout:
                     for soname in (
@@ -1021,7 +1026,7 @@ class BaseContainersTest(BaseTest):
                         # Mesa, and is at least as new as scout's version
                         # in every supported version of the Steam Runtime.
                         with self.subTest(soname=soname):
-                            target = os.readlink(
+                            target = self.assertSymlink(
                                 os.path.join(overrides_libdir, soname)
                             )
                             self.assertRegex(target, r'^/run/host/')
@@ -1029,47 +1034,21 @@ class BaseContainersTest(BaseTest):
                             devlib = soname.split('.so.', 1)[0] + '.so'
 
                             # It was deleted from /lib, if present...
-                            with self.assertRaises(FileNotFoundError):
-                                print(
-                                    '#',
-                                    os.path.join(root_libdir, soname),
-                                    '->',
-                                    os.readlink(
-                                        os.path.join(root_libdir, soname)
-                                    ),
-                                )
+                            self.assertNoFile(
+                                os.path.join(root_libdir, soname),
+                            )
                             # ... and /usr/lib, if present...
-                            with self.assertRaises(FileNotFoundError):
-                                print(
-                                    '#',
-                                    os.path.join(usr_libdir, soname),
-                                    '->',
-                                    os.readlink(
-                                        os.path.join(usr_libdir, soname)
-                                    ),
-                                )
+                            self.assertNoFile(
+                                os.path.join(usr_libdir, soname),
+                            )
                             # ... and /libQUAL and /usr/libQUAL, if present
                             if libqualdir:
-                                with self.assertRaises(FileNotFoundError):
-                                    print(
-                                        '#',
-                                        os.path.join(libqualdir, soname),
-                                        '->',
-                                        os.readlink(
-                                            os.path.join(libqualdir, soname)
-                                        ),
-                                    )
-                                with self.assertRaises(FileNotFoundError):
-                                    print(
-                                        '#',
-                                        os.path.join(usr_libqualdir, soname),
-                                        '->',
-                                        os.readlink(
-                                            os.path.join(
-                                                usr_libqualdir, soname,
-                                            )
-                                        ),
-                                    )
+                                self.assertNoFile(
+                                    os.path.join(libqualdir, soname),
+                                )
+                                self.assertNoFile(
+                                    os.path.join(usr_libqualdir, soname),
+                                )
 
                             # In most cases we expect the development
                             # symlink to be removed, too - but some of
@@ -1079,24 +1058,12 @@ class BaseContainersTest(BaseTest):
                                 'libc.so.6',
                                 'libpthread.so.0',
                             ):
-                                with self.assertRaises(FileNotFoundError):
-                                    print(
-                                        '#',
-                                        os.path.join(usr_libdir, devlib),
-                                        '->',
-                                        os.readlink(
-                                            os.path.join(usr_libdir, devlib)
-                                        ),
-                                    )
-                                with self.assertRaises(FileNotFoundError):
-                                    print(
-                                        '#',
-                                        os.path.join(root_libdir, devlib),
-                                        '->',
-                                        os.readlink(
-                                            os.path.join(root_libdir, devlib)
-                                        ),
-                                    )
+                                self.assertNoFile(
+                                    os.path.join(usr_libdir, devlib),
+                                )
+                                self.assertNoFile(
+                                    os.path.join(root_libdir, devlib),
+                                )
 
                     for soname in (
                         # These are some examples of libraries in the
@@ -1108,69 +1075,81 @@ class BaseContainersTest(BaseTest):
                         'libudev.so.0',
                     ):
                         with self.subTest(soname=soname):
-                            if (
-                                not os.path.exists(
-                                    os.path.join(host_usr_libdir, soname)
-                                )
-                                and not os.path.exists(
-                                    os.path.join(host_root_libdir, soname)
-                                )
+                            for host_path in (
+                                os.path.join(host_usr_libdir, soname),
+                                os.path.join(host_root_libdir, soname),
                             ):
+                                if os.path.exists(host_path):
+                                    break
+                            else:
+                                logger.info(
+                                    '%s not found in host $LIB or /usr/$LIB',
+                                    soname,
+                                )
                                 self.assertTrue(
                                     os.path.exists(
                                         os.path.join(usr_libdir, soname)
                                     )
                                     or os.path.exists(
                                         os.path.join(root_libdir, soname)
+                                    ),
+                                    '{} not found in host $LIB or /usr/$LIB'
+                                    ' but it should exist in scout'
+                                    ' container'.format(
+                                        soname,
                                     )
                                 )
                                 continue
 
+                            logger.info(
+                                '%s found in host $LIB or /usr/$LIB at %s',
+                                soname, host_path,
+                            )
+
                             devlib = soname.split('.so.', 1)[0] + '.so'
+                            logger.info('devlib: %s', devlib)
                             pattern = soname + '.*'
 
-                            target = os.readlink(
-                                os.path.join(overrides_libdir, soname)
+                            target = self.assertSymlink(
+                                os.path.join(overrides_libdir, soname),
+                                '{} found at {} so it should have been '
+                                ' added to {}'.format(
+                                    soname,
+                                    host_path,
+                                    overrides_libdir,
+                                )
                             )
                             self.assertRegex(target, r'^/run/host/')
 
-                            # It was deleted from /lib, if present...
-                            with self.assertRaises(FileNotFoundError):
-                                os.readlink(
-                                    os.path.join(root_libdir, soname)
-                                )
-                            with self.assertRaises(FileNotFoundError):
-                                os.readlink(
-                                    os.path.join(root_libdir, devlib)
-                                )
-                            self.assertEqual(
-                                glob.glob(os.path.join(root_libdir, pattern)),
-                                [],
-                            )
+                            for libdir in (
+                                root_libdir,
+                                usr_libdir,
+                            ):
+                                for base in (soname, devlib):
+                                    path = os.path.join(libdir, base)
+                                    self.assertNoFile(
+                                        path,
+                                        '{} found at {} so it should have been'
+                                        ' deleted from {}'.format(
+                                            soname,
+                                            host_path,
+                                            path,
+                                        ),
+                                    )
 
-                            # ... and /usr/lib, if present
-                            with self.assertRaises(FileNotFoundError):
-                                os.readlink(
-                                    os.path.join(usr_libdir, soname)
+                                self.assertEqual(
+                                    glob.glob(os.path.join(libdir, pattern)),
+                                    [],
                                 )
-                            with self.assertRaises(FileNotFoundError):
-                                os.readlink(
-                                    os.path.join(usr_libdir, devlib)
-                                )
-                            self.assertEqual(
-                                glob.glob(os.path.join(usr_libdir, pattern)),
-                                [],
-                            )
 
                     for soname in (
                         'libSDL-1.2.so.0',
                         'libfltk.so.1.1',
                     ):
                         with self.subTest(soname=soname):
-                            with self.assertRaises(FileNotFoundError):
-                                os.readlink(
-                                    os.path.join(overrides_libdir, soname),
-                                )
+                            self.assertNoFile(
+                                os.path.join(overrides_libdir, soname),
+                            )
 
                 # Keys are the basename of a DRI driver.
                 # Values are lists of paths to DRI drivers of that name
@@ -1208,7 +1187,7 @@ class BaseContainersTest(BaseTest):
                 for k, vs in expect_symlinks.items():
                     with self.subTest(dri_symlink=k):
                         link = os.path.join(overrides_libdir, 'dri', k)
-                        target = os.readlink(link)
+                        target = self.assertSymlink(link)
                         self.assertEqual(target[:10], '/run/host/')
                         target = target[9:]     # includes the / after host/
 
@@ -1225,7 +1204,7 @@ class BaseContainersTest(BaseTest):
                         link = os.path.join(
                             tree, 'usr', 'lib', multiarch, 'gconv',
                         )
-                        target = os.readlink(link)
+                        target = self.assertSymlink(link)
                         self.assertEqual(
                             target,
                             '/run/host/usr/lib/{}/gconv'.format(multiarch),
@@ -1235,34 +1214,34 @@ class BaseContainersTest(BaseTest):
                         link = os.path.join(
                             tree, 'usr', 'share', 'libdrm',
                         )
-                        target = os.readlink(link)
+                        target = self.assertSymlink(link)
                         self.assertEqual(target, '/run/host/usr/share/libdrm')
 
         if is_scout:
             if os.path.isdir('/usr/lib/locale'):
                 link = os.path.join(tree, 'usr', 'lib', 'locale')
-                target = os.readlink(link)
+                target = self.assertSymlink(link)
                 self.assertEqual(target, '/run/host/usr/lib/locale')
 
             if os.path.isdir('/usr/share/i18n'):
                 link = os.path.join(tree, 'usr', 'share', 'i18n')
-                target = os.readlink(link)
+                target = self.assertSymlink(link)
                 self.assertEqual(target, '/run/host/usr/share/i18n')
 
             link = os.path.join(tree, 'sbin', 'ldconfig')
-            target = os.readlink(link)
+            target = self.assertSymlink(link)
             # Might not be /sbin/ldconfig, for example on non-Debian hosts
             self.assertRegex(target, r'^/run/host/')
 
             if os.path.isfile('/usr/bin/locale'):
                 link = os.path.join(tree, 'usr', 'bin', 'locale')
-                target = os.readlink(link)
+                target = self.assertSymlink(link)
                 # Might be either /usr/bin/locale or /usr/sbin/locale
                 self.assertRegex(target, r'^/run/host/usr/')
 
             if os.path.isfile('/usr/bin/localedef'):
                 link = os.path.join(tree, 'usr', 'bin', 'localedef')
-                target = os.readlink(link)
+                target = self.assertSymlink(link)
                 # Might be either /usr/bin/localedef or /usr/sbin/localedef
                 self.assertRegex(target, r'^/run/host/usr/')
 
@@ -1282,10 +1261,10 @@ class BaseContainersTest(BaseTest):
                     pass
                 else:
                     link = os.path.join(tree, './' + ldso)
-                    target = os.readlink(link)
+                    target = self.assertSymlink(link)
                     self.assertEqual(target, '/run/host' + host_path)
                     link = os.path.join(tree, './' + scout_impl)
-                    target = os.readlink(link)
+                    target = self.assertSymlink(link)
                     self.assertEqual(target, '/run/host' + host_path)
 
 

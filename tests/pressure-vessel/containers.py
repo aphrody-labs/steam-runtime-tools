@@ -449,6 +449,15 @@ class BaseContainersTest(BaseTest):
             )
 
         if host_srsi is None:
+            pv = os.path.join(cls.containers_dir, 'pressure-vessel')
+
+            host_srsi = shutil.which(
+                os.path.join(
+                    pv, 'bin', 'steam-runtime-system-info',
+                )
+            )
+
+        if host_srsi is None:
             host_srsi = shutil.which('steam-runtime-system-info')
 
         cls.host_srsi = host_srsi
@@ -654,6 +663,29 @@ class BaseContainersTest(BaseTest):
 
         if not os.path.isdir(runtime):
             self.skipTest('{} not found'.format(runtime))
+
+        is_minimized = Path(runtime, 'usr-mtree.txt.gz').exists()
+
+        # The --no-copy-runtime code path is rather fragile, and won't
+        # work reliably on older Ubuntu, which is one of the reasons we
+        # stopped using it in production
+        if (
+            # In practice it works on e.g. Arch, modern Debian, or
+            # Ubuntu 26.04 (see
+            # https://bugs.launchpad.net/ubuntu/+source/glibc/+bug/2127856)
+            # but not on older Ubuntu, because we can't bind-mount
+            # /sbin/ldconfig.real onto a nonexistent mount point in a
+            # read-only directory
+            Path('/sbin/ldconfig.real').exists()
+            # The --copy-runtime code path is immune to this problem.
+            # We always use that code path if the runtime is "minimized"
+            # (reconstitutes its content from a mtree manifest).
+            and not (copy or is_minimized)
+            # We don't need to skip this for scout sysroots, because scout
+            # happens to contain a /sbin/ldconfig.real itself.
+            and not is_scout
+        ):
+            self.skipTest('steamrt/tasks#934')
 
         start_time = time.time()
         logger.info('Testing: %s', test_name)
@@ -1075,8 +1107,8 @@ class BaseContainersTest(BaseTest):
                         # expect the host version to be newer (or possibly
                         # absent if the host graphics stack doesn't use
                         # them, for example static linking or something).
+                        'libXau.so.6',
                         'libdrm.so.2',
-                        'libudev.so.0',
                     ):
                         with self.subTest(soname=soname):
                             for host_path in (
@@ -1086,25 +1118,35 @@ class BaseContainersTest(BaseTest):
                                 if os.path.exists(host_path):
                                     break
                             else:
-                                logger.info(
-                                    '%s not found in host $LIB or /usr/$LIB',
-                                    soname,
-                                )
+                                # We didn't find /{,usr/}lib/MULTIARCH/SONAME,
+                                # but in general we can't know whether that's
+                                # because the host doesn't have it, or
+                                # because the host uses a different library
+                                # directory like /usr/lib{,32,64}.
+                                # Make the weaker assertion that the library
+                                # exists either in the runtime's /usr,
+                                # or captured from the host.
                                 self.assertTrue(
                                     os.path.exists(
                                         os.path.join(usr_libdir, soname)
                                     )
                                     or os.path.exists(
                                         os.path.join(root_libdir, soname)
+                                    )
+                                    or os.path.islink(
+                                        os.path.join(overrides_libdir, soname)
                                     ),
-                                    '{} not found in host $LIB or /usr/$LIB'
-                                    ' but it should exist in scout'
-                                    ' container'.format(
+                                    '{} should exist in container'
+                                    ' or overrides'.format(
                                         soname,
                                     )
                                 )
                                 continue
 
+                            # On multiarch systems like Debian,
+                            # we can be confident that any library that
+                            # can be found in the multiarch library directory
+                            # is the one that we'll want to be using.
                             logger.info(
                                 '%s found in host $LIB or /usr/$LIB at %s',
                                 soname, host_path,
@@ -1175,14 +1217,10 @@ class BaseContainersTest(BaseTest):
                         # We don't make any assertion about the search
                         # order here.
 
-                        # Take the realpath() on non-Debian-derived hosts,
-                        # because on Arch Linux, we find drivers in
-                        # /usr/lib64 that are physically in /usr/lib.
-                        # Be more strict on Debian because we know more
-                        # about the canonical paths there.
-                        if not self.host_is_debian_derived:
-                            with contextlib.suppress(OSError):
-                                path = os.path.realpath(path)
+                        # Take the realpath() because `path` might be a symlink
+                        # itself, and it will be followed when creating links
+                        # in the `overrides/` dir inside the container.
+                        path = os.path.realpath(path)
 
                         expect_symlinks.setdefault(
                             os.path.basename(path), []
@@ -1195,8 +1233,11 @@ class BaseContainersTest(BaseTest):
                         self.assertEqual(target[:10], '/run/host/')
                         target = target[9:]     # includes the / after host/
 
-                        # Again, take the realpath() on non-Debian-derived
-                        # hosts, but be more strict on Debian.
+                        # Take the realpath() on non-Debian-derived hosts,
+                        # because on Arch Linux, we find drivers in
+                        # /usr/lib64 that are physically in /usr/lib.
+                        # Be more strict on Debian because we know more
+                        # about the canonical paths there.
                         if not self.host_is_debian_derived:
                             with contextlib.suppress(OSError):
                                 target = os.path.realpath(target)

@@ -625,7 +625,22 @@ class TestInsideRuntime(BaseTest):
                     # Every locale that worked on the host works in the
                     # container
                     if 'resulting-name' in host_details:
-                        self.assertEqual(host_details, details)
+                        if (
+                            locale == '<default>'
+                            and host_details['resulting-name'] == 'C'
+                            and host_details != details
+                        ):
+                            # Newer versions of Python force LC_CTYPE
+                            # to be C.UTF-8 as a result of PEP-0538,
+                            # and this is a Python script, so we can't
+                            # assert that the default locale is still C:
+                            # it could be something more useful now
+                            self.assertIn('resulting-name', details)
+                            self.assertEqual(details.get('charset'), 'UTF-8')
+                            self.assertEqual(details.get('error'), None)
+                            self.assertEqual(details.get('is_utf8'), True)
+                        else:
+                            self.assertEqual(host_details, details)
 
                     # en_US.UTF-8 should also work in the container, because we
                     # make sure to generate it
@@ -802,17 +817,13 @@ class TestInsideRuntime(BaseTest):
                         # order here.
                         host_path = '/run/host' + path
 
-                        # Take the realpath() on non-Debian-derived hosts,
-                        # because on Arch Linux, we find drivers in
-                        # /usr/lib64 that are physically in /usr/lib.
-                        # Be more strict on Debian because we know more
-                        # about the canonical paths there.
-                        if not host_is_debian_derived:
-                            with contextlib.suppress(OSError):
-                                host_path = os.path.realpath(host_path)
+                        # Take the realpath() because `path` might be a symlink
+                        # itself, and it will be followed when creating links
+                        # in the `overrides/` dir inside the container.
+                        host_path = os.path.realpath(host_path)
 
                         expect_symlinks.setdefault(
-                            os.path.basename(path), []
+                            os.path.basename(host_path), []
                         ).append(host_path)
 
                 for k, vs in expect_symlinks.items():
@@ -823,8 +834,11 @@ class TestInsideRuntime(BaseTest):
                         logger.info('Target of %s should be in %s', link, vs)
                         target = self.assertSymlink(link)
 
-                        # Again, take the realpath() on non-Debian-derived
-                        # hosts, but be more strict on Debian.
+                        # Take the realpath() on non-Debian-derived hosts,
+                        # because on Arch Linux, we find drivers in
+                        # /usr/lib64 that are physically in /usr/lib.
+                        # Be more strict on Debian because we know more
+                        # about the canonical paths there.
                         if not host_is_debian_derived:
                             with contextlib.suppress(OSError):
                                 target = os.path.realpath(link)
@@ -883,9 +897,27 @@ class TestInsideRuntime(BaseTest):
                             'library-vendor',
                         ):
                             with self.subTest(key=key):
-                                if key in host_details:
+                                host_value = host_details.get(key)
+
+                                # An unknown library vendor or a missing
+                                # library is represented as "unknown",
+                                # whereas an unknown or non-functioning
+                                # renderer is represented as null (None).
+                                # Normalize to None.
+                                if (
+                                    key == 'library-vendor'
+                                    and host_value == 'unknown'
+                                ):
+                                    host_value = None
+
+                                # If the host library can't be loaded or
+                                # identified, we can't assert that the same
+                                # will be true in the container:
+                                # SLR has a fallback copy of Mesa,
+                                # with at least software rendering available.
+                                if host_value is not None:
                                     self.assertEqual(
-                                        host_details[key],
+                                        host_value,
                                         details.get(key),
                                     )
 

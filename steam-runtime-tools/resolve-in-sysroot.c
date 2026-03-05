@@ -301,11 +301,8 @@ _srt_resolve_in_sysroot (int sysroot,
       fd = TEMP_FAILURE_RETRY (fcntl (sysroot, F_DUPFD_CLOEXEC, 0));
 
       if (fd < 0)
-        {
-          glnx_throw_errno_prefix (error, "Unable to duplicate fd \"%d\"",
-                                   sysroot);
-          return -1;
-        }
+        return glnx_fd_throw_errno_prefix (error, "Unable to duplicate fd \"%d\"",
+                                           sysroot);
 
       fds = g_array_new (FALSE, FALSE, sizeof (int));
       g_array_set_clear_func (fds, clear_fd);
@@ -385,11 +382,8 @@ _srt_resolve_in_sysroot (int sysroot,
         {
           if (TEMP_FAILURE_RETRY (mkdirat (g_array_index (fds, int, fds->len - 1),
                                            next, 0700)) != 0)
-            {
-              glnx_throw_errno_prefix (error, "Unable to create \"%s/%s\"",
-                                       current_path->str, next);
-              return -1;
-            }
+            return glnx_fd_throw_errno_prefix (error, "Unable to create \"%s/%s\"",
+                                               current_path->str, next);
 
           g_debug ("Created \"%s/%s\" in /proc/self/fd/%d",
                    current_path->str, next, sysroot);
@@ -399,11 +393,8 @@ _srt_resolve_in_sysroot (int sysroot,
         }
 
       if (fd < 0)
-        {
-          glnx_throw_errno_prefix (error, "Unable to open \"%s/%s\"",
-                                   current_path->str, next);
-          return -1;
-        }
+        return glnx_fd_throw_errno_prefix (error, "Unable to open \"%s/%s\"",
+                                           current_path->str, next);
 
       /* Maybe it's a symlink? */
       target = glnx_readlinkat_malloc (fd, "", NULL, NULL);
@@ -512,11 +503,8 @@ _srt_resolve_in_sysroot (int sysroot,
       g_assert (proc_fd_name != NULL);
 
       if (access (proc_fd_name, X_OK) != 0)
-        {
-          glnx_throw_errno_prefix (error, "\"%s\" is not executable",
-                                   current_path->str);
-          return -1;
-        }
+        return glnx_fd_throw_errno_prefix (error, "\"%s\" is not executable",
+                                           current_path->str);
     }
 
   if (flags & SRT_RESOLVE_FLAGS_READABLE)
@@ -634,10 +622,8 @@ _srt_sysroot_open (SrtSysroot *sysroot,
           fd = TEMP_FAILURE_RETRY (openat (AT_FDCWD, path, open_flags));
 
           if (fd < 0)
-            {
-              glnx_throw_errno_prefix (error, "Unable to open \"%s\"", path);
-              return -1;
-            }
+            return glnx_fd_throw_errno_prefix (error, "Unable to open \"%s\"",
+                                               path);
         }
 
       if ((flags & SRT_RESOLVE_FLAGS_MUST_BE_REGULAR) != 0
@@ -646,10 +632,8 @@ _srt_sysroot_open (SrtSysroot *sysroot,
 
       if ((flags & SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE) != 0
           && access (path, X_OK) != 0)
-        {
-          glnx_throw_errno_prefix (error, "\"%s\" is not executable", path);
-          return -1;
-        }
+        return glnx_fd_throw_errno_prefix (error, "\"%s\" is not executable",
+                                           path);
 
       if (resolved != NULL)
         {

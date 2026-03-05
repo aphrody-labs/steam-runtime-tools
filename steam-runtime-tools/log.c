@@ -132,8 +132,7 @@ _srt_journal_stream_fd (const char *identifier,
       if (handle == NULL)
         {
           g_once_init_leave (&our_sd_journal_stream_fd, no_sd_journal_stream_fd);
-          glnx_throw (error, "%s", dlerror ());
-          return -1;
+          return glnx_fd_throw (error, "%s", dlerror ());
         }
 
       LOAD_OPTIONAL_SYMBOL (handle, sd_journal_send);
@@ -146,14 +145,13 @@ _srt_journal_stream_fd (const char *identifier,
       if (message != NULL)
         {
           g_once_init_leave (&our_sd_journal_stream_fd, no_sd_journal_stream_fd);
-          glnx_throw (error, "%s", message);
-          return -1;
+          return glnx_fd_throw (error, "%s", message);
         }
+
       if (sym == NULL)
         {
           g_once_init_leave (&our_sd_journal_stream_fd, no_sd_journal_stream_fd);
-          glnx_throw (error, "sd_journal_stream_fd resolved to NULL");
-          return -1;
+          return glnx_fd_throw (error, "sd_journal_stream_fd resolved to NULL");
         }
 
       g_once_init_leave (&our_sd_journal_stream_fd, sym);
@@ -163,11 +161,8 @@ _srt_journal_stream_fd (const char *identifier,
 
   if (fd < 0)
     {
-      g_set_error (error, G_IO_ERROR,
-                   g_io_error_from_errno (-fd),
-                   "sd_journal_stream_fd: %s",
-                   g_strerror (-fd));
-      return -1;
+      errno = -fd;
+      return glnx_fd_throw_errno_prefix (error, "sd_journal_stream_fd");
     }
 
   return g_steal_fd (&fd);

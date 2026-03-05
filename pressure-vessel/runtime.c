@@ -1833,11 +1833,11 @@ pv_runtime_finalize (GObject *object)
   g_free (self->helpers_dir_in_container);
   g_free (self->libcapsule_knowledge);
   g_strfreev (self->original_environ);
-  glnx_close_fd (&self->overrides_fd);
+  g_clear_fd (&self->overrides_fd, NULL);
   g_clear_pointer (&self->providers, g_ptr_array_unref);
   g_free (self->runtime_abi_json);
   g_free (self->runtime_app);
-  glnx_close_fd (&self->runtime_files_fd);
+  g_clear_fd (&self->runtime_files_fd, NULL);
   g_free (self->runtime_files_on_host);
   g_free (self->runtime_usr);
   g_clear_pointer (&self->runtime_lock, srt_file_lock_free);
@@ -1845,7 +1845,7 @@ pv_runtime_finalize (GObject *object)
   g_free (self->source_files);
   g_clear_pointer (&self->tuples, g_array_unref);
   g_free (self->variable_dir);
-  glnx_close_fd (&self->variable_dir_fd);
+  g_clear_fd (&self->variable_dir_fd, NULL);
 
   G_OBJECT_CLASS (pv_runtime_parent_class)->finalize (object);
 }
@@ -6958,7 +6958,7 @@ pv_runtime_get_provider_ldconfig_architecture (PvRuntime *self,
         {
           g_debug ("ldconfig is a script and ldconfig.real exists, "
                    "trying to get architecture from ldconfig.real instead");
-          glnx_close_fd (&fd);
+          g_clear_fd (&fd, NULL);
           fd = _srt_sysroot_open (provider->in_current_ns, ldconfig_real,
                                   SRT_RESOLVE_FLAGS_READABLE,
                                   NULL, error);

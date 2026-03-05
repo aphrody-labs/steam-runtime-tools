@@ -242,7 +242,7 @@ pv_wrap_context_finalize (GObject *object)
   g_strfreev (self->original_argv);
   g_strfreev (self->original_environ);
   g_free (self->current_home);
-  glnx_close_fd (&self->current_home_fd);
+  g_clear_fd (&self->current_home_fd, NULL);
 
   G_OBJECT_CLASS (pv_wrap_context_parent_class)->finalize (object);
 }

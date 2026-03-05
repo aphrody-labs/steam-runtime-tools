@@ -47,8 +47,8 @@ _srt_emulator_server_finalize (GObject *object)
 {
   SrtEmulatorServer *self = SRT_EMULATOR_SERVER (object);
 
-  glnx_close_fd (&self->exit_fd);
-  glnx_close_fd (&self->ready_fd);
+  g_clear_fd (&self->exit_fd, NULL);
+  g_clear_fd (&self->ready_fd, NULL);
   g_mutex_clear (&self->lock);
 
   G_OBJECT_CLASS (_srt_emulator_server_parent_class)->finalize (object);

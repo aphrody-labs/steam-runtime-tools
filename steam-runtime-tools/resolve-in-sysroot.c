@@ -49,7 +49,7 @@ _srt_sysroot_finalize (GObject *object)
 {
   SrtSysroot *self = SRT_SYSROOT (object);
 
-  glnx_close_fd (&self->fd);
+  g_clear_fd (&self->fd, NULL);
   g_free (self->path);
 
   G_OBJECT_CLASS (_srt_sysroot_parent_class)->finalize (object);

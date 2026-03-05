@@ -449,9 +449,9 @@ srt_pty_bridge_finalize (GObject *object)
 
   g_clear_error (&self->init_error);
   g_clear_pointer (&self->context, g_main_context_unref);
-  glnx_close_fd (&self->ptmx_fd);
-  glnx_close_fd (&self->terminal_fd);
-  glnx_close_fd (&self->controlling_terminal_fd);
+  g_clear_fd (&self->ptmx_fd, NULL);
+  g_clear_fd (&self->terminal_fd, NULL);
+  g_clear_fd (&self->controlling_terminal_fd, NULL);
   g_string_free (self->oob_buffer, TRUE);
 
   G_OBJECT_CLASS (_srt_pty_bridge_parent_class)->finalize (object);

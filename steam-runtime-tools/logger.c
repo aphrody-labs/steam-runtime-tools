@@ -166,15 +166,15 @@ _srt_logger_finalize (GObject *object)
   g_clear_pointer (&self->previous_filename, g_free);
   g_clear_pointer (&self->new_filename, g_free);
   g_clear_pointer (&self->terminal, g_free);
-  glnx_close_fd (&self->child_ready_to_parent);
-  glnx_close_fd (&self->pipe_from_parent);
-  glnx_close_fd (&self->file_fd);
+  g_clear_fd (&self->child_ready_to_parent, NULL);
+  g_clear_fd (&self->pipe_from_parent, NULL);
+  g_clear_fd (&self->file_fd, NULL);
 
   if (self->journal_fd > STDERR_FILENO)
-    glnx_close_fd (&self->journal_fd);
+    g_clear_fd (&self->journal_fd, NULL);
 
   if (self->terminal_fd > STDERR_FILENO)
-    glnx_close_fd (&self->terminal_fd);
+    g_clear_fd (&self->terminal_fd, NULL);
 
   G_OBJECT_CLASS (_srt_logger_parent_class)->finalize (object);
 }

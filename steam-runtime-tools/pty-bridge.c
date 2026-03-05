@@ -91,27 +91,6 @@ bridge_fd_init (BridgeFd *self)
   self->flags = BRIDGE_FD_DEFAULT;
 }
 
-static int
-fd_reopen (int fd,
-           int flags)
-{
-  g_autofree gchar *path = g_strdup_printf ("/proc/self/fd/%d", fd);
-  int new_fd;
-
-  /* We don't provide a mode */
-  g_return_val_if_fail ((flags & (O_CREAT|O_TMPFILE)) == 0, -1);
-
-  new_fd = open (path, flags);
-
-  if (new_fd >= 0)
-    return new_fd;
-
-  if (errno == ENOENT)
-    errno = EBADF;
-
-  return -1;
-}
-
 static gboolean
 fd_set_blocking (int fd,
                  gboolean want_blocking,
@@ -152,6 +131,8 @@ bridge_fd_set (BridgeFd *self,
                int fd,
                GError **error)
 {
+  g_autoptr(GError) local_error = NULL;
+
   g_return_val_if_fail (self->fd < 0, FALSE);
   g_return_val_if_fail (fd >= 0, FALSE);
   g_return_val_if_fail (mode == O_RDONLY || mode == O_WRONLY, FALSE);
@@ -163,13 +144,14 @@ bridge_fd_set (BridgeFd *self,
    * input source and output destination in non-blocking mode. This
    * avoids messing with the non-blocking state of the fds we were
    * given, e.g. by a parent process which might still be using them. */
-  self->fd = fd_reopen (fd, mode | O_CLOEXEC | O_NOCTTY | O_NONBLOCK);
+  self->fd = glnx_fd_reopen (fd, mode | O_NONBLOCK, &local_error);
 
   if (self->fd < 0)
     {
       /* We might not be able to do that, for example if fd is a socket. */
       g_debug ("Failed to reopen %s fd, duplicating original fd: %s",
-               side, g_strerror (errno));
+               side, local_error->message);
+      g_clear_error (&local_error);
       self->fd = TEMP_FAILURE_RETRY (fcntl (fd, F_DUPFD_CLOEXEC, 0));
       self->flags |= BRIDGE_FD_SHARED;
     }

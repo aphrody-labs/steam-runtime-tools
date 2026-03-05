@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260220.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260305.0) UNRELEASED; urgency=medium
 
   [ Antonio Ospite ]
   * pressure-vessel:
@@ -13,16 +13,19 @@ steam-runtime-tools (0.20260220.0) UNRELEASED; urgency=medium
   * pressure-vessel:
     - Refactoring
   * Tests:
+    - build-aux: Add a convenience command to run lint checks
     - Replace tests/pressure-vessel/containers.py with smaller tests that
       can run in parallel (the total coverage is the same)
+    - Fix assertions that can fail on newer systems
     - Don't write pressure-vessel debug logs to top-level CI log since
       this can result in limits being exceeded
     - Align artifacts subdirectory names with subTest names
+    - Install pressure-vessel tests into /usr/libexec/installed-tests
     - In CI, produce TAP output via python3-tap if possible
     - Remove dead code
-    (steamrt/tasks#919)
+    (steamrt/tasks#824, steamrt/tasks#919)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 04 Mar 2026 15:43:40 +0000
+ -- Simon McVittie <smcv@collabora.com>  Thu, 05 Mar 2026 11:03:15 +0000
 
 steam-runtime-tools (0.20260218.0) steamrt; urgency=medium
 

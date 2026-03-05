@@ -317,8 +317,8 @@ static void
 _srt_subprocess_clear (SrtSubprocess *self)
 {
   _srt_subprocess_cancel_timeout (self);
-  glnx_close_fd (&self->stdout_fd);
-  glnx_close_fd (&self->stderr_fd);
+  g_clear_fd (&self->stdout_fd, NULL);
+  g_clear_fd (&self->stderr_fd, NULL);
   gstring_free0 (self->out);
   gstring_free0 (self->err);
   g_clear_pointer (&self->completing_context, g_main_context_unref);

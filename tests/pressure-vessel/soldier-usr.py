@@ -31,6 +31,12 @@ class TestSoldierUsr(BaseContainersTest):
                 'copy', soldier, copy=True, locales=True,
             )
 
+        with self.subTest('fake-home'):
+            self._test_soldier(
+                'fake-home', soldier, copy=True,
+                fake_home=True,
+            )
+
         cls = self.__class__
         if cls.is_x86:
             with self.subTest('prepare-mock-emulator-usr'):

@@ -495,17 +495,12 @@ path_to_handle (GUnixFDList *fd_list,
                 GError **error)
 {
   int path_fd = open (path, O_PATH|O_CLOEXEC|O_NOFOLLOW|O_RDONLY);
-  int saved_errno;
   gint32 handle;
 
   if (path_fd < 0)
-    {
-      saved_errno = errno;
-      g_set_error (error, G_IO_ERROR, g_io_error_from_errno (saved_errno),
-                   "Failed to open %s to expose in sandbox: %s",
-                   path, g_strerror (saved_errno));
-      return -1;
-    }
+    return glnx_fd_throw_errno_prefix (error,
+                                       "Failed to open %s to expose in sandbox",
+                                       path);
 
   if (home_realpath != NULL && flatpak_id != NULL)
     {

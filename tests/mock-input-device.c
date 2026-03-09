@@ -86,10 +86,7 @@ mock_input_device_open_device (SrtInputDevice *device,
   devnode = srt_input_device_get_dev_node (device);
 
   if (devnode == NULL)
-    {
-      glnx_throw (error, "Device has no device node");
-      return -1;
-    }
+    return glnx_fd_throw (error, "Device has no device node");
 
   /* We aren't really going to open the device node, so provide a somewhat
    * realistic permissions check. */
@@ -126,12 +123,9 @@ mock_input_device_open_device (SrtInputDevice *device,
   fd = open ("/dev/null", flags | _SRT_INPUT_DEVICE_ALWAYS_OPEN_FLAGS);
 
   if (fd < 0)
-    {
-      glnx_throw_errno_prefix (error,
-                               "Unable to open device node \"%s\"",
-                               devnode);
-      return -1;
-    }
+    return glnx_fd_throw_errno_prefix (error,
+                                       "Unable to open device node \"%s\"",
+                                       devnode);
 
   return fd;
 }

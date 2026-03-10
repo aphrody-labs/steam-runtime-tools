@@ -124,9 +124,15 @@ keys:
         Steam, for example **1.0.0.66** or **1.0.0.66-2/Debian**.
         Otherwise, or if unavailable, it is **null**.
 
+    **ok**
+    :   If **true** no Steam-installation-related problems were found.
+        No other value is allowed:
+        if problems were found,
+        `issues` will be emitted instead.
+
     **issues**
     :   An array of strings representing problems with the Steam
-        installation. If empty, no problems were found.
+        installation.
 
         **unknown** (or **internal-error** in older reports)
         :   An error occurred while checking the Steam installation.

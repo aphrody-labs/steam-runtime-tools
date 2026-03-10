@@ -726,10 +726,12 @@ _srt_steam_get_from_report (JsonObject *json_obj)
       if (json_sub_obj == NULL)
         goto out;
 
-      issues = srt_get_flags_from_json_array (SRT_TYPE_STEAM_ISSUES,
-                                              json_sub_obj,
-                                              "issues",
-                                              SRT_STEAM_ISSUES_UNKNOWN);
+      issues = _srt_json_object_get_issues_from_report (json_sub_obj,
+                                                        "steam-installation",
+                                                        SRT_TYPE_STEAM_ISSUES,
+                                                        "issues",
+                                                        "ok",
+                                                        SRT_STEAM_ISSUES_UNKNOWN);
 
       install_path = json_object_get_string_member_with_default (json_sub_obj, "path", NULL);
       data_path = json_object_get_string_member_with_default (json_sub_obj, "data_path", NULL);

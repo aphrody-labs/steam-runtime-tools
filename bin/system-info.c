@@ -227,13 +227,6 @@ jsonify_enum (JsonBuilder *builder,
 }
 
 static void
-jsonify_steam_issues (JsonBuilder *builder,
-                      SrtSteamIssues issues)
-{
-  jsonify_flags (builder, SRT_TYPE_STEAM_ISSUES, issues);
-}
-
-static void
 jsonify_runtime_issues (JsonBuilder *builder,
                         SrtRuntimeIssues issues)
 {
@@ -1408,10 +1401,8 @@ main (int argc,
   json_builder_add_string_value (builder, steamscript_version);
 
   steam_issues = srt_system_info_get_steam_issues (info);
-  json_builder_set_member_name (builder, "issues");
-  json_builder_begin_array (builder);
-  jsonify_steam_issues (builder, steam_issues);
-  json_builder_end_array (builder);
+  jsonify_issues_or_no_issues (builder, SRT_TYPE_STEAM_ISSUES,
+                               "issues", "ok", steam_issues);
 
   json_builder_end_object (builder);
 

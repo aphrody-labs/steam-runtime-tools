@@ -559,9 +559,9 @@ steam_presence (Fixture *f,
   script_version = json_object_get_string_member (json_sub_object, "steamscript_version");
   g_assert_cmpstr (script_version, ==, "1.0.0.66");
 
-  g_assert_true (json_object_has_member (json_sub_object, "issues"));
-  array = json_object_get_array_member (json_sub_object, "issues");
-  g_assert_cmpint (json_array_get_length (array), ==, 0);
+  g_assert_true (json_object_has_member (json_sub_object, "ok"));
+  g_assert_cmpint (json_object_get_boolean_member (json_sub_object, "ok"), ==, TRUE);
+  g_assert_false (json_object_has_member (json_sub_object, "issues"));
 
   g_assert_true (json_object_has_member (json, "runtime"));
   json_sub_object = json_object_get_object_member (json, "runtime");

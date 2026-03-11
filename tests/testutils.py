@@ -187,6 +187,13 @@ class BaseTest(unittest.TestCase):
         self.top_builddir = cls.top_builddir
         self.top_srcdir = cls.top_srcdir
 
+        # host_is_debian_derived will be assigned by subclasses.
+        #
+        #: If true, the host is known to be a Debian-derived OS.
+        #: If false, it isn't.
+        #: If None, we don't know yet.
+        self.host_is_debian_derived = None  # type: typing.Optional[bool]
+
         # Class and each test get separate temp directories
         self.tmpdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmpdir.cleanup)

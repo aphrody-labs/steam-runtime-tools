@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260310.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260311.0) UNRELEASED; urgency=medium
 
   [ Antonio Ospite ]
   * pressure-vessel:
@@ -10,6 +10,7 @@ steam-runtime-tools (0.20260310.0) UNRELEASED; urgency=medium
     - Improve coverage (steamrt/tasks#837, steamrt/tasks#919)
     - Fix assertions that can fail on newer systems
       (steamrt/tasks#919)
+    - Speed up container testing (steamrt/task#900)
 
   [ Simon McVittie ]
   * pressure-vessel:
@@ -32,7 +33,7 @@ steam-runtime-tools (0.20260310.0) UNRELEASED; urgency=medium
     - In CI, produce TAP output via python3-tap if possible
     - In CI, use new CI runners for better coverage (steamrt/tasks#919)
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 10 Mar 2026 18:20:01 +0000
+ -- Simon McVittie <smcv@collabora.com>  Wed, 11 Mar 2026 16:39:54 +0000
 
 steam-runtime-tools (0.20260218.0) steamrt; urgency=medium
 

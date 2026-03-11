@@ -262,13 +262,6 @@ jsonify_display_wayland_issues (JsonBuilder *builder,
 }
 
 static void
-jsonify_flatpak_issues (JsonBuilder *builder,
-                                SrtFlatpakIssues issues)
-{
-  jsonify_flags (builder, SRT_TYPE_FLATPAK_ISSUES, issues);
-}
-
-static void
 jsonify_x86_features (JsonBuilder *builder,
                       SrtX86FeatureFlags present,
                       SrtX86FeatureFlags known)
@@ -809,10 +802,9 @@ jsonify_container (JsonBuilder *builder,
       switch (type)
         {
           case SRT_CONTAINER_TYPE_FLATPAK:
-            json_builder_set_member_name (builder, "flatpak_issues");
-            json_builder_begin_array (builder);
-            jsonify_flatpak_issues (builder, flatpak_issues);
-            json_builder_end_array (builder);
+            jsonify_issues_or_no_issues (builder, SRT_TYPE_FLATPAK_ISSUES,
+                                         "flatpak_issues", "flatpak_ok",
+                                         flatpak_issues);
 
             if (flatpak_version != NULL)
               {

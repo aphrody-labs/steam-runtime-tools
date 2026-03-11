@@ -96,10 +96,12 @@ _srt_container_info_get_from_report (JsonObject *json_obj)
       switch (type)
         {
           case SRT_CONTAINER_TYPE_FLATPAK:
-            flatpak_issues = srt_get_flags_from_json_array (SRT_TYPE_FLATPAK_ISSUES,
-                                                            json_sub_obj,
-                                                            "flatpak_issues",
-                                                            SRT_FLATPAK_ISSUES_UNKNOWN);
+            flatpak_issues = _srt_json_object_get_issues_from_report (json_sub_obj,
+                                                                      "container",
+                                                                      SRT_TYPE_FLATPAK_ISSUES,
+                                                                      "flatpak_issues",
+                                                                      "flatpak_ok",
+                                                                      SRT_FLATPAK_ISSUES_UNKNOWN);
             flatpak_version = json_object_get_string_member_with_default (json_sub_obj,
                                                                           "flatpak_version",
                                                                           NULL);

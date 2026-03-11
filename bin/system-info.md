@@ -511,6 +511,12 @@ keys:
         to **bwrap**(1), if any.
         This key is not provided if the array would be empty.
 
+    **flatpak_ok**
+    :   If **true** no Flatpak-related problems were found.
+        No other value is allowed:
+        if problems were found,
+        `flatpak_issues` will be emitted instead.
+
     **flatpak_issues**
     :   An array of flags describing potential problems with Flatpak,
         such as a version that is too old or cannot create subsandboxes.

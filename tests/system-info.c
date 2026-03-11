@@ -4293,14 +4293,11 @@ static JsonTest json_test[] =
     },
     .container =
     {
-      .type = SRT_CONTAINER_TYPE_DOCKER,
-      .bwrap_issues = (SRT_BWRAP_ISSUES_SETUID
-                       | SRT_BWRAP_ISSUES_SYSTEM
-                       | SRT_BWRAP_ISSUES_NO_UNPRIVILEGED_USERNS_CLONE
-                       | SRT_BWRAP_ISSUES_MAX_USER_NAMESPACES_ZERO),
-      .bwrap_messages = "bwrap: warning: this is not going to work\n",
-      .bwrap_path = "/usr/bin/bwrap",
+      .type = SRT_CONTAINER_TYPE_FLATPAK,
+      .flatpak_version = "1.10.2",
       .flatpak_issues = SRT_FLATPAK_ISSUES_NONE,
+      .bwrap_issues = (SRT_BWRAP_ISSUES_CANNOT_RUN
+                       | SRT_BWRAP_ISSUES_NOT_TESTED),
     },
     .architecture =
     {

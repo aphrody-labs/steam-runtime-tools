@@ -112,10 +112,12 @@ _srt_container_info_get_from_report (JsonObject *json_obj)
           case SRT_CONTAINER_TYPE_UNKNOWN:
           case SRT_CONTAINER_TYPE_NONE:
           default:
-            bwrap_issues = srt_get_flags_from_json_array (SRT_TYPE_BWRAP_ISSUES,
-                                                          json_sub_obj,
-                                                          "bubblewrap_issues",
-                                                          SRT_BWRAP_ISSUES_UNKNOWN);
+            bwrap_issues = _srt_json_object_get_issues_from_report (json_sub_obj,
+                                                                    "container",
+                                                                    SRT_TYPE_BWRAP_ISSUES,
+                                                                    "bubblewrap_issues",
+                                                                    "bubblewrap_ok",
+                                                                    SRT_BWRAP_ISSUES_UNKNOWN);
             bwrap_messages = _srt_json_object_dup_array_of_lines_member (json_sub_obj,
                                                                          "bubblewrap_messages");
             bwrap_path = json_object_get_string_member_with_default (json_sub_obj,

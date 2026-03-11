@@ -56,7 +56,7 @@
   },
   "container" : {
     "type" : "docker",
-    "bubblewrap_issues" : [],
+    "bubblewrap_ok" : true,
     "host" : {
       "path" : "/the/host/path",
       "os-release" : {

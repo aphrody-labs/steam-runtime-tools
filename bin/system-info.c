@@ -262,13 +262,6 @@ jsonify_display_wayland_issues (JsonBuilder *builder,
 }
 
 static void
-jsonify_bwrap_issues (JsonBuilder *builder,
-                                SrtBwrapIssues issues)
-{
-  jsonify_flags (builder, SRT_TYPE_BWRAP_ISSUES, issues);
-}
-
-static void
 jsonify_flatpak_issues (JsonBuilder *builder,
                                 SrtFlatpakIssues issues)
 {
@@ -835,10 +828,9 @@ jsonify_container (JsonBuilder *builder,
           case SRT_CONTAINER_TYPE_UNKNOWN:
           case SRT_CONTAINER_TYPE_NONE:
           default:
-            json_builder_set_member_name (builder, "bubblewrap_issues");
-            json_builder_begin_array (builder);
-            jsonify_bwrap_issues (builder, bwrap_issues);
-            json_builder_end_array (builder);
+            jsonify_issues_or_no_issues (builder, SRT_TYPE_BWRAP_ISSUES,
+                                         "bubblewrap_issues", "bubblewrap_ok",
+                                         bwrap_issues);
 
             /* Don't log the path to bwrap in the common case that it's
              * our bundled one and it worked successfully */

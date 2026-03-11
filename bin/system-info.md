@@ -487,6 +487,12 @@ keys:
         **unknown** (if we appear to be in a container but the type is
         unknown), or **none** (if we do not appear to be in a container).
 
+    **bubblewrap_ok**
+    :   If **true** no bubblewrap-related problems were found.
+        No other value is allowed:
+        if problems were found,
+        `bubblewrap_issues` will be emitted instead.
+
     **bubblewrap_issues**
     :   An array of flags describing potential problems with **bwrap**(1),
         such as not having the necessary system configuration to be able

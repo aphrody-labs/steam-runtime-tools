@@ -99,6 +99,13 @@ class BaseTest(unittest.TestCase):
     is_x86 = False
     is_x86_64 = False
 
+    #: If `run_inside_runtime` is true, we assume the tests are running
+    #  inside a SLR container, with the host filesystem described by
+    #  `modules` mounted in /run/host rather than at the root.
+    #: If it's false, the tests are running on the host system.
+    #: If it's None, we don't know yet.
+    run_inside_runtime = None   # type: typing.Optional[bool]
+
     @staticmethod
     def getenv_tristate(
         variable,

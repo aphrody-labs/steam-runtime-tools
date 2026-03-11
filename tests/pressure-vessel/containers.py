@@ -176,6 +176,8 @@ class BaseContainersTest(BaseTest):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
+        cls.run_inside_runtime = False
+
         cls.G_TEST_SRCDIR = os.getenv(
             'G_TEST_SRCDIR',
             os.path.abspath(os.path.dirname(__file__)),
@@ -1197,7 +1199,7 @@ class BaseContainersTest(BaseTest):
                                 os.path.join(overrides_libdir, soname),
                             )
 
-                run_inside_runtime = False
+                cls = self.__class__
 
                 # Keys are the basename of a DRI driver.
                 # Values are lists of paths to DRI drivers of that name
@@ -1219,7 +1221,7 @@ class BaseContainersTest(BaseTest):
                         # We don't make any assertion about the search
                         # order here.
 
-                        if run_inside_runtime:
+                        if cls.run_inside_runtime:
                             host_path = '/run/host/' + path
                         else:
                             host_path = path
@@ -1240,7 +1242,7 @@ class BaseContainersTest(BaseTest):
                         logger.info('Target of %s should be in %s', link, vs)
                         target = self.assertSymlink(link)
 
-                        if not run_inside_runtime:
+                        if not cls.run_inside_runtime:
                             self.assertEqual(target[:10], '/run/host/')
                             target = target[9:]     # includes the / after host/
 

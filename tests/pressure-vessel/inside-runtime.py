@@ -73,6 +73,12 @@ class HostInfo:
 
 
 class TestInsideRuntime(BaseTest):
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+
+        cls.run_inside_runtime = True
+
     def setUp(self) -> None:
         super().setUp()
         self.host = HostInfo()
@@ -802,10 +808,11 @@ class TestInsideRuntime(BaseTest):
                     )
 
             if host_info:
-                run_inside_runtime = True
                 overrides_libdir = '{}/lib/{}'.format(
                     overrides, multiarch
                 )
+
+                cls = self.__class__
 
                 expect_symlinks = {
                 }    # type: typing.Dict[str, typing.List[str]]
@@ -821,7 +828,7 @@ class TestInsideRuntime(BaseTest):
                         # We don't make any assertion about the search
                         # order here.
 
-                        if run_inside_runtime:
+                        if cls.run_inside_runtime:
                             host_path = '/run/host/' + path
                         else:
                             host_path = path
@@ -842,7 +849,7 @@ class TestInsideRuntime(BaseTest):
                         logger.info('Target of %s should be in %s', link, vs)
                         target = self.assertSymlink(link)
 
-                        if not run_inside_runtime:
+                        if not cls.run_inside_runtime:
                             self.assertEqual(target[:10], '/run/host/')
                             target = target[9:]     # includes the / after host/
 

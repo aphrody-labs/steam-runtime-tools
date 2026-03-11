@@ -81,7 +81,7 @@
         "path" : "/lib64/ld-linux-x86-64.so.2",
         "resolved" : "/lib/x86_64-linux-gnu/ld-2.31.so"
       },
-      "library-issues-summary" : [],
+      "libraries-ok" : true,
       "graphics-details" : {
         "x11/vulkan" : {
           "renderer" : "AMD RADV NAVI10 (ACO)",

@@ -608,9 +608,15 @@ keys:
         **error**
         :   A human-readable error message.
 
+    **libraries-ok**
+    :   If **true** no loadable-library-related problems were found.
+        No other value is allowed:
+        if problems were found,
+        `library-issues-summary` will be emitted instead.
+
     **library-issues-summary**
     :   A summary of issues found when loading the expected libraries,
-        as an array of strings. If empty, no problems were found.
+        as an array of strings.
 
         **unknown** (or **internal-error** in older reports)
         :   There was an internal error while checking libraries.

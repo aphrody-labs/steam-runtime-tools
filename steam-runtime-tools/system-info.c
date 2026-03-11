@@ -1045,7 +1045,12 @@ srt_system_info_new_from_json (const char *path,
           get_libdl_from_report (info, abi, json_arch_obj);
 
           abi->libraries_cache_available = TRUE;
-          abi->cached_combined_issues = _srt_library_get_issues_from_report (json_arch_obj);
+          abi->cached_combined_issues = _srt_json_object_get_issues_from_report (json_arch_obj,
+                                                                                 l->data,
+                                                                                 SRT_TYPE_LIBRARY_ISSUES,
+                                                                                 "library-issues-summary",
+                                                                                 "libraries-ok",
+                                                                                 SRT_LIBRARY_ISSUES_UNKNOWN);
 
           get_runtime_linker_from_report (info, abi, json_arch_obj);
 

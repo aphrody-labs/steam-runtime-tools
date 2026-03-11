@@ -1552,10 +1552,9 @@ main (int argc,
         {
           library_issues = srt_system_info_check_libraries (info, tuple,
                                                             &libraries);
-          json_builder_set_member_name (builder, "library-issues-summary");
-          json_builder_begin_array (builder);
-          jsonify_library_issues (builder, library_issues);
-          json_builder_end_array (builder);
+          jsonify_issues_or_no_issues (builder, SRT_TYPE_LIBRARY_ISSUES,
+                                       "library-issues-summary", "libraries-ok",
+                                       library_issues);
         }
 
       if (libraries != NULL && (library_issues != SRT_LIBRARY_ISSUES_NONE || verbose))

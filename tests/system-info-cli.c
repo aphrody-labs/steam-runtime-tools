@@ -168,14 +168,9 @@ libraries_presence (Fixture *f,
       g_assert_true (json_object_has_member (json_arch, "can-run"));
       g_assert_cmpint (json_object_get_boolean_member (json_arch, "can-run"),
                       ==, srt_system_info_can_run (info, multiarch_tuples[i]));
-      g_assert_cmpint (json_object_has_member (json_arch, "library-issues-summary"),
+      g_assert_cmpint (json_object_has_member (json_arch, "libraries-ok") ||
+                       json_object_has_member (json_arch, "library-issues-summary"),
                       ==, srt_system_info_can_run (info, multiarch_tuples[i]));
-      if (json_object_has_member (json_arch, "library-issues-summary"))
-        {
-          JsonArray *array;
-          array = json_object_get_array_member (json_arch, "library-issues-summary");
-          g_assert_cmpint (json_array_get_length (array), ==, 0);
-        }
       g_assert_true (json_object_has_member (json_arch, "dri_drivers"));
       g_assert_true (json_object_has_member (json_arch, "gbm_backends"));
       g_assert_true (json_object_has_member (json_arch, "va-api_drivers"));
@@ -299,7 +294,8 @@ libraries_missing (Fixture *f,
       g_assert_true (json_object_has_member (json_arch, "can-run"));
       g_assert_cmpint (json_object_get_boolean_member (json_arch, "can-run"),
                       ==, srt_system_info_can_run (info, multiarch_tuples[i]));
-      g_assert_cmpint (json_object_has_member (json_arch, "library-issues-summary"),
+      g_assert_cmpint (json_object_has_member (json_arch, "libraries-ok") ||
+                       json_object_has_member (json_arch, "library-issues-summary"),
                       ==, srt_system_info_can_run (info, multiarch_tuples[i]));
       g_assert_true (json_object_has_member (json_arch, "dri_drivers"));
       g_assert_true (json_object_has_member (json_arch, "gbm_backends"));
@@ -330,12 +326,10 @@ check_library_no_errors (JsonObject *json_details,
 static void
 check_libraries_verbose (JsonObject *json_arch)
 {
-  JsonArray *array;
   JsonObject *json_details;
-  if (json_object_has_member (json_arch, "library-issues-summary"))
+  if (json_object_has_member (json_arch, "libraries-ok"))
     {
-      array = json_object_get_array_member (json_arch, "library-issues-summary");
-      g_assert_cmpint (json_array_get_length (array), ==, 0);
+      g_assert_cmpint (json_object_get_boolean_member (json_arch, "libraries-ok"), ==, TRUE);
 
       g_assert_true (json_object_has_member (json_arch, "library-details"));
       json_details = json_object_get_object_member (json_arch, "library-details");
@@ -412,7 +406,8 @@ libraries_presence_verbose (Fixture *f,
       g_assert_true (json_object_has_member (json_arch, "can-run"));
       g_assert_cmpint (json_object_get_boolean_member (json_arch, "can-run"),
                       ==, srt_system_info_can_run (info, multiarch_tuples[i]));
-      g_assert_cmpint (json_object_has_member (json_arch, "library-issues-summary"),
+      g_assert_cmpint (json_object_has_member (json_arch, "libraries-ok") ||
+                       json_object_has_member (json_arch, "library-issues-summary"),
                       ==, srt_system_info_can_run (info, multiarch_tuples[i]));
       g_assert_true (json_object_has_member (json_arch, "dri_drivers"));
       g_assert_true (json_object_has_member (json_arch, "gbm_backends"));

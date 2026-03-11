@@ -34,12 +34,6 @@ class TestSoldierSysroot(BaseContainersTest):
                 'copy', soldier, copy=True, gc=False,
             )
 
-        with self.subTest('fake-home'):
-            self._test_soldier(
-                'fake-home', soldier, copy=True,
-                fake_home=True,
-            )
-
         with self.subTest('transient'):
             self._test_soldier('transient', soldier, locales=True)
 

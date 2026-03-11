@@ -198,9 +198,15 @@ keys:
     :   The version number of the Steam Runtime, for example
         `0.20190711.3`.
 
+    **ok**
+    :   If **true** no Steam-Runtime-related problems were found.
+        No other value is allowed:
+        if problems were found,
+        `issues` will be emitted instead.
+
     **issues**
     :   An array of strings representing problems with the Steam
-        Runtime. If empty, no problems were found.
+        Runtime.
 
         **unknown** (or **internal-error** in older reports)
         :   An error occurred while checking the Steam Runtime.

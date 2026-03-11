@@ -497,7 +497,6 @@ steam_presence (Fixture *f,
   g_autoptr(JsonNode) node = NULL;
   JsonObject *json;
   JsonObject *json_sub_object;
-  JsonArray *array;
   g_autoptr(GError) error = NULL;
   g_autofree gchar *output = NULL;
   const gchar *path = NULL;
@@ -507,7 +506,6 @@ steam_presence (Fixture *f,
   const gchar *version = NULL;
   const gchar *argv[] = { "steam-runtime-system-info", NULL };
   FakeHome *fake_home;
-  size_t i, n;
 
   fake_home = fake_home_new (NULL);
   fake_home_create_structure (fake_home);
@@ -575,17 +573,28 @@ steam_presence (Fixture *f,
   version = json_object_get_string_member (json_sub_object, "version");
   g_assert_cmpstr (version, !=, NULL);
 
-  g_assert_true (json_object_has_member (json_sub_object, "issues"));
-  array = json_object_get_array_member (json_sub_object, "issues");
-  n = json_array_get_length (array);
+  if (json_object_has_member (json_sub_object, "ok"))
+   {
+     g_assert_cmpint (json_object_get_boolean_member (json_sub_object, "ok"), ==, TRUE);
+     g_assert_false (json_object_has_member (json_sub_object, "issues"));
+   }
+  else
+  {
+    JsonArray *array;
+    size_t i, n;
 
-  for (i = 0; i < n; i++)
-    {
-      const char *issue = json_array_get_string_element (array, i);
+    g_assert_true (json_object_has_member (json_sub_object, "issues"));
+    array = json_object_get_array_member (json_sub_object, "issues");
+    n = json_array_get_length (array);
 
-      if (!runtime_issue_name_ignorable (issue))
-        g_test_fail_printf ("Unexpected runtime->issues: %s", issue);
-    }
+    for (i = 0; i < n; i++)
+      {
+        const char *issue = json_array_get_string_element (array, i);
+
+        if (!runtime_issue_name_ignorable (issue))
+          g_test_fail_printf ("Unexpected runtime->issues: %s", issue);
+      }
+  }
 
   g_assert_false (json_object_has_member (json_sub_object, "overrides"));
   g_assert_true (json_object_has_member (json_sub_object, "pinned_libs_32"));

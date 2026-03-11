@@ -227,13 +227,6 @@ jsonify_enum (JsonBuilder *builder,
 }
 
 static void
-jsonify_runtime_issues (JsonBuilder *builder,
-                        SrtRuntimeIssues issues)
-{
-  jsonify_flags (builder, SRT_TYPE_RUNTIME_ISSUES, issues);
-}
-
-static void
 jsonify_issues_or_no_issues (JsonBuilder *builder,
                              GType flags_type,
                              const char *issues_member,
@@ -1420,10 +1413,8 @@ main (int argc,
       json_builder_add_string_value (builder, version);
 
       runtime_issues = srt_system_info_get_runtime_issues (info);
-      json_builder_set_member_name (builder, "issues");
-      json_builder_begin_array (builder);
-      jsonify_runtime_issues (builder, runtime_issues);
-      json_builder_end_array (builder);
+      jsonify_issues_or_no_issues (builder, SRT_TYPE_RUNTIME_ISSUES,
+                                   "issues", "ok", runtime_issues);
 
       overrides = srt_system_info_list_pressure_vessel_overrides (info, &messages);
 

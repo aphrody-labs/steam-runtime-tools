@@ -397,29 +397,6 @@ _srt_os_info_new_from_report (JsonObject *json_obj)
   return _srt_os_info_new (fields, messages, source_path, source_path_resolved);
 }
 
-/*
- * _srt_runtime_get_issues_from_report:
- * @json_obj: (not nullable): A JSON Object used to search for "issues"
- *  property
- *
- * If the provided @json_obj doesn't have a "issues" member, or it is
- * malformed, %SRT_RUNTIME_ISSUES_UNKNOWN will be returned.
- * If @json_obj has some elements that we can't parse,
- * %SRT_RUNTIME_ISSUES_UNKNOWN will be added to the returned #SrtRuntimeIssues.
- *
- * Returns: The #SrtRuntimeIssues that has been found
- */
-static SrtRuntimeIssues
-_srt_runtime_get_issues_from_report (JsonObject *json_obj)
-{
-  g_return_val_if_fail (json_obj != NULL, SRT_RUNTIME_ISSUES_UNKNOWN);
-
-  return srt_get_flags_from_json_array (SRT_TYPE_RUNTIME_ISSUES,
-                                        json_obj,
-                                        "issues",
-                                        SRT_RUNTIME_ISSUES_UNKNOWN);
-}
-
 static gchar *
 dup_json_string_member (JsonObject *obj,
                         const gchar *name)
@@ -691,7 +668,12 @@ _srt_runtime_fill_from_report (SrtRuntime *self,
       self->version = g_strdup (json_object_get_string_member_with_default (json_sub_obj,
                                                                             "version",
                                                                             NULL));
-      self->issues = _srt_runtime_get_issues_from_report (json_sub_obj);
+      self->issues = _srt_json_object_get_issues_from_report (json_sub_obj,
+                                                              "runtime",
+                                                              SRT_TYPE_RUNTIME_ISSUES,
+                                                              "issues",
+                                                              "ok",
+                                                              SRT_RUNTIME_ISSUES_UNKNOWN);
     }
 }
 

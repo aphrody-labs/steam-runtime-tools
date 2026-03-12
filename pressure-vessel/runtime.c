@@ -5738,6 +5738,13 @@ collect_graphics_libraries_patterns (PvRuntime *self,
                                      RuntimeArchitecture *arch,
                                      GPtrArray *patterns)
 {
+  static const char * const literal_patterns[] =
+  {
+    /* Mesa GLX, etc. */
+    "gl:",
+    /* On Ubuntu, this is packaged with its dependencies missing */
+    "quiet:if-exists:even-if-older:soname-match:libnvidia-pkcs11*.so.*",
+  };
   static const char * const sonames[] =
   {
     /* Vulkan */
@@ -5877,9 +5884,6 @@ collect_graphics_libraries_patterns (PvRuntime *self,
     "libnvidia-vulkan-producer.so.*",
     "libnvoptix.so.*",
     "libvdpau_nvidia.so.*",
-
-    /* On Ubuntu, this is packaged with its dependencies missing */
-    "quiet:libnvidia-pkcs11*.so.*",
   };
   /* Each of these is substituted into libnvidia-NAME.so.VERSION.
    * TODO: It would be better if these came from some sort of manifest:
@@ -5906,8 +5910,8 @@ collect_graphics_libraries_patterns (PvRuntime *self,
 
   g_return_if_fail (patterns != NULL);
 
-  /* Mesa GLX, etc. */
-  g_ptr_array_add (patterns, g_strdup ("gl:"));
+  for (size_t i = 0; i < G_N_ELEMENTS (literal_patterns); i++)
+    g_ptr_array_add (patterns, g_strdup (literal_patterns[i]));
 
   for (size_t i = 0; i < G_N_ELEMENTS (sonames); i++)
     g_ptr_array_add (patterns,

@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260311.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260312.0) UNRELEASED; urgency=medium
 
   [ Antonio Ospite ]
   * pressure-vessel:
@@ -14,6 +14,11 @@ steam-runtime-tools (0.20260311.0) UNRELEASED; urgency=medium
 
   [ Simon McVittie ]
   * pressure-vessel:
+    - Capture more of the libraries added by recent Nvidia drivers,
+      up to and including version 590.x
+      (steamrt/tasks#914, might help steam-runtime#799)
+    - Capture libnvidia-pkcs11*.so.* again, fixing a regression in
+      0.20240806.0
     - Refactoring
   * Update libglnx subproject to 2026-03-10
   * Tests:
@@ -33,7 +38,7 @@ steam-runtime-tools (0.20260311.0) UNRELEASED; urgency=medium
     - In CI, produce TAP output via python3-tap if possible
     - In CI, use new CI runners for better coverage (steamrt/tasks#919)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 11 Mar 2026 16:39:54 +0000
+ -- Simon McVittie <smcv@collabora.com>  Thu, 12 Mar 2026 17:35:27 +0000
 
 steam-runtime-tools (0.20260218.0) steamrt; urgency=medium
 

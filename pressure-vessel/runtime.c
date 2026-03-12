@@ -5738,6 +5738,13 @@ collect_graphics_libraries_patterns (PvRuntime *self,
                                      RuntimeArchitecture *arch,
                                      GPtrArray *patterns)
 {
+  static const char * const literal_patterns[] =
+  {
+    /* Mesa GLX, etc. */
+    "gl:",
+    /* On Ubuntu, this is packaged with its dependencies missing */
+    "quiet:if-exists:even-if-older:soname-match:libnvidia-pkcs11*.so.*",
+  };
   static const char * const sonames[] =
   {
     /* Vulkan */
@@ -5802,12 +5809,16 @@ collect_graphics_libraries_patterns (PvRuntime *self,
     "libnvidia-cfg.so.1",
     "libnvidia-egl-gbm.so.1",
     "libnvidia-egl-wayland.so.1",
+    "libnvidia-egl-wayland2.so.1",
+    "libnvidia-egl-xcb.so.1",
+    "libnvidia-egl-xlib.so.1",
     "libnvidia-encode.so.1",
     "libnvidia-fbc.so.1",
     "libnvidia-ifr.so.1",
     "libnvidia-ml.so.1",
     "libnvidia-ngx.so.1",
     "libnvidia-nvvm.so.4",
+    "libnvidia-nvvm70.so.4",
     "libnvidia-opencl.so.1",
     "libnvidia-opticalflow.so.1",
     "libnvidia-ptxjitcompiler.so.1",
@@ -5850,8 +5861,7 @@ collect_graphics_libraries_patterns (PvRuntime *self,
     "libnvidia-cbl.so.*",
     "libnvidia-cfg.so.*",
     "libnvidia-compiler.so.*",
-    "libnvidia-egl-gbm.so.*",
-    "libnvidia-egl-wayland.so.*",
+    "libnvidia-egl-*.so.*",
     "libnvidia-eglcore.so.*",
     "libnvidia-encode.so.*",
     "libnvidia-fatbinaryloader.so.*",
@@ -5863,18 +5873,17 @@ collect_graphics_libraries_patterns (PvRuntime *self,
     "libnvidia-ifr.so.*",
     "libnvidia-ml.so.*",
     "libnvidia-ngx.so.*",
-    "libnvidia-nvvm.so.*",
+    "libnvidia-nvvm*.so.*",
     "libnvidia-opencl.so.*",
     "libnvidia-opticalflow.so.*",
+    "libnvidia-present.so.*",
     "libnvidia-ptxjitcompiler.so.*",
     "libnvidia-rtcore.so.*",
+    "libnvidia-tileiras.so.*",
     "libnvidia-tls.so.*",
     "libnvidia-vulkan-producer.so.*",
     "libnvoptix.so.*",
     "libvdpau_nvidia.so.*",
-
-    /* On Ubuntu, this is packaged with its dependencies missing */
-    "quiet:libnvidia-pkcs11*.so.*",
   };
   /* Each of these is substituted into libnvidia-NAME.so.VERSION.
    * TODO: It would be better if these came from some sort of manifest:
@@ -5890,12 +5899,19 @@ collect_graphics_libraries_patterns (PvRuntime *self,
     "tls",
     "vulkan-producer",
   };
+  /*
+   * Nvidia libraries that we intentionally do not include:
+   * libnvidia-gtk* (nvidia-settings): depends on GLib, GTK
+   * libnvidia-sandboxutils.so.1: believed to be only useful on the host
+   * libnvidia-vksc-core.so.1: Vulkan-safety-critical ICD, not relevant for gaming
+   * libnvidia-wayland-client.so.* (nvidia-settings): assumed only relevant on host
+   */
   g_autofree gchar *nvidia_version = NULL;
 
   g_return_if_fail (patterns != NULL);
 
-  /* Mesa GLX, etc. */
-  g_ptr_array_add (patterns, g_strdup ("gl:"));
+  for (size_t i = 0; i < G_N_ELEMENTS (literal_patterns); i++)
+    g_ptr_array_add (patterns, g_strdup (literal_patterns[i]));
 
   for (size_t i = 0; i < G_N_ELEMENTS (sonames); i++)
     g_ptr_array_add (patterns,

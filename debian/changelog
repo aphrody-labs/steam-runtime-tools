@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260312.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260312.0) steamrt; urgency=medium
 
   [ Antonio Ospite ]
   * pressure-vessel:
@@ -38,7 +38,7 @@ steam-runtime-tools (0.20260312.0) UNRELEASED; urgency=medium
     - In CI, produce TAP output via python3-tap if possible
     - In CI, use new CI runners for better coverage (steamrt/tasks#919)
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 12 Mar 2026 17:35:27 +0000
+ -- Simon McVittie <smcv@collabora.com>  Thu, 12 Mar 2026 18:34:41 +0000
 
 steam-runtime-tools (0.20260218.0) steamrt; urgency=medium
 

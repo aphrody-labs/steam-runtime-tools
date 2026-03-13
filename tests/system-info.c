@@ -2012,6 +2012,82 @@ os_steamrt (Fixture *f,
 }
 
 static void
+os_steamrt3c (Fixture *f,
+              gconstpointer context)
+{
+  g_autoptr(SrtSystemInfo) info = NULL;
+  g_auto(GStrv) strv = NULL;
+  g_autofree gchar *sysroot = NULL;
+  g_autofree gchar *s = NULL;
+  SrtRuntimeIssues runtime_issues;
+
+  if (_srt_tests_skip_if_really_in_steam_runtime ())
+    return;
+
+  sysroot = g_build_filename (f->sysroots, "steamrt3c", NULL);
+
+  info = srt_system_info_new (NULL);
+  srt_system_info_set_sysroot (info, sysroot);
+  check_os_release (info);
+
+  s = srt_system_info_dup_os_build_id (info);
+  g_assert_cmpstr (s, ==, "3c.0.20260123.456789");
+  g_clear_pointer (&s, g_free);
+
+  s = srt_system_info_dup_os_id (info);
+  g_assert_cmpstr (s, ==, "steamrt");
+  g_clear_pointer (&s, g_free);
+
+  strv = srt_system_info_dup_os_id_like (info, FALSE);
+  g_assert_nonnull (strv);
+  g_assert_cmpstr (strv[0], ==, "debian");
+  g_assert_cmpstr (strv[1], ==, NULL);
+  g_clear_pointer (&strv, g_strfreev);
+
+  strv = srt_system_info_dup_os_id_like (info, TRUE);
+  g_assert_nonnull (strv);
+  g_assert_cmpstr (strv[0], ==, "steamrt");
+  g_assert_cmpstr (strv[1], ==, "debian");
+  g_assert_cmpstr (strv[2], ==, NULL);
+  g_clear_pointer (&strv, g_strfreev);
+
+  s = srt_system_info_dup_os_name (info);
+  g_assert_cmpstr (s, ==, "Steam Runtime");
+  g_clear_pointer (&s, g_free);
+
+  s = srt_system_info_dup_os_pretty_name (info);
+  g_assert_cmpstr (s, ==, "Steam Runtime 3c (steamrt3c)");
+  g_clear_pointer (&s, g_free);
+
+  s = srt_system_info_dup_os_variant (info);
+  g_assert_cmpstr (s, ==, "Platform");
+  g_clear_pointer (&s, g_free);
+
+  s = srt_system_info_dup_os_variant_id (info);
+  g_assert_cmpstr (s, ==, "com.valvesoftware.steamruntime.platform-amd64_i386-steamrt3c");
+  g_clear_pointer (&s, g_free);
+
+  s = srt_system_info_dup_os_version_codename (info);
+  g_assert_cmpstr (s, ==, "steamrt3c");
+  g_clear_pointer (&s, g_free);
+
+  s = srt_system_info_dup_os_version_id (info);
+  g_assert_cmpstr (s, ==, "3c");
+  g_clear_pointer (&s, g_free);
+
+  runtime_issues = srt_system_info_get_runtime_issues (info) & ~ignore_runtime_issues;
+  g_assert_cmpint (runtime_issues, ==, SRT_RUNTIME_ISSUES_NONE);
+
+  s = srt_system_info_dup_runtime_path (info);
+  g_assert_cmpstr (s, ==, "/");
+  g_clear_pointer (&s, g_free);
+
+  s = srt_system_info_dup_runtime_version (info);
+  g_assert_cmpstr (s, ==, "3c.0.20260123.456789");
+  g_clear_pointer (&s, g_free);
+}
+
+static void
 os_steamrt_unofficial (Fixture *f,
                        gconstpointer context)
 {
@@ -5558,6 +5634,8 @@ main (int argc,
               setup, os_debian_unstable, teardown);
   g_test_add ("/system-info/os/steamrt", Fixture, NULL,
               setup, os_steamrt, teardown);
+  g_test_add ("/system-info/os/steamrt3c", Fixture, NULL,
+              setup, os_steamrt3c, teardown);
   g_test_add ("/system-info/os/steamrt-unofficial", Fixture, NULL,
               setup, os_steamrt_unofficial, teardown);
   g_test_add ("/system-info/os/invalid-os-release", Fixture, NULL,

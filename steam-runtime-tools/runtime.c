@@ -654,6 +654,9 @@ _srt_runtime_check_container (SrtRuntime *self,
 
       for (p = self->version; *p != '\0'; p++)
         {
+          if (p == self->version + 1 && *p == 'c')
+            continue;
+
           if (!g_ascii_isdigit (*p) && *p != '.')
             self->issues |= SRT_RUNTIME_ISSUES_UNOFFICIAL;
         }

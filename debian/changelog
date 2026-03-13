@@ -1,3 +1,17 @@
+steam-runtime-tools (0.20260313.0) steamrt; urgency=medium
+
+  [ Simon McVittie ]
+  * Diagnostic tools:
+    - runtime: Don't diagnose steamrt3c as unofficial
+  * Tests:
+    - Don't fail if run against an unofficial (test-build) runtime
+
+  [ Antonio Ospite ]
+  * Tests:
+    - Add coverage for GBM backend modules (steamrt/tasks#900)
+
+ -- Simon McVittie <smcv@collabora.com>  Fri, 13 Mar 2026 17:41:59 +0000
+
 steam-runtime-tools (0.20260312.0) steamrt; urgency=medium
 
   [ Antonio Ospite ]

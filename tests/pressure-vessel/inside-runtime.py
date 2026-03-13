@@ -73,6 +73,12 @@ class HostInfo:
 
 
 class TestInsideRuntime(BaseTest):
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+
+        cls.run_inside_runtime = True
+
     def setUp(self) -> None:
         super().setUp()
         self.host = HostInfo()
@@ -502,13 +508,13 @@ class TestInsideRuntime(BaseTest):
 
         if host_os_release.get('id') == 'debian':
             logger.info('Host OS is Debian')
-            host_is_debian_derived = True
+            self.host_is_debian_derived = True
         elif 'debian' in host_os_release.get('id_like', []):
             logger.info('Host OS is Debian-derived')
-            host_is_debian_derived = True
+            self.host_is_debian_derived = True
         else:
             logger.info('Host OS is not Debian-derived')
-            host_is_debian_derived = False
+            self.host_is_debian_derived = False
 
         if host_parsed:
             # If the Steam installation on the host system is sane, we expect
@@ -802,48 +808,23 @@ class TestInsideRuntime(BaseTest):
                     )
 
             if host_info:
-                expect_symlinks = {
-                }    # type: typing.Dict[str, typing.List[str]]
-                for dri in host_info.get('dri_drivers', ()):
-                    path = dri['library_path']
+                overrides_libdir = '{}/lib/{}'.format(
+                    overrides, multiarch
+                )
 
-                    if path.startswith((    # any of:
-                        '/usr/lib/dri/',
-                        '/usr/lib32/dri/',
-                        '/usr/lib64/dri/',
-                        '/usr/lib/{}/dri/'.format(multiarch),
-                    )) and not dri.get('is_extra', False):
-                        # We don't make any assertion about the search
-                        # order here.
-                        host_path = '/run/host' + path
+                self.assertGraphicsModulesOverrides(
+                    modules=host_info.get('dri_drivers', ()),
+                    module_type='dri',
+                    multiarch=multiarch,
+                    overrides_libdir=overrides_libdir,
+                )
 
-                        # Take the realpath() because `path` might be a symlink
-                        # itself, and it will be followed when creating links
-                        # in the `overrides/` dir inside the container.
-                        host_path = os.path.realpath(host_path)
-
-                        expect_symlinks.setdefault(
-                            os.path.basename(host_path), []
-                        ).append(host_path)
-
-                for k, vs in expect_symlinks.items():
-                    with self.subTest(dri_symlink=k):
-                        link = '{}/lib/{}/dri/{}'.format(
-                            overrides, multiarch, k,
-                        )
-                        logger.info('Target of %s should be in %s', link, vs)
-                        target = self.assertSymlink(link)
-
-                        # Take the realpath() on non-Debian-derived hosts,
-                        # because on Arch Linux, we find drivers in
-                        # /usr/lib64 that are physically in /usr/lib.
-                        # Be more strict on Debian because we know more
-                        # about the canonical paths there.
-                        if not host_is_debian_derived:
-                            with contextlib.suppress(OSError):
-                                target = os.path.realpath(link)
-
-                        self.assertIn(target, vs)
+                self.assertGraphicsModulesOverrides(
+                    modules=host_info.get('gbm_backends', ()),
+                    module_type='gbm',
+                    multiarch=multiarch,
+                    overrides_libdir=overrides_libdir,
+                )
 
                 for stack, host_details in (
                     host_info.get('graphics-details', {}).items()
@@ -856,7 +837,7 @@ class TestInsideRuntime(BaseTest):
                     # our libedit.so.2 is older or newer than the
                     # host's. (T21954)
                     if (
-                        host_is_debian_derived
+                        self.host_is_debian_derived
                         and (
                             Path('/usr/lib') / multiarch / 'libedit.so.2'
                         ).exists()
@@ -872,7 +853,7 @@ class TestInsideRuntime(BaseTest):
                     # container is newer, due to a bug. We work around it
                     # for now, to get some test coverage going.
                     if (
-                        host_is_debian_derived
+                        self.host_is_debian_derived
                         and Path(
                             '/usr/lib/x86_64-linux-gnu/libedit.so.2'
                         ).exists()

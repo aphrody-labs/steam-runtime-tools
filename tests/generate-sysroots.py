@@ -75,6 +75,7 @@ for abi in supported_abis:
         debian10/usr/lib/{0}/vdpau
         fake-steam-runtime/usr/lib/steamrt/expectations/{0}
         steamrt/overrides/lib/{0}
+        steamrt3c/overrides/lib/{0}
         steamrt-overrides-issues/usr/lib/pressure-vessel/overrides/lib/{0}
         ''').format(abi)
 
@@ -177,6 +178,11 @@ steamrt/etc
 steamrt/overrides/bin
 steamrt/usr/lib
 steamrt/run/pressure-vessel
+steamrt3c/etc
+steamrt3c/overrides/bin
+steamrt3c/usr/lib
+steamrt3c/proc/1
+steamrt3c/run/pressure-vessel
 steamrt-overrides-issues/etc
 steamrt-overrides-issues/usr/lib/pressure-vessel/overrides/bin
 steamrt-overrides-issues/usr/lib
@@ -320,6 +326,8 @@ steamrt/overrides/lib/x86_64-linux-gnu/libGLX_custom.so.0
 steamrt/overrides/lib/x86_64-linux-gnu/libGLX_mesa.so.0
 steamrt/overrides/lib/i386-linux-gnu/libGLX_nvidia.so.0
 steamrt/run/pressure-vessel/.exists
+steamrt3c/overrides/bin/.keep
+steamrt3c/run/pressure-vessel/.exists
 steamrt-overrides-issues/usr/lib/pressure-vessel/overrides/bin/.keep
 steamrt-overrides-issues/usr/lib/pressure-vessel/overrides/lib/i386-linux-gnu/.keep
 ubuntu16/lib64/ld-linux-x86-64.so.2
@@ -365,6 +373,8 @@ for name, target in {
     'fedora/usr/lib64/vdpau/libvdpau_radeonsi.so.1':
         'libvdpau_radeonsi.so',
     'steamrt/etc/os-release':
+        '../usr/lib/os-release',
+    'steamrt3c/etc/os-release':
         '../usr/lib/os-release',
     'steamrt/overrides/lib/x86_64-linux-gnu/libgcc_s.so.1':
         '/run/host/usr/lib/libgcc_s.so.1',
@@ -1452,6 +1462,26 @@ with open('steamrt-unofficial/proc/1/cgroup', 'w') as writer:
 1:name=systemd:/docker/9999999999999999999999999999999999999999999999999999999999999999
 0::/system.slice/docker.service
 ''')    # noqa
+
+for name in (
+    'steamrt3c/usr/lib/os-release',
+):
+    with open(name, 'w') as writer:
+        writer.write('''\
+PRETTY_NAME="Steam Runtime 3c (steamrt3c)"
+NAME="Steam Runtime"
+VERSION_ID="3c"
+VERSION="3c (steamrt3c)"
+VERSION_CODENAME=steamrt3c
+ID=steamrt
+ID_LIKE=debian
+HOME_URL="https://store.steampowered.com/"
+SUPPORT_URL="https://help.steampowered.com/"
+BUG_REPORT_URL="https://github.com/ValveSoftware/steam-runtime/issues"
+BUILD_ID="3c.0.20260123.456789"
+VARIANT=Platform
+VARIANT_ID="com.valvesoftware.steamruntime.platform-amd64_i386-steamrt3c"
+''')
 
 with open('ubuntu16/sys/class/dmi/id/sys_vendor', 'w') as writer:
     writer.write('QEMU\n')

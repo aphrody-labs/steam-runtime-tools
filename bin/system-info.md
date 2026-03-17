@@ -780,7 +780,6 @@ keys:
                 `integrated-gpu`, `discrete-gpu`, `virtual-gpu`,
                 or `cpu` (denoting software rendering such as llvmpipe).
 
-
             **messages**
             :   Human-readable array of diagnostic messages.
 

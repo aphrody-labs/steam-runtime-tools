@@ -1943,33 +1943,15 @@ srt_graphics_get_devices (SrtGraphics *self)
 static SrtGraphicsIssues
 _srt_get_graphics_issues_from_json_object (JsonObject *json_obj)
 {
-  JsonArray *array;
   SrtGraphicsIssues graphics_issues = SRT_GRAPHICS_ISSUES_NONE;
-  gsize j;
 
   /* In graphics, a missing "issues" array means that no issues were found */
   if (json_object_has_member (json_obj, "issues"))
     {
-      array = json_object_get_array_member (json_obj, "issues");
-
-      /* We are expecting an array of issues here */
-      if (array == NULL)
-        {
-          g_debug ("'issues' in 'graphics-details' is not an array as expected");
-          graphics_issues |= SRT_GRAPHICS_ISSUES_UNKNOWN;
-        }
-      else
-        {
-          for (j = 0; j < json_array_get_length (array); j++)
-            {
-              const gchar *issue_string = json_array_get_string_element (array, j);
-              if (!srt_add_flag_from_nick (SRT_TYPE_GRAPHICS_ISSUES,
-                                            issue_string,
-                                            &graphics_issues,
-                                            NULL))
-                graphics_issues |= SRT_GRAPHICS_ISSUES_UNKNOWN;
-            }
-        }
+      graphics_issues = srt_get_flags_from_json_array (SRT_TYPE_GRAPHICS_ISSUES,
+                                                       json_obj,
+                                                       "issues",
+                                                       SRT_GRAPHICS_ISSUES_UNKNOWN);
     }
   return graphics_issues;
 }

@@ -2047,7 +2047,12 @@ _srt_graphics_get_from_report (JsonObject *json_obj,
           version = json_object_get_string_member_with_default (json_stack_obj, "version",
                                                                 NULL);
 
-          graphics_issues = _srt_get_graphics_issues_from_json_object (json_stack_obj);
+          graphics_issues = _srt_json_object_get_issues_from_report (json_stack_obj,
+                                                                     l->data,
+                                                                     SRT_TYPE_GRAPHICS_ISSUES,
+                                                                     "issues",
+                                                                     NULL,
+                                                                     SRT_GRAPHICS_ISSUES_UNKNOWN);
 
           /* A missing exit_status means that its value is the default zero */
           exit_status = json_object_get_int_member_with_default (json_stack_obj, "exit-status", 0);

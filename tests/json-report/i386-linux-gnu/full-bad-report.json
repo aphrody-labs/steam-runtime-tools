@@ -142,7 +142,8 @@
               "driver-version" : "Mesa 20.3.3 (ACO)",
               "vendor-id" : "0x1002",
               "device-id" : "0x731f",
-              "type" : "discrete-gpu"
+              "type" : "discrete-gpu",
+              "issues" : [ "cannot-load" ]
             },
             {
               "name" : "llvmpipe (LLVM 8.0, 256 bits)",

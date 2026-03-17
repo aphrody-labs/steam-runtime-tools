@@ -3746,6 +3746,7 @@ static JsonTest json_test[] =
                 .vendor_id = SRT_TEST_GOOD_GRAPHICS_VENDOR_ID,
                 .device_id = SRT_TEST_GOOD_GRAPHICS_DEVICE_ID,
                 .type = SRT_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
+                .issues = SRT_GRAPHICS_ISSUES_CANNOT_LOAD,
               },
               {
                 .name = SRT_TEST_SOFTWARE_GRAPHICS_RENDERER,

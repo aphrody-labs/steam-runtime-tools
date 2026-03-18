@@ -454,7 +454,7 @@
         }
       }
     },
-    "issues" : []
+    "ok" : true
   },
   "cpu-features" : {
     "x86-64" : true,

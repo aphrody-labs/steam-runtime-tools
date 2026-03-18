@@ -1259,9 +1259,15 @@ keys:
             **available**
             :   A boolean value indicating whether this backend is available.
 
+    **ok**
+    :   If **true** no XDG-portal-related problems were found.
+        No other value is allowed:
+        if problems were found,
+        `issues` will be emitted instead.
+
     **issues**
     :   Problems with the XDG portal support, represented as an array
-        of strings. The array is empty if no problems were detected.
+        of strings.
 
         **unknown**
         :   There was an unknown error while checking XDG portal support.

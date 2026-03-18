@@ -241,13 +241,6 @@ jsonify_issues_or_no_issues (JsonBuilder *builder,
 }
 
 static void
-jsonify_xdg_portal_issues (JsonBuilder *builder,
-                           SrtXdgPortalIssues issues)
-{
-  jsonify_flags (builder, SRT_TYPE_XDG_PORTAL_ISSUES, issues);
-}
-
-static void
 jsonify_x86_features (JsonBuilder *builder,
                       SrtX86FeatureFlags present,
                       SrtX86FeatureFlags known)
@@ -1933,10 +1926,8 @@ main (int argc,
         }
 
       xdg_portal_issues = srt_system_info_get_xdg_portal_issues (info, &xdg_portal_messages);
-      json_builder_set_member_name (builder, "issues");
-      json_builder_begin_array (builder);
-      jsonify_xdg_portal_issues (builder, xdg_portal_issues);
-      json_builder_end_array (builder);
+      jsonify_issues_or_no_issues (builder, SRT_TYPE_XDG_PORTAL_ISSUES,
+                                   "issues", "ok", xdg_portal_issues);
 
       if (xdg_portal_messages != NULL)
         _srt_json_builder_add_array_of_lines (builder, "messages", xdg_portal_messages);

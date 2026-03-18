@@ -521,10 +521,12 @@ _srt_display_info_get_from_report (JsonObject *json_obj)
                                                                      "wayland-session",
                                                                      FALSE);
 
-      wayland_issues = srt_get_flags_from_json_array (SRT_TYPE_DISPLAY_WAYLAND_ISSUES,
-                                                      json_sub_obj,
-                                                      "wayland-issues",
-                                                      SRT_DISPLAY_WAYLAND_ISSUES_UNKNOWN);
+      wayland_issues = _srt_json_object_get_issues_from_report (json_sub_obj,
+                                                                "display",
+                                                                SRT_TYPE_DISPLAY_WAYLAND_ISSUES,
+                                                                "wayland-issues",
+                                                                "wayland-ok",
+                                                                SRT_DISPLAY_WAYLAND_ISSUES_UNKNOWN);
 
       G_STATIC_ASSERT (sizeof (SrtDisplayX11Type) == sizeof (gint));
       x11_string = json_object_get_string_member_with_default (json_sub_obj,

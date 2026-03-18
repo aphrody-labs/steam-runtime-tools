@@ -1192,9 +1192,14 @@ keys:
     :   A boolean value indicating whether the current session is using
         Wayland.
 
+    **wayland-ok**
+    :   If **true** no wayland-related problems were found.
+        No other value is allowed:
+        if problems were found,
+        `wayland-issues` will be emitted instead.
+
     **wayland-issues**
     :   An array of strings representing problems with the Wayland session.
-        If empty, no problems were found.
 
         **unknown**
         :   There was an unknown, or internal, error while checking Wayland

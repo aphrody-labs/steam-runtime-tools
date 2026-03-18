@@ -324,7 +324,7 @@
       "WAYLAND_DISPLAY=wayland-0"
     ],
     "wayland-session" : true,
-    "wayland-issues" : [],
+    "wayland-ok" : true,
     "x11-type" : "xwayland"
   },
   "xdg-portals" : {

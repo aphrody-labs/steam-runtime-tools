@@ -248,13 +248,6 @@ jsonify_xdg_portal_issues (JsonBuilder *builder,
 }
 
 static void
-jsonify_display_wayland_issues (JsonBuilder *builder,
-                                SrtDisplayWaylandIssues issues)
-{
-  jsonify_flags (builder, SRT_TYPE_DISPLAY_WAYLAND_ISSUES, issues);
-}
-
-static void
 jsonify_x86_features (JsonBuilder *builder,
                       SrtX86FeatureFlags present,
                       SrtX86FeatureFlags known)
@@ -878,10 +871,9 @@ jsonify_display (JsonBuilder *builder,
       json_builder_set_member_name (builder, "wayland-session");
       json_builder_add_boolean_value (builder, wayland_session);
 
-      json_builder_set_member_name (builder, "wayland-issues");
-      json_builder_begin_array (builder);
-      jsonify_display_wayland_issues (builder, wayland_issues);
-      json_builder_end_array (builder);
+      jsonify_issues_or_no_issues (builder, SRT_TYPE_DISPLAY_WAYLAND_ISSUES,
+                                   "wayland-issues", "wayland-ok",
+                                   wayland_issues);
 
       json_builder_set_member_name (builder, "x11-type");
       jsonify_enum (builder, SRT_TYPE_DISPLAY_X11_TYPE, x11_type);

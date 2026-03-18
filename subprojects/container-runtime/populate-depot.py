@@ -353,9 +353,9 @@ export PRESSURE_VESSEL_RUNTIME="${{dir}}"
 unset PRESSURE_VESSEL_RUNTIME_ARCHIVE
 export PRESSURE_VESSEL_RUNTIME_BASE="${{here}}"
 
-if [ -z "${{PRESSURE_VESSEL_VARIABLE_DIR-}}" ]; then
-    export PRESSURE_VESSEL_VARIABLE_DIR="${{here}}/var"
-fi
+set -- \\
+    --variable-dir="${{PRESSURE_VESSEL_VARIABLE_DIR:-"${{here}}/var"}}" \\
+    "$@"
 
 exec "${{pressure_vessel}}/bin/pressure-vessel-unruntime" "$@"
 '''

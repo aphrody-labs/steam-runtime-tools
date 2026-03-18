@@ -3734,6 +3734,7 @@ static JsonTest json_test[] =
             .renderer = SRT_TEST_GOOD_GRAPHICS_RENDERER,
             .version = SRT_TEST_GOOD_VULKAN_VERSION,
             .is_available = TRUE,
+            .issues = SRT_GRAPHICS_ISSUES_CANNOT_LOAD,
             .devices =
             {
               {
@@ -3745,6 +3746,7 @@ static JsonTest json_test[] =
                 .vendor_id = SRT_TEST_GOOD_GRAPHICS_VENDOR_ID,
                 .device_id = SRT_TEST_GOOD_GRAPHICS_DEVICE_ID,
                 .type = SRT_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
+                .issues = SRT_GRAPHICS_ISSUES_CANNOT_LOAD,
               },
               {
                 .name = SRT_TEST_SOFTWARE_GRAPHICS_RENDERER,
@@ -3767,12 +3769,14 @@ static JsonTest json_test[] =
             .rendering_interface = SRT_RENDERING_INTERFACE_VDPAU,
             .renderer = "G3DVL VDPAU Driver Shared Library version 1.0\n",
             .is_available = TRUE,
+            .issues = SRT_GRAPHICS_ISSUES_CANNOT_LOAD,
           },
           {
             .window_system = SRT_WINDOW_SYSTEM_X11,
             .rendering_interface = SRT_RENDERING_INTERFACE_VAAPI,
             .renderer = "Mesa Gallium driver 20.0.5 for AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)\n",
             .is_available = TRUE,
+            .issues = SRT_GRAPHICS_ISSUES_CANNOT_LOAD,
           },
           {
             .window_system = SRT_WINDOW_SYSTEM_GLX,
@@ -3797,6 +3801,7 @@ static JsonTest json_test[] =
             .version = "4.6 (Compatibility Profile) Mesa 20.0.5",
             .library_vendor = SRT_GRAPHICS_LIBRARY_VENDOR_GLVND,
             .is_available = TRUE,
+            .issues = SRT_GRAPHICS_ISSUES_CANNOT_LOAD,
           },
           {
             .window_system = SRT_WINDOW_SYSTEM_EGL_X11,
@@ -3805,6 +3810,7 @@ static JsonTest json_test[] =
             .version = "OpenGL ES 3.2 Mesa 20.0.5",
             .library_vendor = SRT_GRAPHICS_LIBRARY_VENDOR_GLVND,
             .is_available = TRUE,
+            .issues = SRT_GRAPHICS_ISSUES_CANNOT_LOAD,
           },
         },
         .dri_drivers =
@@ -4708,6 +4714,13 @@ json_parsing (Fixture *f,
                                   "/home/me/.local/share/Steam/ubuntu12_32/steam-runtime/usr/lib/x86_64-linux-gnu/libjack.so.0.1.0";
   jt->architecture[1] = jt->architecture[0];
   jt->architecture[0] = i386_architecture_full;
+  /* Set graphics issues for the overridden architecture too */
+  jt->architecture[0].graphics[0].issues = SRT_GRAPHICS_ISSUES_CANNOT_LOAD | SRT_GRAPHICS_ISSUES_CANNOT_DRAW;
+  jt->architecture[0].graphics[1].issues = SRT_GRAPHICS_ISSUES_CANNOT_LOAD;
+  jt->architecture[0].graphics[2].issues = SRT_GRAPHICS_ISSUES_CANNOT_LOAD;
+  jt->architecture[0].graphics[3].issues = SRT_GRAPHICS_ISSUES_CANNOT_LOAD;
+  jt->architecture[0].graphics[4].issues = SRT_GRAPHICS_ISSUES_CANNOT_LOAD;
+  jt->architecture[0].graphics[5].issues = SRT_GRAPHICS_ISSUES_CANNOT_LOAD;
   /* Set openxr_1_rt issues for the overridden architecture too */
   jt->architecture[0].openxr_1_rt.issues =
     SRT_LOADABLE_ISSUES_UNKNOWN |

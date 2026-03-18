@@ -124,6 +124,7 @@
         "x11/vulkan" : {
           "renderer" : "AMD RADV NAVI10 (ACO)",
           "version" : "Mesa 20.3.3 (ACO)",
+          "issues" : [ "cannot-load" ],
           "devices" : [
             {
               "name" : "AMD RADV NAVI10 (ACO)",
@@ -133,7 +134,8 @@
               "driver-version" : "Mesa 20.3.3 (ACO)",
               "vendor-id" : "0x1002",
               "device-id" : "0x731f",
-              "type" : "discrete-gpu"
+              "type" : "discrete-gpu",
+              "issues" : [ "cannot-load" ]
             },
             {
               "name" : "llvmpipe (LLVM 8.0, 256 bits)",
@@ -154,11 +156,13 @@
         },
         "x11/vdpau" : {
           "renderer" : "G3DVL VDPAU Driver Shared Library version 1.0\n",
-          "version" : null
+          "version" : null,
+          "issues" : [ "cannot-load" ]
         },
         "x11/vaapi" : {
           "renderer" : "Mesa Gallium driver 20.0.5 for AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)\n",
-          "version" : null
+          "version" : null,
+          "issues" : [ "cannot-load" ]
         },
         "glx/gl" : {
           "messages" : [
@@ -182,12 +186,14 @@
         "egl_x11/gl" : {
           "renderer" : "AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)",
           "version" : "4.6 (Compatibility Profile) Mesa 20.0.5",
-          "library-vendor" : "glvnd"
+          "library-vendor" : "glvnd",
+          "issues" : [ "cannot-load" ]
         },
         "egl_x11/glesv2" : {
           "renderer" : "AMD Radeon RX 5700 XT (NAVI10, DRM 3.36.0, 5.6.7-arch1-1, LLVM 10.0.0)",
           "version" : "OpenGL ES 3.2 Mesa 20.0.5",
-          "library-vendor" : "glvnd"
+          "library-vendor" : "glvnd",
+          "issues" : [ "cannot-load" ]
         }
       },
       "dri_drivers" : [

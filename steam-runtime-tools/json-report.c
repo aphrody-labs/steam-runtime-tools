@@ -710,7 +710,6 @@ SrtSteam *
 _srt_steam_get_from_report (JsonObject *json_obj)
 {
   JsonObject *json_sub_obj;
-  JsonArray *array;
   SrtSteamIssues issues = SRT_STEAM_ISSUES_UNKNOWN;
   const gchar *install_path = NULL;
   const gchar *data_path = NULL;
@@ -727,27 +726,10 @@ _srt_steam_get_from_report (JsonObject *json_obj)
       if (json_sub_obj == NULL)
         goto out;
 
-      if (json_object_has_member (json_sub_obj, "issues"))
-        {
-          issues = SRT_STEAM_ISSUES_NONE;
-          array = json_object_get_array_member (json_sub_obj, "issues");
-
-          /* We are expecting an array of issues here */
-          if (array == NULL)
-            {
-              g_debug ("'issues' in 'steam-installation' is not an array as expected");
-              issues |= SRT_STEAM_ISSUES_UNKNOWN;
-            }
-          else
-            {
-              for (guint i = 0; i < json_array_get_length (array); i++)
-                {
-                  const gchar *issue_string = json_array_get_string_element (array, i);
-                  if (!srt_add_flag_from_nick (SRT_TYPE_STEAM_ISSUES, issue_string, &issues, NULL))
-                    issues |= SRT_STEAM_ISSUES_UNKNOWN;
-                }
-            }
-        }
+      issues = srt_get_flags_from_json_array (SRT_TYPE_STEAM_ISSUES,
+                                              json_sub_obj,
+                                              "issues",
+                                              SRT_STEAM_ISSUES_UNKNOWN);
 
       install_path = json_object_get_string_member_with_default (json_sub_obj, "path", NULL);
       data_path = json_object_get_string_member_with_default (json_sub_obj, "data_path", NULL);

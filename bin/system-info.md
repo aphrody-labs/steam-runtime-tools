@@ -954,8 +954,11 @@ keys:
     :   A human-readable error message.
 
 **egl**
-:   An object describing EGL support. Currently the only key is
-    **icds**. Its value is an array of objects describing ICDs,
+:   An object describing EGL support. Currently the keys are
+    **icds** and **external_platforms**.
+    Their value is an array of objects describing ICDs
+    such as `libEGL_mesa.so.0` or external platforms
+    such as `libnvidia-egl-wayland.so.1`
     with the following keys and values:
 
     **json_path**

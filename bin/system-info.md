@@ -1005,9 +1005,14 @@ keys:
     **json_path**
     :   Absolute path to the JSON file describing the ICD
 
+    **ok**
+    :   If **true** no egl problems were found.
+        No other value is allowed:
+        if problems were found,
+        `issues` will be emitted instead.
+
     **issues**
     :   An array of strings representing problems with the ICD.
-        If empty, no problems were found.
 
         **unknown**
         :   There was an unknown, or internal, error while checking the ICD.

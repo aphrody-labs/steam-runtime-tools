@@ -348,7 +348,9 @@ get_driver_loadable_from_json_report (JsonObject *json_obj,
   portability_driver = json_object_get_boolean_member_with_default (json_obj,
                                                                     "is_portability_driver",
                                                                     FALSE);
-  if (which == SRT_TYPE_OPENXR_1_LAYER
+  if (which == SRT_TYPE_EGL_ICD
+      || which == SRT_TYPE_EGL_EXTERNAL_PLATFORM
+      || which == SRT_TYPE_OPENXR_1_LAYER
       || which == SRT_TYPE_OPENXR_1_RUNTIME)
     issues = _srt_json_object_get_issues_from_report (json_obj,
                                                       debug_member,

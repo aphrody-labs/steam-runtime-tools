@@ -1689,10 +1689,9 @@ main (int argc,
         }
 
       loadable_issues = srt_egl_icd_get_issues (icd_iter->data);
-      json_builder_set_member_name (builder, "issues");
-      json_builder_begin_array (builder);
-      jsonify_loadable_issues (builder, loadable_issues);
-      json_builder_end_array (builder);
+      jsonify_issues_or_no_issues (builder, SRT_TYPE_LOADABLE_ISSUES,
+                                   "issues", "ok",
+                                   loadable_issues);
 
       json_builder_end_object (builder);
     }
@@ -1734,10 +1733,9 @@ main (int argc,
         }
 
       loadable_issues = srt_egl_external_platform_get_issues (icd_iter->data);
-      json_builder_set_member_name (builder, "issues");
-      json_builder_begin_array (builder);
-      jsonify_loadable_issues (builder, loadable_issues);
-      json_builder_end_array (builder);
+      jsonify_issues_or_no_issues (builder, SRT_TYPE_LOADABLE_ISSUES,
+                                   "issues", "ok",
+                                   loadable_issues);
 
       json_builder_end_object (builder);
     }

@@ -177,7 +177,7 @@
         "json_origin" : "/home/me/.config/openxr/1/active_runtime.x86_64.json",
         "library_path" : "/usr/lib/libopenxr_monado.so",
         "name" : "Monado",
-        "issues" : []
+        "ok" : true
       }
     }
   },
@@ -271,13 +271,13 @@
         "library_path" : "../../../lib/libopenxr_monado.so",
         "dlopen" : "/usr/share/openxr/1/../../../lib/libopenxr_monado.so",
         "name" : "Monado",
-        "issues" : []
+        "ok" : true
       },
       "inactive" : [
         {
           "json_path" : "/etc/xdg/openxr/1/active_runtime.m68k.json",
           "library_path" : "/usr/lib/libopenxr_monado.so",
-          "issues" : []
+          "ok" : true
         }
       ]
     },
@@ -289,7 +289,7 @@
         "api_version": "1.1",
         "implementation_version": "1",
         "library_path": "libXrApiLayer_api_dump.so",
-        "issues" : []
+        "ok" : true
       }
     ],
     "implicit_layers" : [
@@ -302,7 +302,7 @@
         "implementation_version": "1.2.3",
         "library_path": "./libXrApiLayer_example.so",
         "dlopen": "/opt/openxr/./libXrApiLayer_example.so",
-        "issues" : []
+        "ok" : true
       }
     ]
   },

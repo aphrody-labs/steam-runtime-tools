@@ -1078,10 +1078,9 @@ fill_openxr_layer (JsonBuilder *builder,
     }
 
   loadable_issues = srt_openxr_1_layer_get_issues (layer);
-  json_builder_set_member_name (builder, "issues");
-  json_builder_begin_array (builder);
-  jsonify_loadable_issues (builder, loadable_issues);
-  json_builder_end_array (builder);
+  jsonify_issues_or_no_issues (builder, SRT_TYPE_LOADABLE_ISSUES,
+                               "issues", "ok",
+                               loadable_issues);
 }
 
 static void
@@ -1165,10 +1164,9 @@ print_openxr_1_runtime_details (JsonBuilder *builder,
     }
 
   loadable_issues = srt_openxr_1_runtime_get_issues (rt);
-  json_builder_set_member_name (builder, "issues");
-  json_builder_begin_array (builder);
-  jsonify_loadable_issues (builder, loadable_issues);
-  json_builder_end_array (builder);
+  jsonify_issues_or_no_issues (builder, SRT_TYPE_LOADABLE_ISSUES,
+                               "issues", "ok",
+                               loadable_issues);
 
   json_builder_end_object (builder);
 }

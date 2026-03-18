@@ -901,6 +901,12 @@ keys:
             for example `/etc/xdg/openxr/1/active_runtime.json`.
             Omitted if it would be the same as the **json_path**.
 
+       **ok**
+       :   If **true** no openxr-1-runtime problems were found.
+           No other value is allowed:
+           if problems were found,
+           `issues` will be emitted instead.
+
         **issues**
         :   An array of strings representing problems with the ICD,
             in the same representation documented for EGL ICDs.

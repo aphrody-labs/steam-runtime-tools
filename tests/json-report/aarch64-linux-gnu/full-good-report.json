@@ -227,7 +227,7 @@
         "library_path" : "/usr/lib/amdvlk64.so",
         "library_arch" : "64",
         "api_version" : "1.2.136",
-        "issues" : []
+        "ok" : true
       },
       {
         "json_path" : "/usr/share/vulkan/icd.d/amd_icd_partial.json",
@@ -247,7 +247,7 @@
         "api_version" : "1.1.73",
         "implementation_version": "1",
         "library_path" : "libVkLayer_MESA_overlay.so",
-        "issues" : []
+        "ok" : true
       }
     ],
     "implicit_layers" : [
@@ -259,7 +259,7 @@
         "api_version" : "1.2.135",
         "implementation_version": "1",
         "library_path" : "/usr/$LIB/libMangoHud.so",
-        "issues" : []
+        "ok" : true
       }
     ]
   },

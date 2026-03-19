@@ -886,9 +886,14 @@ keys:
         **error-domain**, **error-code**, **error**
         :   The same as documented for EGL ICDs.
 
+**locales-ok**
+:   If **true** no locale-related problems were found.
+    No other value is allowed:
+    if problems were found,
+    `locale-issues` will be emitted instead.
+
 **locale-issues**
 :   An array of strings indicating locale-related issues.
-    The array is empty if no problems were detected.
 
     **unknown** (or **internal-error** in older reports)
     :   There was an internal error while checking locale support.

@@ -400,7 +400,7 @@ _srt_locale_get_locale_from_report (JsonObject *json_obj,
  * If @json_obj has some elements that we can't parse,
  * %SRT_LOCALE_ISSUES_UNKNOWN will be added to the returned #SrtLocaleIssues.
  *
- * Returns: The %SrtLocaleIssues that has been found
+ * Returns: The #SrtLocaleIssues that has been found
  */
 SrtLocaleIssues
 _srt_locale_get_issues_from_report (JsonObject *json_obj)

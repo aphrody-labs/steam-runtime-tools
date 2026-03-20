@@ -1,3 +1,21 @@
+steam-runtime-tools (0.20260320.0) UNRELEASED; urgency=medium
+
+  [ Simon McVittie ]
+  * SteamLinuxRuntime_*:
+    - Avoid $PRESSURE_VESSEL_VARIABLE_DIR being inherited by the command
+      inside the container (steamrt/tasks#956)
+
+  [ Antonio Ospite ]
+  * Diagnostic tools:
+    - Provide clearer output if there are no locale issues to report
+      (steamrt/tasks#837)
+    - Refactoring
+    - Documentation fixes
+  * Tests:
+    - Improve coverage (steamrt/tasks#837)
+
+ -- Simon McVittie <smcv@collabora.com>  Fri, 20 Mar 2026 15:09:55 +0000
+
 steam-runtime-tools (0.20260313.0) steamrt; urgency=medium
 
   [ Simon McVittie ]

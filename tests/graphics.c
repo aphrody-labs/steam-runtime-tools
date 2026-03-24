@@ -3349,6 +3349,8 @@ typedef struct
   const gchar *sysroot;
   const gchar *vk_add_layer_path;
   const gchar *vk_layer_path;
+  const gchar *vk_add_implicit_layer_path;
+  const gchar *vk_implicit_layer_path;
   const gchar *home;
   const gchar *xdg_config_dirs;
   const gchar *xdg_data_dirs;
@@ -3362,6 +3364,7 @@ static const VulkanLayersTest vulkan_layers_test[] =
     .description = "Good single VK_LAYER_PATH dir",
     .sysroot = "debian10",
     .vk_layer_path = "/custom_path",
+    .vk_implicit_layer_path = "/custom_implicit",
     .explicit_layers =
     {
       {
@@ -3379,22 +3382,14 @@ static const VulkanLayersTest vulkan_layers_test[] =
         .json_to_compare = "custom_path/Single-good-layer.json",
       },
     },
-    /* Implicit layers are not affected by VK_LAYER_PATH env */
     .implicit_layers =
     {
       {
-        .name = "VK_LAYER_first",
-        .description = "Vulkan first layer",
-        .library_path = "libFirst.so",
+        .name = "VK_LAYER_custom",
+        .description = "Vulkan implicit layer in custom path",
+        .library_path = "libCustom.so",
         .api_version = "1.0.13",
-        .json_to_compare = "expectations/MultiLayers_part1.json",
-      },
-      {
-        .name = "VK_LAYER_second",
-        .description = "Vulkan second layer",
-        .library_path = "libSecond.so",
-        .api_version = "1.0.13",
-        .json_to_compare = "expectations/MultiLayers_part2.json",
+        .json_to_compare = "custom_implicit/implicit.json",
       },
     },
   },
@@ -3405,6 +3400,7 @@ static const VulkanLayersTest vulkan_layers_test[] =
     .home = "/home/debian",
     .xdg_config_dirs = "/usr/local/etc:::",
     .vk_add_layer_path = "/custom_path",
+    .vk_add_implicit_layer_path = "/custom_implicit",
     .explicit_layers =
     {
       /* VK_ADD_LAYER_PATH is searched before the default search path */
@@ -3432,6 +3428,13 @@ static const VulkanLayersTest vulkan_layers_test[] =
     },
     .implicit_layers =
     {
+      {
+        .name = "VK_LAYER_custom",
+        .description = "Vulkan implicit layer in custom path",
+        .library_path = "libCustom.so",
+        .api_version = "1.0.13",
+        .json_to_compare = "custom_implicit/implicit.json",
+      },
       {
         .name = "VK_LAYER_VALVE_steam_overlay_64",
         .description = "Steam Overlay Layer",
@@ -3730,6 +3733,12 @@ test_layer_vulkan (Fixture *f,
       vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
                                                 "VK_ADD_LAYER_PATH",
                                                 test->vk_add_layer_path);
+      vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
+                                                "VK_IMPLICIT_LAYER_PATH",
+                                                test->vk_implicit_layer_path);
+      vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
+                                                "VK_ADD_IMPLICIT_LAYER_PATH",
+                                                test->vk_add_implicit_layer_path);
       vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
                                                 "HOME", test->home);
       vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,

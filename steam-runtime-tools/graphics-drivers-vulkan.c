@@ -1489,16 +1489,16 @@ _srt_load_vulkan_layers_extended (SrtSysroot *sysroot,
     suffix = _SRT_GRAPHICS_IMPLICIT_VULKAN_LAYER_SUFFIX;
 
   envp = _srt_subprocess_runner_get_environ (runner);
-  value = _srt_environ_getenv (envp, "VK_LAYER_PATH");
 
-  /* As in the Vulkan-Loader implementation, implicit layers are not
-   * overridden by "VK_LAYER_PATH"
-   * https://github.com/KhronosGroup/Vulkan-Loader/blob/v1.3.207/docs/LoaderApplicationInterface.md#forcing-layer-source-folders
-   */
-  if (value != NULL && explicit)
+  if (explicit)
+    value = _srt_environ_getenv (envp, "VK_LAYER_PATH");
+  else
+    value = _srt_environ_getenv (envp, "VK_IMPLICIT_LAYER_PATH");
+
+  if (value != NULL)
     {
       g_auto(GStrv) dirs = g_strsplit (value, G_SEARCHPATH_SEPARATOR_S, -1);
-      g_debug ("Vulkan explicit layer search path overridden to: %s", value);
+      g_debug ("Vulkan layer search path overridden to: %s", value);
       load_json_dirs (sysroot, _srt_const_strv (dirs), NULL,
                       _srt_indirect_strcmp0, vulkan_layer_load_json_cb, &ret);
     }
@@ -1508,11 +1508,13 @@ _srt_load_vulkan_layers_extended (SrtSysroot *sysroot,
 
       if (explicit)
         add = _srt_environ_getenv (envp, "VK_ADD_LAYER_PATH");
+      else
+        add = _srt_environ_getenv (envp, "VK_ADD_IMPLICIT_LAYER_PATH");
 
       if (add != NULL)
         {
           g_auto(GStrv) dirs = g_strsplit (add, G_SEARCHPATH_SEPARATOR_S, -1);
-          g_debug ("Vulkan additional explicit layer search path: %s", add);
+          g_debug ("Vulkan additional layer search path: %s", add);
           load_json_dirs (sysroot, _srt_const_strv (dirs), NULL,
                           _srt_indirect_strcmp0, vulkan_layer_load_json_cb,
                           &ret);

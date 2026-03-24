@@ -7820,6 +7820,21 @@ check_path_entries_all_in_dir (const char *path,
 
 #define OPENXR_1_RUNTIME_OVERRIDES_PREFIX "etc/xdg"
 
+/*
+ * Set @var to @val in @overlay, except that if @val has a length of
+ * zero, mark @var to be unset instead.
+ */
+static void
+env_overlay_set_unset_zero_length (SrtEnvOverlay *overlay,
+                                   const char *var,
+                                   const GString *val)
+{
+  if (val->len != 0)
+    _srt_env_overlay_set (overlay, var, val->str);
+  else
+    _srt_env_overlay_set (overlay, var, NULL);
+}
+
 static gboolean
 pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                         FlatpakBwrap *bwrap,
@@ -8417,55 +8432,38 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
         }
     }
 
-  if (dri_path->len != 0)
-    {
-      _srt_env_overlay_set (container_env, "LIBGL_DRIVERS_PATH", dri_path->str);
-      _srt_env_overlay_set (container_env, "LIBVA_DRIVERS_PATH", dri_path->str);
-    }
-  else
-    {
-      _srt_env_overlay_set (container_env, "LIBGL_DRIVERS_PATH", NULL);
-      _srt_env_overlay_set (container_env, "LIBVA_DRIVERS_PATH", NULL);
-    }
+  env_overlay_set_unset_zero_length (container_env,
+                                     "LIBGL_DRIVERS_PATH",
+                                     dri_path);
+  env_overlay_set_unset_zero_length (container_env,
+                                     "LIBVA_DRIVERS_PATH",
+                                     dri_path);
+  env_overlay_set_unset_zero_length (container_env,
+                                     "GBM_BACKENDS_PATH",
+                                     gbm_path);
 
-  if (gbm_path->len != 0)
-    _srt_env_overlay_set (container_env, "GBM_BACKENDS_PATH", gbm_path->str);
-  else
-    _srt_env_overlay_set (container_env, "GBM_BACKENDS_PATH", NULL);
-
-  if (egl_path->len != 0)
-    _srt_env_overlay_set (container_env, "__EGL_VENDOR_LIBRARY_FILENAMES",
-                          egl_path->str);
-  else
-    _srt_env_overlay_set (container_env, "__EGL_VENDOR_LIBRARY_FILENAMES",
-                          NULL);
-
+  env_overlay_set_unset_zero_length (container_env,
+                                     "__EGL_VENDOR_LIBRARY_FILENAMES",
+                                     egl_path);
+  /* Unset so __EGL_VENDOR_LIBRARY_FILENAMES will be used instead */
   _srt_env_overlay_set (container_env, "__EGL_VENDOR_LIBRARY_DIRS", NULL);
 
-  if (egl_ext_platform_path->len != 0)
-    _srt_env_overlay_set (container_env, "__EGL_EXTERNAL_PLATFORM_CONFIG_FILENAMES",
-                          egl_ext_platform_path->str);
-  else
-    _srt_env_overlay_set (container_env, "__EGL_EXTERNAL_PLATFORM_CONFIG_FILENAMES",
-                          NULL);
-
+  env_overlay_set_unset_zero_length (container_env,
+                                     "__EGL_EXTERNAL_PLATFORM_CONFIG_FILENAMES",
+                                     egl_ext_platform_path);
   _srt_env_overlay_set (container_env, "__EGL_EXTERNAL_PLATFORM_CONFIG_DIRS", NULL);
 
-  if (vulkan_path->len != 0)
-    {
-      /* VK_ICD_FILENAMES is deprecated, VK_DRIVER_FILES takes precedence.
-       * Until all branches of the Steam Runtime have a Vulkan-Loader
-       * that supports VK_DRIVER_FILES, we need to set both:
-       * old Vulkan-Loader versions will use the old variable, while new
-       * versions will use the new one. */
-      _srt_env_overlay_set (container_env, "VK_DRIVER_FILES", vulkan_path->str);
-      _srt_env_overlay_set (container_env, "VK_ICD_FILENAMES", vulkan_path->str);
-    }
-  else
-    {
-      _srt_env_overlay_set (container_env, "VK_ICD_FILENAMES", NULL);
-      _srt_env_overlay_set (container_env, "VK_DRIVER_FILES", NULL);
-    }
+  env_overlay_set_unset_zero_length (container_env,
+                                     "VK_DRIVER_FILES",
+                                     vulkan_path);
+  /* VK_ICD_FILENAMES is deprecated, VK_DRIVER_FILES takes precedence.
+   * Until all branches of the Steam Runtime have a Vulkan-Loader
+   * that supports VK_DRIVER_FILES, we need to set both:
+   * old Vulkan-Loader versions will use the old variable, while new
+   * versions will use the new one. */
+  env_overlay_set_unset_zero_length (container_env,
+                                     "VK_ICD_FILENAMES",
+                                     vulkan_path);
 
   /* Setting VK_DRIVER_FILES now disables this, but that wasn't the case
    * in Vulkan-Loader 1.3.207, and it seems clearer if we unset it anyway. */

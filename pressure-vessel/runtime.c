@@ -8515,7 +8515,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                             override_share,
                                             _SRT_GRAPHICS_EXPLICIT_VULKAN_LAYER_SUFFIX);
           env_overlay_set_common_directory (container_env,
-                                            NULL,
+                                            "VK_IMPLICIT_LAYER_PATH",
                                             vulkan_imp_layer_path,
                                             override_share,
                                             _SRT_GRAPHICS_IMPLICIT_VULKAN_LAYER_SUFFIX);
@@ -8537,10 +8537,12 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
       else
         {
           _srt_env_overlay_set (container_env, "VK_LAYER_PATH", NULL);
+          _srt_env_overlay_set (container_env, "VK_IMPLICIT_LAYER_PATH", NULL);
           _srt_env_overlay_set (container_env, "XR_API_LAYER_PATH", NULL);
         }
 
       _srt_env_overlay_set (container_env, "VK_ADD_LAYER_PATH", NULL);
+      _srt_env_overlay_set (container_env, "VK_ADD_IMPLICIT_LAYER_PATH", NULL);
     }
 
   if (self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)

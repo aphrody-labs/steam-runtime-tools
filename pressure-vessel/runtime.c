@@ -7790,20 +7790,34 @@ pv_runtime_prepend_to_xdg_dirs (PvRuntime *self,
   _srt_env_overlay_set (container_env, var, prepended_dirs);
 }
 
-/* Log a warning if any colon-delimited entry in @path is not in
- * ${prefix}/${suffix}. */
+/* Set @var to ${prefix}/${suffix}, assumed to be the common prefix of
+ * all colon-delimited entries in @path.
+ *
+ * If any colon-delimited entry in @path is not in
+ * ${prefix}/${suffix}, log a warning.
+ *
+ * If @var is null, don't set anything but still do the checks.
+ *
+ * If @path is empty, mark @var to be unset instead. */
 static void
-check_path_entries_all_in_dir (const char *path,
-                               const char *prefix,
-                               const char *suffix)
+env_overlay_set_common_directory (SrtEnvOverlay *container_env,
+                                  const char *var,
+                                  const GString *path,
+                                  const char *prefix,
+                                  const char *suffix)
 {
   g_autofree char *dir = g_build_filename (prefix, suffix, NULL);
   g_auto(GStrv) entries = NULL;
 
-  if (path == NULL || *path == '\0')
-    return;
+  if (path->len == 0)
+    {
+      if (var != NULL)
+        _srt_env_overlay_set (container_env, var, NULL);
 
-  entries = g_strsplit (path, ":", -1);
+      return;
+    }
+
+  entries = g_strsplit (path->str, ":", -1);
 
   if (entries == NULL)
     return;
@@ -7816,6 +7830,9 @@ check_path_entries_all_in_dir (const char *path,
           || strstr (after, "/") != NULL)
         g_critical ("%s is not in %s", entries[i], dir);
     }
+
+  if (var != NULL)
+    _srt_env_overlay_set (container_env, var, dir);
 }
 
 #define OPENXR_1_RUNTIME_OVERRIDES_PREFIX "etc/xdg"
@@ -8488,26 +8505,40 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
             g_build_filename (self->overrides_in_container, "share", NULL);
 
           /* We are relying here on setup_json_manifest() having generated
-           * all the layers' JSON manifests in the same directory. */
-          check_path_entries_all_in_dir (vulkan_exp_layer_path->str,
-                                         override_share,
-                                         _SRT_GRAPHICS_EXPLICIT_VULKAN_LAYER_SUFFIX);
-          check_path_entries_all_in_dir (vulkan_imp_layer_path->str,
-                                         override_share,
-                                         _SRT_GRAPHICS_IMPLICIT_VULKAN_LAYER_SUFFIX);
-          check_path_entries_all_in_dir (openxr_1_exp_layer_path->str,
-                                         override_share,
-                                         _SRT_GRAPHICS_OPENXR_1_EXPLICIT_LAYER_SUFFIX);
-          check_path_entries_all_in_dir (openxr_1_imp_layer_path->str,
-                                         override_share,
-                                         _SRT_GRAPHICS_OPENXR_1_IMPLICIT_LAYER_SUFFIX);
+           * all the layers' JSON manifests in the same directory.
+           * Where possible, we might as well set the environment
+           * variable to tell the loader more explicitly where to look,
+           * rather than using the indirection through XDG_DATA_DIRS. */
+          env_overlay_set_common_directory (container_env,
+                                            "VK_LAYER_PATH",
+                                            vulkan_exp_layer_path,
+                                            override_share,
+                                            _SRT_GRAPHICS_EXPLICIT_VULKAN_LAYER_SUFFIX);
+          env_overlay_set_common_directory (container_env,
+                                            NULL,
+                                            vulkan_imp_layer_path,
+                                            override_share,
+                                            _SRT_GRAPHICS_IMPLICIT_VULKAN_LAYER_SUFFIX);
+          env_overlay_set_common_directory (container_env,
+                                            "XR_API_LAYER_PATH",
+                                            openxr_1_exp_layer_path,
+                                            override_share,
+                                            _SRT_GRAPHICS_OPENXR_1_EXPLICIT_LAYER_SUFFIX);
+          env_overlay_set_common_directory (container_env,
+                                            NULL,
+                                            openxr_1_imp_layer_path,
+                                            override_share,
+                                            _SRT_GRAPHICS_OPENXR_1_IMPLICIT_LAYER_SUFFIX);
+
           pv_runtime_prepend_to_xdg_dirs (self, container_env, override_share,
                                           "XDG_DATA_DIRS",
                                           "/usr/local/share:/usr/share");
         }
-
-      _srt_env_overlay_set (container_env, "VK_LAYER_PATH", NULL);
-      _srt_env_overlay_set (container_env, "XR_API_LAYER_PATH", NULL);
+      else
+        {
+          _srt_env_overlay_set (container_env, "VK_LAYER_PATH", NULL);
+          _srt_env_overlay_set (container_env, "XR_API_LAYER_PATH", NULL);
+        }
     }
 
   if (self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
@@ -8518,11 +8549,14 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
            g_build_filename (self->overrides_in_container,
                              OPENXR_1_RUNTIME_OVERRIDES_PREFIX, NULL);
 
-          /* We are relying here on setup_json_manifest() having generated
-           * all the JSON manifests in the same directory. */
-          check_path_entries_all_in_dir (openxr_1_runtime_path->str,
-                                         override_config,
-                                         _SRT_GRAPHICS_OPENXR_1_RUNTIME_SUFFIX);
+          /* There's no environment variable for this,
+           * but we should still check that every runtime is in the
+           * same directory we expect to have used */
+          env_overlay_set_common_directory (container_env,
+                                            NULL,
+                                            openxr_1_runtime_path,
+                                            override_config,
+                                            _SRT_GRAPHICS_OPENXR_1_RUNTIME_SUFFIX);
           pv_runtime_prepend_to_xdg_dirs (self, container_env, override_config,
                                           "XDG_CONFIG_DIRS", "/etc/xdg");
         }

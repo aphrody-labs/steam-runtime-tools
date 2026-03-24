@@ -5102,9 +5102,12 @@ get_manifest_relative_to_overrides (PvRuntime *self,
 {
   /* For layers, we know that the filename doesn't matter - choice
    * of layers is based on manifest["layer"]["name"] - but we have
-   * to make sure they're all unique and in the same directory,
-   * because there is no equivalent of VK_DRIVER_FILES or
-   * VK_LAYER_PATH for implicit layers, so the only thing we can
+   * to make sure they're all unique and in the same directory.
+   * This is because OpenXR has no equivalent of XR_API_LAYER_PATH for
+   * implicit layers,
+   * and similarly Vulkan-Loader before 1.3.296 didn't have
+   * VK_IMPLICIT_LAYER_PATH (and we can't rely on having a version that new).
+   * This means that the only thing we can
    * do is to add our directory to XDG_DATA_DIRS. Because we have
    * to do this for implicit layers anyway, for simplicity we do
    * the same thing for explicit layers. */
@@ -8471,11 +8474,13 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   if (self->flags & (PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS
                      | PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_LAYERS))
     {
-      /* Implicit layers are not affected by "VK_LAYER_PATH". So instead of using
-       * this environment variable, we prepend our "/overrides/share" to
+      /* OpenXR has no equivalent of XR_API_LAYER_PATH for implicit layers,
+       * and similarly in Vulkan,
+       * VK_IMPLICIT_LAYER_PATH wasn't implemented until Vulkan-Loader
+       * 1.3.296 which we can't guarantee to have. So instead of relying on
+       * these environment variables, we prepend our "/overrides/share" to
        * "XDG_DATA_DIRS" to cover any explicit and implicit layers that we may
-       * have.
-       * OpenXR implicit layers follow a similar pattern. */
+       * have. */
       if (vulkan_exp_layer_path->len != 0
           || vulkan_imp_layer_path->len != 0
           || openxr_1_exp_layer_path->len != 0

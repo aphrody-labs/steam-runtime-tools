@@ -8539,6 +8539,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
           _srt_env_overlay_set (container_env, "VK_LAYER_PATH", NULL);
           _srt_env_overlay_set (container_env, "XR_API_LAYER_PATH", NULL);
         }
+
+      _srt_env_overlay_set (container_env, "VK_ADD_LAYER_PATH", NULL);
     }
 
   if (self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)

@@ -60,6 +60,21 @@ typedef struct
   gchar **fake_icds_envp;
 } Fixture;
 
+/*
+ * Same as g_environ_setenv() with @overwrite set to %TRUE,
+ * except that if @value is %NULL then @var is unset instead.
+ */
+static GStrv
+environ_set_or_unset (GStrv envp,
+                      const char *var,
+                      const char *value)
+{
+  if (value == NULL)
+    return g_environ_unsetenv (envp, var);
+  else
+    return g_environ_setenv (envp, var, value, TRUE);
+}
+
 typedef enum
 {
   ICD_MODE_NORMAL,
@@ -3709,38 +3724,20 @@ test_layer_vulkan (Fixture *f,
 
       vulkan_layer_envp = g_environ_setenv (vulkan_layer_envp, "SRT_TEST_SYSROOT",
                                             sysroot, TRUE);
-
-      if (test->vk_layer_path == NULL)
-        vulkan_layer_envp = g_environ_unsetenv (vulkan_layer_envp, "VK_LAYER_PATH");
-      else
-        vulkan_layer_envp = g_environ_setenv (vulkan_layer_envp,
-                                              "VK_LAYER_PATH", test->vk_layer_path,
-                                              TRUE);
-
-      if (test->vk_add_layer_path == NULL)
-        vulkan_layer_envp = g_environ_unsetenv (vulkan_layer_envp, "VK_ADD_LAYER_PATH");
-      else
-        vulkan_layer_envp = g_environ_setenv (vulkan_layer_envp,
-                                              "VK_ADD_LAYER_PATH", test->vk_add_layer_path,
-                                              TRUE);
-
-      if (test->home == NULL)
-        vulkan_layer_envp = g_environ_unsetenv (vulkan_layer_envp, "HOME");
-      else
-        vulkan_layer_envp = g_environ_setenv (vulkan_layer_envp,
-                                              "HOME", test->home, TRUE);
-
-      if (test->xdg_config_dirs == NULL)
-        vulkan_layer_envp = g_environ_unsetenv (vulkan_layer_envp, "XDG_CONFIG_DIRS");
-      else
-        vulkan_layer_envp = g_environ_setenv (vulkan_layer_envp,
-                                              "XDG_CONFIG_DIRS", test->xdg_config_dirs, TRUE);
-
-      if (test->xdg_data_dirs == NULL)
-        vulkan_layer_envp = g_environ_unsetenv (vulkan_layer_envp, "XDG_DATA_DIRS");
-      else
-        vulkan_layer_envp = g_environ_setenv (vulkan_layer_envp,
-                                              "XDG_DATA_DIRS", test->xdg_data_dirs, TRUE);
+      vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
+                                                "VK_LAYER_PATH",
+                                                test->vk_layer_path);
+      vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
+                                                "VK_ADD_LAYER_PATH",
+                                                test->vk_add_layer_path);
+      vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
+                                                "HOME", test->home);
+      vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
+                                                "XDG_CONFIG_DIRS",
+                                                test->xdg_config_dirs);
+      vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
+                                                "XDG_DATA_DIRS",
+                                                test->xdg_data_dirs);
 
       info = srt_system_info_new (NULL);
       g_assert_nonnull (info);

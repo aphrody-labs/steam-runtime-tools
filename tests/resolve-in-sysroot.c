@@ -99,6 +99,7 @@ typedef enum
 {
   RESOLVE_CALL_FLAGS_IGNORE_PATH = (1 << 0),
   RESOLVE_CALL_FLAGS_SKIP_IF_DIRECT = (1 << 1),
+  RESOLVE_CALL_FLAGS_CANNOT_CHASE = (1 << 2),
   RESOLVE_CALL_FLAGS_NONE = 0
 } ResolveCallFlags;
 
@@ -173,15 +174,18 @@ test_resolve_in_sysroot (Fixture *f,
     { { "a/b/c/file", SRT_RESOLVE_FLAGS_READABLE }, { "a/b/c/file" } },
     { { "a/b/c/file/" }, { NULL, G_IO_ERROR_NOT_DIRECTORY }},
     {
-      { "a/b/c/file", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE },
+      /* glnx_chaseat() doesn't implement MUST_BE_EXECUTABLE */
+      { "a/b/c/file", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE, RESOLVE_CALL_FLAGS_CANNOT_CHASE },
       { NULL, G_IO_ERROR_FAILED }
     },
     {
-      { "a/b/c/exe", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE },
+      /* glnx_chaseat() doesn't implement MUST_BE_EXECUTABLE */
+      { "a/b/c/exe", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE, RESOLVE_CALL_FLAGS_CANNOT_CHASE },
       { "a/b/c/exe" }
     },
     {
-      { "a/b/c/d", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE },
+      /* glnx_chaseat() doesn't implement MUST_BE_EXECUTABLE */
+      { "a/b/c/d", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE, RESOLVE_CALL_FLAGS_CANNOT_CHASE },
       { "a/b/c/d" }
     },
     {
@@ -193,7 +197,10 @@ test_resolve_in_sysroot (Fixture *f,
       { NULL, G_IO_ERROR_NOT_DIRECTORY }
     },
     {
-      { "a/b/c/file", SRT_RESOLVE_FLAGS_MKDIR_P },
+      /* glnx_chaseat() doesn't implement MKDIR_P, and unlike the other
+       * uses of MKDIR_P here, _srt_resolve_in_sysroot() won't create the
+       * directory in this case */
+      { "a/b/c/file", SRT_RESOLVE_FLAGS_MKDIR_P, RESOLVE_CALL_FLAGS_CANNOT_CHASE },
       { NULL, G_IO_ERROR_NOT_DIRECTORY }
     },
     {
@@ -245,7 +252,10 @@ test_resolve_in_sysroot (Fixture *f,
     {
       {
         "a/b/symlink_to_itself",
-        SRT_RESOLVE_FLAGS_KEEP_FINAL_SYMLINK|SRT_RESOLVE_FLAGS_READABLE
+        SRT_RESOLVE_FLAGS_KEEP_FINAL_SYMLINK|SRT_RESOLVE_FLAGS_READABLE,
+        /* glnx_chaseat() doesn't implement READABLE,
+         * but glnx_fd_reopen() would fail with TOO_MANY_LINKS */
+        RESOLVE_CALL_FLAGS_CANNOT_CHASE,
       },
       { NULL, G_IO_ERROR_TOO_MANY_LINKS },
     },
@@ -350,10 +360,12 @@ test_resolve_in_sysroot (Fixture *f,
     {
       const ResolveTest *it = &tests[i];
       glnx_autofd int fd = -1;
+      glnx_autofd int chased_fd = -1;
       g_autofree gchar *path = NULL;
       g_autofree gchar *path_prefix = NULL;
       g_autofree gchar *in_path = NULL;
       gchar **out_path;
+      g_autoptr(GError) chase_error = NULL;
       g_autoptr(GString) description = g_string_new ("");
       g_autoptr(SrtSysroot) sysroot = NULL;
       TestsOpenFdSet old_fds;
@@ -431,6 +443,59 @@ test_resolve_in_sysroot (Fixture *f,
                                   out_path, &error);
         }
 
+      if (fd >= 0)
+        g_test_message ("-> resolved successfully");
+      else
+        g_test_message ("-> could not resolve: %s #%d: %s",
+                        g_quark_to_string (error->domain), error->code, error->message);
+
+      if (it->call.test_flags & RESOLVE_CALL_FLAGS_CANNOT_CHASE)
+        {
+          g_test_message ("Skip glnx_chaseat(): unimplementable");
+        }
+      else
+        {
+          GlnxChaseFlags chase_flags = GLNX_CHASE_RESOLVE_IN_ROOT;
+
+          /* Ignore SRT_RESOLVE_FLAGS_MKDIR_P: there is no direct equivalent,
+           * but we call _srt_resolve_in_sysroot first, so the directory
+           * would already have been created */
+
+          if (it->call.flags & SRT_RESOLVE_FLAGS_KEEP_FINAL_SYMLINK)
+            chase_flags |= GLNX_CHASE_NOFOLLOW;
+
+          if (it->call.flags & SRT_RESOLVE_FLAGS_REJECT_SYMLINKS)
+            chase_flags |= GLNX_CHASE_RESOLVE_NO_SYMLINKS;
+
+          /* Ignore SRT_RESOLVE_FLAGS_READABLE: there is no direct equivalent,
+           * but we can use glnx_fd_reopen() */
+
+          if (it->call.flags & SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY)
+            chase_flags |= GLNX_CHASE_MUST_BE_DIRECTORY;
+
+          if (it->call.flags & SRT_RESOLVE_FLAGS_MUST_BE_REGULAR)
+            chase_flags |= GLNX_CHASE_MUST_BE_REGULAR;
+
+          /* Ignore SRT_RESOLVE_FLAGS_RETURN_ABSOLUTE: no direct equivalent,
+           * glnx_chaseat() doesn't output the resolved path at all */
+
+          /* No direct equivalent, use fstat() */
+          if (it->call.flags & SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE)
+            g_assert_not_reached ();
+
+          chased_fd = glnx_chaseat (sysroot->fd, in_path, chase_flags,
+                                    &chase_error);
+
+          if (fd >= 0)
+            g_test_message ("-> resolved successfully via glnx_chaseat()");
+          else
+            g_test_message ("-> could not resolve: %s #%d: %s (via glnx_chaseat())",
+                            g_quark_to_string (chase_error->domain),
+                            chase_error->code,
+                            chase_error->message);
+
+        }
+
       if (it->expect.path != NULL)
         {
           const char *rel_path;
@@ -488,6 +553,13 @@ test_resolve_in_sysroot (Fixture *f,
             }
 
           check_fd_same_as_rel_path_nofollow (fd, tmpdir.fd, rel_path);
+
+          if (!(it->call.test_flags & RESOLVE_CALL_FLAGS_CANNOT_CHASE))
+            {
+              g_assert_no_error (chase_error);
+              g_assert_cmpint (chased_fd, >=, 0);
+              check_fd_same_as_rel_path_nofollow (chased_fd, tmpdir.fd, rel_path);
+            }
         }
       else
         {
@@ -503,16 +575,26 @@ test_resolve_in_sysroot (Fixture *f,
               g_assert_error (error, G_IO_ERROR, it->expect.code);
             }
 
-          g_test_message ("Got error as expected: %s", error->message);
+          g_test_message ("Got error as expected");
           g_assert_cmpint (fd, ==, -1);
 
           if (out_path != NULL)
             g_assert_cmpstr (*out_path, ==, NULL);
 
           g_clear_error (&error);
+
+          if (!(it->call.test_flags & RESOLVE_CALL_FLAGS_CANNOT_CHASE))
+            {
+              g_assert_nonnull (chase_error);
+              g_assert_cmpstr (g_quark_to_string (chase_error->domain), ==,
+                               g_quark_to_string (G_IO_ERROR));
+              g_assert_cmpint (chased_fd, ==, -1);
+              g_test_message ("Also got error from chase as expected");
+            }
         }
 
       glnx_close_fd (&fd);
+      glnx_close_fd (&chased_fd);
       g_clear_object (&sysroot);
       tests_check_fd_leaks_leave (old_fds);
     }

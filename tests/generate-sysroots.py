@@ -82,6 +82,7 @@ for abi in supported_abis:
 
 dirs = dirs + '''
 debian10/custom_path
+debian10/custom_implicit
 debian10/expectations
 debian10/home/debian/.local/share/vulkan/implicit_layer.d
 debian10/usr/local/etc/vulkan/explicit_layer.d
@@ -457,6 +458,22 @@ with open('debian10/custom_path/Single-good-layer.json', 'w') as writer:
     }
   }
 }''')       # noqa
+
+with open(
+    'debian10/custom_implicit/implicit.json', 'w'
+) as writer:
+    writer.write('''\
+{
+  "file_format_version" : "1.0.1",
+  "layer" : {
+    "name" : "VK_LAYER_custom",
+    "type" : "INSTANCE",
+    "library_path" : "libCustom.so",
+    "api_version" : "1.0.13",
+    "implementation_version" : "1",
+    "description" : "Vulkan implicit layer in custom path"
+  }
+}''')
 
 with open('debian10/expectations/MultiLayers_part1.json', 'w') as writer:
     writer.write('''\

@@ -60,6 +60,21 @@ typedef struct
   gchar **fake_icds_envp;
 } Fixture;
 
+/*
+ * Same as g_environ_setenv() with @overwrite set to %TRUE,
+ * except that if @value is %NULL then @var is unset instead.
+ */
+static GStrv
+environ_set_or_unset (GStrv envp,
+                      const char *var,
+                      const char *value)
+{
+  if (value == NULL)
+    return g_environ_unsetenv (envp, var);
+  else
+    return g_environ_setenv (envp, var, value, TRUE);
+}
+
 typedef enum
 {
   ICD_MODE_NORMAL,
@@ -3334,6 +3349,8 @@ typedef struct
   const gchar *sysroot;
   const gchar *vk_add_layer_path;
   const gchar *vk_layer_path;
+  const gchar *vk_add_implicit_layer_path;
+  const gchar *vk_implicit_layer_path;
   const gchar *home;
   const gchar *xdg_config_dirs;
   const gchar *xdg_data_dirs;
@@ -3347,6 +3364,7 @@ static const VulkanLayersTest vulkan_layers_test[] =
     .description = "Good single VK_LAYER_PATH dir",
     .sysroot = "debian10",
     .vk_layer_path = "/custom_path",
+    .vk_implicit_layer_path = "/custom_implicit",
     .explicit_layers =
     {
       {
@@ -3364,22 +3382,14 @@ static const VulkanLayersTest vulkan_layers_test[] =
         .json_to_compare = "custom_path/Single-good-layer.json",
       },
     },
-    /* Implicit layers are not affected by VK_LAYER_PATH env */
     .implicit_layers =
     {
       {
-        .name = "VK_LAYER_first",
-        .description = "Vulkan first layer",
-        .library_path = "libFirst.so",
+        .name = "VK_LAYER_custom",
+        .description = "Vulkan implicit layer in custom path",
+        .library_path = "libCustom.so",
         .api_version = "1.0.13",
-        .json_to_compare = "expectations/MultiLayers_part1.json",
-      },
-      {
-        .name = "VK_LAYER_second",
-        .description = "Vulkan second layer",
-        .library_path = "libSecond.so",
-        .api_version = "1.0.13",
-        .json_to_compare = "expectations/MultiLayers_part2.json",
+        .json_to_compare = "custom_implicit/implicit.json",
       },
     },
   },
@@ -3390,6 +3400,7 @@ static const VulkanLayersTest vulkan_layers_test[] =
     .home = "/home/debian",
     .xdg_config_dirs = "/usr/local/etc:::",
     .vk_add_layer_path = "/custom_path",
+    .vk_add_implicit_layer_path = "/custom_implicit",
     .explicit_layers =
     {
       /* VK_ADD_LAYER_PATH is searched before the default search path */
@@ -3417,6 +3428,13 @@ static const VulkanLayersTest vulkan_layers_test[] =
     },
     .implicit_layers =
     {
+      {
+        .name = "VK_LAYER_custom",
+        .description = "Vulkan implicit layer in custom path",
+        .library_path = "libCustom.so",
+        .api_version = "1.0.13",
+        .json_to_compare = "custom_implicit/implicit.json",
+      },
       {
         .name = "VK_LAYER_VALVE_steam_overlay_64",
         .description = "Steam Overlay Layer",
@@ -3709,38 +3727,26 @@ test_layer_vulkan (Fixture *f,
 
       vulkan_layer_envp = g_environ_setenv (vulkan_layer_envp, "SRT_TEST_SYSROOT",
                                             sysroot, TRUE);
-
-      if (test->vk_layer_path == NULL)
-        vulkan_layer_envp = g_environ_unsetenv (vulkan_layer_envp, "VK_LAYER_PATH");
-      else
-        vulkan_layer_envp = g_environ_setenv (vulkan_layer_envp,
-                                              "VK_LAYER_PATH", test->vk_layer_path,
-                                              TRUE);
-
-      if (test->vk_add_layer_path == NULL)
-        vulkan_layer_envp = g_environ_unsetenv (vulkan_layer_envp, "VK_ADD_LAYER_PATH");
-      else
-        vulkan_layer_envp = g_environ_setenv (vulkan_layer_envp,
-                                              "VK_ADD_LAYER_PATH", test->vk_add_layer_path,
-                                              TRUE);
-
-      if (test->home == NULL)
-        vulkan_layer_envp = g_environ_unsetenv (vulkan_layer_envp, "HOME");
-      else
-        vulkan_layer_envp = g_environ_setenv (vulkan_layer_envp,
-                                              "HOME", test->home, TRUE);
-
-      if (test->xdg_config_dirs == NULL)
-        vulkan_layer_envp = g_environ_unsetenv (vulkan_layer_envp, "XDG_CONFIG_DIRS");
-      else
-        vulkan_layer_envp = g_environ_setenv (vulkan_layer_envp,
-                                              "XDG_CONFIG_DIRS", test->xdg_config_dirs, TRUE);
-
-      if (test->xdg_data_dirs == NULL)
-        vulkan_layer_envp = g_environ_unsetenv (vulkan_layer_envp, "XDG_DATA_DIRS");
-      else
-        vulkan_layer_envp = g_environ_setenv (vulkan_layer_envp,
-                                              "XDG_DATA_DIRS", test->xdg_data_dirs, TRUE);
+      vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
+                                                "VK_LAYER_PATH",
+                                                test->vk_layer_path);
+      vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
+                                                "VK_ADD_LAYER_PATH",
+                                                test->vk_add_layer_path);
+      vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
+                                                "VK_IMPLICIT_LAYER_PATH",
+                                                test->vk_implicit_layer_path);
+      vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
+                                                "VK_ADD_IMPLICIT_LAYER_PATH",
+                                                test->vk_add_implicit_layer_path);
+      vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
+                                                "HOME", test->home);
+      vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
+                                                "XDG_CONFIG_DIRS",
+                                                test->xdg_config_dirs);
+      vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
+                                                "XDG_DATA_DIRS",
+                                                test->xdg_data_dirs);
 
       info = srt_system_info_new (NULL);
       g_assert_nonnull (info);

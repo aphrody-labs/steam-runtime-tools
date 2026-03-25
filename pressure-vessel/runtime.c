@@ -5102,9 +5102,12 @@ get_manifest_relative_to_overrides (PvRuntime *self,
 {
   /* For layers, we know that the filename doesn't matter - choice
    * of layers is based on manifest["layer"]["name"] - but we have
-   * to make sure they're all unique and in the same directory,
-   * because there is no equivalent of VK_DRIVER_FILES or
-   * VK_LAYER_PATH for implicit layers, so the only thing we can
+   * to make sure they're all unique and in the same directory.
+   * This is because OpenXR has no equivalent of XR_API_LAYER_PATH for
+   * implicit layers,
+   * and similarly Vulkan-Loader before 1.3.296 didn't have
+   * VK_IMPLICIT_LAYER_PATH (and we can't rely on having a version that new).
+   * This means that the only thing we can
    * do is to add our directory to XDG_DATA_DIRS. Because we have
    * to do this for implicit layers anyway, for simplicity we do
    * the same thing for explicit layers. */
@@ -5470,6 +5473,10 @@ setup_json_manifest (PvRuntime *self,
  * @error: Used to raise an error on failure
  *
  * Make a list of Vulkan layers or ICDs available in the container.
+ * We do this by rewriting their JSON manifests with the library_path
+ * replaced by a path appropriate for the container, and dropping the
+ * rewritten manifests into ${overrides}. Later, we'll set the search-path
+ * environment variables to search ${overrides}.
  */
 static gboolean
 setup_each_json_manifest (PvRuntime *self,
@@ -7787,20 +7794,34 @@ pv_runtime_prepend_to_xdg_dirs (PvRuntime *self,
   _srt_env_overlay_set (container_env, var, prepended_dirs);
 }
 
-/* Log a warning if any colon-delimited entry in @path is not in
- * ${prefix}/${suffix}. */
+/* Set @var to ${prefix}/${suffix}, assumed to be the common prefix of
+ * all colon-delimited entries in @path.
+ *
+ * If any colon-delimited entry in @path is not in
+ * ${prefix}/${suffix}, log a warning.
+ *
+ * If @var is null, don't set anything but still do the checks.
+ *
+ * If @path is empty, mark @var to be unset instead. */
 static void
-check_path_entries_all_in_dir (const char *path,
-                               const char *prefix,
-                               const char *suffix)
+env_overlay_set_common_directory (SrtEnvOverlay *container_env,
+                                  const char *var,
+                                  const GString *path,
+                                  const char *prefix,
+                                  const char *suffix)
 {
   g_autofree char *dir = g_build_filename (prefix, suffix, NULL);
   g_auto(GStrv) entries = NULL;
 
-  if (path == NULL || *path == '\0')
-    return;
+  if (path->len == 0)
+    {
+      if (var != NULL)
+        _srt_env_overlay_set (container_env, var, NULL);
 
-  entries = g_strsplit (path, ":", -1);
+      return;
+    }
+
+  entries = g_strsplit (path->str, ":", -1);
 
   if (entries == NULL)
     return;
@@ -7813,9 +7834,27 @@ check_path_entries_all_in_dir (const char *path,
           || strstr (after, "/") != NULL)
         g_critical ("%s is not in %s", entries[i], dir);
     }
+
+  if (var != NULL)
+    _srt_env_overlay_set (container_env, var, dir);
 }
 
 #define OPENXR_1_RUNTIME_OVERRIDES_PREFIX "etc/xdg"
+
+/*
+ * Set @var to @val in @overlay, except that if @val has a length of
+ * zero, mark @var to be unset instead.
+ */
+static void
+env_overlay_set_unset_zero_length (SrtEnvOverlay *overlay,
+                                   const char *var,
+                                   const GString *val)
+{
+  if (val->len != 0)
+    _srt_env_overlay_set (overlay, var, val->str);
+  else
+    _srt_env_overlay_set (overlay, var, NULL);
+}
 
 static gboolean
 pv_runtime_use_provider_graphics_stack (PvRuntime *self,
@@ -8266,6 +8305,14 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   if (!pv_runtime_take_misc_data_from_provider (self, bwrap, error))
     return FALSE;
 
+  /*
+   * Write out JSON manifests in ${overrides} describing the EGL ICDs,
+   * Vulkan drivers, and any other JSON-based modules. We need to do this
+   * because the original `library_path` might be a host path like
+   * /usr/lib/libfoo.so, but the JSON manifest seen inside the container
+   * needs to refer to that path more like /run/host/usr/lib/libfoo.so.
+   */
+
   g_debug ("Setting up EGL ICD JSON...");
 
   if (!setup_each_json_manifest (self, bwrap, "share/glvnd/egl_vendor.d",
@@ -8414,55 +8461,55 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
         }
     }
 
-  if (dri_path->len != 0)
-    {
-      _srt_env_overlay_set (container_env, "LIBGL_DRIVERS_PATH", dri_path->str);
-      _srt_env_overlay_set (container_env, "LIBVA_DRIVERS_PATH", dri_path->str);
-    }
-  else
-    {
-      _srt_env_overlay_set (container_env, "LIBGL_DRIVERS_PATH", NULL);
-      _srt_env_overlay_set (container_env, "LIBVA_DRIVERS_PATH", NULL);
-    }
+  /*
+   * Set environment variables forcing the various loaders
+   * (Vulkan-Loader, GLVND, etc.) to load exactly the drivers/layers/etc.
+   * that we found, ideally in exactly the same order that we found them.
+   *
+   * If there is more than one variable controlling search order,
+   * usually we set the one we want to use and unset all the others,
+   * to avoid the others leaking into the container and causing an
+   * unintended search order. For example we set
+   * __EGL_VENDOR_LIBRARY_FILENAMES and unset __EGL_VENDOR_LIBRARY_DIRS,
+   * and similarly, set VK_LAYER_PATH and unset VK_ADD_LAYER_PATH.
+   *
+   * For backward compatibility, sometimes we need to set both an "old"
+   * and "new" variable so that old and new loaders will both do what we
+   * want, for example setting both VK_DRIVER_FILES and VK_ICD_FILENAMES.
+   */
 
-  if (gbm_path->len != 0)
-    _srt_env_overlay_set (container_env, "GBM_BACKENDS_PATH", gbm_path->str);
-  else
-    _srt_env_overlay_set (container_env, "GBM_BACKENDS_PATH", NULL);
+  env_overlay_set_unset_zero_length (container_env,
+                                     "LIBGL_DRIVERS_PATH",
+                                     dri_path);
+  env_overlay_set_unset_zero_length (container_env,
+                                     "LIBVA_DRIVERS_PATH",
+                                     dri_path);
+  env_overlay_set_unset_zero_length (container_env,
+                                     "GBM_BACKENDS_PATH",
+                                     gbm_path);
 
-  if (egl_path->len != 0)
-    _srt_env_overlay_set (container_env, "__EGL_VENDOR_LIBRARY_FILENAMES",
-                          egl_path->str);
-  else
-    _srt_env_overlay_set (container_env, "__EGL_VENDOR_LIBRARY_FILENAMES",
-                          NULL);
-
+  env_overlay_set_unset_zero_length (container_env,
+                                     "__EGL_VENDOR_LIBRARY_FILENAMES",
+                                     egl_path);
+  /* Unset so __EGL_VENDOR_LIBRARY_FILENAMES will be used instead */
   _srt_env_overlay_set (container_env, "__EGL_VENDOR_LIBRARY_DIRS", NULL);
 
-  if (egl_ext_platform_path->len != 0)
-    _srt_env_overlay_set (container_env, "__EGL_EXTERNAL_PLATFORM_CONFIG_FILENAMES",
-                          egl_ext_platform_path->str);
-  else
-    _srt_env_overlay_set (container_env, "__EGL_EXTERNAL_PLATFORM_CONFIG_FILENAMES",
-                          NULL);
-
+  env_overlay_set_unset_zero_length (container_env,
+                                     "__EGL_EXTERNAL_PLATFORM_CONFIG_FILENAMES",
+                                     egl_ext_platform_path);
   _srt_env_overlay_set (container_env, "__EGL_EXTERNAL_PLATFORM_CONFIG_DIRS", NULL);
 
-  if (vulkan_path->len != 0)
-    {
-      /* VK_ICD_FILENAMES is deprecated, VK_DRIVER_FILES takes precedence.
-       * Until all branches of the Steam Runtime have a Vulkan-Loader
-       * that supports VK_DRIVER_FILES, we need to set both:
-       * old Vulkan-Loader versions will use the old variable, while new
-       * versions will use the new one. */
-      _srt_env_overlay_set (container_env, "VK_DRIVER_FILES", vulkan_path->str);
-      _srt_env_overlay_set (container_env, "VK_ICD_FILENAMES", vulkan_path->str);
-    }
-  else
-    {
-      _srt_env_overlay_set (container_env, "VK_ICD_FILENAMES", NULL);
-      _srt_env_overlay_set (container_env, "VK_DRIVER_FILES", NULL);
-    }
+  env_overlay_set_unset_zero_length (container_env,
+                                     "VK_DRIVER_FILES",
+                                     vulkan_path);
+  /* VK_ICD_FILENAMES is deprecated, VK_DRIVER_FILES takes precedence.
+   * Until all branches of the Steam Runtime have a Vulkan-Loader
+   * that supports VK_DRIVER_FILES, we need to set both:
+   * old Vulkan-Loader versions will use the old variable, while new
+   * versions will use the new one. */
+  env_overlay_set_unset_zero_length (container_env,
+                                     "VK_ICD_FILENAMES",
+                                     vulkan_path);
 
   /* Setting VK_DRIVER_FILES now disables this, but that wasn't the case
    * in Vulkan-Loader 1.3.207, and it seems clearer if we unset it anyway. */
@@ -8471,11 +8518,13 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   if (self->flags & (PV_RUNTIME_FLAGS_IMPORT_VULKAN_LAYERS
                      | PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_LAYERS))
     {
-      /* Implicit layers are not affected by "VK_LAYER_PATH". So instead of using
-       * this environment variable, we prepend our "/overrides/share" to
+      /* OpenXR has no equivalent of XR_API_LAYER_PATH for implicit layers,
+       * and similarly in Vulkan,
+       * VK_IMPLICIT_LAYER_PATH wasn't implemented until Vulkan-Loader
+       * 1.3.296 which we can't guarantee to have. So instead of relying on
+       * these environment variables, we prepend our "/overrides/share" to
        * "XDG_DATA_DIRS" to cover any explicit and implicit layers that we may
-       * have.
-       * OpenXR implicit layers follow a similar pattern. */
+       * have. */
       if (vulkan_exp_layer_path->len != 0
           || vulkan_imp_layer_path->len != 0
           || openxr_1_exp_layer_path->len != 0
@@ -8485,26 +8534,44 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
             g_build_filename (self->overrides_in_container, "share", NULL);
 
           /* We are relying here on setup_json_manifest() having generated
-           * all the layers' JSON manifests in the same directory. */
-          check_path_entries_all_in_dir (vulkan_exp_layer_path->str,
-                                         override_share,
-                                         _SRT_GRAPHICS_EXPLICIT_VULKAN_LAYER_SUFFIX);
-          check_path_entries_all_in_dir (vulkan_imp_layer_path->str,
-                                         override_share,
-                                         _SRT_GRAPHICS_IMPLICIT_VULKAN_LAYER_SUFFIX);
-          check_path_entries_all_in_dir (openxr_1_exp_layer_path->str,
-                                         override_share,
-                                         _SRT_GRAPHICS_OPENXR_1_EXPLICIT_LAYER_SUFFIX);
-          check_path_entries_all_in_dir (openxr_1_imp_layer_path->str,
-                                         override_share,
-                                         _SRT_GRAPHICS_OPENXR_1_IMPLICIT_LAYER_SUFFIX);
+           * all the layers' JSON manifests in the same directory.
+           * Where possible, we might as well set the environment
+           * variable to tell the loader more explicitly where to look,
+           * rather than using the indirection through XDG_DATA_DIRS. */
+          env_overlay_set_common_directory (container_env,
+                                            "VK_LAYER_PATH",
+                                            vulkan_exp_layer_path,
+                                            override_share,
+                                            _SRT_GRAPHICS_EXPLICIT_VULKAN_LAYER_SUFFIX);
+          env_overlay_set_common_directory (container_env,
+                                            "VK_IMPLICIT_LAYER_PATH",
+                                            vulkan_imp_layer_path,
+                                            override_share,
+                                            _SRT_GRAPHICS_IMPLICIT_VULKAN_LAYER_SUFFIX);
+          env_overlay_set_common_directory (container_env,
+                                            "XR_API_LAYER_PATH",
+                                            openxr_1_exp_layer_path,
+                                            override_share,
+                                            _SRT_GRAPHICS_OPENXR_1_EXPLICIT_LAYER_SUFFIX);
+          env_overlay_set_common_directory (container_env,
+                                            NULL,
+                                            openxr_1_imp_layer_path,
+                                            override_share,
+                                            _SRT_GRAPHICS_OPENXR_1_IMPLICIT_LAYER_SUFFIX);
+
           pv_runtime_prepend_to_xdg_dirs (self, container_env, override_share,
                                           "XDG_DATA_DIRS",
                                           "/usr/local/share:/usr/share");
         }
+      else
+        {
+          _srt_env_overlay_set (container_env, "VK_LAYER_PATH", NULL);
+          _srt_env_overlay_set (container_env, "VK_IMPLICIT_LAYER_PATH", NULL);
+          _srt_env_overlay_set (container_env, "XR_API_LAYER_PATH", NULL);
+        }
 
-      _srt_env_overlay_set (container_env, "VK_LAYER_PATH", NULL);
-      _srt_env_overlay_set (container_env, "XR_API_LAYER_PATH", NULL);
+      _srt_env_overlay_set (container_env, "VK_ADD_LAYER_PATH", NULL);
+      _srt_env_overlay_set (container_env, "VK_ADD_IMPLICIT_LAYER_PATH", NULL);
     }
 
   if (self->flags & PV_RUNTIME_FLAGS_IMPORT_OPENXR_1_RUNTIMES)
@@ -8515,11 +8582,14 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
            g_build_filename (self->overrides_in_container,
                              OPENXR_1_RUNTIME_OVERRIDES_PREFIX, NULL);
 
-          /* We are relying here on setup_json_manifest() having generated
-           * all the JSON manifests in the same directory. */
-          check_path_entries_all_in_dir (openxr_1_runtime_path->str,
-                                         override_config,
-                                         _SRT_GRAPHICS_OPENXR_1_RUNTIME_SUFFIX);
+          /* There's no environment variable for this,
+           * but we should still check that every runtime is in the
+           * same directory we expect to have used */
+          env_overlay_set_common_directory (container_env,
+                                            NULL,
+                                            openxr_1_runtime_path,
+                                            override_config,
+                                            _SRT_GRAPHICS_OPENXR_1_RUNTIME_SUFFIX);
           pv_runtime_prepend_to_xdg_dirs (self, container_env, override_config,
                                           "XDG_CONFIG_DIRS", "/etc/xdg");
         }

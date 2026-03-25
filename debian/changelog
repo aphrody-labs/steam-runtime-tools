@@ -1,9 +1,28 @@
-steam-runtime-tools (0.20260320.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260325.0) UNRELEASED; urgency=medium
 
   [ Simon McVittie ]
   * SteamLinuxRuntime_*:
     - Avoid $PRESSURE_VESSEL_VARIABLE_DIR being inherited by the command
       inside the container (steamrt/tasks#956)
+  * pressure-vessel:
+    - Take $VK_IMPLICIT_LAYER_PATH and $VK_ADD_IMPLICIT_LAYER_PATH
+      into account when finding and remapping Vulkan layers,
+      and avoid them "leaking" into the container unchanged
+      (steamrt/tasks#964, steam-runtime#808)
+    - Set $VK_LAYER_PATH, $VK_IMPLICIT_LAYER_PATH, $XR_API_LAYER_PATH
+      in the container. Strictly speaking they're redundant with
+      $XDG_DATA_DIRS, and we still need to set $XDG_DATA_DIRS for the
+      benefit of older Vulkan-Loader versions and OpenXR implicit layers,
+      but they make it more obvious which layers we are going to be
+      loading and might be a little bit more efficient.
+      (steamrt/tasks#964, steam-runtime#808)
+    - Refactoring
+  * Diagnostic tools:
+    - Record $VK_IMPLICIT_LAYER_PATH and $VK_ADD_IMPLICIT_LAYER_PATH,
+      and take them into account when listing Vulkan implicit layers
+      (steamrt/tasks#964)
+  * Update bubblewrap to v0.11.1
+  * Update libglnx subproject to 2026-03-24
 
   [ Antonio Ospite ]
   * Diagnostic tools:
@@ -14,7 +33,7 @@ steam-runtime-tools (0.20260320.0) UNRELEASED; urgency=medium
   * Tests:
     - Improve coverage (steamrt/tasks#837)
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 20 Mar 2026 15:09:55 +0000
+ -- Simon McVittie <smcv@collabora.com>  Wed, 25 Mar 2026 20:19:37 +0000
 
 steam-runtime-tools (0.20260313.0) steamrt; urgency=medium
 

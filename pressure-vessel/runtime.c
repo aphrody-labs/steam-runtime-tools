@@ -5473,6 +5473,10 @@ setup_json_manifest (PvRuntime *self,
  * @error: Used to raise an error on failure
  *
  * Make a list of Vulkan layers or ICDs available in the container.
+ * We do this by rewriting their JSON manifests with the library_path
+ * replaced by a path appropriate for the container, and dropping the
+ * rewritten manifests into ${overrides}. Later, we'll set the search-path
+ * environment variables to search ${overrides}.
  */
 static gboolean
 setup_each_json_manifest (PvRuntime *self,
@@ -8301,6 +8305,14 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
   if (!pv_runtime_take_misc_data_from_provider (self, bwrap, error))
     return FALSE;
 
+  /*
+   * Write out JSON manifests in ${overrides} describing the EGL ICDs,
+   * Vulkan drivers, and any other JSON-based modules. We need to do this
+   * because the original `library_path` might be a host path like
+   * /usr/lib/libfoo.so, but the JSON manifest seen inside the container
+   * needs to refer to that path more like /run/host/usr/lib/libfoo.so.
+   */
+
   g_debug ("Setting up EGL ICD JSON...");
 
   if (!setup_each_json_manifest (self, bwrap, "share/glvnd/egl_vendor.d",
@@ -8448,6 +8460,23 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
             }
         }
     }
+
+  /*
+   * Set environment variables forcing the various loaders
+   * (Vulkan-Loader, GLVND, etc.) to load exactly the drivers/layers/etc.
+   * that we found, ideally in exactly the same order that we found them.
+   *
+   * If there is more than one variable controlling search order,
+   * usually we set the one we want to use and unset all the others,
+   * to avoid the others leaking into the container and causing an
+   * unintended search order. For example we set
+   * __EGL_VENDOR_LIBRARY_FILENAMES and unset __EGL_VENDOR_LIBRARY_DIRS,
+   * and similarly, set VK_LAYER_PATH and unset VK_ADD_LAYER_PATH.
+   *
+   * For backward compatibility, sometimes we need to set both an "old"
+   * and "new" variable so that old and new loaders will both do what we
+   * want, for example setting both VK_DRIVER_FILES and VK_ICD_FILENAMES.
+   */
 
   env_overlay_set_unset_zero_length (container_env,
                                      "LIBGL_DRIVERS_PATH",

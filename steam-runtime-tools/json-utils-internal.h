@@ -116,3 +116,10 @@ gboolean _srt_json_builder_print (JsonBuilder *builder,
                                   FILE *fh,
                                   SrtJsonOutputFlags flags,
                                   GError **error);
+
+guint _srt_json_object_get_issues_from_report (JsonObject *object,
+                                               const char *object_description,
+                                               GType flags_type,
+                                               const char *issues_member,
+                                               const char *no_issues_member,
+                                               guint set_flag_if_unknown);

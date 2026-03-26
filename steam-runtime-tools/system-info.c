@@ -1079,7 +1079,12 @@ srt_system_info_new_from_json (const char *path,
     srt_system_info_set_multiarch_tuples (info, NULL);
 
   info->locales.have_issues = TRUE;
-  info->locales.issues = _srt_locale_get_issues_from_report (json_obj);
+  info->locales.issues = _srt_json_object_get_issues_from_report (json_obj,
+                                                                  "top level",
+                                                                  SRT_TYPE_LOCALE_ISSUES,
+                                                                  "locale-issues",
+                                                                  "locales-ok",
+                                                                  SRT_LOCALE_ISSUES_UNKNOWN);
 
   if (info->locales.cached_locales == NULL)
     info->locales.cached_locales = g_hash_table_new_full (NULL, NULL, NULL,

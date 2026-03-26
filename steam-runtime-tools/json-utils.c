@@ -579,3 +579,98 @@ _srt_json_builder_print (JsonBuilder *builder,
 
   return TRUE;
 }
+
+/**
+ * _srt_json_object_get_issues_from_report
+ * @object: (not nullable): A JSON Object used to search for issues-related
+ *  properties, like for example "issues" and "ok".
+ * @object_description: a description of @object in the JSON data.
+ *  Used for debug messages.
+ * @flags_type: the type of the issues being handled, for example
+ *  SRT_TYPE_RUNTIME_ISSUES.
+ * @issues_member: name of the JSON member in @object that indicates that
+ *  some issues have been found, for example "issues" or "locale-issues".
+ *  The member value is an array of strings.
+ * @no_issues_member: (nullable): name of the JSON member
+ *  in @object that indicates that no issues have been found,
+ *  for example "ok" or "locales-ok".
+ *  The value is expected to be %TRUE.
+ *  If %NULL, the absence of @issues_member is assumed to be
+ *  enough to imply that there were no issues.
+ * @set_flag_if_unknown: value to represent "unknown" issues for
+ *  the given type @flags_type.
+ *
+ * If the provided @object has @no_issues_member set to true,
+ * or @issues_member set to an empty array,
+ * 0 will be returned, to represent that no issues have been found.
+ * If the provided @object has @no_issues_member set to true,
+ * and @issues_member set to a non-empty array,
+ * then @set_flag_if_unknown will be returned in addition to
+ * the issues that can be parsed.
+ * If the provided @object doesn't have either @no_issues_member
+ * or @issues_member, or if either is
+ * malformed, then @set_flag_if_unknown will be returned.
+ * If @object has some elements that we can't parse,
+ * then @set_flag_if_unknown will be added to the returned issues.
+ *
+ * Returns: The issues that has been found
+ */
+guint
+_srt_json_object_get_issues_from_report (JsonObject *object,
+                                         const char *object_description,
+                                         GType flags_type,
+                                         const char *issues_member,
+                                         const char *no_issues_member,
+                                         guint set_flag_if_unknown)
+{
+  /*
+   * The success case where no_issues_member is TRUE or issues_member is empty
+   * is handled implicitly.
+   */
+  guint issues = 0;
+
+  g_return_val_if_fail (object != NULL, set_flag_if_unknown);
+  g_return_val_if_fail (issues_member != NULL, set_flag_if_unknown);
+
+  /* When no_issues_member is FALSE or invalid, signal that somehow */
+  if (json_object_has_member (object, no_issues_member) &&
+      !json_object_get_boolean_member (object, no_issues_member))
+    {
+      g_debug ("Report is invalid: %s \"%s\" value other than true",
+               object_description, no_issues_member);
+      issues |= set_flag_if_unknown;
+    }
+
+  /*
+   * One of no_issues_member or issues_member is always supposed to be
+   * in the JSON.
+   * If neither is present then we don't know whether the area of interest was
+   * found to be OK, or not tested at all.
+   */
+  if (!json_object_has_member (object, no_issues_member) &&
+      !json_object_has_member (object, issues_member))
+    issues |= set_flag_if_unknown;
+
+  if (json_object_has_member (object, issues_member) &&
+      json_array_get_length (json_object_get_array_member (object, issues_member)) != 0)
+    {
+      issues |= srt_get_flags_from_json_array (flags_type,
+                                               object,
+                                               issues_member,
+                                               set_flag_if_unknown);
+
+      /*
+       * It doesn't make sense to have no_issues_member : TRUE if issues
+       * were discovered, so signal that as "something is wrong".
+       */
+      if (json_object_has_member (object, no_issues_member) &&
+          json_object_get_boolean_member (object, no_issues_member))
+        {
+          g_debug ("Report is invalid: %s has both \"%s\" and \"%s\"",
+                   object_description, issues_member, no_issues_member);
+          issues |= set_flag_if_unknown;
+        }
+    }
+
+  return issues;
+}

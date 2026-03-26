@@ -65,5 +65,3 @@ SrtLocale *_srt_check_locale (SrtSubprocessRunner *runner,
 SrtLocale *_srt_locale_get_locale_from_report (JsonObject *json_obj,
                                                const gchar *requested_name,
                                                GError **error);
-
-SrtLocaleIssues _srt_locale_get_issues_from_report (JsonObject *json_obj);

@@ -23,7 +23,7 @@
 
 project(
   'steam-runtime-tools', 'c',
-  version : '0.20260313.0',
+  version : '0.20260326.0',
   default_options: [
     'c_std=c99',
     'warning_level=2',

@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260325.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260326.0) steamrt; urgency=medium
 
   [ Simon McVittie ]
   * SteamLinuxRuntime_*:
@@ -33,7 +33,7 @@ steam-runtime-tools (0.20260325.0) UNRELEASED; urgency=medium
   * Tests:
     - Improve coverage (steamrt/tasks#837)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 25 Mar 2026 20:19:37 +0000
+ -- Simon McVittie <smcv@collabora.com>  Thu, 26 Mar 2026 17:54:54 +0000
 
 steam-runtime-tools (0.20260313.0) steamrt; urgency=medium
 

@@ -632,6 +632,20 @@ _srt_json_object_get_issues_from_report (JsonObject *object,
   g_return_val_if_fail (object != NULL, set_flag_if_unknown);
   g_return_val_if_fail (issues_member != NULL, set_flag_if_unknown);
 
+  /* 
+   * If there is no member that explicitly indicates "no issues",
+   * then the implementation can be greatly simplified.
+   */
+  if (no_issues_member == NULL)
+    {
+      if (json_object_has_member (object, issues_member))
+        issues = srt_get_flags_from_json_array (flags_type,
+                                                object,
+                                                issues_member,
+                                                set_flag_if_unknown);
+      return issues;
+    }
+
   /* When no_issues_member is FALSE or invalid, signal that somehow */
   if (json_object_has_member (object, no_issues_member) &&
       !json_object_get_boolean_member (object, no_issues_member))

@@ -33,7 +33,7 @@ project(
 
 api_major = '0'
 abi_major = '0'
-abi_minor = '20260313.0'
+abi_minor = '20260326.0'
 
 gnome = import('gnome')
 pkg = import('pkgconfig')

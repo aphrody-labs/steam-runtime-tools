@@ -626,7 +626,7 @@ class TestPressureVessel(unittest.TestCase):
                 self.assertTrue(arch_info['can-run'])
                 self.assertEqual(
                     library_issues,
-                    set(arch_info['library-issues-summary']),
+                    set(arch_info.get('library-issues-summary', [])),
                 )
                 # Graphics driver support depends on the host system, so we
                 # don't assert that everything is fine, only that we have

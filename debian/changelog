@@ -1,9 +1,13 @@
-steam-runtime-tools (0.20260327.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260327.0) steamrt; urgency=medium
 
+  * Diagnostic tools:
+    - launch-options: Cope with the experimental steamrt3c-based Steam
+      client putting reaper and steam-launch-wrapper in steamrt64/
+      (steamrt/tasks#972)
   * Tests:
     - Fix regressions (steamrt/tasks#837)
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 27 Mar 2026 15:39:50 +0000
+ -- Simon McVittie <smcv@collabora.com>  Fri, 27 Mar 2026 18:30:47 +0000
 
 steam-runtime-tools (0.20260326.0) steamrt; urgency=medium
 

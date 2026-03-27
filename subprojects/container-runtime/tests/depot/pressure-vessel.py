@@ -636,7 +636,9 @@ class TestPressureVessel(unittest.TestCase):
 
         # Locale support depends on the host system, so we don't assert
         # that everything is fine, only that we have the information.
-        self.assertIn('locale-issues', parsed)
+        if 'locales-ok' not in parsed:
+            self.assertIn('locale-issues', parsed)
+
         self.assertIn('locales', parsed)
 
         # Graphics driver support depends on the host system, so we

@@ -984,6 +984,8 @@ class Gui:
         while (
             len(command_argv) > 2
             and command_argv[0].endswith((
+                'steamrt64/reaper',
+                'steamrt64/steam-launch-wrapper',
                 'ubuntu12_32/reaper',
                 'ubuntu12_32/steam-launch-wrapper',
             ))

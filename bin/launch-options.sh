@@ -49,19 +49,23 @@ run_like_game () {
     app_id="${STEAM_COMPAT_APP_ID-${SteamAppId-}}"
 
     if [ -n "$app_id" ]; then
-        if [ -x ~/.steam/root/ubuntu12_32/reaper ]; then
+        if [ -x ~/.steam/root/steamrt64/reaper ]; then
+            set -- ~/.steam/root/steamrt64/reaper SteamLaunch AppId="$app_id" -- "$@"
+        elif [ -x ~/.steam/root/ubuntu12_32/reaper ]; then
             set -- ~/.steam/root/ubuntu12_32/reaper SteamLaunch AppId="$app_id" -- "$@"
         else
-            log "warning: ~/.steam/root/ubuntu12_32/reaper not found"
+            log "warning: ~/.steam/root/{steamrt64,ubuntu12_32}/reaper not found"
         fi
     else
         log "warning: Steam app ID not found in environment"
     fi
 
-    if [ -x ~/.steam/root/ubuntu12_32/steam-launch-wrapper ]; then
+    if [ -x ~/.steam/root/steamrt64/steam-launch-wrapper ]; then
+        set -- ~/.steam/root/steamrt64/steam-launch-wrapper -- "$@"
+    elif [ -x ~/.steam/root/ubuntu12_32/steam-launch-wrapper ]; then
         set -- ~/.steam/root/ubuntu12_32/steam-launch-wrapper -- "$@"
     else
-        log "warning: ~/.steam/root/ubuntu12_32/steam-launch-wrapper not found"
+        log "warning: ~/.steam/root/{steamrt64,ubuntu12_32}/steam-launch-wrapper not found"
     fi
 
     ${use_exec:+exec} "$@"

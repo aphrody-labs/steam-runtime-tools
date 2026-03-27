@@ -1,3 +1,10 @@
+steam-runtime-tools (0.20260327.0) UNRELEASED; urgency=medium
+
+  * Tests:
+    - Fix regressions (steamrt/tasks#837)
+
+ -- Simon McVittie <smcv@collabora.com>  Fri, 27 Mar 2026 15:39:50 +0000
+
 steam-runtime-tools (0.20260326.0) steamrt; urgency=medium
 
   [ Simon McVittie ]

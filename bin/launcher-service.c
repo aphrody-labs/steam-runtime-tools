@@ -93,6 +93,7 @@ typedef enum
   PV_LAUNCHER_SERVER_FLAGS_STOP_ON_EXIT = (1 << 1),
   PV_LAUNCHER_SERVER_FLAGS_STARTED = (1 << 2),
   PV_LAUNCHER_SERVER_FLAGS_HINT = (1 << 3),
+  PV_LAUNCHER_SERVER_FLAGS_FLATPAK = (1 << 4),
   PV_LAUNCHER_SERVER_FLAGS_NONE = 0,
 } PvLauncherServerFlags;
 
@@ -345,10 +346,23 @@ child_watch_died (GPid     pid,
 
   if (pid_data->connection != NULL)
     {
-      /* Note that pid_data->client can be NULL on peer-to-peer sockets. */
+      /* The destination for the signal: the unique name of the client,
+       * or NULL on peer-to-peer sockets, or NULL to send a broadcast
+       * across the session bus. */
+      const char *dest;
+
+      /* Workaround for https://github.com/flatpak/xdg-dbus-proxy/issues/25:
+       * normally we'd send a unicast signal like flatpak-portal does,
+       * but when running as a Flatpak app, unicast signals to a unique name
+       * are blocked by xdg-dbus-proxy, so in this case we use a broadcast. */
+      if (self->flags & PV_LAUNCHER_SERVER_FLAGS_FLATPAK)
+        dest = NULL;
+      else
+        dest = pid_data->client;
+
       signal_variant = g_variant_ref_sink (g_variant_new ("(uu)", pid, status));
       g_dbus_connection_emit_signal (pid_data->connection,
-                                     pid_data->client,
+                                     dest,
                                      LAUNCHER_PATH,
                                      LAUNCHER_IFACE,
                                      "ProcessExited",
@@ -1597,6 +1611,9 @@ main (int argc,
     server->flags |= PV_LAUNCHER_SERVER_FLAGS_STOP_ON_NAME_LOSS;
   else
     server->listener->flags |= SRT_PORTAL_LISTENER_FLAGS_PREFER_UNIQUE_NAME;
+
+  if (access ("/.flatpak-info", F_OK) == 0)
+    server->flags |= PV_LAUNCHER_SERVER_FLAGS_FLATPAK;
 
   if (opt_stop_on_parent_exit
       && !_srt_raise_on_parent_death (SIGTERM, error))

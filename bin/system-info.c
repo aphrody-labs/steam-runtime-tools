@@ -241,10 +241,24 @@ jsonify_runtime_issues (JsonBuilder *builder,
 }
 
 static void
-jsonify_locale_issues (JsonBuilder *builder,
-                       SrtLocaleIssues issues)
+jsonify_issues_or_no_issues (JsonBuilder *builder,
+                             GType flags_type,
+                             const char *issues_member,
+                             const char *no_issues_member,
+                             unsigned int issues)
 {
-  jsonify_flags (builder, SRT_TYPE_LOCALE_ISSUES, issues);
+  if (issues == 0)
+    {
+      json_builder_set_member_name (builder, no_issues_member);
+      json_builder_add_boolean_value (builder, TRUE);
+    }
+  else
+    {
+      json_builder_set_member_name (builder, issues_member);
+      json_builder_begin_array (builder);
+      jsonify_flags (builder, flags_type, issues);
+      json_builder_end_array (builder);
+    }
 }
 
 static void
@@ -1628,18 +1642,10 @@ main (int argc,
   json_builder_end_object (builder);
 
   locale_issues = srt_system_info_get_locale_issues (info);
-  if (locale_issues == SRT_LOCALE_ISSUES_NONE)
-    {
-      json_builder_set_member_name (builder, "locales-ok");
-      json_builder_add_boolean_value (builder, TRUE);
-    }
-  else
-    {
-      json_builder_set_member_name (builder, "locale-issues");
-      json_builder_begin_array (builder);
-      jsonify_locale_issues (builder, locale_issues);
-      json_builder_end_array (builder);
-    }
+  jsonify_issues_or_no_issues (builder,
+                               SRT_TYPE_LOCALE_ISSUES,
+                               "locale-issues", "locales-ok",
+                               locale_issues);
 
   json_builder_set_member_name (builder, "locales");
   json_builder_begin_object (builder);

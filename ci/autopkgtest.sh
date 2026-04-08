@@ -29,6 +29,10 @@ tempdir="$(mktemp -d)"
 # shellcheck source=/dev/null
 case "$(. /usr/lib/os-release; echo "${VERSION_CODENAME-${VERSION}}")" in
     (scout)
+        # Ensure that each of these projects has
+        # CI/CD Settings -> Job token permissions -> Allowlist ->
+        #   steamrt/steam-runtime-tools -> Fine-grained -> Repositories -> Read
+        # This can be dropped if we stop running autopkgtest in scout.
         git clone --branch steam/for-ci "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.steamos.cloud/steamrt/packaging/autopkgtest.git" "$tempdir/autopkgtest"
         git clone --branch debian/buster "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.steamos.cloud/steamrt/packaging/chardet.git" "$tempdir/chardet"
         git clone --branch debian/buster "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.steamos.cloud/steamrt/packaging/python-debian.git" "$tempdir/python-debian"

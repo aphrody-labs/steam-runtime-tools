@@ -29,10 +29,10 @@ tempdir="$(mktemp -d)"
 # shellcheck source=/dev/null
 case "$(. /usr/lib/os-release; echo "${VERSION_CODENAME-${VERSION}}")" in
     (scout)
-        git clone --branch steam/for-ci "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.steamos.cloud/packaging/autopkgtest.git" "$tempdir/autopkgtest"
-        git clone --branch debian/buster "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.steamos.cloud/packaging/chardet.git" "$tempdir/chardet"
-        git clone --branch debian/buster "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.steamos.cloud/packaging/python-debian.git" "$tempdir/python-debian"
-        git clone --branch debian/buster "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.steamos.cloud/packaging/six.git" "$tempdir/six"
+        git clone --branch steam/for-ci "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.steamos.cloud/steamrt/packaging/autopkgtest.git" "$tempdir/autopkgtest"
+        git clone --branch debian/buster "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.steamos.cloud/steamrt/packaging/chardet.git" "$tempdir/chardet"
+        git clone --branch debian/buster "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.steamos.cloud/steamrt/packaging/python-debian.git" "$tempdir/python-debian"
+        git clone --branch debian/buster "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.steamos.cloud/steamrt/packaging/six.git" "$tempdir/six"
 
         export PYTHONPATH="$tempdir/chardet:$tempdir/python-debian/lib:$tempdir/six"
         set -- python3.5 "$tempdir/autopkgtest/runner/autopkgtest"

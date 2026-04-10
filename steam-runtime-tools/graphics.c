@@ -1940,22 +1940,6 @@ srt_graphics_get_devices (SrtGraphics *self)
   return g_list_reverse (ret);
 }
 
-static SrtGraphicsIssues
-_srt_get_graphics_issues_from_json_object (JsonObject *json_obj)
-{
-  SrtGraphicsIssues graphics_issues = SRT_GRAPHICS_ISSUES_NONE;
-
-  /* In graphics, a missing "issues" array means that no issues were found */
-  if (json_object_has_member (json_obj, "issues"))
-    {
-      graphics_issues = srt_get_flags_from_json_array (SRT_TYPE_GRAPHICS_ISSUES,
-                                                       json_obj,
-                                                       "issues",
-                                                       SRT_GRAPHICS_ISSUES_UNKNOWN);
-    }
-  return graphics_issues;
-}
-
 /**
  * _srt_graphics_get_from_report:
  * @json_obj: (not nullable): A JSON Object representing an ABI,
@@ -2047,7 +2031,12 @@ _srt_graphics_get_from_report (JsonObject *json_obj,
           version = json_object_get_string_member_with_default (json_stack_obj, "version",
                                                                 NULL);
 
-          graphics_issues = _srt_get_graphics_issues_from_json_object (json_stack_obj);
+          graphics_issues = _srt_json_object_get_issues_from_report (json_stack_obj,
+                                                                     l->data,
+                                                                     SRT_TYPE_GRAPHICS_ISSUES,
+                                                                     "issues",
+                                                                     NULL,
+                                                                     SRT_GRAPHICS_ISSUES_UNKNOWN);
 
           /* A missing exit_status means that its value is the default zero */
           exit_status = json_object_get_int_member_with_default (json_stack_obj, "exit-status", 0);
@@ -2124,7 +2113,12 @@ _srt_graphics_get_from_report (JsonObject *json_obj,
                         type = SRT_VK_PHYSICAL_DEVICE_TYPE_OTHER;
                     }
 
-                  issues = _srt_get_graphics_issues_from_json_object (device_obj);
+                  issues = _srt_json_object_get_issues_from_report (device_obj,
+                                                                    name,
+                                                                    SRT_TYPE_GRAPHICS_ISSUES,
+                                                                    "issues",
+                                                                    NULL,
+                                                                    SRT_GRAPHICS_ISSUES_UNKNOWN);
                   dev_messages = _srt_json_object_dup_array_of_lines_member (device_obj,
                                                                              "messages");
 

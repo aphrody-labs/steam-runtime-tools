@@ -96,10 +96,12 @@ _srt_container_info_get_from_report (JsonObject *json_obj)
       switch (type)
         {
           case SRT_CONTAINER_TYPE_FLATPAK:
-            flatpak_issues = srt_get_flags_from_json_array (SRT_TYPE_FLATPAK_ISSUES,
-                                                            json_sub_obj,
-                                                            "flatpak_issues",
-                                                            SRT_FLATPAK_ISSUES_UNKNOWN);
+            flatpak_issues = _srt_json_object_get_issues_from_report (json_sub_obj,
+                                                                      "container",
+                                                                      SRT_TYPE_FLATPAK_ISSUES,
+                                                                      "flatpak_issues",
+                                                                      "flatpak_ok",
+                                                                      SRT_FLATPAK_ISSUES_UNKNOWN);
             flatpak_version = json_object_get_string_member_with_default (json_sub_obj,
                                                                           "flatpak_version",
                                                                           NULL);
@@ -112,10 +114,12 @@ _srt_container_info_get_from_report (JsonObject *json_obj)
           case SRT_CONTAINER_TYPE_UNKNOWN:
           case SRT_CONTAINER_TYPE_NONE:
           default:
-            bwrap_issues = srt_get_flags_from_json_array (SRT_TYPE_BWRAP_ISSUES,
-                                                          json_sub_obj,
-                                                          "bubblewrap_issues",
-                                                          SRT_BWRAP_ISSUES_UNKNOWN);
+            bwrap_issues = _srt_json_object_get_issues_from_report (json_sub_obj,
+                                                                    "container",
+                                                                    SRT_TYPE_BWRAP_ISSUES,
+                                                                    "bubblewrap_issues",
+                                                                    "bubblewrap_ok",
+                                                                    SRT_BWRAP_ISSUES_UNKNOWN);
             bwrap_messages = _srt_json_object_dup_array_of_lines_member (json_sub_obj,
                                                                          "bubblewrap_messages");
             bwrap_path = json_object_get_string_member_with_default (json_sub_obj,
@@ -262,29 +266,6 @@ out:
 }
 
 /**
- * _srt_library_get_issues_from_report:
- * @json_obj: (not nullable): A JSON Object used to search for
- *  "library-issues-summary" property
- *
- * If the provided @json_obj doesn't have a "library-issues-summary" member,
- * or it is malformed, %SRT_LIBRARY_ISSUES_UNKNOWN will be returned.
- * If @json_obj has some elements that we can't parse,
- * %SRT_LIBRARY_ISSUES_UNKNOWN will be added to the returned #SrtLibraryIssues.
- *
- * Returns: The #SrtLibraryIssues that has been found
- */
-SrtLibraryIssues
-_srt_library_get_issues_from_report (JsonObject *json_obj)
-{
-  g_return_val_if_fail (json_obj != NULL, SRT_LIBRARY_ISSUES_UNKNOWN);
-
-  return srt_get_flags_from_json_array (SRT_TYPE_LIBRARY_ISSUES,
-                                        json_obj,
-                                        "library-issues-summary",
-                                        SRT_LIBRARY_ISSUES_UNKNOWN);
-}
-
-/**
  * _srt_os_info_new_from_report:
  * @json_obj: (not nullable): A JSON Object used to search for "os-release"
  *  property
@@ -395,29 +376,6 @@ _srt_os_info_new_from_report (JsonObject *json_obj)
     }
 
   return _srt_os_info_new (fields, messages, source_path, source_path_resolved);
-}
-
-/*
- * _srt_runtime_get_issues_from_report:
- * @json_obj: (not nullable): A JSON Object used to search for "issues"
- *  property
- *
- * If the provided @json_obj doesn't have a "issues" member, or it is
- * malformed, %SRT_RUNTIME_ISSUES_UNKNOWN will be returned.
- * If @json_obj has some elements that we can't parse,
- * %SRT_RUNTIME_ISSUES_UNKNOWN will be added to the returned #SrtRuntimeIssues.
- *
- * Returns: The #SrtRuntimeIssues that has been found
- */
-static SrtRuntimeIssues
-_srt_runtime_get_issues_from_report (JsonObject *json_obj)
-{
-  g_return_val_if_fail (json_obj != NULL, SRT_RUNTIME_ISSUES_UNKNOWN);
-
-  return srt_get_flags_from_json_array (SRT_TYPE_RUNTIME_ISSUES,
-                                        json_obj,
-                                        "issues",
-                                        SRT_RUNTIME_ISSUES_UNKNOWN);
 }
 
 static gchar *
@@ -691,7 +649,12 @@ _srt_runtime_fill_from_report (SrtRuntime *self,
       self->version = g_strdup (json_object_get_string_member_with_default (json_sub_obj,
                                                                             "version",
                                                                             NULL));
-      self->issues = _srt_runtime_get_issues_from_report (json_sub_obj);
+      self->issues = _srt_json_object_get_issues_from_report (json_sub_obj,
+                                                              "runtime",
+                                                              SRT_TYPE_RUNTIME_ISSUES,
+                                                              "issues",
+                                                              "ok",
+                                                              SRT_RUNTIME_ISSUES_UNKNOWN);
     }
 }
 
@@ -726,10 +689,12 @@ _srt_steam_get_from_report (JsonObject *json_obj)
       if (json_sub_obj == NULL)
         goto out;
 
-      issues = srt_get_flags_from_json_array (SRT_TYPE_STEAM_ISSUES,
-                                              json_sub_obj,
-                                              "issues",
-                                              SRT_STEAM_ISSUES_UNKNOWN);
+      issues = _srt_json_object_get_issues_from_report (json_sub_obj,
+                                                        "steam-installation",
+                                                        SRT_TYPE_STEAM_ISSUES,
+                                                        "issues",
+                                                        "ok",
+                                                        SRT_STEAM_ISSUES_UNKNOWN);
 
       install_path = json_object_get_string_member_with_default (json_sub_obj, "path", NULL);
       data_path = json_object_get_string_member_with_default (json_sub_obj, "data_path", NULL);

@@ -706,10 +706,12 @@ _srt_xdg_portal_get_info_from_report (JsonObject *json_obj)
 
   json_portals_obj = json_object_get_object_member (json_obj, "xdg-portals");
 
-  issues = srt_get_flags_from_json_array (SRT_TYPE_XDG_PORTAL_ISSUES,
-                                          json_portals_obj,
-                                          "issues",
-                                          SRT_XDG_PORTAL_ISSUES_UNKNOWN);
+  issues = _srt_json_object_get_issues_from_report (json_portals_obj,
+                                                    "xdg-portals",
+                                                    SRT_TYPE_XDG_PORTAL_ISSUES,
+                                                    "issues",
+                                                    "ok",
+                                                    SRT_XDG_PORTAL_ISSUES_UNKNOWN);
 
   messages = _srt_json_object_dup_array_of_lines_member (json_portals_obj, "messages");
 

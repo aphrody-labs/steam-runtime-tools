@@ -168,14 +168,9 @@ libraries_presence (Fixture *f,
       g_assert_true (json_object_has_member (json_arch, "can-run"));
       g_assert_cmpint (json_object_get_boolean_member (json_arch, "can-run"),
                       ==, srt_system_info_can_run (info, multiarch_tuples[i]));
-      g_assert_cmpint (json_object_has_member (json_arch, "library-issues-summary"),
+      g_assert_cmpint (json_object_has_member (json_arch, "libraries-ok") ||
+                       json_object_has_member (json_arch, "library-issues-summary"),
                       ==, srt_system_info_can_run (info, multiarch_tuples[i]));
-      if (json_object_has_member (json_arch, "library-issues-summary"))
-        {
-          JsonArray *array;
-          array = json_object_get_array_member (json_arch, "library-issues-summary");
-          g_assert_cmpint (json_array_get_length (array), ==, 0);
-        }
       g_assert_true (json_object_has_member (json_arch, "dri_drivers"));
       g_assert_true (json_object_has_member (json_arch, "gbm_backends"));
       g_assert_true (json_object_has_member (json_arch, "va-api_drivers"));
@@ -299,7 +294,8 @@ libraries_missing (Fixture *f,
       g_assert_true (json_object_has_member (json_arch, "can-run"));
       g_assert_cmpint (json_object_get_boolean_member (json_arch, "can-run"),
                       ==, srt_system_info_can_run (info, multiarch_tuples[i]));
-      g_assert_cmpint (json_object_has_member (json_arch, "library-issues-summary"),
+      g_assert_cmpint (json_object_has_member (json_arch, "libraries-ok") ||
+                       json_object_has_member (json_arch, "library-issues-summary"),
                       ==, srt_system_info_can_run (info, multiarch_tuples[i]));
       g_assert_true (json_object_has_member (json_arch, "dri_drivers"));
       g_assert_true (json_object_has_member (json_arch, "gbm_backends"));
@@ -330,12 +326,10 @@ check_library_no_errors (JsonObject *json_details,
 static void
 check_libraries_verbose (JsonObject *json_arch)
 {
-  JsonArray *array;
   JsonObject *json_details;
-  if (json_object_has_member (json_arch, "library-issues-summary"))
+  if (json_object_has_member (json_arch, "libraries-ok"))
     {
-      array = json_object_get_array_member (json_arch, "library-issues-summary");
-      g_assert_cmpint (json_array_get_length (array), ==, 0);
+      g_assert_cmpint (json_object_get_boolean_member (json_arch, "libraries-ok"), ==, TRUE);
 
       g_assert_true (json_object_has_member (json_arch, "library-details"));
       json_details = json_object_get_object_member (json_arch, "library-details");
@@ -412,7 +406,8 @@ libraries_presence_verbose (Fixture *f,
       g_assert_true (json_object_has_member (json_arch, "can-run"));
       g_assert_cmpint (json_object_get_boolean_member (json_arch, "can-run"),
                       ==, srt_system_info_can_run (info, multiarch_tuples[i]));
-      g_assert_cmpint (json_object_has_member (json_arch, "library-issues-summary"),
+      g_assert_cmpint (json_object_has_member (json_arch, "libraries-ok") ||
+                       json_object_has_member (json_arch, "library-issues-summary"),
                       ==, srt_system_info_can_run (info, multiarch_tuples[i]));
       g_assert_true (json_object_has_member (json_arch, "dri_drivers"));
       g_assert_true (json_object_has_member (json_arch, "gbm_backends"));
@@ -497,7 +492,6 @@ steam_presence (Fixture *f,
   g_autoptr(JsonNode) node = NULL;
   JsonObject *json;
   JsonObject *json_sub_object;
-  JsonArray *array;
   g_autoptr(GError) error = NULL;
   g_autofree gchar *output = NULL;
   const gchar *path = NULL;
@@ -507,7 +501,6 @@ steam_presence (Fixture *f,
   const gchar *version = NULL;
   const gchar *argv[] = { "steam-runtime-system-info", NULL };
   FakeHome *fake_home;
-  size_t i, n;
 
   fake_home = fake_home_new (NULL);
   fake_home_create_structure (fake_home);
@@ -559,9 +552,9 @@ steam_presence (Fixture *f,
   script_version = json_object_get_string_member (json_sub_object, "steamscript_version");
   g_assert_cmpstr (script_version, ==, "1.0.0.66");
 
-  g_assert_true (json_object_has_member (json_sub_object, "issues"));
-  array = json_object_get_array_member (json_sub_object, "issues");
-  g_assert_cmpint (json_array_get_length (array), ==, 0);
+  g_assert_true (json_object_has_member (json_sub_object, "ok"));
+  g_assert_cmpint (json_object_get_boolean_member (json_sub_object, "ok"), ==, TRUE);
+  g_assert_false (json_object_has_member (json_sub_object, "issues"));
 
   g_assert_true (json_object_has_member (json, "runtime"));
   json_sub_object = json_object_get_object_member (json, "runtime");
@@ -575,17 +568,28 @@ steam_presence (Fixture *f,
   version = json_object_get_string_member (json_sub_object, "version");
   g_assert_cmpstr (version, !=, NULL);
 
-  g_assert_true (json_object_has_member (json_sub_object, "issues"));
-  array = json_object_get_array_member (json_sub_object, "issues");
-  n = json_array_get_length (array);
+  if (json_object_has_member (json_sub_object, "ok"))
+   {
+     g_assert_cmpint (json_object_get_boolean_member (json_sub_object, "ok"), ==, TRUE);
+     g_assert_false (json_object_has_member (json_sub_object, "issues"));
+   }
+  else
+  {
+    JsonArray *array;
+    size_t i, n;
 
-  for (i = 0; i < n; i++)
-    {
-      const char *issue = json_array_get_string_element (array, i);
+    g_assert_true (json_object_has_member (json_sub_object, "issues"));
+    array = json_object_get_array_member (json_sub_object, "issues");
+    n = json_array_get_length (array);
 
-      if (!runtime_issue_name_ignorable (issue))
-        g_test_fail_printf ("Unexpected runtime->issues: %s", issue);
-    }
+    for (i = 0; i < n; i++)
+      {
+        const char *issue = json_array_get_string_element (array, i);
+
+        if (!runtime_issue_name_ignorable (issue))
+          g_test_fail_printf ("Unexpected runtime->issues: %s", issue);
+      }
+  }
 
   g_assert_false (json_object_has_member (json_sub_object, "overrides"));
   g_assert_true (json_object_has_member (json_sub_object, "pinned_libs_32"));

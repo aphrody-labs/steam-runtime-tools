@@ -124,9 +124,15 @@ keys:
         Steam, for example **1.0.0.66** or **1.0.0.66-2/Debian**.
         Otherwise, or if unavailable, it is **null**.
 
+    **ok**
+    :   If **true** no Steam-installation-related problems were found.
+        No other value is allowed:
+        if problems were found,
+        `issues` will be emitted instead.
+
     **issues**
     :   An array of strings representing problems with the Steam
-        installation. If empty, no problems were found.
+        installation.
 
         **unknown** (or **internal-error** in older reports)
         :   An error occurred while checking the Steam installation.
@@ -192,9 +198,15 @@ keys:
     :   The version number of the Steam Runtime, for example
         `0.20190711.3`.
 
+    **ok**
+    :   If **true** no Steam-Runtime-related problems were found.
+        No other value is allowed:
+        if problems were found,
+        `issues` will be emitted instead.
+
     **issues**
     :   An array of strings representing problems with the Steam
-        Runtime. If empty, no problems were found.
+        Runtime.
 
         **unknown** (or **internal-error** in older reports)
         :   An error occurred while checking the Steam Runtime.
@@ -475,6 +487,12 @@ keys:
         **unknown** (if we appear to be in a container but the type is
         unknown), or **none** (if we do not appear to be in a container).
 
+    **bubblewrap_ok**
+    :   If **true** no bubblewrap-related problems were found.
+        No other value is allowed:
+        if problems were found,
+        `bubblewrap_issues` will be emitted instead.
+
     **bubblewrap_issues**
     :   An array of flags describing potential problems with **bwrap**(1),
         such as not having the necessary system configuration to be able
@@ -492,6 +510,12 @@ keys:
     :   Human-readable array of lines with diagnostic messages related
         to **bwrap**(1), if any.
         This key is not provided if the array would be empty.
+
+    **flatpak_ok**
+    :   If **true** no Flatpak-related problems were found.
+        No other value is allowed:
+        if problems were found,
+        `flatpak_issues` will be emitted instead.
 
     **flatpak_issues**
     :   An array of flags describing potential problems with Flatpak,
@@ -584,9 +608,15 @@ keys:
         **error**
         :   A human-readable error message.
 
+    **libraries-ok**
+    :   If **true** no loadable-library-related problems were found.
+        No other value is allowed:
+        if problems were found,
+        `library-issues-summary` will be emitted instead.
+
     **library-issues-summary**
     :   A summary of issues found when loading the expected libraries,
-        as an array of strings. If empty, no problems were found.
+        as an array of strings.
 
         **unknown** (or **internal-error** in older reports)
         :   There was an internal error while checking libraries.
@@ -750,7 +780,6 @@ keys:
                 `integrated-gpu`, `discrete-gpu`, `virtual-gpu`,
                 or `cpu` (denoting software rendering such as llvmpipe).
 
-
             **messages**
             :   Human-readable array of diagnostic messages.
 
@@ -871,6 +900,12 @@ keys:
             for example `/etc/xdg/openxr/1/active_runtime.json`.
             Omitted if it would be the same as the **json_path**.
 
+       **ok**
+       :   If **true** no openxr-1-runtime problems were found.
+           No other value is allowed:
+           if problems were found,
+           `issues` will be emitted instead.
+
         **issues**
         :   An array of strings representing problems with the ICD,
             in the same representation documented for EGL ICDs.
@@ -969,9 +1004,14 @@ keys:
     **json_path**
     :   Absolute path to the JSON file describing the ICD
 
+    **ok**
+    :   If **true** no egl problems were found.
+        No other value is allowed:
+        if problems were found,
+        `issues` will be emitted instead.
+
     **issues**
     :   An array of strings representing problems with the ICD.
-        If empty, no problems were found.
 
         **unknown**
         :   There was an unknown, or internal, error while checking the ICD.
@@ -1151,9 +1191,14 @@ keys:
     :   A boolean value indicating whether the current session is using
         Wayland.
 
+    **wayland-ok**
+    :   If **true** no wayland-related problems were found.
+        No other value is allowed:
+        if problems were found,
+        `wayland-issues` will be emitted instead.
+
     **wayland-issues**
     :   An array of strings representing problems with the Wayland session.
-        If empty, no problems were found.
 
         **unknown**
         :   There was an unknown, or internal, error while checking Wayland
@@ -1213,9 +1258,15 @@ keys:
             **available**
             :   A boolean value indicating whether this backend is available.
 
+    **ok**
+    :   If **true** no XDG-portal-related problems were found.
+        No other value is allowed:
+        if problems were found,
+        `issues` will be emitted instead.
+
     **issues**
     :   Problems with the XDG portal support, represented as an array
-        of strings. The array is empty if no problems were detected.
+        of strings.
 
         **unknown**
         :   There was an unknown error while checking XDG portal support.

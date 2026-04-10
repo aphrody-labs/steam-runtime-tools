@@ -201,13 +201,6 @@ jsonify_graphics_issues (JsonBuilder *builder,
 }
 
 static void
-jsonify_loadable_issues (JsonBuilder *builder,
-                         SrtLoadableIssues issues)
-{
-  jsonify_flags (builder, SRT_TYPE_LOADABLE_ISSUES, issues);
-}
-
-static void
 jsonify_enum (JsonBuilder *builder,
               GType type,
               int value)
@@ -227,52 +220,24 @@ jsonify_enum (JsonBuilder *builder,
 }
 
 static void
-jsonify_steam_issues (JsonBuilder *builder,
-                      SrtSteamIssues issues)
+jsonify_issues_or_no_issues (JsonBuilder *builder,
+                             GType flags_type,
+                             const char *issues_member,
+                             const char *no_issues_member,
+                             unsigned int issues)
 {
-  jsonify_flags (builder, SRT_TYPE_STEAM_ISSUES, issues);
-}
-
-static void
-jsonify_runtime_issues (JsonBuilder *builder,
-                        SrtRuntimeIssues issues)
-{
-  jsonify_flags (builder, SRT_TYPE_RUNTIME_ISSUES, issues);
-}
-
-static void
-jsonify_locale_issues (JsonBuilder *builder,
-                       SrtLocaleIssues issues)
-{
-  jsonify_flags (builder, SRT_TYPE_LOCALE_ISSUES, issues);
-}
-
-static void
-jsonify_xdg_portal_issues (JsonBuilder *builder,
-                           SrtXdgPortalIssues issues)
-{
-  jsonify_flags (builder, SRT_TYPE_XDG_PORTAL_ISSUES, issues);
-}
-
-static void
-jsonify_display_wayland_issues (JsonBuilder *builder,
-                                SrtDisplayWaylandIssues issues)
-{
-  jsonify_flags (builder, SRT_TYPE_DISPLAY_WAYLAND_ISSUES, issues);
-}
-
-static void
-jsonify_bwrap_issues (JsonBuilder *builder,
-                                SrtBwrapIssues issues)
-{
-  jsonify_flags (builder, SRT_TYPE_BWRAP_ISSUES, issues);
-}
-
-static void
-jsonify_flatpak_issues (JsonBuilder *builder,
-                                SrtFlatpakIssues issues)
-{
-  jsonify_flags (builder, SRT_TYPE_FLATPAK_ISSUES, issues);
+  if (issues == 0)
+    {
+      json_builder_set_member_name (builder, no_issues_member);
+      json_builder_add_boolean_value (builder, TRUE);
+    }
+  else
+    {
+      json_builder_set_member_name (builder, issues_member);
+      json_builder_begin_array (builder);
+      jsonify_flags (builder, flags_type, issues);
+      json_builder_end_array (builder);
+    }
 }
 
 static void
@@ -816,10 +781,9 @@ jsonify_container (JsonBuilder *builder,
       switch (type)
         {
           case SRT_CONTAINER_TYPE_FLATPAK:
-            json_builder_set_member_name (builder, "flatpak_issues");
-            json_builder_begin_array (builder);
-            jsonify_flatpak_issues (builder, flatpak_issues);
-            json_builder_end_array (builder);
+            jsonify_issues_or_no_issues (builder, SRT_TYPE_FLATPAK_ISSUES,
+                                         "flatpak_issues", "flatpak_ok",
+                                         flatpak_issues);
 
             if (flatpak_version != NULL)
               {
@@ -835,10 +799,9 @@ jsonify_container (JsonBuilder *builder,
           case SRT_CONTAINER_TYPE_UNKNOWN:
           case SRT_CONTAINER_TYPE_NONE:
           default:
-            json_builder_set_member_name (builder, "bubblewrap_issues");
-            json_builder_begin_array (builder);
-            jsonify_bwrap_issues (builder, bwrap_issues);
-            json_builder_end_array (builder);
+            jsonify_issues_or_no_issues (builder, SRT_TYPE_BWRAP_ISSUES,
+                                         "bubblewrap_issues", "bubblewrap_ok",
+                                         bwrap_issues);
 
             /* Don't log the path to bwrap in the common case that it's
              * our bundled one and it worked successfully */
@@ -901,10 +864,9 @@ jsonify_display (JsonBuilder *builder,
       json_builder_set_member_name (builder, "wayland-session");
       json_builder_add_boolean_value (builder, wayland_session);
 
-      json_builder_set_member_name (builder, "wayland-issues");
-      json_builder_begin_array (builder);
-      jsonify_display_wayland_issues (builder, wayland_issues);
-      json_builder_end_array (builder);
+      jsonify_issues_or_no_issues (builder, SRT_TYPE_DISPLAY_WAYLAND_ISSUES,
+                                   "wayland-issues", "wayland-ok",
+                                   wayland_issues);
 
       json_builder_set_member_name (builder, "x11-type");
       jsonify_enum (builder, SRT_TYPE_DISPLAY_X11_TYPE, x11_type);
@@ -1020,10 +982,9 @@ print_layer_details (JsonBuilder *builder,
           }
 
         loadable_issues = srt_vulkan_layer_get_issues (iter->data);
-        json_builder_set_member_name (builder, "issues");
-        json_builder_begin_array (builder);
-        jsonify_loadable_issues (builder, loadable_issues);
-        json_builder_end_array (builder);
+        jsonify_issues_or_no_issues (builder, SRT_TYPE_LOADABLE_ISSUES,
+                                     "issues", "ok",
+                                     loadable_issues);
 
         json_builder_end_object (builder);
       }
@@ -1094,10 +1055,9 @@ fill_openxr_layer (JsonBuilder *builder,
     }
 
   loadable_issues = srt_openxr_1_layer_get_issues (layer);
-  json_builder_set_member_name (builder, "issues");
-  json_builder_begin_array (builder);
-  jsonify_loadable_issues (builder, loadable_issues);
-  json_builder_end_array (builder);
+  jsonify_issues_or_no_issues (builder, SRT_TYPE_LOADABLE_ISSUES,
+                               "issues", "ok",
+                               loadable_issues);
 }
 
 static void
@@ -1181,10 +1141,9 @@ print_openxr_1_runtime_details (JsonBuilder *builder,
     }
 
   loadable_issues = srt_openxr_1_runtime_get_issues (rt);
-  json_builder_set_member_name (builder, "issues");
-  json_builder_begin_array (builder);
-  jsonify_loadable_issues (builder, loadable_issues);
-  json_builder_end_array (builder);
+  jsonify_issues_or_no_issues (builder, SRT_TYPE_LOADABLE_ISSUES,
+                               "issues", "ok",
+                               loadable_issues);
 
   json_builder_end_object (builder);
 }
@@ -1394,10 +1353,8 @@ main (int argc,
   json_builder_add_string_value (builder, steamscript_version);
 
   steam_issues = srt_system_info_get_steam_issues (info);
-  json_builder_set_member_name (builder, "issues");
-  json_builder_begin_array (builder);
-  jsonify_steam_issues (builder, steam_issues);
-  json_builder_end_array (builder);
+  jsonify_issues_or_no_issues (builder, SRT_TYPE_STEAM_ISSUES,
+                               "issues", "ok", steam_issues);
 
   json_builder_end_object (builder);
 
@@ -1415,10 +1372,8 @@ main (int argc,
       json_builder_add_string_value (builder, version);
 
       runtime_issues = srt_system_info_get_runtime_issues (info);
-      json_builder_set_member_name (builder, "issues");
-      json_builder_begin_array (builder);
-      jsonify_runtime_issues (builder, runtime_issues);
-      json_builder_end_array (builder);
+      jsonify_issues_or_no_issues (builder, SRT_TYPE_RUNTIME_ISSUES,
+                                   "issues", "ok", runtime_issues);
 
       overrides = srt_system_info_list_pressure_vessel_overrides (info, &messages);
 
@@ -1572,10 +1527,9 @@ main (int argc,
         {
           library_issues = srt_system_info_check_libraries (info, tuple,
                                                             &libraries);
-          json_builder_set_member_name (builder, "library-issues-summary");
-          json_builder_begin_array (builder);
-          jsonify_library_issues (builder, library_issues);
-          json_builder_end_array (builder);
+          jsonify_issues_or_no_issues (builder, SRT_TYPE_LIBRARY_ISSUES,
+                                       "library-issues-summary", "libraries-ok",
+                                       library_issues);
         }
 
       if (libraries != NULL && (library_issues != SRT_LIBRARY_ISSUES_NONE || verbose))
@@ -1628,18 +1582,10 @@ main (int argc,
   json_builder_end_object (builder);
 
   locale_issues = srt_system_info_get_locale_issues (info);
-  if (locale_issues == SRT_LOCALE_ISSUES_NONE)
-    {
-      json_builder_set_member_name (builder, "locales-ok");
-      json_builder_add_boolean_value (builder, TRUE);
-    }
-  else
-    {
-      json_builder_set_member_name (builder, "locale-issues");
-      json_builder_begin_array (builder);
-      jsonify_locale_issues (builder, locale_issues);
-      json_builder_end_array (builder);
-    }
+  jsonify_issues_or_no_issues (builder,
+                               SRT_TYPE_LOCALE_ISSUES,
+                               "locale-issues", "locales-ok",
+                               locale_issues);
 
   json_builder_set_member_name (builder, "locales");
   json_builder_begin_object (builder);
@@ -1720,10 +1666,9 @@ main (int argc,
         }
 
       loadable_issues = srt_egl_icd_get_issues (icd_iter->data);
-      json_builder_set_member_name (builder, "issues");
-      json_builder_begin_array (builder);
-      jsonify_loadable_issues (builder, loadable_issues);
-      json_builder_end_array (builder);
+      jsonify_issues_or_no_issues (builder, SRT_TYPE_LOADABLE_ISSUES,
+                                   "issues", "ok",
+                                   loadable_issues);
 
       json_builder_end_object (builder);
     }
@@ -1765,10 +1710,9 @@ main (int argc,
         }
 
       loadable_issues = srt_egl_external_platform_get_issues (icd_iter->data);
-      json_builder_set_member_name (builder, "issues");
-      json_builder_begin_array (builder);
-      jsonify_loadable_issues (builder, loadable_issues);
-      json_builder_end_array (builder);
+      jsonify_issues_or_no_issues (builder, SRT_TYPE_LOADABLE_ISSUES,
+                                   "issues", "ok",
+                                   loadable_issues);
 
       json_builder_end_object (builder);
     }
@@ -1826,10 +1770,9 @@ main (int argc,
         }
 
       loadable_issues = srt_vulkan_icd_get_issues (icd_iter->data);
-      json_builder_set_member_name (builder, "issues");
-      json_builder_begin_array (builder);
-      jsonify_loadable_issues (builder, loadable_issues);
-      json_builder_end_array (builder);
+      jsonify_issues_or_no_issues (builder, SRT_TYPE_LOADABLE_ISSUES,
+                                   "issues", "ok",
+                                   loadable_issues);
 
       json_builder_end_object (builder);
     }
@@ -1983,10 +1926,8 @@ main (int argc,
         }
 
       xdg_portal_issues = srt_system_info_get_xdg_portal_issues (info, &xdg_portal_messages);
-      json_builder_set_member_name (builder, "issues");
-      json_builder_begin_array (builder);
-      jsonify_xdg_portal_issues (builder, xdg_portal_issues);
-      json_builder_end_array (builder);
+      jsonify_issues_or_no_issues (builder, SRT_TYPE_XDG_PORTAL_ISSUES,
+                                   "issues", "ok", xdg_portal_issues);
 
       if (xdg_portal_messages != NULL)
         _srt_json_builder_add_array_of_lines (builder, "messages", xdg_portal_messages);

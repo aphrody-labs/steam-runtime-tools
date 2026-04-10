@@ -348,10 +348,12 @@ get_driver_loadable_from_json_report (JsonObject *json_obj,
   portability_driver = json_object_get_boolean_member_with_default (json_obj,
                                                                     "is_portability_driver",
                                                                     FALSE);
-  issues = srt_get_flags_from_json_array (SRT_TYPE_LOADABLE_ISSUES,
-                                          json_obj,
-                                          "issues",
-                                          SRT_LOADABLE_ISSUES_UNKNOWN);
+  issues = _srt_json_object_get_issues_from_report (json_obj,
+                                                    debug_member,
+                                                    SRT_TYPE_LOADABLE_ISSUES,
+                                                    "issues",
+                                                    "ok",
+                                                    SRT_LOADABLE_ISSUES_UNKNOWN);
   error_domain = g_quark_from_string (json_object_get_string_member_with_default (json_obj,
                                                                                   "error-domain",
                                                                                   NULL));

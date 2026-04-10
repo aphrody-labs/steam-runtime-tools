@@ -1,3 +1,18 @@
+steam-runtime-tools (0.20260410.0) UNRELEASED; urgency=medium
+
+  [ Antonio Ospite ]
+  * Diagnostic tools:
+    - steam-runtime-system-info: Make the report clearer if no issues are
+      reported (steamrt/tasks#837)
+
+  [ Simon McVittie ]
+  * launcher-service:
+    - Fix the experimental steamrt3c-based Steam client when run from the
+      unofficial Flatpak app (steamrt/tasks#976)
+  * CI fixes (steamrt/tasks#981)
+
+ -- Simon McVittie <smcv@collabora.com>  Fri, 10 Apr 2026 17:19:24 +0100
+
 steam-runtime-tools (0.20260327.0) steamrt; urgency=medium
 
   * Diagnostic tools:

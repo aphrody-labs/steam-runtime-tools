@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260410.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260414.0) steamrt; urgency=medium
 
   [ Antonio Ospite ]
   * Diagnostic tools:
@@ -11,7 +11,7 @@ steam-runtime-tools (0.20260410.0) UNRELEASED; urgency=medium
       unofficial Flatpak app (steamrt/tasks#976)
   * CI fixes (steamrt/tasks#981)
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 10 Apr 2026 17:19:24 +0100
+ -- Simon McVittie <smcv@collabora.com>  Tue, 14 Apr 2026 19:07:00 +0100
 
 steam-runtime-tools (0.20260327.0) steamrt; urgency=medium
 

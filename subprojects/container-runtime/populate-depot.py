@@ -404,6 +404,7 @@ class ComponentVersion:
 class Main:
     def __init__(
         self,
+        add_bin_directory: bool = False,
         architecture: str = 'amd64,i386',
         cache: str = '.cache',
         credential_envs: Sequence[str] = (),
@@ -471,6 +472,7 @@ class Main:
 
         self.opener = urllib.request.build_opener(*openers)
 
+        self.add_bin_directory = add_bin_directory
         self.cache = cache
         self.default_architecture = architecture
         self.default_suite = suite
@@ -763,6 +765,25 @@ class Main:
                 break
 
         self.versions.append(pv_version)
+
+        if self.add_bin_directory:
+            bin_dir = os.path.join(self.depot, 'bin')
+            os.makedirs(bin_dir, exist_ok=True)
+
+            executables = [
+                'steam-runtime-launch-client',
+                'steam-runtime-launch-options',
+            ]
+            for exe in executables:
+                src = os.path.join('..', 'pressure-vessel', 'bin', exe)
+                dst = os.path.join(self.depot, bin_dir, exe)
+
+                logger.info("Creating symlink from {} to {}".format(
+                    src, dst)
+                )
+                if os.path.exists(dst):
+                    os.remove(dst)
+                os.symlink(src, dst)
 
         if self.unpack_ld_library_path is not None:
             if self.runtime.name == 'scout':
@@ -1787,6 +1808,10 @@ def main() -> None:
     parser.add_argument(
         '--pressure-vessel-official', dest='_ignored', action='store_true',
         help='Ignored for backwards compatibility',
+    )
+    parser.add_argument(
+        '--add-bin-directory', default=False, action='store_true',
+        help='Add a bin/ directory with some commonly useful executables',
     )
     parser.add_argument(
         '--no-include-archives', dest='_ignored', action='store_true',

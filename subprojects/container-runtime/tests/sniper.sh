@@ -68,6 +68,7 @@ python3 ./populate-depot.py \
     --fast \
     --no-include-archives \
     --pressure-vessel-archive=.cache/pressure-vessel-bin.tar.gz \
+    --add-bin-directory \
     --toolmanifest \
     --unpack-runtime \
     --versioned-directories \
@@ -79,6 +80,11 @@ find depots/test-sniper-unpacked -ls > depots/test-sniper-unpacked.txt
 
 if ! [ -e "depots/test-sniper-unpacked/steampipe/app_build_1628350.vdf" ]; then
     echo "Bail out! app_build_1628350.vdf not found"
+    exit 1
+fi
+
+if ! [ -e "depots/test-sniper-unpacked/bin" ]; then
+    echo "Bail out! bin/ not found"
     exit 1
 fi
 

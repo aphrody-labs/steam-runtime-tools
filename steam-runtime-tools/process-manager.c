@@ -1015,9 +1015,11 @@ _srt_process_manager_new (SrtProcessManagerOptions *options,
   SrtProcessManagerOptions blank = SRT_PROCESS_MANAGER_OPTIONS_INIT;
   g_autoptr(SrtProcessManager) self = NULL;
 
-  g_return_val_if_fail ((options->terminate_grace_usec < 0
-                         || options->subreaper),
+  g_return_val_if_fail (options->subreaper
+                        || !options->terminate_with_main,
                         FALSE);
+  g_return_val_if_fail (options->terminate_wait_usec >= 0, FALSE);
+  g_return_val_if_fail (options->terminate_grace_usec >= 0, FALSE);
 
   if (options->exit_with_parent)
     {
@@ -1322,7 +1324,7 @@ _srt_process_manager_run (SrtProcessManager *self,
   /* Wait for the other child processes, if any, possibly killing them.
    * Note that this affects whether we return FALSE and set the error,
    * but doesn't affect self->exit_status. */
-  if (self->opts.terminate_grace_usec >= 0)
+  if (self->opts.terminate_with_main)
     return _srt_subreaper_terminate_all_child_processes (self->opts.terminate_wait_usec,
                                                          self->opts.terminate_grace_usec,
                                                          error);

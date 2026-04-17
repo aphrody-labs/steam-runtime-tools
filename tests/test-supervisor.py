@@ -64,6 +64,11 @@ class TestSupervisor(BaseTest):
                     'steam-runtime-supervisor'
                 ),
             ]
+            self.needs_supervision = os.path.join(
+                self.top_builddir,
+                'tests',
+                'needs-supervision',
+            )
         else:
             self.skipTest('Not available as an installed-test')
 
@@ -431,6 +436,140 @@ class TestSupervisor(BaseTest):
                 proc.wait(),
                 (128 + signal.SIGTERM, -signal.SIGTERM),
             )
+
+    def _test_terminate_with_main(
+        self,
+        options=[],             # type: typing.List[str]
+        is_subreaper=None,      # type: typing.Optional[bool]
+        kills_child=False,      # type: bool
+    ) -> None:
+        '''
+        Assert that with the given options,
+        the death of the main process (the immediate child of the supervisor)
+        does or does not result in killing all other descendant processes
+        and waiting for them to exit.
+        '''
+        read_child_stdin, write_child_stdin = os.pipe2(os.O_CLOEXEC)
+        read_child_stdout, write_child_stdout = os.pipe2(os.O_CLOEXEC)
+        read_child_ready, write_child_ready = os.pipe2(os.O_CLOEXEC)
+        read_child_sigterm, write_child_sigterm = os.pipe2(os.O_CLOEXEC)
+        read_parent_ready, write_parent_ready = os.pipe2(os.O_CLOEXEC)
+
+        proc = subprocess.Popen(
+            self.supervisor + options + [
+                '--pass-fd=%d' % read_child_stdin,
+                '--pass-fd=%d' % write_child_ready,
+                '--pass-fd=%d' % write_child_sigterm,
+                '--pass-fd=%d' % write_child_stdout,
+                '--pass-fd=%d' % write_parent_ready,
+                '--',
+                self.needs_supervision,
+                '--child-report-ready=%d' % write_child_ready,
+                '--child-report-sigterm=%d' % write_child_sigterm,
+                '--child-stdin=%d' % read_child_stdin,
+                '--child-stdout=%d' % write_child_stdout,
+                '--parent-report-ready=%d' % write_parent_ready,
+            ],
+            pass_fds=[
+                read_child_stdin,
+                write_child_ready,
+                write_child_sigterm,
+                write_child_stdout,
+                write_parent_ready,
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=2,
+        )
+
+        with proc:
+            # Close the ends of the pipes that the child inherited
+            os.close(read_child_stdin)
+            os.close(write_child_ready)
+            os.close(write_child_sigterm)
+            os.close(write_child_stdout)
+            os.close(write_parent_ready)
+
+            # Wait for both parent and child to set up their SIGTERM
+            # handlers.
+            with open(read_child_ready, 'rb') as reader:
+                self.assertEqual(b'Child ready\n', reader.read())
+
+            with open(read_parent_ready, 'rb') as reader:
+                self.assertEqual(b'Parent ready\n', reader.read())
+
+            # Close the parent process's stdin, allowing it to exit
+            stdin = proc.stdin
+            assert stdin is not None
+            stdin.close()
+
+            # The parent process closes stdout and exits
+            stdout = proc.stdout
+            assert stdout is not None
+            output = stdout.read()
+            self.assertEqual(output, b'')
+
+            # If the supervisor is known not to be a subreaper,
+            # then the supervisor will exit already
+            if (
+                kills_child
+                or (is_subreaper is not None and not is_subreaper)
+            ):
+                self.assertEqual(proc.wait(), 0)
+
+            if kills_child:
+                # The helper's child process gets signalled after the
+                # parent dies.
+                with open(read_child_sigterm, 'rb') as reader:
+                    self.assertEqual(
+                        b'Child received SIGTERM\n',
+                        reader.read(),
+                    )
+
+                with open(read_child_stdout, 'rb') as reader:
+                    self.assertEqual(b'', reader.read())
+
+                os.close(write_child_stdin)
+            else:
+                # The child process is still running afterwards,
+                # and we can prove it by continuing to communicate with it.
+                with open(write_child_stdin, 'wb') as writer:
+                    writer.write(b'hello, world!\n')
+
+                with open(read_child_stdout, 'rb') as reader:
+                    output = reader.read()
+
+                self.assertEqual(output, b'hello, world!\n')
+
+                # If the supervisor is a subreaper, it will only exit
+                # after we have allowed the child to exit
+                if is_subreaper or is_subreaper is None:
+                    self.assertEqual(proc.wait(), 0)
+
+                # The child didn't receive SIGTERM
+                with open(read_child_sigterm, 'rb') as reader:
+                    self.assertEqual(b'', reader.read())
+
+    def test_terminate_timeout(self):
+        # --terminate-timeout implies that we want to clean up any
+        # strays after the main process has exited.
+        self._test_terminate_with_main(
+            ['--terminate-timeout=2.0'],
+            is_subreaper=True,
+            kills_child=True,
+        )
+
+    def test_no_terminate_with_main_by_default(self):
+        self._test_terminate_with_main(
+            [],
+            is_subreaper=False,
+            kills_child=False,
+        )
+        self._test_terminate_with_main(
+            ['--subreaper'],
+            is_subreaper=True,
+            kills_child=False,
+        )
 
     def test_wrong_options(self) -> None:
         for option in (

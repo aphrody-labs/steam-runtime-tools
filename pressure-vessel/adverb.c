@@ -526,7 +526,8 @@ static GOptionEntry options[] =
 {
   { "assign-fd", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, opt_assign_fd_cb,
-    "Make fd TARGET a copy of SOURCE, like TARGET>&SOURCE in shell.",
+    "Make fd TARGET a copy of SOURCE, like TARGET>&SOURCE in shell, "
+    "and close SOURCE in the adverb process.",
     "TARGET=SOURCE" },
 
   { "clear-env", '\0',
@@ -634,7 +635,8 @@ static GOptionEntry options[] =
 
   { "pass-fd", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, opt_pass_fd_cb,
-    "Let the launched process inherit the given fd.",
+    "Let the launched process inherit the given fd, "
+    "while closing it in the adverb.",
     "FD" },
 
   { "prefix", '\0',

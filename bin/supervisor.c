@@ -116,7 +116,8 @@ static GOptionEntry options[] =
 {
   { "assign-fd", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, opt_assign_fd_cb,
-    "Make fd TARGET a copy of SOURCE, like TARGET>&SOURCE in shell.",
+    "Make fd TARGET a copy of SOURCE, like TARGET>&SOURCE in shell, "
+    "and close SOURCE in the supervisor process.",
     "TARGET=SOURCE" },
 
   { "clear-env", '\0',
@@ -126,7 +127,8 @@ static GOptionEntry options[] =
   { "close-fds", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_close_fds,
     "Close all file descriptors other than standard input/output/error "
-    "and those specified with --assign-fd or --pass-fd.",
+    "and those specified with --assign-fd or --pass-fd in the supervised "
+    "process.",
     NULL },
   { "no-close-fds", '\0',
     G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &opt_close_fds,
@@ -197,7 +199,8 @@ static GOptionEntry options[] =
 
   { "pass-fd", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, opt_pass_fd_cb,
-    "Let the launched process inherit the given fd, despite --close-fds.",
+    "Let the launched process inherit the given fd, despite --close-fds, "
+    "while closing it in the supervisor.",
     "FD" },
 
   { "subreaper", '\0',

@@ -53,11 +53,18 @@ determined by the options.
 
 Make file descriptor *TARGET* in the *COMMAND* a copy of file
 descriptor *SOURCE* as passed to **steam-runtime-supervisor**,
-similar to writing `TARGET>&SOURCE` as a shell redirection.
-For example, **--assign-fd=1=3** is the same as **1>&3**.
+similar to writing `TARGET>&SOURCE` or `TARGET<&SOURCE` as a shell redirection.
+For example, **--assign-fd=1=3** is the same as **1>&3**,
+making fd 1 (standard output) a copy of what is currently fd 3.
 The redirection is done at the last possible moment, so the output
 of **steam-runtime-supervisor** (if any) will still go to the
 original standard error.
+
+Additionally,
+*SOURCE* will be closed in the **steam-runtime-supervisor** process before
+waiting for the *COMMAND* (and possibly its descendants) to exit,
+unless it is being used as standard input or standard error for the
+**steam-runtime-supervisor** process.
 
 </dd>
 <dt>
@@ -228,9 +235,14 @@ acquired.
 </dt><dd>
 
 Pass the file descriptor *FD* (specified as a small positive integer)
-from the parent process to the *COMMAND*, even if **--close-fds**
-was specified.
-This option has no practical effect if **--close-fds** was not used.
+from the parent process to the *COMMAND*,
+even if **--close-fds** was specified.
+
+Additionally,
+*FD* will be closed in the **steam-runtime-supervisor** process before
+waiting for the *COMMAND* (and possibly its descendants) to exit,
+unless it is being used as standard input or standard error for the
+**steam-runtime-supervisor** process.
 
 </dd>
 <dt>

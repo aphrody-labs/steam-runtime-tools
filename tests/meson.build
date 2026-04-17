@@ -402,6 +402,15 @@ foreach arch : [
   endforeach
 endforeach
 
+# Used to test s-r-supervisor
+test_depends += executable(
+  'needs-supervision',
+  'needs-supervision.c',
+  include_directories : project_include_dirs,
+  install : get_option('installed_tests'),
+  install_dir : tests_dir,
+)
+
 # A list of strings each of this form:
 # test-name:any one-line shell command, which will include ${G_TEST_BUILDDIR}
 # A typical example:

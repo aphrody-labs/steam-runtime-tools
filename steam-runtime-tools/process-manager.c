@@ -1202,6 +1202,8 @@ static int forwarded_signals[] =
 static void
 terminate_child_cb (int signum)
 {
+  int saved_errno = errno;
+
   if (global.main_pid != 0)
     {
       /* pass it on to the child we're going to wait for */
@@ -1213,6 +1215,8 @@ terminate_child_cb (int signum)
       signal (signum, SIG_DFL);
       raise (signum);
     }
+
+  errno = saved_errno;
 }
 
 /*

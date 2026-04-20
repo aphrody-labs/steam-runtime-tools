@@ -1242,10 +1242,14 @@ _srt_process_manager_run (SrtProcessManager *self,
                           GError **error)
 {
   g_autoptr(GError) local_error = NULL;
+  gboolean ok;
   struct sigaction terminate_child_action = {};
   int wait_status = -1;
   pid_t main_pid = 0;
   size_t i;
+  sigset_t mask;
+  sigset_t old_mask;
+  const sigset_t *restore_mask = NULL;
 
   g_return_val_if_fail (global.main_pid == 0, FALSE);
   g_return_val_if_fail (self->exit_status == -1, FALSE);
@@ -1289,12 +1293,29 @@ _srt_process_manager_run (SrtProcessManager *self,
   if (self->opts.dump_parameters && _srt_util_is_debugging ())
     _srt_process_manager_dump_parameters (self, argv, envp);
 
+  if (self->opts.forward_signals)
+    {
+      /* Temporarily block SIGTERM, etc. for this critical section,
+       * until we know the main process's process ID and are ready to
+       * deliver the signal to it */
+      sigemptyset (&mask);
+      sigemptyset (&old_mask);
+
+      for (i = 0; i < G_N_ELEMENTS (forwarded_signals); i++)
+        sigaddset (&mask, forwarded_signals[i]);
+
+      if ((errno = pthread_sigmask (SIG_BLOCK, &mask, &old_mask)) != 0)
+        return glnx_throw_errno_prefix (error, "pthread_sigmask");
+
+      restore_mask = &old_mask;
+    }
+
   fflush (stdout);
   fflush (stderr);
 
   /* We use LEAVE_DESCRIPTORS_OPEN and set CLOEXEC in the child_setup,
    * to work around a deadlock in GLib < 2.60 */
-  if (!g_spawn_async (NULL,   /* working directory */
+  ok = g_spawn_async (NULL,   /* working directory */
                       (char **) argv,
                       (char **) envp,
                       (G_SPAWN_SEARCH_PATH | G_SPAWN_DO_NOT_REAP_CHILD |
@@ -1302,7 +1323,19 @@ _srt_process_manager_run (SrtProcessManager *self,
                        G_SPAWN_CHILD_INHERITS_STDIN),
                       _srt_process_manager_child_setup_cb, self,
                       &main_pid,
-                      &local_error))
+                      &local_error);
+
+  global.main_pid = main_pid;
+
+  if (restore_mask != NULL)
+    {
+      /* Restore the old signal mask. If we received SIGTERM, etc. since
+       * we blocked it, they will be delivered now */
+      if ((errno = pthread_sigmask (SIG_SETMASK, restore_mask, NULL)) != 0)
+        return glnx_throw_errno_prefix (error, "pthread_sigmask");
+    }
+
+  if (!ok)
     {
       if (local_error->domain == G_SPAWN_ERROR
           && local_error->code == G_SPAWN_ERROR_NOENT)
@@ -1313,8 +1346,6 @@ _srt_process_manager_run (SrtProcessManager *self,
       g_propagate_error (error, g_steal_pointer (&local_error));
       return FALSE;
     }
-
-  global.main_pid = main_pid;
 
   /* If the parent or child writes to a passed fd and closes it,
    * don't stand in the way of that. Skip fds 0 (stdin),

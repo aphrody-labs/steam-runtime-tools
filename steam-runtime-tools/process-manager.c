@@ -142,6 +142,9 @@ _srt_wait_for_child_processes (pid_t main_process,
 
       if (died == main_process)
         {
+          if (global.main_pid == main_process)
+            global.main_pid = 0;
+
           if (wait_status_out != NULL)
             *wait_status_out = wait_status;
 
@@ -1381,7 +1384,8 @@ _srt_process_manager_run (SrtProcessManager *self,
       return FALSE;
     }
 
-  global.main_pid = 0;
+  /* On success, the main process should definitely have exited. */
+  g_return_val_if_fail (global.main_pid == 0, FALSE);
   self->exit_status = _srt_wait_status_to_exit_status (wait_status);
 
   /* Wait for the other child processes, if any, possibly killing them.

@@ -1161,6 +1161,13 @@ _srt_process_manager_dump_parameters (SrtProcessManager *self,
     {
       g_debug ("\t(none)");
     }
+
+  g_debug ("Close other fds: %c", self->opts.close_fds ? 'y' : 'n');
+  g_debug ("Exit with parent: %c", self->opts.exit_with_parent ? 'y' : 'n');
+  g_debug ("Forward signals: %c", self->opts.forward_signals ? 'y' : 'n');
+  g_debug ("Subreaper: %c", self->opts.subreaper ? 'y' : 'n');
+  g_debug ("Terminate child processes when command exits: %c",
+           self->opts.terminate_with_main ? 'y' : 'n');
 }
 
 static pid_t global_child_pid = 0;

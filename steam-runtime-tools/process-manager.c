@@ -29,14 +29,24 @@ static struct
    * or 0 if the main process was never started or already exited.
    */
   sig_atomic_t main_pid;
+
+  /*
+   * Set to 1 if we want to respond to fatal signals by terminating all
+   * child processes.
+   */
+  sig_atomic_t terminate_when_signalled;
+
   /*
    * Set to a nonzero signal number if we have moved to the phase of
    * execution where we terminate all child processes.
+   * If we receive a signal that results in child termination,
+   * this is set to that signal number.
    * If our main process exits, this is set to SIGCHLD.
    */
   sig_atomic_t terminate_requested;
 } global = {
   .main_pid = 0,
+  .terminate_when_signalled = 0,
   .terminate_requested = 0,
 };
 
@@ -107,6 +117,7 @@ _srt_wait_status_to_exit_status (int wait_status)
  * to exit.
  *
  * If `global.terminate_requested` becomes true for any reason,
+ * for example receiving `SIGTERM` under `global.terminate_when_signalled`,
  * return %FALSE setting @error to %G_IO_ERROR_CANCELLED.
  *
  * This function cannot be called in a process that is using
@@ -1095,7 +1106,11 @@ _srt_process_manager_new (SrtProcessManagerOptions *options,
   g_autoptr(SrtProcessManager) self = NULL;
 
   g_return_val_if_fail (options->subreaper
-                        || !options->terminate_with_main,
+                        || !(options->terminate_when_signalled
+                             || options->terminate_with_main),
+                        FALSE);
+  g_return_val_if_fail (options->forward_signals
+                        || !options->terminate_when_signalled,
                         FALSE);
   g_return_val_if_fail (options->terminate_wait_usec >= 0, FALSE);
   g_return_val_if_fail (options->terminate_grace_usec >= 0, FALSE);
@@ -1243,6 +1258,8 @@ _srt_process_manager_dump_parameters (SrtProcessManager *self,
   g_debug ("Exit with parent: %c", self->opts.exit_with_parent ? 'y' : 'n');
   g_debug ("Forward signals: %c", self->opts.forward_signals ? 'y' : 'n');
   g_debug ("Subreaper: %c", self->opts.subreaper ? 'y' : 'n');
+  g_debug ("Terminate child processes when signalled: %c",
+           self->opts.terminate_when_signalled ? 'y' : 'n');
   g_debug ("Terminate child processes when command exits: %c",
            self->opts.terminate_with_main ? 'y' : 'n');
 }
@@ -1262,15 +1279,42 @@ static void
 terminate_child_cb (int signum)
 {
   int saved_errno = errno;
+  gboolean is_terminating_signal;
 
-  if (global.main_pid != 0)
+  switch (signum)
+    {
+      case SIGINT:
+      case SIGQUIT:
+      case SIGTERM:
+        is_terminating_signal = TRUE;
+        break;
+
+      /* We don't terminate everything on SIGHUP or SIGUSR* because
+       * those are sometimes used as a control signal, for example
+       * SIGHUP's secondary use for reloading daemon configuration. */
+      default:
+        is_terminating_signal = FALSE;
+        break;
+    }
+
+  if (is_terminating_signal && global.terminate_when_signalled != 0)
+    {
+      global.terminate_requested = signum;
+    }
+  else if (global.main_pid != 0)
     {
       /* pass it on to the child we're going to wait for */
       kill (global.main_pid, signum);
     }
-  else
+  else if (global.terminate_requested == 0)
     {
-      /* guess I'll just die, then */
+      /* If we haven't yet started a child process, we can shortcut
+       * by killing the supervisor process before it starts any
+       * child processes.
+       * Or, if our main child process already exited and we have not
+       * been given permission to forcibly terminate other child processes,
+       * there isn't really much we can do about it other than accepting
+       * the fatal signal and exiting. */
       signal (signum, SIG_DFL);
       raise (signum);
     }
@@ -1315,6 +1359,7 @@ _srt_process_manager_run (SrtProcessManager *self,
   const sigset_t *restore_mask = NULL;
 
   g_return_val_if_fail (global.main_pid == 0, FALSE);
+  g_return_val_if_fail (global.terminate_when_signalled == 0, FALSE);
   g_return_val_if_fail (global.terminate_requested == 0, FALSE);
   g_return_val_if_fail (self->exit_status == -1, FALSE);
 
@@ -1376,6 +1421,15 @@ _srt_process_manager_run (SrtProcessManager *self,
 
   fflush (stdout);
   fflush (stderr);
+
+  /*
+   * Before this point, receiving SIGTERM will kill the supervisor process.
+   * After this point, receiving SIGTERM will kill child processes instead.
+   * We have to use a global variable to pass this information to
+   * terminate_child_cb.
+   */
+  if (self->opts.terminate_when_signalled)
+    global.terminate_when_signalled = 1;
 
   /* We use LEAVE_DESCRIPTORS_OPEN and set CLOEXEC in the child_setup,
    * to work around a deadlock in GLib < 2.60 */

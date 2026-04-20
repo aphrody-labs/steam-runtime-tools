@@ -28,10 +28,16 @@ static struct
    * The main process ID we are waiting for,
    * or 0 if the main process was never started or already exited.
    */
-  pid_t main_pid;
+  sig_atomic_t main_pid;
 } global = {
   .main_pid = 0,
 };
+
+/* Ensure global.main_pid is large enough to store pid_t */
+G_STATIC_ASSERT (sizeof (global.main_pid) >= sizeof (pid_t));
+/* Ensure signedness of sig_atomic_t and pid_t agrees */
+G_STATIC_ASSERT (0 > (sig_atomic_t) -1);
+G_STATIC_ASSERT (0 > (pid_t) -1);
 
 /*
  * _srt_wait_status_to_exit_status:
@@ -1238,6 +1244,7 @@ _srt_process_manager_run (SrtProcessManager *self,
   g_autoptr(GError) local_error = NULL;
   struct sigaction terminate_child_action = {};
   int wait_status = -1;
+  pid_t main_pid = 0;
   size_t i;
 
   g_return_val_if_fail (global.main_pid == 0, FALSE);
@@ -1294,7 +1301,7 @@ _srt_process_manager_run (SrtProcessManager *self,
                        G_SPAWN_LEAVE_DESCRIPTORS_OPEN |
                        G_SPAWN_CHILD_INHERITS_STDIN),
                       _srt_process_manager_child_setup_cb, self,
-                      &global.main_pid,
+                      &main_pid,
                       &local_error))
     {
       if (local_error->domain == G_SPAWN_ERROR
@@ -1306,6 +1313,8 @@ _srt_process_manager_run (SrtProcessManager *self,
       g_propagate_error (error, g_steal_pointer (&local_error));
       return FALSE;
     }
+
+  global.main_pid = main_pid;
 
   /* If the parent or child writes to a passed fd and closes it,
    * don't stand in the way of that. Skip fds 0 (stdin),

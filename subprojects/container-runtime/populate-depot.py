@@ -742,6 +742,12 @@ class Main:
         if root.exists():
             self.merge_dir_into_depot(root)
 
+        tuples = list(self.multiarch_tuples)
+
+        if not tuples:
+            for arch in self.default_architecture.split(','):
+                tuples.append(self.deb_arch_to_multiarch(arch))
+
         pressure_vessel_path = self.pressure_vessel_path
         assert pressure_vessel_path is not None
         self.use_local_pressure_vessel(str(pressure_vessel_path))
@@ -880,12 +886,6 @@ class Main:
                 ),
                 exist_ok=True,
             )
-
-        tuples = list(self.multiarch_tuples)
-
-        if not tuples:
-            for arch in self.default_architecture.split(','):
-                tuples.append(self.deb_arch_to_multiarch(arch))
 
         with open(os.path.join(self.depot, 'run'), 'w') as writer:
             writer.write(

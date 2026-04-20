@@ -10,6 +10,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 
 
 try:
@@ -436,6 +437,356 @@ class TestSupervisor(BaseTest):
                 proc.wait(),
                 (128 + signal.SIGTERM, -signal.SIGTERM),
             )
+
+    def _test_terminate_when_signalled(
+        self,
+        options,                        # type: typing.List[str]
+        send_signal,                    # type: int
+        expect_sigterm=True,            # type: bool
+        is_subreaper=None,              # type: typing.Optional[bool]
+        kills_child=True,               # type: bool
+        parent_exits_first=False,       # type: bool
+        parent_ignores_sigterm=False,   # type: bool
+        parent_killed_by=0,             # type: int
+    ) -> None:
+        '''
+        Assert that with the given options,
+        sending a terminating signal to the supervisor
+        results in killing all other descendant processes
+        and waiting for them to exit;
+        or if kills_child is false, assert that this is not done.
+        '''
+        if parent_killed_by == 0:
+            parent_killed_by = send_signal
+
+        read_child_ready, write_child_ready = os.pipe2(os.O_CLOEXEC)
+        read_child_sigterm, write_child_sigterm = os.pipe2(os.O_CLOEXEC)
+        read_child_stdin, write_child_stdin = os.pipe2(os.O_CLOEXEC)
+        read_child_stdout, write_child_stdout = os.pipe2(os.O_CLOEXEC)
+        read_parent_ready, write_parent_ready = os.pipe2(os.O_CLOEXEC)
+        read_parent_sigterm, write_parent_sigterm = os.pipe2(os.O_CLOEXEC)
+
+        if parent_ignores_sigterm:
+            helper_options = ['--parent-ignore-sigterm']
+        else:
+            helper_options = []
+
+        proc = subprocess.Popen(
+            self.supervisor + options + [
+                '--pass-fd=%d' % read_child_stdin,
+                '--pass-fd=%d' % write_child_ready,
+                '--pass-fd=%d' % write_child_sigterm,
+                '--pass-fd=%d' % write_child_stdout,
+                '--pass-fd=%d' % write_parent_ready,
+                '--pass-fd=%d' % write_parent_sigterm,
+                '--',
+                self.needs_supervision,
+                '--child-report-ready=%d' % write_child_ready,
+                '--child-report-sigterm=%d' % write_child_sigterm,
+                '--child-stdin=%d' % read_child_stdin,
+                '--child-stdout=%d' % write_child_stdout,
+                '--parent-report-ready=%d' % write_parent_ready,
+                '--parent-report-sigterm=%d' % write_parent_sigterm,
+            ] + helper_options,
+            pass_fds=[
+                read_child_stdin,
+                write_child_ready,
+                write_child_sigterm,
+                write_child_stdout,
+                write_parent_ready,
+                write_parent_sigterm,
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=2,
+        )
+
+        with proc:
+            # Close the ends of the pipes that the child inherited
+            os.close(read_child_stdin)
+            os.close(write_child_ready)
+            os.close(write_child_sigterm)
+            os.close(write_child_stdout)
+            os.close(write_parent_ready)
+            os.close(write_parent_sigterm)
+
+            # Wait for both parent and child to set up their SIGTERM
+            # handlers.
+            with open(read_child_ready, 'rb') as reader:
+                self.assertEqual(b'Child ready\n', reader.read())
+
+            with open(read_parent_ready, 'rb') as reader:
+                self.assertEqual(b'Parent ready\n', reader.read())
+
+            # If desired in this test scenario, close the parent process's
+            # stdin, allowing it to exit
+            if parent_exits_first:
+                parent_stdin = proc.stdin
+                assert parent_stdin is not None
+                parent_stdin.close()
+
+                # Wait for EOF on stdout, which is how the helper executable
+                # tells us that its child is ready for testing.
+                parent_stdout = proc.stdout
+                assert parent_stdout is not None
+
+                with parent_stdout as reader:
+                    self.assertEqual(b'', reader.read())
+
+            # If parent_exits_first, the parent has now exited,
+            # but we can't be 100% sure whether the supervisor will have
+            # detected that before we send the signal to the supervisor.
+            # Wait a moment to maximize the supervisor's chance to win
+            # the race, so that we're testing what we intend to test.
+            time.sleep(0.1)
+
+            # Send SIGINT or SIGTERM to the supervisor
+            proc.send_signal(send_signal)
+
+            with open(read_parent_sigterm, 'rb') as reader:
+                out = reader.read()
+
+            if expect_sigterm:
+                if parent_exits_first:
+                    self.assertEqual(b'', out)
+                else:
+                    self.assertEqual(b'Parent received SIGTERM\n', out)
+            else:
+                self.assertEqual(b'', out)
+
+            if kills_child:
+                # The supervisor exits after both the parent and child
+                # have exited.
+                proc.wait(timeout=10)
+
+                # The child process also gets SIGTERM, unless our settings
+                # make us only send SIGKILL.
+                with open(read_child_sigterm, 'rb') as reader:
+                    out = reader.read()
+
+                if expect_sigterm:
+                    self.assertEqual(b'Child received SIGTERM\n', out)
+                else:
+                    self.assertEqual(b'', out)
+
+                # Because the child was killed, its stdout reaches EOF,
+                # even before we close its stdin.
+                with open(read_child_stdout, 'rb') as reader:
+                    self.assertEqual(b'', reader.read())
+
+                os.close(write_child_stdin)
+            else:
+                # If the supervisor is known not to be a subreaper,
+                # then the supervisor will exit already,
+                # even though the child is still running
+                if is_subreaper is not None and not is_subreaper:
+                    proc.wait(timeout=10)
+
+                # The child process is still running afterwards,
+                # and did not receive SIGTERM. We can prove this
+                # by communicating with it.
+
+                with open(write_child_stdin, 'wb') as writer:
+                    writer.write(b'hello, world!\n')
+
+                with open(read_child_stdout, 'rb') as reader:
+                    output = reader.read()
+
+                self.assertEqual(output, b'hello, world!\n')
+
+                with open(read_child_sigterm, 'rb') as reader:
+                    self.assertEqual(b'', reader.read())
+
+                # If the supervisor is a subreaper, it will only exit
+                # after we have allowed the child to exit
+                if is_subreaper or is_subreaper is None:
+                    proc.wait(timeout=10)
+
+            # Now that all code paths have reached a point where the
+            # supervisor should have exited, we can check its exit status
+            self.assertIsNotNone(proc.returncode)
+
+            if parent_killed_by == signal.SIGTERM:
+                if parent_exits_first:
+                    # We can't be 100% sure of the order of events here:
+                    # the supervisor's exit status might reflect the
+                    # parent's exit status, or the supervisor might, itself,
+                    # get killed by SIGTERM after the parent already exited.
+                    self.assertIn(
+                        proc.returncode,
+                        (0, -signal.SIGTERM),
+                    )
+                else:
+                    # The parent received SIGTERM, and responds by exiting
+                    # with exit status equal to SIGTERM.
+                    # The supervisor should have detected this
+                    # and should report it.
+                    self.assertEqual(proc.returncode, signal.SIGTERM)
+            else:
+                if parent_exits_first:
+                    # Logic similar to above: the supervisor's exit status
+                    # might reflect the parent's exit status, or the
+                    # supervisor might be killed by e.g. SIGINT after the
+                    # parent already exited.
+                    self.assertIn(
+                        proc.returncode,
+                        (0, -parent_killed_by),
+                    )
+                else:
+                    # The supervisor's exit status should reflect a
+                    # shell-style encoding of the signal that it saw
+                    # the parent terminated by.
+                    self.assertEqual(proc.returncode, 128 + parent_killed_by)
+
+    def test_terminate_when_signalled(self) -> None:
+        self._test_terminate_when_signalled(
+            ['--terminate-when-signalled'],
+            signal.SIGTERM,
+            expect_sigterm=True,
+            is_subreaper=True,
+            kills_child=True,
+        )
+        # SIGINT to supervisor sends SIGTERM to main process,
+        # because --terminate-when-signalled takes precedence over
+        # --forward-signals
+        self._test_terminate_when_signalled(
+            ['--terminate-when-signalled'],
+            signal.SIGINT,
+            expect_sigterm=True,
+            is_subreaper=True,
+            kills_child=True,
+            parent_killed_by=signal.SIGTERM,
+        )
+        # We send SIGKILL immediately, if told to do so
+        self._test_terminate_when_signalled(
+            ['--terminate-when-signalled', '--terminate-timeout=0.0'],
+            signal.SIGTERM,
+            expect_sigterm=False,
+            is_subreaper=True,
+            kills_child=True,
+            parent_killed_by=signal.SIGKILL,
+        )
+        # If the parent already exited, we still send the signals to its
+        # child processes.
+        # Allow 100ms for the parent to exit, so that we're reasonably
+        # likely to be testing the code path that we intend to be,
+        # but without delaying testing too much.
+        self._test_terminate_when_signalled(
+            ['--terminate-when-signalled', '--terminate-idle-timeout=0.1'],
+            signal.SIGINT,
+            expect_sigterm=True,
+            is_subreaper=True,
+            kills_child=True,
+            parent_exits_first=True,
+            parent_killed_by=signal.SIGTERM,
+        )
+        # If we use --terminate-with-main then there are two reasons why
+        # terminating the parent would terminate the child
+        self._test_terminate_when_signalled(
+            ['--terminate-when-signalled', '--terminate-with-main'],
+            signal.SIGTERM,
+            expect_sigterm=True,
+            is_subreaper=True,
+            kills_child=True,
+        )
+        # SIGHUP to supervisor sends SIGHUP to main process,
+        # but this isn't forwarded to child processes.
+        # SIGUSR1, SIGUSR2 are the same (not tested here)
+        self._test_terminate_when_signalled(
+            ['--terminate-when-signalled'],
+            signal.SIGHUP,
+            expect_sigterm=False,
+            kills_child=False,
+            is_subreaper=True,
+        )
+
+    def test_no_terminate_when_signalled_by_default(self) -> None:
+        # SIGINT to supervisor sends SIGINT to main process,
+        # but by default no signals are sent to its child processes
+        self._test_terminate_when_signalled(
+            [],
+            signal.SIGINT,
+            expect_sigterm=False,
+            is_subreaper=False,
+            kills_child=False,
+        )
+        # SIGTERM to supervisor sends SIGTERM to main process,
+        # but is otherwise the same
+        self._test_terminate_when_signalled(
+            [],
+            signal.SIGTERM,
+            expect_sigterm=True,
+            is_subreaper=False,
+            kills_child=False,
+        )
+        # If we're a subreaper, the only difference is that we wait for
+        # the child to exit, too
+        self._test_terminate_when_signalled(
+            ['--subreaper'],
+            signal.SIGTERM,
+            expect_sigterm=True,
+            is_subreaper=True,
+            kills_child=False,
+        )
+        # If the parent exited first, we still don't send the signal to
+        # its children
+        self._test_terminate_when_signalled(
+            ['--subreaper'],
+            signal.SIGINT,
+            expect_sigterm=False,
+            is_subreaper=True,
+            kills_child=False,
+            parent_exits_first=True,
+        )
+        # If we use --terminate-with-main then terminating the parent
+        # indirectly causes termination of the child
+        self._test_terminate_when_signalled(
+            ['--terminate-with-main'],
+            signal.SIGTERM,
+            expect_sigterm=True,
+            is_subreaper=True,
+            kills_child=True,
+        )
+
+    def test_no_terminate_when_signalled_explicitly(self) -> None:
+        self._test_terminate_when_signalled(
+            ['--no-terminate-when-signalled', '--subreaper'],
+            signal.SIGINT,
+            expect_sigterm=False,
+            is_subreaper=True,
+            kills_child=False,
+        )
+        self._test_terminate_when_signalled(
+            ['--no-terminate-when-signalled'],
+            signal.SIGTERM,
+            expect_sigterm=True,
+            is_subreaper=False,
+            kills_child=False,
+        )
+        self._test_terminate_when_signalled(
+            ['--no-terminate-when-signalled', '--subreaper'],
+            signal.SIGTERM,
+            expect_sigterm=True,
+            is_subreaper=True,
+            kills_child=False,
+        )
+        self._test_terminate_when_signalled(
+            ['--no-terminate-when-signalled', '--subreaper'],
+            signal.SIGTERM,
+            expect_sigterm=True,
+            is_subreaper=True,
+            kills_child=False,
+            parent_exits_first=True,
+        )
+        # If we use --terminate-with-main then terminating the parent
+        # indirectly causes termination of the child
+        self._test_terminate_when_signalled(
+            ['--no-terminate-when-signalled', '--terminate-with-main'],
+            signal.SIGTERM,
+            expect_sigterm=True,
+            is_subreaper=True,
+            kills_child=True,
+        )
 
     def _test_terminate_with_main(
         self,

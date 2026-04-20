@@ -784,13 +784,30 @@ class Main:
                     os.remove(dst)
                 os.symlink(src, dst)
 
-            executables = [
+            pv_bin_executables = [
                 'steam-runtime-launch-client',
                 'steam-runtime-launch-options',
             ]
-            for exe in executables:
+            for exe in pv_bin_executables:
                 src = os.path.join('..', 'pressure-vessel', 'bin', exe)
                 dst = os.path.join(self.depot, bin_dir, exe)
+                symlink_force(src, dst)
+
+            # Executables under libexec have their rpath set relative to their
+            # location under `libexec/`, not `bin/`, so they need to be linked
+            # directly.
+            #
+            # And also, they may be linked with different names, so use a map
+            # instead of a list.
+            pv_libexec_executables = {
+                'steam-runtime-launcher-service':
+                    "{}-srt-launcher-service".format(tuples[0]),
+            }
+
+            for bin_name, libexec_name in pv_libexec_executables.items():
+                src = os.path.join('..', 'pressure-vessel', 'libexec',
+                                   'steam-runtime-tools-0', libexec_name)
+                dst = os.path.join(self.depot, bin_dir, bin_name)
                 symlink_force(src, dst)
 
         if self.unpack_ld_library_path is not None:

@@ -770,6 +770,14 @@ class Main:
             bin_dir = os.path.join(self.depot, 'bin')
             os.makedirs(bin_dir, exist_ok=True)
 
+            def symlink_force(src, dst):
+                logger.info("Creating symlink from {} to {}".format(
+                    src, dst)
+                )
+                if os.path.exists(dst):
+                    os.remove(dst)
+                os.symlink(src, dst)
+
             executables = [
                 'steam-runtime-launch-client',
                 'steam-runtime-launch-options',
@@ -777,13 +785,7 @@ class Main:
             for exe in executables:
                 src = os.path.join('..', 'pressure-vessel', 'bin', exe)
                 dst = os.path.join(self.depot, bin_dir, exe)
-
-                logger.info("Creating symlink from {} to {}".format(
-                    src, dst)
-                )
-                if os.path.exists(dst):
-                    os.remove(dst)
-                os.symlink(src, dst)
+                symlink_force(src, dst)
 
         if self.unpack_ld_library_path is not None:
             if self.runtime.name == 'scout':

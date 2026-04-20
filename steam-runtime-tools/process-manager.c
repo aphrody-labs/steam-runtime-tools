@@ -29,8 +29,15 @@ static struct
    * or 0 if the main process was never started or already exited.
    */
   sig_atomic_t main_pid;
+  /*
+   * Set to a nonzero signal number if we have moved to the phase of
+   * execution where we terminate all child processes.
+   * If our main process exits, this is set to SIGCHLD.
+   */
+  sig_atomic_t terminate_requested;
 } global = {
   .main_pid = 0,
+  .terminate_requested = 0,
 };
 
 /* Ensure global.main_pid is large enough to store pid_t */
@@ -99,6 +106,9 @@ _srt_wait_status_to_exit_status (int wait_status)
  * If @main_process is zero or negative, wait for all child processes
  * to exit.
  *
+ * If `global.terminate_requested` becomes true for any reason,
+ * return %FALSE setting @error to %G_IO_ERROR_CANCELLED.
+ *
  * This function cannot be called in a process that is using
  * g_child_watch_source_new() or similar functions, because it waits
  * for all child processes regardless of their process IDs, and that is
@@ -115,7 +125,7 @@ _srt_wait_for_child_processes (pid_t main_process,
   if (wait_status_out != NULL)
     *wait_status_out = -1;
 
-  while (1)
+  while (global.terminate_requested == 0)
     {
       int wait_status = -1;
       pid_t died = wait (&wait_status);
@@ -124,6 +134,7 @@ _srt_wait_for_child_processes (pid_t main_process,
         {
           if (errno == EINTR)
             {
+              g_debug ("wait(2) interrupted by signal");
               continue;
             }
           else if (errno == ECHILD)
@@ -150,6 +161,20 @@ _srt_wait_for_child_processes (pid_t main_process,
 
           return TRUE;
         }
+    }
+
+  if (global.terminate_requested != 0)
+    {
+      if (global.terminate_requested == SIGCHLD)
+        g_set_error (error, G_IO_ERROR, G_IO_ERROR_CANCELLED,
+                     "Termination requested because main process exited");
+      else
+        g_set_error (error, G_IO_ERROR, G_IO_ERROR_CANCELLED,
+                     "Termination requested by signal %d (%s)",
+                     global.terminate_requested,
+                     strsignal (global.terminate_requested) ?: "(unknown)");
+
+      return FALSE;
     }
 
   if (main_process > 0)
@@ -1290,6 +1315,7 @@ _srt_process_manager_run (SrtProcessManager *self,
   const sigset_t *restore_mask = NULL;
 
   g_return_val_if_fail (global.main_pid == 0, FALSE);
+  g_return_val_if_fail (global.terminate_requested == 0, FALSE);
   g_return_val_if_fail (self->exit_status == -1, FALSE);
 
   g_debug ("Launching child process...");
@@ -1408,28 +1434,74 @@ _srt_process_manager_run (SrtProcessManager *self,
         close (fd);
     }
 
-  /* Reap child processes until child_pid exits */
-  if (!_srt_wait_for_child_processes (global.main_pid, &wait_status, error))
+  while (1)
     {
-      self->exit_status = LAUNCH_EX_CANNOT_REPORT;
-      return FALSE;
+      gboolean waited_for_all_processes = FALSE;
+
+      if (global.terminate_requested != 0)
+        {
+          /* If termination was already requested for any reason,
+           * do that now. */
+          waited_for_all_processes = TRUE;
+          ok = _srt_subreaper_terminate_all_child_processes (self->opts.terminate_wait_usec,
+                                                             self->opts.terminate_grace_usec,
+                                                             global.main_pid,
+                                                             &wait_status,
+                                                             &local_error);
+        }
+      else
+        {
+          /* If the main process is still running (global.main_pid == 0),
+           * wait for it to exit. Otherwise, wait for all processes to exit. */
+          waited_for_all_processes = (global.main_pid == 0);
+          ok = _srt_wait_for_child_processes (global.main_pid,
+                                              &wait_status,
+                                              &local_error);
+        }
+
+      if (ok)
+        {
+          /* On success, the main process should definitely have exited. */
+          g_return_val_if_fail (global.main_pid == 0, FALSE);
+
+          if (self->exit_status < 0)
+            self->exit_status = _srt_wait_status_to_exit_status (wait_status);
+
+          if (self->opts.terminate_with_main)
+            global.terminate_requested = SIGCHLD;
+
+          if (waited_for_all_processes)
+            break;
+        }
+      else if (g_error_matches (local_error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+        {
+          /* Waiting for child processes was cancelled by a request for
+           * termination. We'll loop back around and go into the
+           * global.terminate_requested branch above. */
+
+          if (global.main_pid == 0)
+            g_debug ("Waiting for child processes cancelled by request for termination: %s",
+                     local_error->message);
+          else
+            g_debug ("Waiting for process %d cancelled by request for termination: %s",
+                     global.main_pid, local_error->message);
+
+          g_return_val_if_fail (global.terminate_requested != 0, FALSE);
+          g_clear_error (&local_error);
+        }
+      else
+        {
+          /* Waiting failed for some reason other than a request for
+           * termination. We can't usefully continue. */
+          if (self->exit_status < 0)
+            self->exit_status = LAUNCH_EX_CANNOT_REPORT;
+
+          g_propagate_error (error, g_steal_pointer (&local_error));
+          return FALSE;
+        }
     }
 
-  /* On success, the main process should definitely have exited. */
-  g_return_val_if_fail (global.main_pid == 0, FALSE);
-  self->exit_status = _srt_wait_status_to_exit_status (wait_status);
-
-  /* Wait for the other child processes, if any, possibly killing them.
-   * Note that this affects whether we return FALSE and set the error,
-   * but doesn't affect self->exit_status. */
-  if (self->opts.terminate_with_main)
-    return _srt_subreaper_terminate_all_child_processes (self->opts.terminate_wait_usec,
-                                                         self->opts.terminate_grace_usec,
-                                                         0,
-                                                         NULL,
-                                                         error);
-  else
-    return _srt_wait_for_child_processes (0, NULL, error);
+  return TRUE;
 }
 
 /*

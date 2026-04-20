@@ -40,6 +40,7 @@ static gboolean opt_lock_exclusive = FALSE;
 static gboolean opt_lock_verbose = FALSE;
 static gboolean opt_lock_wait = FALSE;
 static gboolean opt_subreaper = FALSE;
+static gboolean opt_terminate_when_signalled = FALSE;
 static Tristate opt_terminate_with_main = TRISTATE_MAYBE;
 static double opt_terminate_idle_timeout = 0.0;
 /* Note that this is not DEFAULT_TERMINATE_TIMEOUT,
@@ -238,6 +239,19 @@ static GOptionEntry options[] =
     "Only wait for a direct child process [default].",
     NULL },
 
+  { "terminate-when-signalled", '\0',
+    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_terminate_when_signalled,
+    "When the supervisor receives a terminating signal, "
+    "terminate all descendants. "
+    "Implies --subreaper.",
+    NULL },
+  { "no-terminate-when-signalled", '\0',
+    G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &opt_terminate_when_signalled,
+    "When the supervisor receives a terminating signal, "
+    "pass it to the main COMMAND but don't terminate other processes "
+    "[default].",
+    NULL },
+
   { "terminate-with-main", '\0',
     G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, opt_terminate_with_main_cb,
     "When the main COMMAND exits, terminate other descendant processes. "
@@ -261,7 +275,7 @@ static GOptionEntry options[] =
     "send SIGTERM and SIGCONT, "
     "then wait this many seconds before sending SIGKILL and SIGCONT. "
     "If 0.0, skip SIGTERM and use SIGKILL immediately. "
-    "If set without any --terminate-with- options, implies --terminate-with-main. "
+    "If set without any process termination options, implies --terminate-with-main. "
     "[Default: " G_STRINGIFY (DEFAULT_TERMINATE_TIMEOUT) " if any "
     "--terminate-with- options were used]",
     "SECONDS" },
@@ -362,7 +376,8 @@ main (int argc,
    * Fall back on that if necessary. */
   if (opt_terminate_with_main == TRISTATE_MAYBE)
     {
-      if (opt_terminate_timeout >= 0)
+      if (opt_terminate_timeout >= 0
+          && !opt_terminate_when_signalled)
         {
           _srt_log_warning ("--terminate-timeout implying "
                             "--terminate-with-main is deprecated, "
@@ -376,7 +391,8 @@ main (int argc,
     }
 
   if (opt_terminate_timeout < 0
-      && opt_terminate_with_main != TRISTATE_NO)
+      && (opt_terminate_with_main != TRISTATE_NO
+          || opt_terminate_when_signalled))
     {
       /* If we want to terminate child processes, we'll usually want a
        * grace period to let them shut down gracefully before we resort
@@ -391,8 +407,10 @@ main (int argc,
   process_manager_options.dump_parameters = TRUE;
   process_manager_options.exit_with_parent = !!opt_exit_with_parent;
   process_manager_options.forward_signals = TRUE;
+  process_manager_options.terminate_when_signalled = !!opt_terminate_when_signalled;
   process_manager_options.terminate_with_main = (opt_terminate_with_main != TRISTATE_NO);
   process_manager_options.subreaper = (opt_subreaper
+                                       || process_manager_options.terminate_when_signalled
                                        || process_manager_options.terminate_with_main);
 
   if (opt_terminate_idle_timeout > 0.0)

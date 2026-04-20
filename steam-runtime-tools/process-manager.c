@@ -43,7 +43,9 @@ _srt_wait_status_to_exit_status (int wait_status)
   else if (WIFSIGNALED (wait_status))
     {
       ret = 128 + WTERMSIG (wait_status);
-      g_info ("Command killed by signal %d", ret - 128);
+      g_info ("Command killed by signal %d (%s)",
+              ret - 128,
+              strsignal (ret - 128) ?: "(unknown)");
     }
   else
     {

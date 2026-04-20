@@ -789,6 +789,7 @@ class Main:
                 'steam-runtime-launch-client',
                 'steam-runtime-launch-options',
                 'steam-runtime-steam-remote',
+                'steam-runtime-supervisor',
                 'steam-runtime-system-info',
             ]
             for exe in pv_bin_executables:

@@ -20,6 +20,8 @@ gboolean _srt_wait_for_child_processes (pid_t main_process,
 
 gboolean _srt_subreaper_terminate_all_child_processes (GTimeSpan wait_period,
                                                        GTimeSpan grace_period,
+                                                       pid_t main_pid,
+                                                       int *wait_status_out,
                                                        GError **error);
 
 gboolean _srt_process_manager_init_single_threaded (GError **error);

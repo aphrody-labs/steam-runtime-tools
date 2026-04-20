@@ -86,24 +86,30 @@ test_terminate_nothing (Fixture *f,
   g_autoptr(GError) error = NULL;
   gboolean ret;
 
-  ret = _srt_subreaper_terminate_all_child_processes (0, 0, &error);
+  ret = _srt_subreaper_terminate_all_child_processes (0, 0, 0, NULL, &error);
   g_assert_no_error (error);
   g_assert_true (ret);
 
   ret = _srt_subreaper_terminate_all_child_processes (0,
                                                       100 * G_TIME_SPAN_MILLISECOND,
+                                                      0,
+                                                      NULL,
                                                       &error);
   g_assert_no_error (error);
   g_assert_true (ret);
 
   ret = _srt_subreaper_terminate_all_child_processes (100 * G_TIME_SPAN_MILLISECOND,
                                                       0,
+                                                      0,
+                                                      NULL,
                                                       &error);
   g_assert_no_error (error);
   g_assert_true (ret);
 
   ret = _srt_subreaper_terminate_all_child_processes (100 * G_TIME_SPAN_MILLISECOND,
                                                       100 * G_TIME_SPAN_MILLISECOND,
+                                                      0,
+                                                      NULL,
                                                       &error);
   g_assert_no_error (error);
   g_assert_true (ret);
@@ -116,22 +122,39 @@ test_terminate_sigterm (Fixture *f,
   g_autoptr(GError) error = NULL;
   gboolean ret;
   const char * const argv[] = { "sh", "-c", "sleep 3600", NULL };
+  GPid pid = 0;
+  int wait_status = -1;
 
   ret = g_spawn_async (NULL,  /* cwd */
                        (char **) argv,
                        NULL,  /* envp */
                        SPAWN_FLAGS,
                        NULL, NULL,    /* child setup */
-                       NULL,  /* pid */
+                       &pid,
                        &error);
   g_assert_no_error (error);
   g_assert_true (ret);
 
   ret = _srt_subreaper_terminate_all_child_processes (0,
                                                       60 * G_TIME_SPAN_SECOND,
+                                                      pid,
+                                                      &wait_status,
                                                       &error);
   g_assert_no_error (error);
   g_assert_true (ret);
+
+  if (WIFSIGNALED (wait_status))
+    {
+      g_test_message ("Child terminated by signal %d", WTERMSIG (wait_status));
+      g_assert_cmpint (WTERMSIG (wait_status), ==, SIGTERM);
+    }
+  else
+    {
+      g_test_message ("Terminating signal caught by shell, wait status %d",
+                      wait_status);
+      g_assert_true (WIFEXITED (wait_status));
+      g_assert_cmpint (WEXITSTATUS (wait_status), ==, 128 + SIGTERM);
+    }
 }
 
 static void
@@ -144,13 +167,15 @@ test_terminate_sigkill (Fixture *f,
   {
     "sh", "-c", "trap 'echo Ignoring SIGTERM >&2' TERM; sleep 3600", NULL
   };
+  GPid pid = 0;
+  int wait_status = -1;
 
   ret = g_spawn_async (NULL,  /* cwd */
                        (char **) argv,
                        NULL,  /* envp */
                        SPAWN_FLAGS,
                        NULL, NULL,    /* child setup */
-                       NULL,  /* pid */
+                       &pid,
                        &error);
   g_assert_no_error (error);
   g_assert_true (ret);
@@ -158,9 +183,19 @@ test_terminate_sigkill (Fixture *f,
   /* We give it 100ms before SIGTERM to let it put the trap in place */
   ret = _srt_subreaper_terminate_all_child_processes (100 * G_TIME_SPAN_MILLISECOND,
                                                       100 * G_TIME_SPAN_MILLISECOND,
+                                                      pid,
+                                                      &wait_status,
                                                       &error);
   g_assert_no_error (error);
   g_assert_true (ret);
+
+  g_assert_true (WIFSIGNALED (wait_status));
+
+  /* There is a race condition here: if the child takes more than 100ms
+   * to put the trap that ignores SIGTERM into place, it will be terminated
+   * by SIGTERM, not SIGKILL. Cope with that by accepting either one. */
+  if (WTERMSIG (wait_status) != SIGTERM)
+    g_assert_cmpint (WTERMSIG (wait_status), ==, SIGKILL);
 }
 
 static void
@@ -173,20 +208,71 @@ test_terminate_sigkill_immediately (Fixture *f,
   {
     "sh", "-c", "trap 'echo Ignoring SIGTERM >&2' TERM; sleep 3600", NULL
   };
+  GPid pid = 0;
+  int wait_status = -1;
 
   ret = g_spawn_async (NULL,  /* cwd */
                        (char **) argv,
                        NULL,  /* envp */
                        SPAWN_FLAGS,
                        NULL, NULL,    /* child setup */
-                       NULL,  /* pid */
+                       &pid,
                        &error);
   g_assert_no_error (error);
   g_assert_true (ret);
 
-  ret = _srt_subreaper_terminate_all_child_processes (0, 0, &error);
+  ret = _srt_subreaper_terminate_all_child_processes (0,
+                                                      0,
+                                                      pid,
+                                                      &wait_status,
+                                                      &error);
   g_assert_no_error (error);
   g_assert_true (ret);
+
+  g_assert_true (WIFSIGNALED (wait_status));
+  g_assert_cmpint (WTERMSIG (wait_status), ==, SIGKILL);
+}
+
+static void
+test_terminate_pid_not_a_child (Fixture *f,
+                                gconstpointer context)
+{
+  g_autoptr(GError) error = NULL;
+  gboolean ret;
+  const char * const argv[] =
+  {
+    "sh", "-c", "trap 'echo Ignoring SIGTERM >&2' TERM; sleep 3600", NULL
+  };
+  GPid pid = 0;
+  /* This needs to be any process ID that is not among our children,
+   * and will therefore not exit while we are waiting for all our children
+   * to exit. A convenient process ID to use for this is our own:
+   * we can certainly say that this process is not its own child. */
+  GPid not_a_child_pid = getpid ();
+  int wait_status = -2;
+
+  ret = g_spawn_async (NULL,  /* cwd */
+                       (char **) argv,
+                       NULL,  /* envp */
+                       SPAWN_FLAGS,
+                       NULL, NULL,    /* child setup */
+                       &pid,
+                       &error);
+  g_assert_no_error (error);
+  g_assert_true (ret);
+  g_assert_cmpint (pid, !=, not_a_child_pid);
+
+  ret = _srt_subreaper_terminate_all_child_processes (0,
+                                                      0,
+                                                      not_a_child_pid,
+                                                      &wait_status,
+                                                      &error);
+  g_assert_no_error (error);
+  g_assert_true (ret);
+
+  /* Because our own pid is not a child that exited, we didn't have the
+   * opportunity to collect a wait-status for it. */
+  g_assert_cmpint (wait_status, ==, -1);
 }
 
 static void
@@ -348,6 +434,8 @@ main (int argc,
               setup, test_terminate_sigkill, teardown);
   g_test_add ("/terminate/sigkill-immediately", Fixture, NULL,
               setup, test_terminate_sigkill_immediately, teardown);
+  g_test_add ("/terminate/pid-not-a-child", Fixture, NULL,
+              setup, test_terminate_pid_not_a_child, teardown);
   g_test_add ("/wait/for-all", Fixture, NULL,
               setup, test_wait_for_all, teardown);
   g_test_add ("/wait/for-main", Fixture, NULL,

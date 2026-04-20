@@ -177,6 +177,10 @@ typedef struct
   GHashTable *sent_sigkill;
   /* Scratch space to build temporary strings */
   GString *buffer;
+  pid_t main_pid;
+  /* Set to the wait status of the main process,
+   * if it exits during process termination. */
+  int main_pid_wait_status;
   /* 0, SIGTERM or SIGKILL */
   int sending_signal;
   /* Nonzero if wait_source has been attached to context */
@@ -186,6 +190,8 @@ typedef struct
   /* TRUE if we reach a point where we have no more child processes. */
   gboolean finished;
 } TerminationData;
+
+#define TERMINATION_DATA_INIT { .main_pid_wait_status = -1 };
 
 /*
  * Free everything in @data.
@@ -360,6 +366,19 @@ termination_data_refresh (TerminationData *data)
       g_debug ("Process %d exited", died);
       g_hash_table_remove (data->sent_sigkill, GINT_TO_POINTER (died));
       g_hash_table_remove (data->sent_sigterm, GINT_TO_POINTER (died));
+
+      /* No need to check that data->main_pid > 0 here,
+       * because we already checked died > 0 */
+      if (died == data->main_pid)
+        {
+          g_assert (data->main_pid > 0);
+
+          if (global.main_pid == data->main_pid)
+            global.main_pid = 0;
+
+          data->main_pid = 0;
+          data->main_pid_wait_status = wait_status;
+        }
     }
 
   /* If we are still in the wait_period, nothing more to do yet */
@@ -565,6 +584,9 @@ sigchld_cb (int sfd,
  * @grace_period: If greater than 0, after @wait_period plus this many
  *  microseconds, use `SIGKILL` instead of `SIGTERM`. If 0, proceed
  *  directly to sending `SIGKILL`.
+ * @main_pid: process for which we will report wait-status;
+ *  zero or negative if there is no main process
+ * @main_pid_wait_status: (out): wait-status of @main_pid
  * @error: Used to raise an error on failure
  *
  * Make sure all child processes are terminated.
@@ -587,12 +609,17 @@ sigchld_cb (int sfd,
 gboolean
 _srt_subreaper_terminate_all_child_processes (GTimeSpan wait_period,
                                               GTimeSpan grace_period,
+                                              pid_t main_pid,
+                                              int *main_pid_wait_status,
                                               GError **error)
 {
-  g_auto(TerminationData) data = {};
+  g_auto(TerminationData) data = TERMINATION_DATA_INIT;
   sigset_t mask;
   int is_subreaper = -1;
   glnx_autofd int sfd = -1;
+
+  if (main_pid_wait_status != NULL)
+    *main_pid_wait_status = -1;
 
   if (prctl (PR_GET_CHILD_SUBREAPER, (unsigned long) &is_subreaper, 0, 0, 0) != 0)
     return glnx_throw_errno_prefix (error, "prctl PR_GET_CHILD_SUBREAPER");
@@ -608,6 +635,7 @@ _srt_subreaper_terminate_all_child_processes (GTimeSpan wait_period,
   if (!sigismember (&mask, SIGCHLD))
     return glnx_throw (error, "Process has not blocked SIGCHLD");
 
+  data.main_pid = main_pid;
   data.children_file = g_strdup_printf ("/proc/%d/task/%d/children",
                                         getpid (), getpid ());
   data.context = g_main_context_new ();
@@ -670,6 +698,9 @@ _srt_subreaper_terminate_all_child_processes (GTimeSpan wait_period,
       g_propagate_error (error, g_steal_pointer (&data.error));
       return FALSE;
     }
+
+  if (main_pid_wait_status != NULL)
+    *main_pid_wait_status = data.main_pid_wait_status;
 
   return TRUE;
 }
@@ -1394,6 +1425,8 @@ _srt_process_manager_run (SrtProcessManager *self,
   if (self->opts.terminate_with_main)
     return _srt_subreaper_terminate_all_child_processes (self->opts.terminate_wait_usec,
                                                          self->opts.terminate_grace_usec,
+                                                         0,
+                                                         NULL,
                                                          error);
   else
     return _srt_wait_for_child_processes (0, NULL, error);

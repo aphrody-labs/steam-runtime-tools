@@ -21,6 +21,18 @@
 #include "steam-runtime-tools/missing-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
+/* Global variables used to communicate with terminate_child_cb */
+static struct
+{
+  /*
+   * The main process ID we are waiting for,
+   * or 0 if the main process was never started or already exited.
+   */
+  pid_t main_pid;
+} global = {
+  .main_pid = 0,
+};
+
 /*
  * _srt_wait_status_to_exit_status:
  * @wait_status: A `wait()` status
@@ -1170,8 +1182,6 @@ _srt_process_manager_dump_parameters (SrtProcessManager *self,
            self->opts.terminate_with_main ? 'y' : 'n');
 }
 
-static pid_t global_child_pid = 0;
-
 static int forwarded_signals[] =
 {
   SIGHUP,
@@ -1186,10 +1196,10 @@ static int forwarded_signals[] =
 static void
 terminate_child_cb (int signum)
 {
-  if (global_child_pid != 0)
+  if (global.main_pid != 0)
     {
       /* pass it on to the child we're going to wait for */
-      kill (global_child_pid, signum);
+      kill (global.main_pid, signum);
     }
   else
     {
@@ -1230,7 +1240,7 @@ _srt_process_manager_run (SrtProcessManager *self,
   int wait_status = -1;
   size_t i;
 
-  g_return_val_if_fail (global_child_pid == 0, FALSE);
+  g_return_val_if_fail (global.main_pid == 0, FALSE);
   g_return_val_if_fail (self->exit_status == -1, FALSE);
 
   g_debug ("Launching child process...");
@@ -1284,7 +1294,7 @@ _srt_process_manager_run (SrtProcessManager *self,
                        G_SPAWN_LEAVE_DESCRIPTORS_OPEN |
                        G_SPAWN_CHILD_INHERITS_STDIN),
                       _srt_process_manager_child_setup_cb, self,
-                      &global_child_pid,
+                      &global.main_pid,
                       &local_error))
     {
       if (local_error->domain == G_SPAWN_ERROR
@@ -1321,13 +1331,13 @@ _srt_process_manager_run (SrtProcessManager *self,
     }
 
   /* Reap child processes until child_pid exits */
-  if (!_srt_wait_for_child_processes (global_child_pid, &wait_status, error))
+  if (!_srt_wait_for_child_processes (global.main_pid, &wait_status, error))
     {
       self->exit_status = LAUNCH_EX_CANNOT_REPORT;
       return FALSE;
     }
 
-  global_child_pid = 0;
+  global.main_pid = 0;
   self->exit_status = _srt_wait_status_to_exit_status (wait_status);
 
   /* Wait for the other child processes, if any, possibly killing them.

@@ -113,6 +113,17 @@ LIBEXEC_DATA = [
 ]
 
 
+# Wrapper script to run an executable in a different location
+WRAPPER_SCRIPT = '''\
+#!/bin/sh
+# {source_for_generated_file}
+set -eu
+me="$(readlink -f "$0")"
+here="${{me%/*}}"
+exec "$here"/{escaped_real_exe} "$@"
+'''
+
+
 def install(src, dst, mode=0o644):
     # type: (str, str, int) -> None
 
@@ -432,36 +443,37 @@ def main():
         # Normally bin/steam-runtime-launcher-service would be a symlink
         # to ../libexec/steam-runtime-tools/TUPLE-srt-launcher-service,
         # but for the relocatable installation we don't want to rely on
-        # Steampipe handling symlinks gracefully, so we just duplicate it.
-        # It isn't very large.
+        # Steampipe handling symlinks gracefully, so instead generate a
+        # wrapper shell script that invokes it.
         for arch in architectures:
             if arch.name == primary_architecture:
                 for exe in [
                     'launcher-service',
                 ]:
+                    # Where to install the wrapper script
+                    dest = os.path.join(
+                        installation,
+                        'bin',
+                        'steam-runtime-' + exe,
+                    )
+                    # Relative path from dest to the real executable
                     rel = (
-                        'libexec/steam-runtime-tools-0/'
+                        '../libexec/steam-runtime-tools-0/'
                         + arch.multiarch
                         + '-srt-'
                         + exe
                     )
 
-                    path = os.path.join(args.pv_dir, rel)
+                    with open(dest, 'w') as writer:
+                        text = WRAPPER_SCRIPT.format(
+                            escaped_real_exe=quote(rel),
+                            source_for_generated_file=(
+                                'Generated file, do not edit'
+                            ),
+                        )
+                        writer.write(text)
 
-                    if not os.path.exists(path):
-                        path = os.path.join(args.prefix, rel)
-
-                    if not os.path.exists(path):
-                        path = '/usr/{}'.format(rel)
-
-                    install_exe(
-                        path,
-                        os.path.join(
-                            installation,
-                            'bin',
-                            'steam-runtime-' + exe,
-                        ),
-                    )
+                    os.chmod(dest, 0o755)
 
         install(
             os.path.join(srcdir, 'pressure-vessel', 'THIRD-PARTY.md'),

@@ -785,8 +785,11 @@ class Main:
                 os.symlink(src, dst)
 
             pv_bin_executables = [
+                'steam-runtime-check-requirements',
                 'steam-runtime-launch-client',
                 'steam-runtime-launch-options',
+                'steam-runtime-steam-remote',
+                'steam-runtime-system-info',
             ]
             for exe in pv_bin_executables:
                 src = os.path.join('..', 'pressure-vessel', 'bin', exe)

@@ -119,6 +119,26 @@ find_launcher_service (void)
 
   /* Check for the version provided by pressure-vessel, which if anything
    * is probably newer than the one in the container's PATH */
+#ifdef _SRT_MULTIARCH
+  for (i = 0; i < N_ELEMENTS (search_dirs); i++)
+    {
+      autofree char *path = NULL;
+
+      if (asprintf (&path,
+                    "%s/libexec/steam-runtime-tools-0/%s-srt-launcher-service",
+                    search_dirs[i],
+                    _SRT_MULTIARCH) < 0)
+        {
+          log_oom ();
+          return NULL;
+        }
+
+      if (access (path, X_OK) == 0)
+        return steal_pointer (&path);
+    }
+#endif
+
+  /* Same, but with an older naming convention */
   for (i = 0; i < N_ELEMENTS (search_dirs); i++)
     {
       autofree char *path = NULL;
@@ -188,6 +208,22 @@ find_launcher_service (void)
            next = argz_next (argz, argz_len, next))
         {
           autofree char *path = NULL;
+
+#ifdef _SRT_MULTIARCH
+          if (asprintf (&path,
+                        "%s/pressure-vessel/libexec/%s-srt-launcher-service",
+                        next,
+                        _SRT_MULTIARCH) < 0)
+            {
+              log_oom ();
+              return NULL;
+            }
+
+          if (access (path, X_OK) == 0)
+            return steal_pointer (&path);
+
+          free (steal_pointer (&path));
+#endif
 
           if (asprintf (&path,
                         "%s/pressure-vessel/bin/steam-runtime-launcher-service",

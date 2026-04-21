@@ -1,3 +1,19 @@
+steam-runtime-tools (0.20260421.0) UNRELEASED; urgency=medium
+
+  [ Antonio Ospite ]
+  * steam-runtime-steamrt-*:
+    - Add a populate-depot.py option for a top-level bin/ directory.
+      Unlike pressure-vessel/bin/, this is intended to avoid implementation
+      details and only contain executables that would make sense to put in the
+      PATH, with stable interfaces. In particular, it contains the
+      steam-runtime-launch-options debugging tool.
+      (steamrt/tasks#989, steamrt/tasks#998)
+
+  [ Simon McVittie ]
+  * CI fixes (steamrt/tasks#999)
+
+ -- Simon McVittie <smcv@collabora.com>  Tue, 21 Apr 2026 14:47:53 +0100
+
 steam-runtime-tools (0.20260414.0) steamrt; urgency=medium
 
   [ Antonio Ospite ]

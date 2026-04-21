@@ -550,11 +550,27 @@ class TestSupervisor(BaseTest):
                 with open(read_child_sigterm, 'rb') as reader:
                     self.assertEqual(b'', reader.read())
 
-    def test_terminate_timeout(self):
-        # --terminate-timeout implies that we want to clean up any
-        # strays after the main process has exited.
+    def test_terminate_timeout_implicitly_with_main(self):
+        # In older versions, --terminate-timeout implied that we want to
+        # clean up any strays after the main process has exited.
+        # This is now deprecated.
         self._test_terminate_with_main(
             ['--terminate-timeout=2.0'],
+            is_subreaper=True,
+            kills_child=True,
+        )
+
+    def test_terminate_with_main(self):
+        self._test_terminate_with_main(
+            ['--terminate-with-main'],
+            is_subreaper=True,
+            kills_child=True,
+        )
+        self._test_terminate_with_main(
+            [
+                '--terminate-with-main',
+                '--terminate-timeout=2.0',
+            ],
             is_subreaper=True,
             kills_child=True,
         )
@@ -567,6 +583,37 @@ class TestSupervisor(BaseTest):
         )
         self._test_terminate_with_main(
             ['--subreaper'],
+            is_subreaper=True,
+            kills_child=False,
+        )
+
+    def test_no_terminate_with_main_explicitly(self):
+        self._test_terminate_with_main(
+            ['--no-terminate-with-main'],
+            is_subreaper=False,
+            kills_child=False,
+        )
+        self._test_terminate_with_main(
+            ['--no-terminate-with-main', '--subreaper'],
+            is_subreaper=True,
+            kills_child=False,
+        )
+        # --terminate-timeout doesn't imply --terminate-with-main
+        # if --no-terminate-with-main is explicitly used
+        self._test_terminate_with_main(
+            [
+                '--no-terminate-with-main',
+                '--terminate-timeout=2.0',
+            ],
+            is_subreaper=False,
+            kills_child=False,
+        )
+        self._test_terminate_with_main(
+            [
+                '--no-terminate-with-main',
+                '--subreaper',
+                '--terminate-timeout=2.0',
+            ],
             is_subreaper=True,
             kills_child=False,
         )

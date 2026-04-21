@@ -113,17 +113,6 @@ LIBEXEC_DATA = [
 ]
 
 
-# Wrapper script to run an executable in a different location
-WRAPPER_SCRIPT = '''\
-#!/bin/sh
-# {source_for_generated_file}
-set -eu
-me="$(readlink -f "$0")"
-here="${{me%/*}}"
-exec "$here"/{escaped_real_exe} "$@"
-'''
-
-
 def install(src, dst, mode=0o644):
     # type: (str, str, int) -> None
 
@@ -139,6 +128,15 @@ def install(src, dst, mode=0o644):
 def install_exe(src, dst, mode=0o755):
     # type: (str, str, int) -> None
     install(src, dst, mode)
+
+
+def symlink_force(src, dst):
+    # type: (str, str) -> None
+    # Equivalent to ln -fns
+    if os.path.exists(dst):
+        os.remove(dst)
+
+    os.symlink(src, dst)
 
 
 def v_call(command, **kwargs):
@@ -440,17 +438,16 @@ def main():
         # which might be different
         primary_architecture = architectures[0].name
 
-        # Normally bin/steam-runtime-launcher-service would be a symlink
-        # to ../libexec/steam-runtime-tools/TUPLE-srt-launcher-service,
-        # but for the relocatable installation we don't want to rely on
-        # Steampipe handling symlinks gracefully, so instead generate a
-        # wrapper shell script that invokes it.
+        # bin/steam-runtime-launcher-service is a symlink
+        # to ../libexec/steam-runtime-tools/TUPLE-srt-launcher-service.
+        # Historically we've avoided relying on Steampipe handling
+        # symlinks gracefully, but in fact it can cope with symlinks now.
         for arch in architectures:
             if arch.name == primary_architecture:
                 for exe in [
                     'launcher-service',
                 ]:
-                    # Where to install the wrapper script
+                    # Where to install the symlink
                     dest = os.path.join(
                         installation,
                         'bin',
@@ -463,17 +460,7 @@ def main():
                         + '-srt-'
                         + exe
                     )
-
-                    with open(dest, 'w') as writer:
-                        text = WRAPPER_SCRIPT.format(
-                            escaped_real_exe=quote(rel),
-                            source_for_generated_file=(
-                                'Generated file, do not edit'
-                            ),
-                        )
-                        writer.write(text)
-
-                    os.chmod(dest, 0o755)
+                    symlink_force(rel, dest)
 
         install(
             os.path.join(srcdir, 'pressure-vessel', 'THIRD-PARTY.md'),

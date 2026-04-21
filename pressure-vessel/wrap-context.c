@@ -1668,7 +1668,11 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
                                         SrtEnvOverlay *container_env,
                                         GError **error)
 {
+#ifdef _SRT_MULTIARCH
+  const char *helpers_dir;
+#else
   const char *tools_dir;
+#endif
 
   g_return_val_if_fail (PV_IS_WRAP_CONTEXT (self), FALSE);
   g_return_val_if_fail (argc >= 0, FALSE);
@@ -1684,15 +1688,27 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
       g_return_val_if_fail (argv[0] != NULL, FALSE);
     }
 
+#ifdef _SRT_MULTIARCH
+  helpers_dir = _srt_subprocess_runner_get_helpers_path (self->run_in_current_context);
+#else
   tools_dir = _srt_subprocess_runner_get_bin_path (self->run_in_current_context);
+#endif
 
   if (self->options.launcher)
     {
       g_autoptr(FlatpakBwrap) launcher_argv =
         flatpak_bwrap_new (flatpak_bwrap_empty_env);
-      g_autofree gchar *launcher_service = g_build_filename (tools_dir,
-                                                             "steam-runtime-launcher-service",
-                                                             NULL);
+      g_autofree gchar *launcher_service = NULL;
+
+#ifdef _SRT_MULTIARCH
+      launcher_service = g_build_filename (helpers_dir,
+                                           _SRT_MULTIARCH "-srt-launcher-service",
+                                           NULL);
+#else
+      launcher_service = g_build_filename (tools_dir,
+                                           "steam-runtime-launcher-service",
+                                           NULL);
+#endif
       g_debug ("Adding steam-runtime-launcher-service '%s'...", launcher_service);
       flatpak_bwrap_add_arg (launcher_argv, launcher_service);
 

@@ -102,8 +102,8 @@ find_launcher_service (void)
 {
   static const char * const search_dirs[] =
   {
-    "/run/pressure-vessel/pv-from-host/bin",
-    "/usr/lib/pressure-vessel/from-host/bin",
+    "/run/pressure-vessel/pv-from-host",
+    "/usr/lib/pressure-vessel/from-host",
   };
   size_t i;
   const char *env;
@@ -123,7 +123,9 @@ find_launcher_service (void)
     {
       autofree char *path = NULL;
 
-      if (asprintf (&path, "%s/steam-runtime-launcher-service", search_dirs[i]) < 0)
+      if (asprintf (&path,
+                    "%s/bin/steam-runtime-launcher-service",
+                    search_dirs[i]) < 0)
         {
           log_oom ();
           return NULL;

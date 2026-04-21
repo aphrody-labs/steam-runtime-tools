@@ -76,6 +76,11 @@ if ! grep $'^depot\t0\\.1\\.2\\.3\t' depots/test-soldier-unpacked/VERSIONS.txt >
     exit 1
 fi
 
+if [ -e "depots/test-soldier-unpacked/bin" ]; then
+    echo "Bail out! Unexpected bin/ directory found"
+    exit 1
+fi
+
 soldier_version="$(
     IFS="$(printf '\t')"
     while read -r component version runtime comment; do

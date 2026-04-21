@@ -404,6 +404,7 @@ class ComponentVersion:
 class Main:
     def __init__(
         self,
+        add_bin_directory: bool = False,
         architecture: str = 'amd64,i386',
         cache: str = '.cache',
         credential_envs: Sequence[str] = (),
@@ -471,6 +472,7 @@ class Main:
 
         self.opener = urllib.request.build_opener(*openers)
 
+        self.add_bin_directory = add_bin_directory
         self.cache = cache
         self.default_architecture = architecture
         self.default_suite = suite
@@ -740,6 +742,12 @@ class Main:
         if root.exists():
             self.merge_dir_into_depot(root)
 
+        tuples = list(self.multiarch_tuples)
+
+        if not tuples:
+            for arch in self.default_architecture.split(','):
+                tuples.append(self.deb_arch_to_multiarch(arch))
+
         pressure_vessel_path = self.pressure_vessel_path
         assert pressure_vessel_path is not None
         self.use_local_pressure_vessel(str(pressure_vessel_path))
@@ -763,6 +771,47 @@ class Main:
                 break
 
         self.versions.append(pv_version)
+
+        if self.add_bin_directory:
+            bin_dir = os.path.join(self.depot, 'bin')
+            os.makedirs(bin_dir, exist_ok=True)
+
+            def symlink_force(src, dst):
+                logger.info("Creating symlink from {} to {}".format(
+                    src, dst)
+                )
+                if os.path.exists(dst):
+                    os.remove(dst)
+                os.symlink(src, dst)
+
+            pv_bin_executables = [
+                'steam-runtime-check-requirements',
+                'steam-runtime-launch-client',
+                'steam-runtime-launch-options',
+                'steam-runtime-steam-remote',
+                'steam-runtime-system-info',
+            ]
+            for exe in pv_bin_executables:
+                src = os.path.join('..', 'pressure-vessel', 'bin', exe)
+                dst = os.path.join(self.depot, bin_dir, exe)
+                symlink_force(src, dst)
+
+            # Executables under libexec have their rpath set relative to their
+            # location under `libexec/`, not `bin/`, so they need to be linked
+            # directly.
+            #
+            # And also, they may be linked with different names, so use a map
+            # instead of a list.
+            pv_libexec_executables = {
+                'steam-runtime-launcher-service':
+                    "{}-srt-launcher-service".format(tuples[0]),
+            }
+
+            for bin_name, libexec_name in pv_libexec_executables.items():
+                src = os.path.join('..', 'pressure-vessel', 'libexec',
+                                   'steam-runtime-tools-0', libexec_name)
+                dst = os.path.join(self.depot, bin_dir, bin_name)
+                symlink_force(src, dst)
 
         if self.unpack_ld_library_path is not None:
             if self.runtime.name == 'scout':
@@ -857,12 +906,6 @@ class Main:
                 ),
                 exist_ok=True,
             )
-
-        tuples = list(self.multiarch_tuples)
-
-        if not tuples:
-            for arch in self.default_architecture.split(','):
-                tuples.append(self.deb_arch_to_multiarch(arch))
 
         with open(os.path.join(self.depot, 'run'), 'w') as writer:
             writer.write(
@@ -1787,6 +1830,10 @@ def main() -> None:
     parser.add_argument(
         '--pressure-vessel-official', dest='_ignored', action='store_true',
         help='Ignored for backwards compatibility',
+    )
+    parser.add_argument(
+        '--add-bin-directory', default=False, action='store_true',
+        help='Add a bin/ directory with some commonly useful executables',
     )
     parser.add_argument(
         '--no-include-archives', dest='_ignored', action='store_true',

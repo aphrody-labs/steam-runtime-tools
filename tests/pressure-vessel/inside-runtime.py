@@ -908,7 +908,7 @@ class TestInsideRuntime(BaseTest):
             ):
                 self.assertEqual(
                     expect_library_issues,
-                    set(arch_info['library-issues-summary']),
+                    set(arch_info.get('library-issues-summary', ())),
                 )
 
     def test_read_only(self) -> None:

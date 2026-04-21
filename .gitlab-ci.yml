@@ -537,6 +537,8 @@ test:debian-13:
 test:debian-14:
     extends: .test_deb_x86
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian:forky-slim
+    # TODO: currently failing as a result of multiarch skew, steamrt/tasks#1000
+    allow_failure: true
 
 # TODO: Steam officially requires glibc ≥ 2.31, but we are continuing to
 # test on this older OS until there's a public Steam client release that

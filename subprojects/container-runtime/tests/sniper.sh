@@ -58,7 +58,15 @@ fi
 echo "1..1"
 
 mkdir -p .cache
-python3 ./download-pressure-vessel.py "${pressure_vessel_args[@]}" .cache
+python3 ./download-pressure-vessel.py \
+    --write-version-to=pv-version.txt \
+    "${pressure_vessel_args[@]}" \
+    .cache
+python3 ./download-pressure-vessel.py \
+    --architecture=arm64,amd64,i386 \
+    "${pressure_vessel_args[@]}" \
+    --pv-version="$(< .cache/pv-version.txt)" \
+    .cache
 
 rm -fr depots/test-sniper-unpacked
 mkdir -p depots/test-sniper-unpacked
@@ -68,6 +76,7 @@ python3 ./populate-depot.py \
     --fast \
     --no-include-archives \
     --pressure-vessel-archive=.cache/pressure-vessel-bin.tar.gz \
+    --pressure-vessel-foreign="arm64=.cache/pressure-vessel-arm64+amd64+i386.tar.gz" \
     --add-bin-directory \
     --toolmanifest \
     --unpack-runtime \
@@ -104,6 +113,7 @@ for depot_id in 1628351; do
         _v2-entry-point \
         mtree.txt.gz \
         pressure-vessel \
+        pressure-vessel-arm64 \
         run \
         run-in-sniper \
         toolmanifest.vdf \
@@ -135,6 +145,10 @@ for depot_id in 1628351; do
         pressure-vessel/bin/pressure-vessel-wrap \
         pressure-vessel/libexec/steam-runtime-tools-0/i386-linux-gnu-exec \
         pressure-vessel/libexec/steam-runtime-tools-0/x86_64-linux-gnu-exec \
+        pressure-vessel-arm64/bin/pressure-vessel-wrap \
+        pressure-vessel-arm64/libexec/steam-runtime-tools-0/aarch64-linux-gnu-exec \
+        pressure-vessel-arm64/libexec/steam-runtime-tools-0/i386-linux-gnu-exec \
+        pressure-vessel-arm64/libexec/steam-runtime-tools-0/x86_64-linux-gnu-exec \
     ; do
         if [ -e "depots/test-sniper-unpacked/${path_prefix}${path}" ]; then
             echo "# $depot_id has $path on-disk"

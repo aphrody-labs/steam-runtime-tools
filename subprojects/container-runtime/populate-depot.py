@@ -430,6 +430,10 @@ class OverlayDepot(Depot):
         self.parent = parent
 
 
+class EmulationOverlay(OverlayDepot):
+    pass
+
+
 class Main:
     # A dpkg architecture, for example amd64 or musl-linux-riscv64
     _POSSIBLE_DPKG_ARCHITECTURE_RE = re.compile(r'[0-9a-zA-Z][-0-9a-zA-Z]+')
@@ -444,6 +448,7 @@ class Main:
         depot: str = 'depot',
         depot_archive: str = '',
         depot_version: str = '',
+        emulation_depot_ids: Sequence[str] = (),
         fast: bool = False,
         images_uri: str = DEFAULT_IMAGES_URI,
         include_sdk_sysroot: bool = False,
@@ -597,6 +602,39 @@ class Main:
                 path=self.depot,
             ),
         )
+
+        # Map from dpkg architecture name for emulation
+        # to Steam depot ID
+        self.emulation_depot_ids: Dict[str, str] = {}
+
+        for pair in emulation_depot_ids:
+            if '=' not in pair:
+                raise InvocationError(
+                    '--emulation-depot-id requires ARCH=ID pairs'
+                )
+
+            arch, depot_id = pair.split('=', 1)
+
+            if not self._POSSIBLE_DPKG_ARCHITECTURE_RE.match(arch):
+                raise InvocationError(f'Invalid architecture: {arch!r}')
+
+            try:
+                if int(depot_id) == 0:
+                    raise ValueError
+            except ValueError:
+                # Depot ID is non-numeric or zero
+                raise InvocationError(f'Invalid depot ID: {depot_id!r}')
+
+            self.emulation_depot_ids[arch] = depot_id
+
+            self.depots.append(
+                EmulationOverlay(
+                    architecture=arch,
+                    depot_id=depot_id,
+                    parent=self.depots[0],
+                    path=self.depot / f'depot-{depot_id}-{arch}',
+                )
+            )
 
     def new_runtime(
         self,
@@ -850,6 +888,35 @@ class Main:
             else:
                 unpack_dir = 'pressure-vessel'
 
+            if isinstance(depot, EmulationOverlay):
+                if arch == depot.architecture:
+                    logger.info(
+                        'Including %s in emulation overlay depot %s',
+                        unpack_dir, depot.depot_id,
+                    )
+                else:
+                    continue
+
+            elif isinstance(depot, MainDepot):
+                in_main_depot = True
+
+                for other in self.depots:
+                    if other != depot and arch == other.architecture:
+                        logger.info(
+                            'Not including %s in main depot because it is '
+                            'separated into depot %s',
+                            unpack_dir, other.depot_id,
+                        )
+                        in_main_depot = False
+
+                if in_main_depot:
+                    logger.info(
+                        'Including %s in main depot %s',
+                        unpack_dir, depot.depot_id,
+                    )
+                else:
+                    continue
+
             pv_version = ComponentVersion(unpack_dir)
             self.use_local_pressure_vessel(
                 pressure_vessel_path,
@@ -877,7 +944,7 @@ class Main:
 
             versions.append(pv_version)
 
-        if self.add_bin_directory:
+        if self.add_bin_directory and isinstance(depot, MainDepot):
             bin_dir = os.path.join(self.depot, 'bin')
             os.makedirs(bin_dir, exist_ok=True)
 
@@ -2050,6 +2117,15 @@ def main() -> None:
         help=(
             'Export the depot as an archive'
         )
+    )
+    parser.add_argument(
+        '--emulation-depot-id', action='append', default=[],
+        dest='emulation_depot_ids',
+        metavar='ARCH=ID',
+        help=(
+            'Add a secondary depot to run under CPU emulation with a '
+            'different architecture'
+        ),
     )
     parser.add_argument(
         '--fast', default=False, action='store_true',

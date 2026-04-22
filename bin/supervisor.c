@@ -40,7 +40,7 @@ static gboolean opt_lock_exclusive = FALSE;
 static gboolean opt_lock_verbose = FALSE;
 static gboolean opt_lock_wait = FALSE;
 static gboolean opt_subreaper = FALSE;
-static gboolean opt_terminate_when_signalled = FALSE;
+static gboolean opt_terminate_when_signaled = FALSE;
 static Tristate opt_terminate_with_main = TRISTATE_MAYBE;
 static double opt_terminate_idle_timeout = 0.0;
 /* Note that this is not DEFAULT_TERMINATE_TIMEOUT,
@@ -239,14 +239,14 @@ static GOptionEntry options[] =
     "Only wait for a direct child process [default].",
     NULL },
 
-  { "terminate-when-signalled", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_terminate_when_signalled,
+  { "terminate-when-signaled", '\0',
+    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_terminate_when_signaled,
     "When the supervisor receives a terminating signal, "
     "terminate all descendants. "
     "Implies --subreaper.",
     NULL },
-  { "no-terminate-when-signalled", '\0',
-    G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &opt_terminate_when_signalled,
+  { "no-terminate-when-signaled", '\0',
+    G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &opt_terminate_when_signaled,
     "When the supervisor receives a terminating signal, "
     "pass it to the main COMMAND but don't terminate other processes "
     "[default].",
@@ -377,7 +377,7 @@ main (int argc,
   if (opt_terminate_with_main == TRISTATE_MAYBE)
     {
       if (opt_terminate_timeout >= 0
-          && !opt_terminate_when_signalled)
+          && !opt_terminate_when_signaled)
         {
           _srt_log_warning ("--terminate-timeout implying "
                             "--terminate-with-main is deprecated, "
@@ -392,7 +392,7 @@ main (int argc,
 
   if (opt_terminate_timeout < 0
       && (opt_terminate_with_main != TRISTATE_NO
-          || opt_terminate_when_signalled))
+          || opt_terminate_when_signaled))
     {
       /* If we want to terminate child processes, we'll usually want a
        * grace period to let them shut down gracefully before we resort
@@ -407,10 +407,10 @@ main (int argc,
   process_manager_options.dump_parameters = TRUE;
   process_manager_options.exit_with_parent = !!opt_exit_with_parent;
   process_manager_options.forward_signals = TRUE;
-  process_manager_options.terminate_when_signalled = !!opt_terminate_when_signalled;
+  process_manager_options.terminate_when_signaled = !!opt_terminate_when_signaled;
   process_manager_options.terminate_with_main = (opt_terminate_with_main != TRISTATE_NO);
   process_manager_options.subreaper = (opt_subreaper
-                                       || process_manager_options.terminate_when_signalled
+                                       || process_manager_options.terminate_when_signaled
                                        || process_manager_options.terminate_with_main);
 
   if (opt_terminate_idle_timeout > 0.0)

@@ -438,7 +438,7 @@ class TestSupervisor(BaseTest):
                 (128 + signal.SIGTERM, -signal.SIGTERM),
             )
 
-    def _test_terminate_when_signalled(
+    def _test_terminate_when_signaled(
         self,
         options,                        # type: typing.List[str]
         send_signal,                    # type: int
@@ -638,19 +638,19 @@ class TestSupervisor(BaseTest):
                     # the parent terminated by.
                     self.assertEqual(proc.returncode, 128 + parent_killed_by)
 
-    def test_terminate_when_signalled(self) -> None:
-        self._test_terminate_when_signalled(
-            ['--terminate-when-signalled'],
+    def test_terminate_when_signaled(self) -> None:
+        self._test_terminate_when_signaled(
+            ['--terminate-when-signaled'],
             signal.SIGTERM,
             expect_sigterm=True,
             is_subreaper=True,
             kills_child=True,
         )
         # SIGINT to supervisor sends SIGTERM to main process,
-        # because --terminate-when-signalled takes precedence over
+        # because --terminate-when-signaled takes precedence over
         # --forward-signals
-        self._test_terminate_when_signalled(
-            ['--terminate-when-signalled'],
+        self._test_terminate_when_signaled(
+            ['--terminate-when-signaled'],
             signal.SIGINT,
             expect_sigterm=True,
             is_subreaper=True,
@@ -658,8 +658,8 @@ class TestSupervisor(BaseTest):
             parent_killed_by=signal.SIGTERM,
         )
         # We send SIGKILL immediately, if told to do so
-        self._test_terminate_when_signalled(
-            ['--terminate-when-signalled', '--terminate-timeout=0.0'],
+        self._test_terminate_when_signaled(
+            ['--terminate-when-signaled', '--terminate-timeout=0.0'],
             signal.SIGTERM,
             expect_sigterm=False,
             is_subreaper=True,
@@ -671,8 +671,8 @@ class TestSupervisor(BaseTest):
         # Allow 100ms for the parent to exit, so that we're reasonably
         # likely to be testing the code path that we intend to be,
         # but without delaying testing too much.
-        self._test_terminate_when_signalled(
-            ['--terminate-when-signalled', '--terminate-idle-timeout=0.1'],
+        self._test_terminate_when_signaled(
+            ['--terminate-when-signaled', '--terminate-idle-timeout=0.1'],
             signal.SIGINT,
             expect_sigterm=True,
             is_subreaper=True,
@@ -682,8 +682,8 @@ class TestSupervisor(BaseTest):
         )
         # If we use --terminate-with-main then there are two reasons why
         # terminating the parent would terminate the child
-        self._test_terminate_when_signalled(
-            ['--terminate-when-signalled', '--terminate-with-main'],
+        self._test_terminate_when_signaled(
+            ['--terminate-when-signaled', '--terminate-with-main'],
             signal.SIGTERM,
             expect_sigterm=True,
             is_subreaper=True,
@@ -692,18 +692,18 @@ class TestSupervisor(BaseTest):
         # SIGHUP to supervisor sends SIGHUP to main process,
         # but this isn't forwarded to child processes.
         # SIGUSR1, SIGUSR2 are the same (not tested here)
-        self._test_terminate_when_signalled(
-            ['--terminate-when-signalled'],
+        self._test_terminate_when_signaled(
+            ['--terminate-when-signaled'],
             signal.SIGHUP,
             expect_sigterm=False,
             kills_child=False,
             is_subreaper=True,
         )
 
-    def test_no_terminate_when_signalled_by_default(self) -> None:
+    def test_no_terminate_when_signaled_by_default(self) -> None:
         # SIGINT to supervisor sends SIGINT to main process,
         # but by default no signals are sent to its child processes
-        self._test_terminate_when_signalled(
+        self._test_terminate_when_signaled(
             [],
             signal.SIGINT,
             expect_sigterm=False,
@@ -712,7 +712,7 @@ class TestSupervisor(BaseTest):
         )
         # SIGTERM to supervisor sends SIGTERM to main process,
         # but is otherwise the same
-        self._test_terminate_when_signalled(
+        self._test_terminate_when_signaled(
             [],
             signal.SIGTERM,
             expect_sigterm=True,
@@ -721,7 +721,7 @@ class TestSupervisor(BaseTest):
         )
         # If we're a subreaper, the only difference is that we wait for
         # the child to exit, too
-        self._test_terminate_when_signalled(
+        self._test_terminate_when_signaled(
             ['--subreaper'],
             signal.SIGTERM,
             expect_sigterm=True,
@@ -730,7 +730,7 @@ class TestSupervisor(BaseTest):
         )
         # If the parent exited first, we still don't send the signal to
         # its children
-        self._test_terminate_when_signalled(
+        self._test_terminate_when_signaled(
             ['--subreaper'],
             signal.SIGINT,
             expect_sigterm=False,
@@ -740,7 +740,7 @@ class TestSupervisor(BaseTest):
         )
         # If we use --terminate-with-main then terminating the parent
         # indirectly causes termination of the child
-        self._test_terminate_when_signalled(
+        self._test_terminate_when_signaled(
             ['--terminate-with-main'],
             signal.SIGTERM,
             expect_sigterm=True,
@@ -748,30 +748,30 @@ class TestSupervisor(BaseTest):
             kills_child=True,
         )
 
-    def test_no_terminate_when_signalled_explicitly(self) -> None:
-        self._test_terminate_when_signalled(
-            ['--no-terminate-when-signalled', '--subreaper'],
+    def test_no_terminate_when_signaled_explicitly(self) -> None:
+        self._test_terminate_when_signaled(
+            ['--no-terminate-when-signaled', '--subreaper'],
             signal.SIGINT,
             expect_sigterm=False,
             is_subreaper=True,
             kills_child=False,
         )
-        self._test_terminate_when_signalled(
-            ['--no-terminate-when-signalled'],
+        self._test_terminate_when_signaled(
+            ['--no-terminate-when-signaled'],
             signal.SIGTERM,
             expect_sigterm=True,
             is_subreaper=False,
             kills_child=False,
         )
-        self._test_terminate_when_signalled(
-            ['--no-terminate-when-signalled', '--subreaper'],
+        self._test_terminate_when_signaled(
+            ['--no-terminate-when-signaled', '--subreaper'],
             signal.SIGTERM,
             expect_sigterm=True,
             is_subreaper=True,
             kills_child=False,
         )
-        self._test_terminate_when_signalled(
-            ['--no-terminate-when-signalled', '--subreaper'],
+        self._test_terminate_when_signaled(
+            ['--no-terminate-when-signaled', '--subreaper'],
             signal.SIGTERM,
             expect_sigterm=True,
             is_subreaper=True,
@@ -780,8 +780,8 @@ class TestSupervisor(BaseTest):
         )
         # If we use --terminate-with-main then terminating the parent
         # indirectly causes termination of the child
-        self._test_terminate_when_signalled(
-            ['--no-terminate-when-signalled', '--terminate-with-main'],
+        self._test_terminate_when_signaled(
+            ['--no-terminate-when-signaled', '--terminate-with-main'],
             signal.SIGTERM,
             expect_sigterm=True,
             is_subreaper=True,

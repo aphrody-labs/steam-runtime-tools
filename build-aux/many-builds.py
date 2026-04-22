@@ -512,7 +512,11 @@ class Environment:
         with suppress(FileNotFoundError):
             shutil.rmtree(pv)
 
-        shutil.copytree(self.builddir_parent / 'scout-relocatable', pv)
+        shutil.copytree(
+            self.builddir_parent / 'scout-relocatable',
+            pv,
+            symlinks=True,
+        )
         print('To upload to a test machine:')
         print(
             'rsync -avzP --delete {}/ '

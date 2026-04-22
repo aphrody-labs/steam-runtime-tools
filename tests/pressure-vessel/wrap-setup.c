@@ -2375,7 +2375,11 @@ test_payload_command (Fixture *f,
 
       g_assert_cmpuint (argv_in_container->argv->len, >=, 2);
       arg = g_ptr_array_index (argv_in_container->argv, 0);
+#ifdef _SRT_MULTIARCH
+      g_assert_true (g_str_has_suffix (arg, "/" _SRT_MULTIARCH "-srt-launcher-service"));
+#else
       g_assert_true (g_str_has_suffix (arg, "/steam-runtime-launcher-service"));
+#endif
       offset++;
 
       arg = g_ptr_array_index (argv_in_container->argv, 1);

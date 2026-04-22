@@ -130,6 +130,15 @@ def install_exe(src, dst, mode=0o755):
     install(src, dst, mode)
 
 
+def symlink_force(src, dst):
+    # type: (str, str) -> None
+    # Equivalent to ln -fns
+    if os.path.exists(dst):
+        os.remove(dst)
+
+    os.symlink(src, dst)
+
+
 def v_call(command, **kwargs):
     print('# {}'.format(command))
     return subprocess.call(command, **kwargs)
@@ -429,39 +438,29 @@ def main():
         # which might be different
         primary_architecture = architectures[0].name
 
-        # Normally bin/steam-runtime-launcher-service would be a symlink
-        # to ../libexec/steam-runtime-tools/TUPLE-srt-launcher-service,
-        # but for the relocatable installation we don't want to rely on
-        # Steampipe handling symlinks gracefully, so we just duplicate it.
-        # It isn't very large.
+        # bin/steam-runtime-launcher-service is a symlink
+        # to ../libexec/steam-runtime-tools/TUPLE-srt-launcher-service.
+        # Historically we've avoided relying on Steampipe handling
+        # symlinks gracefully, but in fact it can cope with symlinks now.
         for arch in architectures:
             if arch.name == primary_architecture:
                 for exe in [
                     'launcher-service',
                 ]:
+                    # Where to install the symlink
+                    dest = os.path.join(
+                        installation,
+                        'bin',
+                        'steam-runtime-' + exe,
+                    )
+                    # Relative path from dest to the real executable
                     rel = (
-                        'libexec/steam-runtime-tools-0/'
+                        '../libexec/steam-runtime-tools-0/'
                         + arch.multiarch
                         + '-srt-'
                         + exe
                     )
-
-                    path = os.path.join(args.pv_dir, rel)
-
-                    if not os.path.exists(path):
-                        path = os.path.join(args.prefix, rel)
-
-                    if not os.path.exists(path):
-                        path = '/usr/{}'.format(rel)
-
-                    install_exe(
-                        path,
-                        os.path.join(
-                            installation,
-                            'bin',
-                            'steam-runtime-' + exe,
-                        ),
-                    )
+                    symlink_force(rel, dest)
 
         install(
             os.path.join(srcdir, 'pressure-vessel', 'THIRD-PARTY.md'),

@@ -317,8 +317,8 @@ static void
 _srt_subprocess_clear (SrtSubprocess *self)
 {
   _srt_subprocess_cancel_timeout (self);
-  glnx_close_fd (&self->stdout_fd);
-  glnx_close_fd (&self->stderr_fd);
+  g_clear_fd (&self->stdout_fd, NULL);
+  g_clear_fd (&self->stderr_fd, NULL);
   gstring_free0 (self->out);
   gstring_free0 (self->err);
   g_clear_pointer (&self->completing_context, g_main_context_unref);
@@ -384,13 +384,20 @@ _srt_subprocess_read (SrtSubprocess *self,
       if (self->error == NULL)
         self->error = g_steal_pointer (&error);
 
-      glnx_close_fd (fd_p);
+      if (!g_clear_fd (fd_p, NULL))
+        g_debug ("Error closing subprocess %d %s: %s",
+                 self->pid, label, g_strerror (errno));
+
       return G_SOURCE_REMOVE;   /* Destroys the source */
     }
   else if (len == 0)
     {
       trace ("EOF reading from subprocess %d %s", self->pid, label);
-      glnx_close_fd (fd_p);
+
+      if (!g_clear_fd (fd_p, NULL))
+        g_debug ("Error closing subprocess %d %s: %s",
+                 self->pid, label, g_strerror (errno));
+
       return G_SOURCE_REMOVE;   /* Destroys the source */
     }
   else

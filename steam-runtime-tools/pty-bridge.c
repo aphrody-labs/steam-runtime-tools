@@ -269,7 +269,12 @@ bridge_fd_close (BridgeFd *self)
     }
 
   self->flags = BRIDGE_FD_DEFAULT;
-  glnx_close_fd (&self->fd);
+
+  if (!g_clear_fd (&self->fd, NULL))
+    g_debug ("Error closing %s fd %d: %s",
+             (self->flags & BRIDGE_FD_WRITE_SIDE) ? "output" : "input",
+             self->fd,
+             g_strerror (errno));
 }
 
 /*
@@ -444,9 +449,9 @@ srt_pty_bridge_finalize (GObject *object)
 
   g_clear_error (&self->init_error);
   g_clear_pointer (&self->context, g_main_context_unref);
-  glnx_close_fd (&self->ptmx_fd);
-  glnx_close_fd (&self->terminal_fd);
-  glnx_close_fd (&self->controlling_terminal_fd);
+  g_clear_fd (&self->ptmx_fd, NULL);
+  g_clear_fd (&self->terminal_fd, NULL);
+  g_clear_fd (&self->controlling_terminal_fd, NULL);
   g_string_free (self->oob_buffer, TRUE);
 
   G_OBJECT_CLASS (_srt_pty_bridge_parent_class)->finalize (object);
@@ -527,7 +532,10 @@ _srt_pty_bridge_write_ptmx (SrtPtyBridge *self)
 
               /* We can no longer write input to the ptmx */
               g_clear_pointer (&self->input_source.write_source, g_source_unref);
-              glnx_close_fd (&self->ptmx_fd);
+
+              if (!g_clear_fd (&self->ptmx_fd, NULL))
+                g_debug ("Error closing ptmx fd: %s", g_strerror (errno));
+
               return G_SOURCE_REMOVE;   /* Destroys input_source.write_source */
             }
         }
@@ -869,7 +877,10 @@ _srt_pty_bridge_ptmx_in_cb (int ptmx_fd,
 
               /* We can no longer read output from the ptmx */
               g_clear_pointer (&self->output_dest.read_source, g_source_unref);
-              glnx_close_fd (&self->ptmx_fd);
+
+              if (!g_clear_fd (&self->ptmx_fd, NULL))
+                g_debug ("Error closing ptmx fd: %s", g_strerror (errno));
+
               return G_SOURCE_REMOVE;   /* Destroys output_dest.read_source */
             }
         }
@@ -1239,5 +1250,6 @@ _srt_pty_bridge_is_active (SrtPtyBridge *self)
 void
 _srt_pty_bridge_close_terminal_fd (SrtPtyBridge *self)
 {
-  glnx_close_fd (&self->terminal_fd);
+  if (!g_clear_fd (&self->terminal_fd, NULL))
+    g_debug ("Error closing terminal fd: %s", g_strerror (errno));
 }

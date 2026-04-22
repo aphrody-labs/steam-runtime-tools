@@ -531,7 +531,7 @@ _srt_pipe_steal (SrtPipe *self,
 static inline void
 _srt_pipe_clear (SrtPipe *self)
 {
-  /* Note that glnx_close_fd preserves errno */
+  /* Note that glnx_close_fd preserves errno, unlike g_clear_fd() */
   glnx_close_fd (&self->fds[0]);
   glnx_close_fd (&self->fds[1]);
 }

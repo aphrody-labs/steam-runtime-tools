@@ -49,7 +49,7 @@ _srt_sysroot_finalize (GObject *object)
 {
   SrtSysroot *self = SRT_SYSROOT (object);
 
-  glnx_close_fd (&self->fd);
+  g_clear_fd (&self->fd, NULL);
   g_free (self->path);
 
   G_OBJECT_CLASS (_srt_sysroot_parent_class)->finalize (object);
@@ -176,13 +176,13 @@ _srt_sysroot_new_flatpak_host (GError **error)
  *
  * Close the fd pointed to by @p, and set `*(int *) p` to -1.
  *
- * This wraps glnx_close_fd() with the signature required by
+ * This wraps g_clear_fd() with the signature required by
  * g_array_set_clear_func().
  */
 static void
 clear_fd (void *p)
 {
-  glnx_close_fd (p);
+  g_clear_fd (p, NULL);
 }
 
 /*

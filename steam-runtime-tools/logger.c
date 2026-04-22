@@ -166,15 +166,15 @@ _srt_logger_finalize (GObject *object)
   g_clear_pointer (&self->previous_filename, g_free);
   g_clear_pointer (&self->new_filename, g_free);
   g_clear_pointer (&self->terminal, g_free);
-  glnx_close_fd (&self->child_ready_to_parent);
-  glnx_close_fd (&self->pipe_from_parent);
-  glnx_close_fd (&self->file_fd);
+  g_clear_fd (&self->child_ready_to_parent, NULL);
+  g_clear_fd (&self->pipe_from_parent, NULL);
+  g_clear_fd (&self->file_fd, NULL);
 
   if (self->journal_fd > STDERR_FILENO)
-    glnx_close_fd (&self->journal_fd);
+    g_clear_fd (&self->journal_fd, NULL);
 
   if (self->terminal_fd > STDERR_FILENO)
-    glnx_close_fd (&self->terminal_fd);
+    g_clear_fd (&self->terminal_fd, NULL);
 
   G_OBJECT_CLASS (_srt_logger_parent_class)->finalize (object);
 }
@@ -876,8 +876,9 @@ _srt_logger_run_subprocess (SrtLogger *self,
     }
 
   /* These are only needed in the child */
-  glnx_close_fd (&self->child_ready_to_parent);
-  glnx_close_fd (&self->pipe_from_parent);
+  if (!g_clear_fd (&self->child_ready_to_parent, error)
+      || !g_clear_fd (&self->pipe_from_parent, error))
+    return glnx_prefix_error (error, "Unable to close pipe used internally");
 
   /* Wait for child to finish setup */
   status = g_string_new ("");
@@ -898,7 +899,11 @@ _srt_logger_run_subprocess (SrtLogger *self,
       && glnx_loop_write (*original_stdout, status->str, status->len) < 0)
     return glnx_throw_errno_prefix (error, "Unable to report ready");
 
-  glnx_close_fd (original_stdout);
+  /* We don't know what the original stdout was (for example it might
+   * have been a regular file on a disk that's full) so mostly ignore
+   * write errors while closing it */
+  if (!g_clear_fd (original_stdout, NULL))
+    g_warning ("Unable to close original stdout: %s", g_strerror (errno));
 
   if (!consume_stdin)
     {
@@ -1112,7 +1117,12 @@ _srt_logger_try_rotate (SrtLogger *self,
       goto out;
     }
 
-  glnx_close_fd (&self->file_fd);
+  /* We've passed the point of no return by now, so we can't do anything
+   * useful if there's a write error while closing the old file */
+  if (!g_clear_fd (&self->file_fd, NULL))
+    g_warning ("Unable to close old log file \"%s\" after rotation: %s",
+               self->previous_filename, g_strerror (errno));
+
   self->file_fd = g_steal_fd (&new_fd);
   self->file_stat = new_stat;
   ret = TRUE;
@@ -1384,7 +1394,10 @@ _srt_logger_process (SrtLogger *self,
         return glnx_throw_errno_prefix (error, "Unable to report ready");
     }
 
-  glnx_close_fd (original_stdout);
+  /* If a write error occurs while closing the original stdout,
+   * there isn't much we can do about it at this point, so only warn */
+  if (!g_clear_fd (original_stdout, NULL))
+    g_warning ("Unable to close original stdout: %s", g_strerror (errno));
 
   do
     {

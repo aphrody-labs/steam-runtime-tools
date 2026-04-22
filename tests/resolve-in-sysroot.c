@@ -593,8 +593,10 @@ test_resolve_in_sysroot (Fixture *f,
             }
         }
 
-      glnx_close_fd (&fd);
-      glnx_close_fd (&chased_fd);
+      g_clear_fd (&fd, &error);
+      g_assert_no_error (error);
+      g_clear_fd (&chased_fd, &error);
+      g_assert_no_error (error);
       g_clear_object (&sysroot);
       tests_check_fd_leaks_leave (old_fds);
     }

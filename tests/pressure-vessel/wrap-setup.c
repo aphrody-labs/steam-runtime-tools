@@ -819,8 +819,10 @@ teardown (Fixture *f,
 {
   g_autoptr(GError) local_error = NULL;
 
-  glnx_close_fd (&f->mock_runtime_fd);
-  glnx_close_fd (&f->var_fd);
+  g_clear_fd (&f->mock_runtime_fd, &local_error);
+  g_assert_no_error (local_error);
+  g_clear_fd (&f->var_fd, &local_error);
+  g_assert_no_error (local_error);
 
   glnx_tmpdir_delete (&f->tmpdir, NULL, &local_error);
   g_assert_no_error (local_error);

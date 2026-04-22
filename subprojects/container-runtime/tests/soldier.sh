@@ -223,6 +223,24 @@ if [ -n "$symlinks" ]; then
     exit 1
 fi
 
+pv_verify=
+
+case "$(uname -m)" in
+    (x86_64)
+        pv_verify=depots/test-soldier-local/pressure-vessel/bin/pv-verify
+        ;;
+    # In principle we could run a different copy of pv-verify on non-x86,
+    # but our CI runners and development systems are x86 so this is
+    # good enough
+esac
+
+if [ -n "$pv_verify" ]; then
+    if ! "$pv_verify" depots/test-soldier-local; then
+        echo "Bail out! Depot verification failed"
+        exit 1
+    fi
+fi
+
 echo "ok 2 - soldier, running from local builds"
 
 rm -fr depots/test-soldier-unversioned
@@ -279,6 +297,13 @@ for dir in depots/test-soldier-unversioned/soldier*; do
         exit 1
     fi
 done
+
+if [ -n "$pv_verify" ]; then
+    if ! "$pv_verify" depots/test-soldier-unversioned; then
+        echo "Bail out! Depot verification failed"
+        exit 1
+    fi
+fi
 
 echo "ok 3 - soldier, running from unpacked directory without version"
 

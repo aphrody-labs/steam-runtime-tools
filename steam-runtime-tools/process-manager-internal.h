@@ -65,7 +65,7 @@ typedef struct
   /* If true, on receiving a terminating signal (SIGINT, SIGQUIT, SIGTERM)
    * signal all child processes to exit, not just the main process.
    * Requires @forward_signals and @subreaper. */
-  unsigned terminate_when_signalled : 1;
+  unsigned terminate_when_signaled : 1;
   /* If true, after the main command exits, signal remaining child processes
    * to exit. */
   unsigned terminate_with_main : 1;

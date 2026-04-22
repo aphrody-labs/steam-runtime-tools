@@ -28,7 +28,7 @@ steam-runtime-supervisor - run and supervise a subprocess
 [**--[no-]subreaper**]
 [**--terminate-idle-timeout** *SECONDS*]
 [**--terminate-timeout** *SECONDS*]
-[**--[no-]terminate-when-signalled**]
+[**--[no-]terminate-when-signaled**]
 [**--[no-]terminate-with-main**]
 [**--unset-env** *VAR*]
 [**--verbose** [**--verbose**]]
@@ -293,25 +293,25 @@ currently 2.0 seconds.
 For backward compatibility,
 if **--no-terminate-with-main** was not specified,
 and neither of the process termination options
-**--terminate-when-signalled** or **--terminate-with-main** were specified,
+**--terminate-when-signaled** or **--terminate-with-main** were specified,
 then **--terminate-timeout** with a non-negative argument implies
 **--terminate-with-main**.
 
 </dd>
 <dt>
 
-**--terminate-when-signalled**, **--no-terminate-when-signalled**
+**--terminate-when-signaled**, **--no-terminate-when-signaled**
 
 </dt><dd>
 
-With **--terminate-when-signalled**,
+With **--terminate-when-signaled**,
 if the **steam-runtime-supervisor** process receives a signal that
 normally indicates a request to terminate
 (currently **SIGINT**, **SIGQUIT** or **SIGTERM**),
 treat it as a request to terminate all processes
 as documented in section "Terminating processes" below.
 
-With **--no-terminate-when-signalled**,
+With **--no-terminate-when-signaled**,
 only deliver the signal to the *COMMAND*.
 
 </dd>

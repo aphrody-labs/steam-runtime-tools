@@ -34,7 +34,7 @@ static struct
    * Set to 1 if we want to respond to fatal signals by terminating all
    * child processes.
    */
-  sig_atomic_t terminate_when_signalled;
+  sig_atomic_t terminate_when_signaled;
 
   /*
    * Set to a nonzero signal number if we have moved to the phase of
@@ -46,7 +46,7 @@ static struct
   sig_atomic_t terminate_requested;
 } global = {
   .main_pid = 0,
-  .terminate_when_signalled = 0,
+  .terminate_when_signaled = 0,
   .terminate_requested = 0,
 };
 
@@ -117,7 +117,7 @@ _srt_wait_status_to_exit_status (int wait_status)
  * to exit.
  *
  * If `global.terminate_requested` becomes true for any reason,
- * for example receiving `SIGTERM` under `global.terminate_when_signalled`,
+ * for example receiving `SIGTERM` under `global.terminate_when_signaled`,
  * return %FALSE setting @error to %G_IO_ERROR_CANCELLED.
  *
  * This function cannot be called in a process that is using
@@ -1114,11 +1114,11 @@ _srt_process_manager_new (SrtProcessManagerOptions *options,
   g_autoptr(SrtProcessManager) self = NULL;
 
   g_return_val_if_fail (options->subreaper
-                        || !(options->terminate_when_signalled
+                        || !(options->terminate_when_signaled
                              || options->terminate_with_main),
                         FALSE);
   g_return_val_if_fail (options->forward_signals
-                        || !options->terminate_when_signalled,
+                        || !options->terminate_when_signaled,
                         FALSE);
   g_return_val_if_fail (options->terminate_wait_usec >= 0, FALSE);
   g_return_val_if_fail (options->terminate_grace_usec >= 0, FALSE);
@@ -1266,8 +1266,8 @@ _srt_process_manager_dump_parameters (SrtProcessManager *self,
   g_debug ("Exit with parent: %c", self->opts.exit_with_parent ? 'y' : 'n');
   g_debug ("Forward signals: %c", self->opts.forward_signals ? 'y' : 'n');
   g_debug ("Subreaper: %c", self->opts.subreaper ? 'y' : 'n');
-  g_debug ("Terminate child processes when signalled: %c",
-           self->opts.terminate_when_signalled ? 'y' : 'n');
+  g_debug ("Terminate child processes when signaled: %c",
+           self->opts.terminate_when_signaled ? 'y' : 'n');
   g_debug ("Terminate child processes when command exits: %c",
            self->opts.terminate_with_main ? 'y' : 'n');
 }
@@ -1305,7 +1305,7 @@ terminate_child_cb (int signum)
         break;
     }
 
-  if (is_terminating_signal && global.terminate_when_signalled != 0)
+  if (is_terminating_signal && global.terminate_when_signaled != 0)
     {
       global.terminate_requested = signum;
     }
@@ -1367,7 +1367,7 @@ _srt_process_manager_run (SrtProcessManager *self,
   const sigset_t *restore_mask = NULL;
 
   g_return_val_if_fail (global.main_pid == 0, FALSE);
-  g_return_val_if_fail (global.terminate_when_signalled == 0, FALSE);
+  g_return_val_if_fail (global.terminate_when_signaled == 0, FALSE);
   g_return_val_if_fail (global.terminate_requested == 0, FALSE);
   g_return_val_if_fail (self->exit_status == -1, FALSE);
 
@@ -1436,8 +1436,8 @@ _srt_process_manager_run (SrtProcessManager *self,
    * We have to use a global variable to pass this information to
    * terminate_child_cb.
    */
-  if (self->opts.terminate_when_signalled)
-    global.terminate_when_signalled = 1;
+  if (self->opts.terminate_when_signaled)
+    global.terminate_when_signaled = 1;
 
   /* We use LEAVE_DESCRIPTORS_OPEN and set CLOEXEC in the child_setup,
    * to work around a deadlock in GLib < 2.60 */

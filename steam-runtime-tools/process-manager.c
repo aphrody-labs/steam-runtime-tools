@@ -21,6 +21,41 @@
 #include "steam-runtime-tools/missing-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
+/* Global variables used to communicate with terminate_child_cb */
+static struct
+{
+  /*
+   * The main process ID we are waiting for,
+   * or 0 if the main process was never started or already exited.
+   */
+  sig_atomic_t main_pid;
+
+  /*
+   * Set to 1 if we want to respond to fatal signals by terminating all
+   * child processes.
+   */
+  sig_atomic_t terminate_when_signalled;
+
+  /*
+   * Set to a nonzero signal number if we have moved to the phase of
+   * execution where we terminate all child processes.
+   * If we receive a signal that results in child termination,
+   * this is set to that signal number.
+   * If our main process exits, this is set to SIGCHLD.
+   */
+  sig_atomic_t terminate_requested;
+} global = {
+  .main_pid = 0,
+  .terminate_when_signalled = 0,
+  .terminate_requested = 0,
+};
+
+/* Ensure global.main_pid is large enough to store pid_t */
+G_STATIC_ASSERT (sizeof (global.main_pid) >= sizeof (pid_t));
+/* Ensure signedness of sig_atomic_t and pid_t agrees */
+G_STATIC_ASSERT (0 > (sig_atomic_t) -1);
+G_STATIC_ASSERT (0 > (pid_t) -1);
+
 /*
  * _srt_wait_status_to_exit_status:
  * @wait_status: A `wait()` status
@@ -43,7 +78,9 @@ _srt_wait_status_to_exit_status (int wait_status)
   else if (WIFSIGNALED (wait_status))
     {
       ret = 128 + WTERMSIG (wait_status);
-      g_info ("Command killed by signal %d", ret - 128);
+      g_info ("Command killed by signal %d (%s)",
+              ret - 128,
+              strsignal (ret - 128) ?: "(unknown)");
     }
   else
     {
@@ -79,6 +116,10 @@ _srt_wait_status_to_exit_status (int wait_status)
  * If @main_process is zero or negative, wait for all child processes
  * to exit.
  *
+ * If `global.terminate_requested` becomes true for any reason,
+ * for example receiving `SIGTERM` under `global.terminate_when_signalled`,
+ * return %FALSE setting @error to %G_IO_ERROR_CANCELLED.
+ *
  * This function cannot be called in a process that is using
  * g_child_watch_source_new() or similar functions, because it waits
  * for all child processes regardless of their process IDs, and that is
@@ -95,7 +136,7 @@ _srt_wait_for_child_processes (pid_t main_process,
   if (wait_status_out != NULL)
     *wait_status_out = -1;
 
-  while (1)
+  while (global.terminate_requested == 0)
     {
       int wait_status = -1;
       pid_t died = wait (&wait_status);
@@ -104,6 +145,7 @@ _srt_wait_for_child_processes (pid_t main_process,
         {
           if (errno == EINTR)
             {
+              g_debug ("wait(2) interrupted by signal");
               continue;
             }
           else if (errno == ECHILD)
@@ -122,11 +164,28 @@ _srt_wait_for_child_processes (pid_t main_process,
 
       if (died == main_process)
         {
+          if (global.main_pid == main_process)
+            global.main_pid = 0;
+
           if (wait_status_out != NULL)
             *wait_status_out = wait_status;
 
           return TRUE;
         }
+    }
+
+  if (global.terminate_requested != 0)
+    {
+      if (global.terminate_requested == SIGCHLD)
+        g_set_error (error, G_IO_ERROR, G_IO_ERROR_CANCELLED,
+                     "Termination requested because main process exited");
+      else
+        g_set_error (error, G_IO_ERROR, G_IO_ERROR_CANCELLED,
+                     "Termination requested by signal %d (%s)",
+                     global.terminate_requested,
+                     strsignal (global.terminate_requested) ?: "(unknown)");
+
+      return FALSE;
     }
 
   if (main_process > 0)
@@ -154,6 +213,10 @@ typedef struct
   GHashTable *sent_sigkill;
   /* Scratch space to build temporary strings */
   GString *buffer;
+  pid_t main_pid;
+  /* Set to the wait status of the main process,
+   * if it exits during process termination. */
+  int main_pid_wait_status;
   /* 0, SIGTERM or SIGKILL */
   int sending_signal;
   /* Nonzero if wait_source has been attached to context */
@@ -163,6 +226,8 @@ typedef struct
   /* TRUE if we reach a point where we have no more child processes. */
   gboolean finished;
 } TerminationData;
+
+#define TERMINATION_DATA_INIT { .main_pid_wait_status = -1 };
 
 /*
  * Free everything in @data.
@@ -337,6 +402,19 @@ termination_data_refresh (TerminationData *data)
       g_debug ("Process %d exited", died);
       g_hash_table_remove (data->sent_sigkill, GINT_TO_POINTER (died));
       g_hash_table_remove (data->sent_sigterm, GINT_TO_POINTER (died));
+
+      /* No need to check that data->main_pid > 0 here,
+       * because we already checked died > 0 */
+      if (died == data->main_pid)
+        {
+          g_assert (data->main_pid > 0);
+
+          if (global.main_pid == data->main_pid)
+            global.main_pid = 0;
+
+          data->main_pid = 0;
+          data->main_pid_wait_status = wait_status;
+        }
     }
 
   /* If we are still in the wait_period, nothing more to do yet */
@@ -542,6 +620,9 @@ sigchld_cb (int sfd,
  * @grace_period: If greater than 0, after @wait_period plus this many
  *  microseconds, use `SIGKILL` instead of `SIGTERM`. If 0, proceed
  *  directly to sending `SIGKILL`.
+ * @main_pid: process for which we will report wait-status;
+ *  zero or negative if there is no main process
+ * @main_pid_wait_status: (out): wait-status of @main_pid
  * @error: Used to raise an error on failure
  *
  * Make sure all child processes are terminated.
@@ -564,12 +645,17 @@ sigchld_cb (int sfd,
 gboolean
 _srt_subreaper_terminate_all_child_processes (GTimeSpan wait_period,
                                               GTimeSpan grace_period,
+                                              pid_t main_pid,
+                                              int *main_pid_wait_status,
                                               GError **error)
 {
-  g_auto(TerminationData) data = {};
+  g_auto(TerminationData) data = TERMINATION_DATA_INIT;
   sigset_t mask;
   int is_subreaper = -1;
   glnx_autofd int sfd = -1;
+
+  if (main_pid_wait_status != NULL)
+    *main_pid_wait_status = -1;
 
   if (prctl (PR_GET_CHILD_SUBREAPER, (unsigned long) &is_subreaper, 0, 0, 0) != 0)
     return glnx_throw_errno_prefix (error, "prctl PR_GET_CHILD_SUBREAPER");
@@ -585,6 +671,7 @@ _srt_subreaper_terminate_all_child_processes (GTimeSpan wait_period,
   if (!sigismember (&mask, SIGCHLD))
     return glnx_throw (error, "Process has not blocked SIGCHLD");
 
+  data.main_pid = main_pid;
   data.children_file = g_strdup_printf ("/proc/%d/task/%d/children",
                                         getpid (), getpid ());
   data.context = g_main_context_new ();
@@ -647,6 +734,9 @@ _srt_subreaper_terminate_all_child_processes (GTimeSpan wait_period,
       g_propagate_error (error, g_steal_pointer (&data.error));
       return FALSE;
     }
+
+  if (main_pid_wait_status != NULL)
+    *main_pid_wait_status = data.main_pid_wait_status;
 
   return TRUE;
 }
@@ -1023,9 +1113,15 @@ _srt_process_manager_new (SrtProcessManagerOptions *options,
   SrtProcessManagerOptions blank = SRT_PROCESS_MANAGER_OPTIONS_INIT;
   g_autoptr(SrtProcessManager) self = NULL;
 
-  g_return_val_if_fail ((options->terminate_grace_usec < 0
-                         || options->subreaper),
+  g_return_val_if_fail (options->subreaper
+                        || !(options->terminate_when_signalled
+                             || options->terminate_with_main),
                         FALSE);
+  g_return_val_if_fail (options->forward_signals
+                        || !options->terminate_when_signalled,
+                        FALSE);
+  g_return_val_if_fail (options->terminate_wait_usec >= 0, FALSE);
+  g_return_val_if_fail (options->terminate_grace_usec >= 0, FALSE);
 
   if (options->exit_with_parent)
     {
@@ -1165,9 +1261,16 @@ _srt_process_manager_dump_parameters (SrtProcessManager *self,
     {
       g_debug ("\t(none)");
     }
-}
 
-static pid_t global_child_pid = 0;
+  g_debug ("Close other fds: %c", self->opts.close_fds ? 'y' : 'n');
+  g_debug ("Exit with parent: %c", self->opts.exit_with_parent ? 'y' : 'n');
+  g_debug ("Forward signals: %c", self->opts.forward_signals ? 'y' : 'n');
+  g_debug ("Subreaper: %c", self->opts.subreaper ? 'y' : 'n');
+  g_debug ("Terminate child processes when signalled: %c",
+           self->opts.terminate_when_signalled ? 'y' : 'n');
+  g_debug ("Terminate child processes when command exits: %c",
+           self->opts.terminate_with_main ? 'y' : 'n');
+}
 
 static int forwarded_signals[] =
 {
@@ -1183,17 +1286,48 @@ static int forwarded_signals[] =
 static void
 terminate_child_cb (int signum)
 {
-  if (global_child_pid != 0)
+  int saved_errno = errno;
+  gboolean is_terminating_signal;
+
+  switch (signum)
+    {
+      case SIGINT:
+      case SIGQUIT:
+      case SIGTERM:
+        is_terminating_signal = TRUE;
+        break;
+
+      /* We don't terminate everything on SIGHUP or SIGUSR* because
+       * those are sometimes used as a control signal, for example
+       * SIGHUP's secondary use for reloading daemon configuration. */
+      default:
+        is_terminating_signal = FALSE;
+        break;
+    }
+
+  if (is_terminating_signal && global.terminate_when_signalled != 0)
+    {
+      global.terminate_requested = signum;
+    }
+  else if (global.main_pid != 0)
     {
       /* pass it on to the child we're going to wait for */
-      kill (global_child_pid, signum);
+      kill (global.main_pid, signum);
     }
-  else
+  else if (global.terminate_requested == 0)
     {
-      /* guess I'll just die, then */
+      /* If we haven't yet started a child process, we can shortcut
+       * by killing the supervisor process before it starts any
+       * child processes.
+       * Or, if our main child process already exited and we have not
+       * been given permission to forcibly terminate other child processes,
+       * there isn't really much we can do about it other than accepting
+       * the fatal signal and exiting. */
       signal (signum, SIG_DFL);
       raise (signum);
     }
+
+  errno = saved_errno;
 }
 
 /*
@@ -1223,11 +1357,18 @@ _srt_process_manager_run (SrtProcessManager *self,
                           GError **error)
 {
   g_autoptr(GError) local_error = NULL;
+  gboolean ok;
   struct sigaction terminate_child_action = {};
   int wait_status = -1;
+  pid_t main_pid = 0;
   size_t i;
+  sigset_t mask;
+  sigset_t old_mask;
+  const sigset_t *restore_mask = NULL;
 
-  g_return_val_if_fail (global_child_pid == 0, FALSE);
+  g_return_val_if_fail (global.main_pid == 0, FALSE);
+  g_return_val_if_fail (global.terminate_when_signalled == 0, FALSE);
+  g_return_val_if_fail (global.terminate_requested == 0, FALSE);
   g_return_val_if_fail (self->exit_status == -1, FALSE);
 
   g_debug ("Launching child process...");
@@ -1269,20 +1410,58 @@ _srt_process_manager_run (SrtProcessManager *self,
   if (self->opts.dump_parameters && _srt_util_is_debugging ())
     _srt_process_manager_dump_parameters (self, argv, envp);
 
+  if (self->opts.forward_signals)
+    {
+      /* Temporarily block SIGTERM, etc. for this critical section,
+       * until we know the main process's process ID and are ready to
+       * deliver the signal to it */
+      sigemptyset (&mask);
+      sigemptyset (&old_mask);
+
+      for (i = 0; i < G_N_ELEMENTS (forwarded_signals); i++)
+        sigaddset (&mask, forwarded_signals[i]);
+
+      if ((errno = pthread_sigmask (SIG_BLOCK, &mask, &old_mask)) != 0)
+        return glnx_throw_errno_prefix (error, "pthread_sigmask");
+
+      restore_mask = &old_mask;
+    }
+
   fflush (stdout);
   fflush (stderr);
 
+  /*
+   * Before this point, receiving SIGTERM will kill the supervisor process.
+   * After this point, receiving SIGTERM will kill child processes instead.
+   * We have to use a global variable to pass this information to
+   * terminate_child_cb.
+   */
+  if (self->opts.terminate_when_signalled)
+    global.terminate_when_signalled = 1;
+
   /* We use LEAVE_DESCRIPTORS_OPEN and set CLOEXEC in the child_setup,
    * to work around a deadlock in GLib < 2.60 */
-  if (!g_spawn_async (NULL,   /* working directory */
+  ok = g_spawn_async (NULL,   /* working directory */
                       (char **) argv,
                       (char **) envp,
                       (G_SPAWN_SEARCH_PATH | G_SPAWN_DO_NOT_REAP_CHILD |
                        G_SPAWN_LEAVE_DESCRIPTORS_OPEN |
                        G_SPAWN_CHILD_INHERITS_STDIN),
                       _srt_process_manager_child_setup_cb, self,
-                      &global_child_pid,
-                      &local_error))
+                      &main_pid,
+                      &local_error);
+
+  global.main_pid = main_pid;
+
+  if (restore_mask != NULL)
+    {
+      /* Restore the old signal mask. If we received SIGTERM, etc. since
+       * we blocked it, they will be delivered now */
+      if ((errno = pthread_sigmask (SIG_SETMASK, restore_mask, NULL)) != 0)
+        return glnx_throw_errno_prefix (error, "pthread_sigmask");
+    }
+
+  if (!ok)
     {
       if (local_error->domain == G_SPAWN_ERROR
           && local_error->code == G_SPAWN_ERROR_NOENT)
@@ -1317,25 +1496,74 @@ _srt_process_manager_run (SrtProcessManager *self,
         close (fd);
     }
 
-  /* Reap child processes until child_pid exits */
-  if (!_srt_wait_for_child_processes (global_child_pid, &wait_status, error))
+  while (1)
     {
-      self->exit_status = LAUNCH_EX_CANNOT_REPORT;
-      return FALSE;
+      gboolean waited_for_all_processes = FALSE;
+
+      if (global.terminate_requested != 0)
+        {
+          /* If termination was already requested for any reason,
+           * do that now. */
+          waited_for_all_processes = TRUE;
+          ok = _srt_subreaper_terminate_all_child_processes (self->opts.terminate_wait_usec,
+                                                             self->opts.terminate_grace_usec,
+                                                             global.main_pid,
+                                                             &wait_status,
+                                                             &local_error);
+        }
+      else
+        {
+          /* If the main process is still running (global.main_pid == 0),
+           * wait for it to exit. Otherwise, wait for all processes to exit. */
+          waited_for_all_processes = (global.main_pid == 0);
+          ok = _srt_wait_for_child_processes (global.main_pid,
+                                              &wait_status,
+                                              &local_error);
+        }
+
+      if (ok)
+        {
+          /* On success, the main process should definitely have exited. */
+          g_return_val_if_fail (global.main_pid == 0, FALSE);
+
+          if (self->exit_status < 0)
+            self->exit_status = _srt_wait_status_to_exit_status (wait_status);
+
+          if (self->opts.terminate_with_main)
+            global.terminate_requested = SIGCHLD;
+
+          if (waited_for_all_processes)
+            break;
+        }
+      else if (g_error_matches (local_error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+        {
+          /* Waiting for child processes was cancelled by a request for
+           * termination. We'll loop back around and go into the
+           * global.terminate_requested branch above. */
+
+          if (global.main_pid == 0)
+            g_debug ("Waiting for child processes cancelled by request for termination: %s",
+                     local_error->message);
+          else
+            g_debug ("Waiting for process %d cancelled by request for termination: %s",
+                     global.main_pid, local_error->message);
+
+          g_return_val_if_fail (global.terminate_requested != 0, FALSE);
+          g_clear_error (&local_error);
+        }
+      else
+        {
+          /* Waiting failed for some reason other than a request for
+           * termination. We can't usefully continue. */
+          if (self->exit_status < 0)
+            self->exit_status = LAUNCH_EX_CANNOT_REPORT;
+
+          g_propagate_error (error, g_steal_pointer (&local_error));
+          return FALSE;
+        }
     }
 
-  global_child_pid = 0;
-  self->exit_status = _srt_wait_status_to_exit_status (wait_status);
-
-  /* Wait for the other child processes, if any, possibly killing them.
-   * Note that this affects whether we return FALSE and set the error,
-   * but doesn't affect self->exit_status. */
-  if (self->opts.terminate_grace_usec >= 0)
-    return _srt_subreaper_terminate_all_child_processes (self->opts.terminate_wait_usec,
-                                                         self->opts.terminate_grace_usec,
-                                                         error);
-  else
-    return _srt_wait_for_child_processes (0, NULL, error);
+  return TRUE;
 }
 
 /*

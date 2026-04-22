@@ -526,7 +526,8 @@ static GOptionEntry options[] =
 {
   { "assign-fd", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, opt_assign_fd_cb,
-    "Make fd TARGET a copy of SOURCE, like TARGET>&SOURCE in shell.",
+    "Make fd TARGET a copy of SOURCE, like TARGET>&SOURCE in shell, "
+    "and close SOURCE in the adverb process.",
     "TARGET=SOURCE" },
 
   { "clear-env", '\0',
@@ -634,7 +635,8 @@ static GOptionEntry options[] =
 
   { "pass-fd", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, opt_pass_fd_cb,
-    "Let the launched process inherit the given fd.",
+    "Let the launched process inherit the given fd, "
+    "while closing it in the adverb.",
     "FD" },
 
   { "prefix", '\0',
@@ -806,12 +808,14 @@ main (int argc,
   process_manager_options.dump_parameters = TRUE;
   process_manager_options.exit_with_parent = !!opt_exit_with_parent;
   process_manager_options.forward_signals = TRUE;
-  process_manager_options.subreaper = (opt_subreaper || opt_terminate_timeout >= 0.0);
+  process_manager_options.terminate_with_main = (opt_terminate_timeout >= 0.0);
+  process_manager_options.subreaper = (opt_subreaper
+                                       || process_manager_options.terminate_with_main);
 
   if (opt_terminate_idle_timeout > 0.0)
     process_manager_options.terminate_wait_usec = opt_terminate_idle_timeout * G_TIME_SPAN_SECOND;
 
-  if (opt_terminate_timeout >= 0.0)
+  if (opt_terminate_timeout > 0.0)
     process_manager_options.terminate_grace_usec = opt_terminate_timeout * G_TIME_SPAN_SECOND;
 
   /* In the absence of --assign-fd arguments, the default is like shell

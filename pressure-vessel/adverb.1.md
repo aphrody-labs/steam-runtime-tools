@@ -72,11 +72,17 @@ from `runtime-ld.so.conf` in order.
 
 Make file descriptor *TARGET* in the *COMMAND* a copy of file
 descriptor *SOURCE* as passed to **pv-adverb**,
-similar to writing `TARGET>&SOURCE` as a shell redirection.
+similar to writing `TARGET>&SOURCE` or `TARGET<&SOURCE` as a shell redirection.
 For example, **--assign-fd=1=3** is the same as **1>&3**.
 The redirection is done at the last possible moment, so the output
 of **pv-adverb** will still go to the original standard
 error.
+
+Additionally,
+*SOURCE* will be closed in the **pv-adverb** process before
+waiting for the *COMMAND* (and possibly its descendants) to exit,
+unless it is being used as standard input or standard error for the
+**pv-adverb** process.
 
 </dd>
 <dt>
@@ -243,6 +249,12 @@ Pass the file descriptor *FD* (specified as a small positive integer)
 from the parent process to the *COMMAND*. The default is to only pass
 through file descriptors 0, 1 and 2
 (**stdin**, **stdout** and **stderr**).
+
+Additionally,
+*FD* will be closed in the **pv-adverb** process before
+waiting for the *COMMAND* (and possibly its descendants) to exit,
+unless it is being used as standard input or standard error for the
+**pv-adverb** process.
 
 </dd>
 <dt>

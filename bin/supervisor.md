@@ -26,7 +26,10 @@ steam-runtime-supervisor - run and supervise a subprocess
 [**--lock-fd** *FD*...]
 [**--pass-fd** *FD*...]
 [**--[no-]subreaper**]
-[**--terminate-timeout** *SECONDS* [**--terminate-idle-timeout** *SECONDS*]]
+[**--terminate-idle-timeout** *SECONDS*]
+[**--terminate-timeout** *SECONDS*]
+[**--[no-]terminate-when-signalled**]
+[**--[no-]terminate-with-main**]
 [**--unset-env** *VAR*]
 [**--verbose** [**--verbose**]]
 [[**--[no-]lock-create**]
@@ -53,11 +56,18 @@ determined by the options.
 
 Make file descriptor *TARGET* in the *COMMAND* a copy of file
 descriptor *SOURCE* as passed to **steam-runtime-supervisor**,
-similar to writing `TARGET>&SOURCE` as a shell redirection.
-For example, **--assign-fd=1=3** is the same as **1>&3**.
+similar to writing `TARGET>&SOURCE` or `TARGET<&SOURCE` as a shell redirection.
+For example, **--assign-fd=1=3** is the same as **1>&3**,
+making fd 1 (standard output) a copy of what is currently fd 3.
 The redirection is done at the last possible moment, so the output
 of **steam-runtime-supervisor** (if any) will still go to the
 original standard error.
+
+Additionally,
+*SOURCE* will be closed in the **steam-runtime-supervisor** process before
+waiting for the *COMMAND* (and possibly its descendants) to exit,
+unless it is being used as standard input or standard error for the
+**steam-runtime-supervisor** process.
 
 </dd>
 <dt>
@@ -228,9 +238,14 @@ acquired.
 </dt><dd>
 
 Pass the file descriptor *FD* (specified as a small positive integer)
-from the parent process to the *COMMAND*, even if **--close-fds**
-was specified.
-This option has no practical effect if **--close-fds** was not used.
+from the parent process to the *COMMAND*,
+even if **--close-fds** was specified.
+
+Additionally,
+*FD* will be closed in the **steam-runtime-supervisor** process before
+waiting for the *COMMAND* (and possibly its descendants) to exit,
+unless it is being used as standard input or standard error for the
+**steam-runtime-supervisor** process.
 
 </dd>
 <dt>
@@ -265,18 +280,57 @@ This option is ignored if **--terminate-timeout** is not used.
 
 </dt><dd>
 
-If non-negative, terminate background processes after the *COMMAND*
-exits. This implies **--subreaper**.
+When terminating descendant processes,
+send **SIGTERM** and **SIGCONT**,
+then wait this many seconds before sending **SIGKILL** and **SIGCONT**.
 Non-integer decimal values are allowed.
-When this option is enabled, after *COMMAND* exits,
-**steam-runtime-supervisor** will wait for up to the time specified
-by **--terminate-idle-timeout**, then send **SIGTERM** to any
-remaining child processes and wait for them to exit gracefully.
-If child processes continue to run after a further time specified
-by this option, send **SIGKILL** to force them to be terminated,
-and continue to send **SIGKILL** until there are no more descendant
-processes. If *SECONDS* is 0, **SIGKILL** is sent immediately.
-A negative number means signals are not sent, which is the default.
+If *SECONDS* is 0.0, **SIGKILL** is sent immediately.
+
+If *SECONDS* is negative and termination of child processes was requested,
+then a default is used,
+currently 2.0 seconds.
+
+For backward compatibility,
+if **--no-terminate-with-main** was not specified,
+and neither of the process termination options
+**--terminate-when-signalled** or **--terminate-with-main** were specified,
+then **--terminate-timeout** with a non-negative argument implies
+**--terminate-with-main**.
+
+</dd>
+<dt>
+
+**--terminate-when-signalled**, **--no-terminate-when-signalled**
+
+</dt><dd>
+
+With **--terminate-when-signalled**,
+if the **steam-runtime-supervisor** process receives a signal that
+normally indicates a request to terminate
+(currently **SIGINT**, **SIGQUIT** or **SIGTERM**),
+treat it as a request to terminate all processes
+as documented in section "Terminating processes" below.
+
+With **--no-terminate-when-signalled**,
+only deliver the signal to the *COMMAND*.
+
+</dd>
+<dt>
+
+**--terminate-with-main**, **--no-terminate-with-main**
+
+</dt><dd>
+
+With **--terminate-with-main**,
+terminate background processes after the *COMMAND* exits,
+as documented in section "Terminating processes" below.
+This implies **--subreaper**.
+
+With **--no-terminate-with-main**,
+continue to run after the *COMMAND* exits,
+even if **--terminate-timeout** was specified.
+This can be used to set a timeout for other termination conditions,
+if any are added in subsequent versions.
 
 </dd>
 <dt>
@@ -301,6 +355,21 @@ Be more verbose. If used twice, debug messages are shown.
 
 </dd>
 </dl>
+
+## Terminating processes
+
+If **steam-runtime-supervisor** will terminate child processes for any reason,
+it proceeds as follows:
+
+* If **--terminate-idle-timeout** is greater than 0,
+    wait that many seconds without taking action.
+
+* If **--terminate-timeout** is greater than 0,
+    send **SIGTERM** and **SIGCONT**,
+    then wait that many seconds.
+
+* Send **SIGKILL** and **SIGCONT**.
+    The child process cannot prevent this signal.
 
 # ENVIRONMENT
 

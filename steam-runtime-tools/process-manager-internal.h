@@ -20,6 +20,8 @@ gboolean _srt_wait_for_child_processes (pid_t main_process,
 
 gboolean _srt_subreaper_terminate_all_child_processes (GTimeSpan wait_period,
                                                        GTimeSpan grace_period,
+                                                       pid_t main_pid,
+                                                       int *wait_status_out,
                                                        GError **error);
 
 gboolean _srt_process_manager_init_single_threaded (GError **error);
@@ -36,11 +38,13 @@ typedef struct
 
   /* If greater than 0, wait this many microseconds after the main child
    * process has exited before terminating remaining child processes.
+   * If 0, proceed directly to terminating child processes.
    * Must be non-negative. */
   GTimeSpan terminate_wait_usec;
   /* If greater than 0, after @terminate_wait_usec plus this many
-   * microseconds, use `SIGKILL` instead of `SIGTERM`. If 0, proceed
-   * directly to sending `SIGKILL`. */
+   * microseconds, use `SIGKILL` instead of `SIGTERM`.
+   * If 0, proceed directly to sending `SIGKILL`.
+   * Must be non-negative. */
   GTimeSpan terminate_grace_usec;
 
   /* If true, all fds not mentioned in @pass_fds or @assign_fds will be
@@ -56,13 +60,19 @@ typedef struct
    * to the main child process. */
   unsigned forward_signals : 1;
   /* If true, wait for all descendant processes to exit.
-   * Must be true if using @terminate_wait_usec or @terminate_grace_usec. */
+   * Must be true if using @terminate_with_main or similar. */
   unsigned subreaper : 1;
+  /* If true, on receiving a terminating signal (SIGINT, SIGQUIT, SIGTERM)
+   * signal all child processes to exit, not just the main process.
+   * Requires @forward_signals and @subreaper. */
+  unsigned terminate_when_signalled : 1;
+  /* If true, after the main command exits, signal remaining child processes
+   * to exit. */
+  unsigned terminate_with_main : 1;
 } SrtProcessManagerOptions;
 
 #define SRT_PROCESS_MANAGER_OPTIONS_INIT \
 { \
-  .terminate_grace_usec = -1, \
 }
 
 void _srt_process_manager_options_take_fd_assignment (SrtProcessManagerOptions *self,

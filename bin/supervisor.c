@@ -22,6 +22,15 @@
 #include "steam-runtime-tools/process-manager-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
+#define DEFAULT_TERMINATE_TIMEOUT 2.0
+
+typedef enum
+{
+  TRISTATE_NO = 0,
+  TRISTATE_YES,
+  TRISTATE_MAYBE
+} Tristate;
+
 static SrtProcessManagerOptions *global_options = NULL;
 static gboolean opt_clear_env = FALSE;
 static gboolean opt_close_fds = FALSE;
@@ -31,7 +40,11 @@ static gboolean opt_lock_exclusive = FALSE;
 static gboolean opt_lock_verbose = FALSE;
 static gboolean opt_lock_wait = FALSE;
 static gboolean opt_subreaper = FALSE;
+static gboolean opt_terminate_when_signalled = FALSE;
+static Tristate opt_terminate_with_main = TRISTATE_MAYBE;
 static double opt_terminate_idle_timeout = 0.0;
+/* Note that this is not DEFAULT_TERMINATE_TIMEOUT,
+ * to give us a way to distinguish between specified and unspecified */
 static double opt_terminate_timeout = -1.0;
 static unsigned opt_verbose = 0;
 static gboolean opt_version = FALSE;
@@ -54,6 +67,20 @@ opt_lock_fd_cb (const char *name,
 {
   return _srt_process_manager_options_lock_fd_cli (global_options,
                                                    name, value, error);
+}
+
+static gboolean
+opt_terminate_with_main_cb (const char *name,
+                            G_GNUC_UNUSED const char *value,
+                            G_GNUC_UNUSED void *data,
+                            GError **error)
+{
+  if (g_str_equal (name, "--terminate-with-main"))
+    opt_terminate_with_main = TRISTATE_YES;
+  else
+    opt_terminate_with_main = TRISTATE_NO;
+
+  return TRUE;
 }
 
 static gboolean
@@ -116,7 +143,8 @@ static GOptionEntry options[] =
 {
   { "assign-fd", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, opt_assign_fd_cb,
-    "Make fd TARGET a copy of SOURCE, like TARGET>&SOURCE in shell.",
+    "Make fd TARGET a copy of SOURCE, like TARGET>&SOURCE in shell, "
+    "and close SOURCE in the supervisor process.",
     "TARGET=SOURCE" },
 
   { "clear-env", '\0',
@@ -126,7 +154,8 @@ static GOptionEntry options[] =
   { "close-fds", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_close_fds,
     "Close all file descriptors other than standard input/output/error "
-    "and those specified with --assign-fd or --pass-fd.",
+    "and those specified with --assign-fd or --pass-fd in the supervised "
+    "process.",
     NULL },
   { "no-close-fds", '\0',
     G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &opt_close_fds,
@@ -197,7 +226,8 @@ static GOptionEntry options[] =
 
   { "pass-fd", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, opt_pass_fd_cb,
-    "Let the launched process inherit the given fd, despite --close-fds.",
+    "Let the launched process inherit the given fd, despite --close-fds, "
+    "while closing it in the supervisor.",
     "FD" },
 
   { "subreaper", '\0',
@@ -209,18 +239,45 @@ static GOptionEntry options[] =
     "Only wait for a direct child process [default].",
     NULL },
 
+  { "terminate-when-signalled", '\0',
+    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_terminate_when_signalled,
+    "When the supervisor receives a terminating signal, "
+    "terminate all descendants. "
+    "Implies --subreaper.",
+    NULL },
+  { "no-terminate-when-signalled", '\0',
+    G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &opt_terminate_when_signalled,
+    "When the supervisor receives a terminating signal, "
+    "pass it to the main COMMAND but don't terminate other processes "
+    "[default].",
+    NULL },
+
+  { "terminate-with-main", '\0',
+    G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, opt_terminate_with_main_cb,
+    "When the main COMMAND exits, terminate other descendant processes. "
+    "Implies --subreaper.",
+    NULL },
+  { "no-terminate-with-main", '\0',
+    G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, opt_terminate_with_main_cb,
+    "When the main COMMAND exits, other descendants may continue to run "
+    "[default].",
+    NULL },
+
   { "terminate-idle-timeout", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_DOUBLE, &opt_terminate_idle_timeout,
-    "If --terminate-timeout is used, wait this many seconds before "
-    "sending SIGTERM. [default: 0.0]",
+    "When terminating descendant processes, "
+    "wait this many seconds before sending the first signal. "
+    "[Default: 0.0]",
     "SECONDS" },
   { "terminate-timeout", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_DOUBLE, &opt_terminate_timeout,
-    "Send SIGTERM and SIGCONT to descendant processes that didn't "
-    "exit within --terminate-idle-timeout. If they don't all exit within "
-    "this many seconds, send SIGKILL and SIGCONT to survivors. If 0.0, "
-    "skip SIGTERM and use SIGKILL immediately. Implies --subreaper. "
-    "[Default: -1.0, meaning don't signal].",
+    "When terminating descendant processes, "
+    "send SIGTERM and SIGCONT, "
+    "then wait this many seconds before sending SIGKILL and SIGCONT. "
+    "If 0.0, skip SIGTERM and use SIGKILL immediately. "
+    "If set without any process termination options, implies --terminate-with-main. "
+    "[Default: " G_STRINGIFY (DEFAULT_TERMINATE_TIMEOUT) " if any "
+    "--terminate-with- options were used]",
     "SECONDS" },
 
   { "verbose", 'v',
@@ -314,16 +371,52 @@ main (int argc,
       goto out;
     }
 
+  /* Before we had a --terminate-with-main option, it was implied by the
+   * presence or absence of a non-negative --terminate-timeout.
+   * Fall back on that if necessary. */
+  if (opt_terminate_with_main == TRISTATE_MAYBE)
+    {
+      if (opt_terminate_timeout >= 0
+          && !opt_terminate_when_signalled)
+        {
+          _srt_log_warning ("--terminate-timeout implying "
+                            "--terminate-with-main is deprecated, "
+                            "please specify --terminate-with-main explicitly");
+          opt_terminate_with_main = TRISTATE_YES;
+        }
+      else
+        {
+          opt_terminate_with_main = TRISTATE_NO;
+        }
+    }
+
+  if (opt_terminate_timeout < 0
+      && (opt_terminate_with_main != TRISTATE_NO
+          || opt_terminate_when_signalled))
+    {
+      /* If we want to terminate child processes, we'll usually want a
+       * grace period to let them shut down gracefully before we resort
+       * to sending SIGKILL. We only SIGKILL them immediately if explicitly
+       * requested with --terminate-timeout=0. */
+      g_info ("Defaulting to %.1fs termination timeout",
+              DEFAULT_TERMINATE_TIMEOUT);
+      opt_terminate_timeout = DEFAULT_TERMINATE_TIMEOUT;
+    }
+
   process_manager_options.close_fds = !!opt_close_fds;
   process_manager_options.dump_parameters = TRUE;
   process_manager_options.exit_with_parent = !!opt_exit_with_parent;
   process_manager_options.forward_signals = TRUE;
-  process_manager_options.subreaper = (opt_subreaper || opt_terminate_timeout >= 0);
+  process_manager_options.terminate_when_signalled = !!opt_terminate_when_signalled;
+  process_manager_options.terminate_with_main = (opt_terminate_with_main != TRISTATE_NO);
+  process_manager_options.subreaper = (opt_subreaper
+                                       || process_manager_options.terminate_when_signalled
+                                       || process_manager_options.terminate_with_main);
 
   if (opt_terminate_idle_timeout > 0.0)
     process_manager_options.terminate_wait_usec = opt_terminate_idle_timeout * G_TIME_SPAN_SECOND;
 
-  if (opt_terminate_timeout >= 0.0)
+  if (opt_terminate_timeout > 0.0)
     process_manager_options.terminate_grace_usec = opt_terminate_timeout * G_TIME_SPAN_SECOND;
 
   /* In the absence of --assign-fd arguments, the default is like shell

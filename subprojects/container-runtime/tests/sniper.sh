@@ -131,6 +131,18 @@ for depot_id in 1628351; do
         fi
     done
 
+    for path in \
+        pressure-vessel/bin/pressure-vessel-wrap \
+        pressure-vessel/libexec/steam-runtime-tools-0/i386-linux-gnu-exec \
+        pressure-vessel/libexec/steam-runtime-tools-0/x86_64-linux-gnu-exec \
+    ; do
+        if [ -e "depots/test-sniper-unpacked/${path_prefix}${path}" ]; then
+            echo "# $depot_id has $path on-disk"
+        else
+            echo "Bail out! Depot $depot_id lacks $path"
+            exit 1
+        fi
+    done
 done
 
 echo "ok 1 - sniper, running from unpacked directory"

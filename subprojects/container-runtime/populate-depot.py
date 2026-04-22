@@ -431,6 +431,9 @@ class OverlayDepot(Depot):
 
 
 class Main:
+    # A dpkg architecture, for example amd64 or musl-linux-riscv64
+    _POSSIBLE_DPKG_ARCHITECTURE_RE = re.compile(r'[0-9a-zA-Z][-0-9a-zA-Z]+')
+
     def __init__(
         self,
         add_bin_directory: bool = False,
@@ -448,6 +451,7 @@ class Main:
         mtree: bool = True,
         multiarch_tuples: Sequence[str] = (),
         pressure_vessel_archive: str = '',
+        pressure_vessel_foreign: Sequence[str] = (),
         runtime: str = 'scout',
         scripts_version: str = '',
         source_dir: str = str(HERE),
@@ -552,15 +556,33 @@ class Main:
 
         self.runtime = self.new_runtime(name, details)
 
+        # Map from empty string for native architecture,
+        # or dpkg architecture name for emulation,
+        # to pressure-vessel archive path
+        self.pressure_vessels: Dict[str, Path] = {}
+
         if self.layered:
-            self.pressure_vessel_path: Path | None = None
+            self.pressure_vessels = {}
         elif pressure_vessel_archive:
-            self.pressure_vessel_path = Path(pressure_vessel_archive)
+            self.pressure_vessels = {'': Path(pressure_vessel_archive)}
         else:
             raise InvocationError(
                 '--pressure-vessel-archive is required when not '
                 'using --layered'
             )
+
+        for pair in pressure_vessel_foreign:
+            if '=' not in pair:
+                raise InvocationError(
+                    '--pressure-vessel-foreign requires ARCH=PATH pairs'
+                )
+
+            arch, path = pair.split('=', 1)
+
+            if not self._POSSIBLE_DPKG_ARCHITECTURE_RE.match(arch):
+                raise InvocationError(f'Invalid architecture: {arch!r}')
+
+            self.pressure_vessels[arch] = Path(path)
 
         if 'SOURCE_DATE_EPOCH' in os.environ:
             self.reference_timestamp = int(os.environ['SOURCE_DATE_EPOCH'])
@@ -806,7 +828,6 @@ class Main:
         depot.path.mkdir(exist_ok=True, parents=True)
 
         runtime = self.runtime
-        pv_version = ComponentVersion('pressure-vessel')
 
         self.merge_dir_into_depot(self.source_dir / 'common', depot.path)
 
@@ -821,29 +842,40 @@ class Main:
             for arch in self.default_architecture.split(','):
                 tuples.append(self.deb_arch_to_multiarch(arch))
 
-        pressure_vessel_path = self.pressure_vessel_path
-        assert pressure_vessel_path is not None
-        self.use_local_pressure_vessel(pressure_vessel_path, depot.path)
+        for arch, pressure_vessel_path in sorted(
+            self.pressure_vessels.items()
+        ):
+            if arch:
+                unpack_dir = f'pressure-vessel-{arch}'
+            else:
+                unpack_dir = 'pressure-vessel'
 
-        for path in ('metadata/VERSION.txt', 'sources/VERSION.txt'):
-            full = os.path.join(depot.path, 'pressure-vessel', path)
-            if os.path.exists(full):
-                with open(full) as text_reader:
-                    v = text_reader.read().rstrip('\n')
-                    if pv_version.version:
-                        if pv_version.version != v:
-                            raise RuntimeError(
-                                'Inconsistent version! '
-                                '{} says {}, but expected {}'.format(
-                                    path, v, pv_version.version,
+            pv_version = ComponentVersion(unpack_dir)
+            self.use_local_pressure_vessel(
+                pressure_vessel_path,
+                depot.path,
+                unpack_dir=unpack_dir,
+            )
+
+            for path in ('metadata/VERSION.txt', 'sources/VERSION.txt'):
+                full = os.path.join(depot.path, unpack_dir, path)
+                if os.path.exists(full):
+                    with open(full) as text_reader:
+                        v = text_reader.read().rstrip('\n')
+                        if pv_version.version:
+                            if pv_version.version != v:
+                                raise RuntimeError(
+                                    'Inconsistent version! '
+                                    '{} says {}, but expected {}'.format(
+                                        path, v, pv_version.version,
+                                    )
                                 )
-                            )
-                    else:
-                        pv_version.version = v
+                        else:
+                            pv_version.version = v
 
                 break
 
-        versions.append(pv_version)
+            versions.append(pv_version)
 
         if self.add_bin_directory:
             bin_dir = os.path.join(self.depot, 'bin')
@@ -1176,8 +1208,9 @@ class Main:
         self,
         archive: Path,
         dest: Path,
+        unpack_dir: str = 'pressure-vessel',
     ) -> None:
-        pv_dir = dest / 'pressure-vessel'
+        pv_dir = dest / unpack_dir
         os.makedirs(pv_dir, exist_ok=True)
         argv = ['tar', '-C', str(pv_dir), '--strip-components=1', '-xf']
 
@@ -2040,6 +2073,14 @@ def main() -> None:
     parser.add_argument(
         '--pressure-vessel-official', dest='_ignored', action='store_true',
         help='Ignored for backwards compatibility',
+    )
+    parser.add_argument(
+        '--pressure-vessel-foreign', default=[], metavar='ARCH=PATH',
+        action='append',
+        help=(
+            'Unpack pressure-vessel from PATH for use with emulation on '
+            'dpkg architecture ARCH'
+        ),
     )
     parser.add_argument(
         '--add-bin-directory', default=False, action='store_true',

@@ -20,11 +20,11 @@ steam-runtime-tools (0.20260421.0) UNRELEASED; urgency=medium
     - Add s-r-supervisor to the relocatable bundle (steamrt/tasks#991)
   * s-r-supervisor:
     - Add --[no-]terminate-with-main (steamrt/tasks#991)
-    - Add --[no-]terminate-when-signalled (steamrt/tasks#991)
+    - Add --[no-]terminate-when-signaled (steamrt/tasks#991)
     - Using --terminate-timeout on its own implies --terminate-with-main
       for historical reasons, but this is now deprecated. Please use
       --terminate-timeout in conjunction with --terminate-with-main or
-      --terminate-when-signalled to specify when to terminate the child
+      --terminate-when-signaled to specify when to terminate the child
       processes. (steamrt/tasks#991)
     - Fix a race condition where we would not forward SIGINT, etc. to
       the main process if received after starting it, but before learning
@@ -38,7 +38,7 @@ steam-runtime-tools (0.20260421.0) UNRELEASED; urgency=medium
     - Better test coverage for s-r-supervisor (steamrt/tasks#991)
     - CI fixes (steamrt/tasks#999, steamrt/tasks#1000)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 22 Apr 2026 13:01:05 +0100
+ -- Simon McVittie <smcv@collabora.com>  Wed, 22 Apr 2026 15:34:04 +0100
 
 steam-runtime-tools (0.20260414.0) steamrt; urgency=medium
 

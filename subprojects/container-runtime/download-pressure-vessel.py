@@ -148,6 +148,7 @@ class Main:
         ssh_path: str = '',
         uri: str = DEFAULT_PRESSURE_VESSEL_URI,
         version: str = 'latest',
+        write_version_to: str = '',
         **kwargs: dict[str, Any],
     ) -> None:
         self.architecture = architecture
@@ -157,6 +158,7 @@ class Main:
         self.ssh_path = ssh_path
         self.uri = uri
         self.version = version
+        self.write_version_to = write_version_to
 
         openers: list[urllib.request.BaseHandler] = []
 
@@ -213,6 +215,18 @@ class Main:
             version=self.version,
         )
         pinned = pv.pin_version(self.opener)
+
+        if self.write_version_to:
+            logger.info(
+                'Saving pressure-vessel version "%s" to %s',
+                pinned,
+                self.dest / self.write_version_to,
+            )
+            self.dest.mkdir(parents=True, exist_ok=True)
+
+            with open(self.dest / self.write_version_to, 'w') as writer:
+                writer.write(f'{pinned}\n')
+
         filename = f'pressure-vessel-{arch}.tar.gz'
         return pv.fetch(
             filename,
@@ -283,6 +297,12 @@ def main() -> None:
         help=(
             'Download pressure-vessel from a versioned subdirectory of URI'
         ),
+    )
+    parser.add_argument(
+        '--write-version-to',
+        default='',
+        metavar='FILENAME',
+        help='Save "pinned" version number in DEST/FILENAME',
     )
     parser.add_argument(
         'dest', metavar='DEST',

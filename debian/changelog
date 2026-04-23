@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260421.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260423.0) UNRELEASED; urgency=medium
 
   [ Antonio Ospite ]
   * steam-runtime-steamrt-*:
@@ -34,11 +34,12 @@ steam-runtime-tools (0.20260421.0) UNRELEASED; urgency=medium
       same as for pressure-vessel (steamrt/tasks#998)
   * Update libglnx subproject to 2026-04-16
   * Improve error reporting in various places when fds are closed
+  * Documentation updates
   * Tests/CI:
-    - Better test coverage for s-r-supervisor (steamrt/tasks#991)
+    - Better test coverage (steamrt/tasks#845, steamrt/tasks#991)
     - CI fixes (steamrt/tasks#999, steamrt/tasks#1000)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 22 Apr 2026 15:34:04 +0100
+ -- Simon McVittie <smcv@collabora.com>  Thu, 23 Apr 2026 20:25:57 +0100
 
 steam-runtime-tools (0.20260414.0) steamrt; urgency=medium
 

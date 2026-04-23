@@ -155,7 +155,7 @@ This field is required,
 and must list at least one architecture.
 
 For example,
-[FEX-Emu][] can emulate `x86_64-linux-gnu` and `i386-linux-gnu`.
+[FEX][] can emulate `x86_64-linux-gnu` and `i386-linux-gnu`.
 
 ### `environment` (object with string or null values)
 
@@ -220,7 +220,7 @@ Instead of being prepended to a command to execute,
 they are used to start a server associated with a particular game
 instance running under the emulator.
 For example,
-FEX-Emu uses `FEXServer` to cache translated code,
+[FEX][] uses `FEXServer` to cache translated code,
 amortizing the cost of translation across multiple processes,
 and centralize logging.
 
@@ -290,7 +290,7 @@ then it should treat that as a fatal error and refuse to parse the file.
 
 # EXAMPLE
 
-A manifest describing FEX-Emu might look like this:
+A manifest describing [FEX][] might look like this:
 
     {
       "emulator_v0": {
@@ -326,6 +326,7 @@ x86 game on x86 or an aarch64 game on aarch64:
 * **pressure-vessel-wrap**(1)
 * `SrtEmulator` in [steam-runtime-tools][] source code
 
+[FEX]: https://github.com/FEX-Emu/FEX
 [multiarch tuples]: https://wiki.debian.org/Multiarch/Tuples
 [steam-runtime-tools]: https://gitlab.steamos.cloud/steamrt/steam-runtime-tools
 

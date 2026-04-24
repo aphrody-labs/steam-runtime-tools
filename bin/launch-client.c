@@ -909,7 +909,7 @@ static const GOptionEntry options[] =
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_share_pids,
     "Use same pid namespace as calling sandbox.", NULL },
   { "shell-command", 'c',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_STRING, &opt_shell_command,
+    G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME, &opt_shell_command,
     "Run this command via /bin/sh, with COMMAND as $0 and ARG... as $@.",
     "SHELL_COMMAND" },
   { "usr-path", '\0',

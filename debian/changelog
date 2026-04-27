@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260423.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260427.0) UNRELEASED; urgency=medium
 
   [ Antonio Ospite ]
   * steam-runtime-steamrt-*:
@@ -18,6 +18,10 @@ steam-runtime-tools (0.20260423.0) UNRELEASED; urgency=medium
     - When running s-r-launcher-service, try to use the executable of the
       matching architecture directly (steamrt/tasks#998)
     - Add s-r-supervisor to the relocatable bundle (steamrt/tasks#991)
+  * s-r-launch-client:
+    - Fix a regression in the experimental steamrt3c-based Steam client
+      when a game's install folder contains non-ASCII characters,
+      for example "steamapps/common/EVERSPACE™ 2" (steamrt/tasks#1003)
   * s-r-supervisor:
     - Add --[no-]terminate-with-main (steamrt/tasks#991)
     - Add --[no-]terminate-when-signaled (steamrt/tasks#991)
@@ -36,10 +40,11 @@ steam-runtime-tools (0.20260423.0) UNRELEASED; urgency=medium
   * Improve error reporting in various places when fds are closed
   * Documentation updates
   * Tests/CI:
-    - Better test coverage (steamrt/tasks#845, steamrt/tasks#991)
+    - Better test coverage
+      (steamrt/tasks#845, steamrt/tasks#991, steamrt/tasks#1003)
     - CI fixes (steamrt/tasks#999, steamrt/tasks#1000)
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 23 Apr 2026 20:25:57 +0100
+ -- Simon McVittie <smcv@collabora.com>  Mon, 27 Apr 2026 11:57:08 +0100
 
 steam-runtime-tools (0.20260414.0) steamrt; urgency=medium
 

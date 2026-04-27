@@ -74,6 +74,9 @@ class TestLauncher(BaseTest):
             '-u', 'STEAM_COMPAT_APP_ID',
             '-u', 'SteamAppId',
         ]
+        self.clean_up_env_as_bytes = [
+            s.encode('utf-8') for s in self.clean_up_env
+        ]
 
         if 'SRT_TEST_UNINSTALLED' in os.environ:
             if 'SRT_TEST_MULTIARCH' in os.environ:
@@ -103,6 +106,7 @@ class TestLauncher(BaseTest):
                     'steam-runtime-launch-client',
                 ),
             ]
+            self.launch_as_bytes = [s.encode('utf-8') for s in self.launch]
         else:
             self.skipTest('Not available as an installed-test')
 
@@ -204,6 +208,27 @@ class TestLauncher(BaseTest):
                 )
                 self.assertEqual(completed.stdout, b'hello')
                 self.assertIn(b'WORLD', completed.stderr)
+
+                logger.debug('launch-client -c ... should succeed')
+                completed = run_subprocess(
+                    self.clean_up_env_as_bytes + self.launch_as_bytes + [
+                        b'--dbus-address', dbus_address.encode('utf-8'),
+                        b'-c',
+                        # Note that this is not valid UTF-8, but we want
+                        # to make sure we can pass it through anyway.
+                        b"printf '\xf6'; echo \"(argv[0]=$0)\"; echo \"$*\"",
+                        b'sh',      # $0 for the one-line shell script
+                        b'\xf7',    # $1 (again, not UTF-8)
+                    ],
+                    check=True,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                self.assertEqual(
+                    completed.stdout,
+                    b'\xf6(argv[0]=sh)\n\xf7\n',
+                )
 
                 logger.debug('Checking env not inherited from launch-client')
                 completed = run_subprocess(

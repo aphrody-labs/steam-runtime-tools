@@ -10,6 +10,10 @@ steam-runtime-tools (0.20260427.0) UNRELEASED; urgency=medium
       (steamrt/tasks#989, steamrt/tasks#998)
 
   [ Simon McVittie ]
+  * SteamLinuxRuntime_*:
+    - Add a populate-depot.py option for foreign-architecture versions
+      of pressure-vessel, to be used when emulating one architecture
+      on another, in practice x86 on arm64 (steamrt/tasks#845)
   * pressure-vessel:
     - In the relocatable bundle, make p-v/bin/s-r-launcher-service
       a symlink instead of a copy so that it has the correct RPATH
@@ -39,12 +43,13 @@ steam-runtime-tools (0.20260427.0) UNRELEASED; urgency=medium
   * Update libglnx subproject to 2026-04-16
   * Improve error reporting in various places when fds are closed
   * Documentation updates
+    (steamrt/tasks#854)
   * Tests/CI:
     - Better test coverage
       (steamrt/tasks#845, steamrt/tasks#991, steamrt/tasks#1003)
     - CI fixes (steamrt/tasks#999, steamrt/tasks#1000)
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 27 Apr 2026 11:57:08 +0100
+ -- Simon McVittie <smcv@collabora.com>  Tue, 28 Apr 2026 21:14:00 +0100
 
 steam-runtime-tools (0.20260414.0) steamrt; urgency=medium
 

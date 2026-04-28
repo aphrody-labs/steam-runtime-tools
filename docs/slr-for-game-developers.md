@@ -69,9 +69,8 @@ compatibility tool.
 ### <a name="steamrt4"></a>Native Linux games targeting Steam Runtime 4 'steamrt4'
 
 [Steam Runtime version 4][steamrt4]
-is a modern runtime based on Debian 13 (2025).
-It can be used by any game that benefits from a newer library stack
-or SDK environment.
+is the recommended runtime for native Linux games on Steam,
+and is based on Debian 13 (2025).
 
 Most of its libraries are taken directly from Debian, and can benefit
 from Debian's long-term security support.
@@ -102,9 +101,9 @@ Games that use steamrt4 include [TODO].
 [Steam Runtime version 3, codenamed sniper][sniper],
 was the first container runtime available to developers of native Linux
 games on Steam.
-It is a recommended runtime for new native Linux games
-(early adopters should consider using [steamrt4](#steamrt4) instead)
-and is based on Debian 11 (2021).
+It is based on Debian 11 (2021).
+Consider using [steamrt4](#steamrt4) instead,
+especially for newly-released titles.
 
 Games that target sniper should be compiled in the [sniper SDK][].
 

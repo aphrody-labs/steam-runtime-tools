@@ -56,6 +56,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import (
     Any,
+    Container,
     Dict,
     List,
     Optional,
@@ -401,7 +402,42 @@ class ComponentVersion:
         )) + '\n'
 
 
+class Depot:
+    def __init__(
+        self,
+        architecture: str,
+        depot_id: str,
+        path: Path,
+    ):
+        self.architecture = architecture
+        self.depot_id = depot_id
+        self.path = path
+
+
+class MainDepot(Depot):
+    pass
+
+
+class OverlayDepot(Depot):
+    def __init__(
+        self,
+        architecture: str,
+        depot_id: str,
+        path: Path,
+        parent: Depot,
+    ):
+        super().__init__(architecture, depot_id, path)
+        self.parent = parent
+
+
+class EmulationOverlay(OverlayDepot):
+    pass
+
+
 class Main:
+    # A dpkg architecture, for example amd64 or musl-linux-riscv64
+    _POSSIBLE_DPKG_ARCHITECTURE_RE = re.compile(r'[0-9a-zA-Z][-0-9a-zA-Z]+')
+
     def __init__(
         self,
         add_bin_directory: bool = False,
@@ -412,6 +448,7 @@ class Main:
         depot: str = 'depot',
         depot_archive: str = '',
         depot_version: str = '',
+        emulation_depot_ids: Sequence[str] = (),
         fast: bool = False,
         images_uri: str = DEFAULT_IMAGES_URI,
         include_sdk_sysroot: bool = False,
@@ -419,6 +456,7 @@ class Main:
         mtree: bool = True,
         multiarch_tuples: Sequence[str] = (),
         pressure_vessel_archive: str = '',
+        pressure_vessel_foreign: Sequence[str] = (),
         runtime: str = 'scout',
         scripts_version: str = '',
         source_dir: str = str(HERE),
@@ -523,22 +561,80 @@ class Main:
 
         self.runtime = self.new_runtime(name, details)
 
-        self.versions: List[ComponentVersion] = []
+        # Map from empty string for native architecture,
+        # or dpkg architecture name for emulation,
+        # to pressure-vessel archive path
+        self.pressure_vessels: Dict[str, Path] = {}
 
         if self.layered:
-            self.pressure_vessel_path: Path | None = None
+            self.pressure_vessels = {}
         elif pressure_vessel_archive:
-            self.pressure_vessel_path = Path(pressure_vessel_archive)
+            self.pressure_vessels = {'': Path(pressure_vessel_archive)}
         else:
             raise InvocationError(
                 '--pressure-vessel-archive is required when not '
                 'using --layered'
             )
 
+        for pair in pressure_vessel_foreign:
+            if '=' not in pair:
+                raise InvocationError(
+                    '--pressure-vessel-foreign requires ARCH=PATH pairs'
+                )
+
+            arch, path = pair.split('=', 1)
+
+            if not self._POSSIBLE_DPKG_ARCHITECTURE_RE.match(arch):
+                raise InvocationError(f'Invalid architecture: {arch!r}')
+
+            self.pressure_vessels[arch] = Path(path)
+
         if 'SOURCE_DATE_EPOCH' in os.environ:
             self.reference_timestamp = int(os.environ['SOURCE_DATE_EPOCH'])
         else:
             self.reference_timestamp = int(time.time())
+
+        self.depots: List[Depot] = []
+        self.depots.append(
+            MainDepot(
+                architecture=self.default_architecture,
+                depot_id=self.steam_depot_id,
+                path=self.depot,
+            ),
+        )
+
+        # Map from dpkg architecture name for emulation
+        # to Steam depot ID
+        self.emulation_depot_ids: Dict[str, str] = {}
+
+        for pair in emulation_depot_ids:
+            if '=' not in pair:
+                raise InvocationError(
+                    '--emulation-depot-id requires ARCH=ID pairs'
+                )
+
+            arch, depot_id = pair.split('=', 1)
+
+            if not self._POSSIBLE_DPKG_ARCHITECTURE_RE.match(arch):
+                raise InvocationError(f'Invalid architecture: {arch!r}')
+
+            try:
+                if int(depot_id) == 0:
+                    raise ValueError
+            except ValueError:
+                # Depot ID is non-numeric or zero
+                raise InvocationError(f'Invalid depot ID: {depot_id!r}')
+
+            self.emulation_depot_ids[arch] = depot_id
+
+            self.depots.append(
+                EmulationOverlay(
+                    architecture=arch,
+                    depot_id=depot_id,
+                    parent=self.depots[0],
+                    path=self.depot / f'depot-{depot_id}-{arch}',
+                )
+            )
 
     def new_runtime(
         self,
@@ -561,34 +657,32 @@ class Main:
     def merge_dir_into_depot(
         self,
         source_root: Path,
+        depot: Path,
     ):
-        for (dirpath, dirnames, filenames) in os.walk(str(source_root)):
+        for (dirpath, dirnames, filenames) in os.walk(source_root):
             relative_path = Path(dirpath).relative_to(source_root)
 
             for member in dirnames:
-                (self.depot / relative_path / member).mkdir(
+                (depot / relative_path / member).mkdir(
                     exist_ok=True,
                     parents=True,
                 )
 
             for member in filenames:
                 source = Path(dirpath, member)
-                merged = self.depot / relative_path / member
+                merged = depot / relative_path / member
 
                 with suppress(FileNotFoundError):
                     merged.unlink()
 
                 merged.parent.mkdir(exist_ok=True, parents=True)
-                shutil.copy(str(source), str(merged))
+                shutil.copy(source, merged)
 
     def run(self) -> None:
         if self.layered:
             self.do_layered_runtime()
         else:
             self.do_container_runtime()
-
-        if self.mtree:
-            self.write_top_level_mtree()
 
         if self.steam_app_id and self.steam_depot_id:
             self.write_steampipe_config()
@@ -626,10 +720,12 @@ class Main:
             )
 
         self.merge_dir_into_depot(
-            self.source_dir / 'runtimes' / 'scout-on-soldier'
+            self.source_dir / 'runtimes' / 'scout-on-soldier',
+            self.depot,
         )
 
         runtime = self.runtime
+        versions: List[ComponentVersion] = []
 
         if runtime.path:
             logger.info('Using runtime from local directory %r', runtime.path)
@@ -643,7 +739,7 @@ class Main:
             local_version.runtime = 'scout'
             local_version.runtime_version = extracted_version
             local_version.comment = 'steam-runtime/'
-            self.versions.append(local_version)
+            versions.append(local_version)
         elif runtime.version:
             logger.info('Downloading runtime from %s', runtime)
             self.unpack_ld_library_path = self.depot
@@ -655,7 +751,7 @@ class Main:
             local_version.runtime = 'scout'
             local_version.runtime_version = version
             local_version.comment = 'steam-runtime/'
-            self.versions.append(local_version)
+            versions.append(local_version)
         else:
             unspecified_version = ComponentVersion('LD_LIBRARY_PATH')
             unspecified_version.version = '-'
@@ -664,9 +760,12 @@ class Main:
             unspecified_version.comment = (
                 'see ~/.steam/root/ubuntu12_32/steam-runtime/version.txt'
             )
-            self.versions.append(unspecified_version)
+            versions.append(unspecified_version)
 
-        self.write_component_versions()
+        self.write_component_versions(versions, self.depot)
+
+        if self.mtree:
+            self.write_top_level_mtree(self.depot)
 
     def prune_runtime(self, directory: Path) -> None:
         """
@@ -733,14 +832,47 @@ class Main:
             return stdout.decode('utf-8').strip()
 
     def do_container_runtime(self) -> None:
-        pv_version = ComponentVersion('pressure-vessel')
+        # We assume that only the main depot will contain the Platform:
+        # this is the largest part of the complete compatibility tool,
+        # and is determined only by the architecture of the game that
+        # we want to run, even if we are running it via emulation on some
+        # other architecture.
+        #
+        # For example, if we're going to run an x86 game then it gets the
+        # x86_64 + i386 Platform, even if the machine architecture is arm64.
+        runtime_version, runtime_subdir = self.provide_runtime_usr()
 
-        self.merge_dir_into_depot(self.source_dir / 'common')
+        for depot in self.depots:
+            self.populate_container_runtime_depot(
+                depot,
+                runtime_subdir=runtime_subdir,
+                runtime_version=runtime_version,
+            )
+
+    def populate_container_runtime_depot(
+        self,
+        depot: Depot,
+        *,
+        runtime_subdir: str,
+        runtime_version: ComponentVersion,
+    ) -> None:
+        logger.info(
+            'Populating depot %s in %s...',
+            depot.depot_id, depot.path,
+        )
+
+        versions: List[ComponentVersion] = []
+
+        depot.path.mkdir(exist_ok=True, parents=True)
+
+        runtime = self.runtime
+
+        self.merge_dir_into_depot(self.source_dir / 'common', depot.path)
 
         root = self.source_dir / 'runtimes' / self.runtime.name
 
         if root.exists():
-            self.merge_dir_into_depot(root)
+            self.merge_dir_into_depot(root, depot.path)
 
         tuples = list(self.multiarch_tuples)
 
@@ -748,31 +880,71 @@ class Main:
             for arch in self.default_architecture.split(','):
                 tuples.append(self.deb_arch_to_multiarch(arch))
 
-        pressure_vessel_path = self.pressure_vessel_path
-        assert pressure_vessel_path is not None
-        self.use_local_pressure_vessel(str(pressure_vessel_path))
+        for arch, pressure_vessel_path in sorted(
+            self.pressure_vessels.items()
+        ):
+            if arch:
+                unpack_dir = f'pressure-vessel-{arch}'
+            else:
+                unpack_dir = 'pressure-vessel'
 
-        for path in ('metadata/VERSION.txt', 'sources/VERSION.txt'):
-            full = os.path.join(self.depot, 'pressure-vessel', path)
-            if os.path.exists(full):
-                with open(full) as text_reader:
-                    v = text_reader.read().rstrip('\n')
-                    if pv_version.version:
-                        if pv_version.version != v:
-                            raise RuntimeError(
-                                'Inconsistent version! '
-                                '{} says {}, but expected {}'.format(
-                                    path, v, pv_version.version,
+            if isinstance(depot, EmulationOverlay):
+                if arch == depot.architecture:
+                    logger.info(
+                        'Including %s in emulation overlay depot %s',
+                        unpack_dir, depot.depot_id,
+                    )
+                else:
+                    continue
+
+            elif isinstance(depot, MainDepot):
+                in_main_depot = True
+
+                for other in self.depots:
+                    if other != depot and arch == other.architecture:
+                        logger.info(
+                            'Not including %s in main depot because it is '
+                            'separated into depot %s',
+                            unpack_dir, other.depot_id,
+                        )
+                        in_main_depot = False
+
+                if in_main_depot:
+                    logger.info(
+                        'Including %s in main depot %s',
+                        unpack_dir, depot.depot_id,
+                    )
+                else:
+                    continue
+
+            pv_version = ComponentVersion(unpack_dir)
+            self.use_local_pressure_vessel(
+                pressure_vessel_path,
+                depot.path,
+                unpack_dir=unpack_dir,
+            )
+
+            for path in ('metadata/VERSION.txt', 'sources/VERSION.txt'):
+                full = os.path.join(depot.path, unpack_dir, path)
+                if os.path.exists(full):
+                    with open(full) as text_reader:
+                        v = text_reader.read().rstrip('\n')
+                        if pv_version.version:
+                            if pv_version.version != v:
+                                raise RuntimeError(
+                                    'Inconsistent version! '
+                                    '{} says {}, but expected {}'.format(
+                                        path, v, pv_version.version,
+                                    )
                                 )
-                            )
-                    else:
-                        pv_version.version = v
+                        else:
+                            pv_version.version = v
 
                 break
 
-        self.versions.append(pv_version)
+            versions.append(pv_version)
 
-        if self.add_bin_directory:
+        if self.add_bin_directory and isinstance(depot, MainDepot):
             bin_dir = os.path.join(self.depot, 'bin')
             os.makedirs(bin_dir, exist_ok=True)
 
@@ -828,6 +1000,185 @@ class Main:
                 str(self.unpack_ld_library_path))
             self.download_scout_tarball(scout)
 
+        run_script = depot.path / 'run'
+
+        with open(run_script, 'w') as writer:
+            writer.write(
+                RUN_IN_DIR_SOURCE.format(
+                    escaped_dir=shlex.quote(runtime_subdir),
+                    escaped_multiarch_tuples=shlex.quote(':'.join(tuples)),
+                    source_for_generated_file=(
+                        'Generated file, do not edit'
+                    ),
+                )
+            )
+
+        run_script.chmod(0o755)
+
+        if runtime.name in ('scout', 'soldier', 'sniper'):
+            run_script_alias = depot.path / ('run-in-' + runtime.name)
+            shutil.copy2(run_script, run_script_alias)
+            run_script_alias.chmod(0o755)
+
+        versions.append(runtime_version)
+
+        if self.toolmanifest:
+
+            with open(
+                os.path.join(depot.path, 'toolmanifest.vdf'), 'w'
+            ) as writer:
+                import vdf      # noqa
+
+                writer.write('// Generated file, do not edit\n')
+                words = [
+                    '/_v2-entry-point',
+                    '--verb=%verb%',
+                    '--',
+                ]
+
+                # Each ABI level needs a unique "priority" so that we will
+                # not suggest SLR 2.0 as a runtime for SLR 3.0 games, etc.;
+                # and they all need to be less than 10, to avoid colliding
+                # with SLR 1.0 (scout), which needs to be highest-priority
+                # to make it the default for legacy games.
+                filter_exclusive_priority = '9'
+
+                # Note that this is checking whether the runtime /usr
+                # is for x86, not whether pressure-vessel is for x86:
+                # we want SLR 1.0 to be available on non-x86,
+                # as the legacy default (priority 0), via x86 emulation
+                is_x86 = all(
+                    a in ('amd64', 'i386')
+                    for a in runtime.architecture.split(',')
+                )
+
+                if runtime.suite == 'sniper' and not is_x86:
+                    # On x86 the oldest runtime is scout or
+                    # scout-on-soldier (configured elsewhere), but those
+                    # legacy runtimes never existed on non-x86, so the default
+                    # becomes the oldest runtime that could support non-x86,
+                    # namely sniper.
+                    filter_exclusive_priority = '0'
+                elif runtime.suite.startswith('steamrt'):
+                    # steamrt4, steamrt5, ... get priority 4, 5, ...
+                    # If we get to steamrt9 with this limitation still
+                    # present, we'll have to bump the priority of SLR 1.0
+                    # or teach the Steam Client a different mechanism.
+                    major_version = runtime.suite[len('steamrt'):]
+                    assert int(major_version) >= 4, major_version
+                    assert int(major_version) <= 9, major_version
+                    filter_exclusive_priority = major_version
+                elif runtime.suite == 'scout':
+                    # Hypothetically we might have a super-strict scout
+                    # runtime for QA purposes (steamrt/tasks#59) and if
+                    # we do, it must match SLR 1.0
+                    filter_exclusive_priority = '10'
+                else:
+                    # For older suites with whimsical codenames, we have a
+                    # mapping from codename to major version.
+                    # Set the priority equal to the major version.
+                    filter_exclusive_priority = str(
+                        SUITES.get(runtime.suite, 9)
+                    )
+
+                content: Dict[str, Any] = dict(
+                    manifest=dict(
+                        commandline=' '.join(words),
+                        filter_exclusive_priority=filter_exclusive_priority,
+                        version='2',
+                        use_tool_subprocess_reaper='1',
+                    )
+                )
+
+                content['manifest']['compatmanager_layer_name'] = (
+                    'container-runtime'
+                )
+
+                vdf.dump(content, writer, pretty=True, escaped=True)
+
+        self.write_component_versions(versions, depot.path)
+
+        if self.mtree:
+            exclude_paths: Set[str] = set()
+            parent_depot: Optional[Path] = None
+
+            if isinstance(depot, MainDepot):
+                for overlay in self.depots:
+                    if not isinstance(overlay, MainDepot):
+                        exclude_paths.add(overlay.path.name)
+
+            if isinstance(depot, OverlayDepot):
+                # We assume the parent of each overlay is the first depot
+                # in the stacking order, so that files in the overlay
+                # with the same name will overwrite files from the main depot
+                parent_depot = depot.parent.path
+
+            self.write_top_level_mtree(
+                depot.path,
+                exclude_paths=exclude_paths,
+                parent_depot=parent_depot,
+            )
+
+    def write_component_versions(
+        self,
+        versions: Sequence[ComponentVersion],
+        dest: Path,
+    ) -> None:
+        try:
+            with subprocess.Popen(
+                [
+                    'git', 'describe',
+                    '--always',
+                    '--dirty',
+                    '--long',
+                ],
+                cwd=os.path.dirname(__file__),
+                stdout=subprocess.PIPE,
+                universal_newlines=True,
+            ) as describe:
+                stdout = describe.stdout
+                assert stdout is not None
+                version = stdout.read().strip()
+                # Deliberately ignoring exit status:
+                # if git is missing or old we'll use 'unknown'
+        except (OSError, subprocess.SubprocessError):
+            version = ''
+
+        try:
+            with open(HERE / '.tarball-version', 'r') as reader:
+                version = reader.read().strip()
+        except OSError:
+            pass
+
+        editable_versions = list(versions)
+
+        if self.scripts_version:
+            version = self.scripts_version
+
+        if self.depot_version:
+            component_version = ComponentVersion('depot', sort_weight=-1)
+            component_version.version = self.depot_version
+            component_version.comment = 'Overall version number'
+            editable_versions.append(component_version)
+
+        component_version = ComponentVersion('scripts')
+        component_version.version = version or 'unknown'
+        component_version.comment = 'from steam-runtime-tools'
+        editable_versions.append(component_version)
+
+        with open(dest / 'VERSIONS.txt', 'w') as writer:
+            writer.write(
+                '#Name\tVersion\t\tRuntime\tRuntime_Version\tComment\n'
+            )
+
+            for entry in sorted(
+                editable_versions,
+                key=lambda v: v.to_sort_key(),
+            ):
+                logger.info('Component version: %s', entry)
+                writer.write(entry.to_tsv())
+
+    def provide_runtime_usr(self) -> Tuple[ComponentVersion, str]:
         runtime = self.runtime
 
         if runtime.path:
@@ -908,26 +1259,6 @@ class Main:
                 exist_ok=True,
             )
 
-        with open(os.path.join(self.depot, 'run'), 'w') as writer:
-            writer.write(
-                RUN_IN_DIR_SOURCE.format(
-                    escaped_dir=shlex.quote(subdir),
-                    escaped_multiarch_tuples=shlex.quote(':'.join(tuples)),
-                    source_for_generated_file=(
-                        'Generated file, do not edit'
-                    ),
-                )
-            )
-
-        os.chmod(os.path.join(self.depot, 'run'), 0o755)
-
-        if runtime.name in ('scout', 'soldier', 'sniper'):
-            shutil.copy2(
-                os.path.join(self.depot, 'run'),
-                os.path.join(self.depot, 'run-in-' + runtime.name),
-            )
-            os.chmod(os.path.join(self.depot, 'run-in-' + runtime.name), 0o755)
-
         comment = ', '.join(sorted(runtime_files))
 
         if runtime.path and not runtime.official:
@@ -937,139 +1268,23 @@ class Main:
         component_version.runtime = runtime.suite
         component_version.runtime_version = version
         component_version.comment = comment
-        self.versions.append(component_version)
 
-        if self.toolmanifest:
+        return component_version, subdir
 
-            with open(
-                os.path.join(self.depot, 'toolmanifest.vdf'), 'w'
-            ) as writer:
-                import vdf      # noqa
-
-                writer.write('// Generated file, do not edit\n')
-                words = [
-                    '/_v2-entry-point',
-                    '--verb=%verb%',
-                    '--',
-                ]
-
-                # Each ABI level needs a unique "priority" so that we will
-                # not suggest SLR 2.0 as a runtime for SLR 3.0 games, etc.;
-                # and they all need to be less than 10, to avoid colliding
-                # with SLR 1.0 (scout), which needs to be highest-priority
-                # to make it the default for legacy games.
-                filter_exclusive_priority = '9'
-
-                is_x86 = all(
-                    a in ('amd64', 'i386')
-                    for a in runtime.architecture.split(',')
-                )
-
-                if runtime.suite == 'sniper' and not is_x86:
-                    # On x86 the oldest runtime is scout or
-                    # scout-on-soldier (configured elsewhere), but those
-                    # legacy runtimes never existed on non-x86, so the default
-                    # becomes the oldest runtime that could support non-x86,
-                    # namely sniper.
-                    filter_exclusive_priority = '0'
-                elif runtime.suite.startswith('steamrt'):
-                    # steamrt4, steamrt5, ... get priority 4, 5, ...
-                    # If we get to steamrt9 with this limitation still
-                    # present, we'll have to bump the priority of SLR 1.0
-                    # or teach the Steam Client a different mechanism.
-                    major_version = runtime.suite[len('steamrt'):]
-                    assert int(major_version) >= 4, major_version
-                    assert int(major_version) <= 9, major_version
-                    filter_exclusive_priority = major_version
-                elif runtime.suite == 'scout':
-                    # Hypothetically we might have a super-strict scout
-                    # runtime for QA purposes (steamrt/tasks#59) and if
-                    # we do, it must match SLR 1.0
-                    filter_exclusive_priority = '10'
-                else:
-                    # For older suites with whimsical codenames, we have a
-                    # mapping from codename to major version.
-                    # Set the priority equal to the major version.
-                    filter_exclusive_priority = str(
-                        SUITES.get(runtime.suite, 9)
-                    )
-
-                content: Dict[str, Any] = dict(
-                    manifest=dict(
-                        commandline=' '.join(words),
-                        filter_exclusive_priority=filter_exclusive_priority,
-                        version='2',
-                        use_tool_subprocess_reaper='1',
-                    )
-                )
-
-                content['manifest']['compatmanager_layer_name'] = (
-                    'container-runtime'
-                )
-
-                vdf.dump(content, writer, pretty=True, escaped=True)
-
-        self.write_component_versions()
-
-    def write_component_versions(self) -> None:
-        try:
-            with subprocess.Popen(
-                [
-                    'git', 'describe',
-                    '--always',
-                    '--dirty',
-                    '--long',
-                ],
-                cwd=os.path.dirname(__file__),
-                stdout=subprocess.PIPE,
-                universal_newlines=True,
-            ) as describe:
-                stdout = describe.stdout
-                assert stdout is not None
-                version = stdout.read().strip()
-                # Deliberately ignoring exit status:
-                # if git is missing or old we'll use 'unknown'
-        except (OSError, subprocess.SubprocessError):
-            version = ''
-
-        try:
-            with open(HERE / '.tarball-version', 'r') as reader:
-                version = reader.read().strip()
-        except OSError:
-            pass
-
-        if self.scripts_version:
-            version = self.scripts_version
-
-        if self.depot_version:
-            component_version = ComponentVersion('depot', sort_weight=-1)
-            component_version.version = self.depot_version
-            component_version.comment = 'Overall version number'
-            self.versions.append(component_version)
-
-        component_version = ComponentVersion('scripts')
-        component_version.version = version or 'unknown'
-        component_version.comment = 'from steam-runtime-tools'
-        self.versions.append(component_version)
-
-        with open(os.path.join(self.depot, 'VERSIONS.txt'), 'w') as writer:
-            writer.write(
-                '#Name\tVersion\t\tRuntime\tRuntime_Version\tComment\n'
-            )
-
-            for entry in sorted(self.versions, key=lambda v: v.to_sort_key()):
-                logger.info('Component version: %s', entry)
-                writer.write(entry.to_tsv())
-
-    def use_local_pressure_vessel(self, path: str = '.') -> None:
-        pv_dir = os.path.join(self.depot, 'pressure-vessel')
+    def use_local_pressure_vessel(
+        self,
+        archive: Path,
+        dest: Path,
+        unpack_dir: str = 'pressure-vessel',
+    ) -> None:
+        pv_dir = dest / unpack_dir
         os.makedirs(pv_dir, exist_ok=True)
-        argv = ['tar', '-C', pv_dir, '--strip-components=1', '-xf']
+        argv = ['tar', '-C', str(pv_dir), '--strip-components=1', '-xf']
 
-        if os.path.isfile(path):
-            argv.append(path)
+        if archive.is_file():
+            argv.append(str(archive))
         else:
-            argv.append(os.path.join(path, 'pressure-vessel-bin.tar.gz'))
+            argv.append(str(archive / 'pressure-vessel-bin.tar.gz'))
 
         logger.info('%r', argv)
         subprocess.run(argv, check=True)
@@ -1166,6 +1381,17 @@ class Main:
     def octal_escape(self, s: str) -> str:
         return self._NEEDS_OCTAL_ESCAPE.sub(self.octal_escape_char, s)
 
+    _OCTAL_ESCAPES = re.compile(r'(?:\\[0-7]{1,3})+')
+
+    def _octal_unescape_char(self, match: 're.Match') -> str:
+        text = match.group(0)
+        assert text[0] == '\\'
+        sequences = text[1:].split('\\')
+        return bytes([int(seq, base=8) for seq in sequences]).decode('utf-8')
+
+    def octal_unescape(self, s: str) -> str:
+        return self._OCTAL_ESCAPES.sub(self._octal_unescape_char, s)
+
     def filename_is_friendly(self, s: str) -> bool:
         '''
         Return true if the filename is non-problematic for Windows
@@ -1224,6 +1450,7 @@ class Main:
         top: Path,
         writer: TextIO,
         *,
+        exclude_paths: Container[str] = (),
         minimize: bool = False,
         preserve_mode: bool = True,
         preserve_time: bool = True,
@@ -1254,6 +1481,15 @@ class Main:
 
                 if name == 'steampipe' and base in dirnames:
                     dirnames.remove(base)
+                    continue
+
+                if name in exclude_paths:
+                    with suppress(ValueError):
+                        dirnames.remove(base)
+
+                    with suppress(ValueError):
+                        filenames.remove(base)
+
                     continue
 
                 if (
@@ -1394,21 +1630,30 @@ class Main:
 
         return lc_names
 
-    def write_top_level_mtree(self) -> None:
+    def write_top_level_mtree(
+        self,
+        top: Path,
+        *,
+        exclude_paths: Container[str] = (),
+        parent_depot: Optional[Path] = None,
+    ) -> None:
+        logger.info('Summarizing %s in mtree manifest...', top)
         with tempfile.TemporaryDirectory(prefix='slr-mtree-') as temp:
             writer = gzip.open(os.path.join(temp, 'mtree.txt.gz'), 'wt')
 
             lc_names = self.write_mtree(
-                Path(self.depot),
+                top,
                 writer,
                 minimize=False,
                 preserve_mode=False,
                 preserve_time=False,
+                exclude_paths=exclude_paths,
                 skip_runtime_files=True,
             )
 
             if '.ref' not in lc_names:
                 writer.write('./.ref type=file size=0 optional\n')
+                lc_names['.ref'] = '.ref'
 
             if (
                 self.steam_app_id
@@ -1416,13 +1661,40 @@ class Main:
                 and 'steampipe' not in lc_names
             ):
                 writer.write('./steampipe type=dir ignore optional\n')
+                lc_names['steampipe'] = 'steampipe'
 
             if 'var' not in lc_names:
                 writer.write('./var type=dir ignore optional\n')
+                lc_names['var'] = 'var'
 
             writer.write('./mtree.txt.gz type=file\n')
+            lc_names['mtree.txt.gz'] = 'mtree.txt.gz'
+
+            if parent_depot is not None:
+                with gzip.open(
+                    str(parent_depot / 'mtree.txt.gz'),
+                    'rt',
+                ) as reader:
+                    for line in reader:
+                        if not line.strip():
+                            continue
+
+                        if line.startswith(('#', '. ')):
+                            continue
+
+                        assert line.startswith('./'), line
+                        name, rest = line[2:].split(maxsplit=1)
+                        assert rest.endswith('\n'), line
+                        name = self.octal_unescape(name)
+                        lower = name.lower()
+
+                        if lower not in lc_names:
+                            logger.info('%s inherited from parent depot', name)
+                            writer.write(f'./{name} {rest}')
+                            lc_names[lower] = name
+
             writer.close()
-            shutil.copy2(writer.name, self.depot)
+            shutil.copy2(writer.name, top)
 
     def minimize_runtime(self, root: str) -> None:
         '''
@@ -1499,55 +1771,80 @@ class Main:
         assert self.steam_app_id
         assert self.steam_depot_id
 
-        depot = Path(self.depot)
-        steampipe = depot / 'steampipe'
+        main_depot = Path(self.depot)
+        steampipe = main_depot / 'steampipe'
         steampipe.mkdir(exist_ok=True)
         app_vdf = f'app_build_{self.steam_app_id}.vdf'
-        depot_vdf = f'depot_build_{self.steam_depot_id}.vdf'
+        depot_vdfs: Dict[str, str] = {}
+        exclude_paths = set([
+            steampipe,
+            main_depot / 'var',
+        ])
+
+        for depot in self.depots:
+            exclude_paths.add(depot.path)
+
+        for depot in self.depots:
+            depot_id = depot.depot_id or '0'
+            depot_path = depot.path
+
+            depot_vdf = f'depot_build_{depot_id}.vdf'
+            file_mappings: List[Tuple[str, Any]] = []
+            # Path to depot, relative to steampipe
+            if depot_path == main_depot:
+                rel_depot = Path('..')
+            else:
+                rel_depot = Path('..', depot_path.relative_to(main_depot))
+
+            for child in sorted(depot_path.iterdir()):
+                rel_child = rel_depot / child.name
+
+                if child in exclude_paths:
+                    continue
+                elif child.is_dir():
+                    file_mappings.append(
+                        (
+                            'FileMapping', dict(
+                                LocalPath=str(rel_child) + '/*',
+                                DepotPath=f'{child.name}/',
+                                recursive='1',
+                            ),
+                        )
+                    )
+                else:
+                    file_mappings.append(
+                        (
+                            'FileMapping', dict(
+                                LocalPath=str(rel_child),
+                                DepotPath='.',
+                            ),
+                        )
+                    )
+
+            content = dict(
+                DepotBuildConfig=VDFDict(
+                    [('DepotID', depot_id)] + file_mappings,
+                )
+            )
+
+            with open(steampipe / depot_vdf, 'w') as writer:
+                vdf.dump(content, writer, pretty=True, escaped=True)
+
+            # We only add depots to app_build_*.vdf if they really exist,
+            # and aren't just a placeholder for a depot that we could
+            # potentially have in future.
+            if depot_id and depot_id != '0':
+                depot_vdfs[depot_id] = depot_vdf
 
         content = dict(
             appbuild=dict(
                 appid=self.steam_app_id,
                 buildoutput='output',
-                depots={self.steam_depot_id: depot_vdf},
+                depots=depot_vdfs,
             )
         )
 
         with open(steampipe / app_vdf, 'w') as writer:
-            vdf.dump(content, writer, pretty=True, escaped=True)
-
-        file_mappings: List[Tuple[str, Any]] = []
-
-        for child in sorted(depot.iterdir()):
-            if child.name in ('steampipe', 'var'):
-                continue
-            elif child.is_dir():
-                file_mappings.append(
-                    (
-                        'FileMapping', dict(
-                            LocalPath=f'../{child.name}/*',
-                            DepotPath=f'{child.name}/',
-                            recursive='1',
-                        ),
-                    )
-                )
-            else:
-                file_mappings.append(
-                    (
-                        'FileMapping', dict(
-                            LocalPath='../' + str(child.relative_to(depot)),
-                            DepotPath='.',
-                        ),
-                    )
-                )
-
-        content = dict(
-            DepotBuildConfig=VDFDict(
-                [('DepotID', self.steam_depot_id)] + file_mappings,
-            )
-        )
-
-        with open(steampipe / depot_vdf, 'w') as writer:
             vdf.dump(content, writer, pretty=True, escaped=True)
 
     def do_depot_archive(self, name: str) -> None:
@@ -1699,6 +1996,18 @@ class SelfTest(unittest.TestCase):
                 f'{bad!r} should be unfriendly: {why}'
             )
 
+    def test_octal_unescape(self) -> None:
+        m = Main(layered=True)
+
+        for i, o in (
+            ('', ''),
+            ('abc', 'abc'),
+            (r'\302\247', '\u00a7'),
+            (r'\302\247\342\200\275', '\u00a7\u203D'),
+            (r'abc\302\247def\342\200\275ghi', 'abc\u00a7def\u203Dghi'),
+        ):
+            self.assertEqual(m.octal_unescape(i), o)
+
 
 def main() -> None:
     logging.basicConfig()
@@ -1810,6 +2119,15 @@ def main() -> None:
         )
     )
     parser.add_argument(
+        '--emulation-depot-id', action='append', default=[],
+        dest='emulation_depot_ids',
+        metavar='ARCH=ID',
+        help=(
+            'Add a secondary depot to run under CPU emulation with a '
+            'different architecture'
+        ),
+    )
+    parser.add_argument(
         '--fast', default=False, action='store_true',
         help=(
             'Speed up compression at the expense of compression ratio'
@@ -1831,6 +2149,14 @@ def main() -> None:
     parser.add_argument(
         '--pressure-vessel-official', dest='_ignored', action='store_true',
         help='Ignored for backwards compatibility',
+    )
+    parser.add_argument(
+        '--pressure-vessel-foreign', default=[], metavar='ARCH=PATH',
+        action='append',
+        help=(
+            'Unpack pressure-vessel from PATH for use with emulation on '
+            'dpkg architecture ARCH'
+        ),
     )
     parser.add_argument(
         '--add-bin-directory', default=False, action='store_true',

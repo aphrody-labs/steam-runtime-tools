@@ -277,6 +277,41 @@ if [ -n "${ld_preload}" ]; then
     set -- "--ld-preloads=$ld_preload" "$@"
 fi
 
+if [ -n "${STEAM_COMPAT_MACHINE_ARCHITECTURE-}" ] \
+    && [ -f "${STEAM_COMPAT_EMULATOR-}" ] \
+    && [ -f "${STEAM_COMPAT_GRAPHICS_PROVIDER-}" ] \
+; then
+    pv="${PRESSURE_VESSEL_PREFIX-}"
+
+    # If we're using emulation, we prefer to run a pressure-vessel executable
+    # that is appropriate for the machine's real architecture, with helper
+    # executables that it can run under emulation.
+    if [ -z "$pv" ]; then
+        case "${STEAM_COMPAT_MACHINE_ARCHITECTURE-}" in
+            (aarch64-linux-gnu)
+                pv="${here}/pressure-vessel-arm64"
+                ;;
+            (x86_64-linux-gnu)
+                pv="${here}/pressure-vessel-amd64"
+                ;;
+            (*)
+                pv="${here}/pressure-vessel"
+                ;;
+        esac
+    fi
+
+    # If we're already under emulation, for example FEX running this script
+    # under an x86 /bin/on on arm64, then going via aarch64-linux-gnu-exec
+    # will escape from transparent emulation and end up running ./run using
+    # a native arm64 /bin/sh, which is more efficient than continuing to
+    # operate under transparent emulation.
+    # If not, the extra process wrapper has negligible performance impact.
+    if [ -x "${pv}/libexec/steam-runtime-tools-0/${STEAM_COMPAT_MACHINE_ARCHITECTURE}-exec" ]; then
+        export PRESSURE_VESSEL_PREFIX="$pv"
+        exec "${pv}/libexec/steam-runtime-tools-0/${STEAM_COMPAT_MACHINE_ARCHITECTURE}-exec" "${here}/${run}" "$@"
+    fi
+fi
+
 exec "${here}/${run}" "$@"
 exit 125
 

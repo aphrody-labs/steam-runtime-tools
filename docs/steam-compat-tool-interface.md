@@ -430,6 +430,19 @@ Some environment variables are set by Steam, including:
     In the legacy [scout `LD_LIBRARY_PATH` runtime][ldlp], this variable
     is not set.
 
+* `STEAM_COMPAT_MACHINE_ARCHITECTURE`:
+
+    The architecture (native ABI) of the machine that Steam is running on,
+    represented as a [multiarch tuple][multiarch tuples].
+    This should be set by Steam or its compatibility tool stack when using
+    CPU emulation,
+    for example running x86\_64 or i386 games on aarch64.
+
+    For example,
+    when running x86 games via [FEX][] on an aarch64 (64-bit ARM) system,
+    either Steam or FEX would set
+    `STEAM_COMPAT_MACHINE_ARCHITECTURE=aarch64-linux-gnu`.
+
 * `STEAM_COMPAT_MOUNTS`:
 
     Colon-delimited list of paths to additional directories that are to be
@@ -709,6 +722,7 @@ unless this is set to the game's top-level directory.
 
 <!-- References: -->
 
+[FEX]: https://github.com/FEX-Emu/FEX
 [SDL_DYNAMIC_API]: https://github.com/libsdl-org/SDL/blob/SDL2/docs/README-dynapi.md
 [SDL3_DYNAMIC_API]: https://github.com/libsdl-org/SDL/blob/main/docs/README-dynapi.md
 [Steamworks launch options]: https://partner.steamgames.com/doc/sdk/uploading
@@ -719,6 +733,7 @@ unless this is set to the game's top-level directory.
 [install script]: https://partner.steamgames.com/doc/sdk/installscripts
 [install scripts]: https://partner.steamgames.com/doc/sdk/installscripts
 [ldlp]: ld-library-path-runtime.md
+[multiarch tuples]: https://wiki.debian.org/Multiarch/Tuples
 [prctl]: https://manpages.debian.org/unstable/manpages-dev/prctl.2.en.html
 [scout-on-soldier]: container-runtime.md#steam-linux-runtime-scout-on-soldier
 [sdl2-compat]: https://github.com/libsdl-org/sdl2-compat/

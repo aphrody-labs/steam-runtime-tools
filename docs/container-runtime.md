@@ -41,9 +41,35 @@ when necessary.
 
 [steamrt4]: #steamrt4
 
-Steam Linux Runtime 4.0 is a newer runtime based on Debian 13
-(released in 2025)
-and is structurally similar to [sniper](#sniper).
+Steam Linux Runtime 4.0, `steamrt4`,
+is a new runtime environment for native Linux games on Steam.
+It can be used by any game that benefits from a newer library stack
+or SDK environment.
+
+It is based on Debian 13 (released in 2025).
+Most of its libraries are taken directly from Debian, and can benefit
+from Debian's long-term security support.
+Selected libraries that are particularly important for games, such as
+SDL and Vulkan-Loader, have been upgraded to newer versions backported
+from newer branches of Debian.
+
+For backwards compatibility,
+the default runtime environment for existing native Linux games is
+[Steam Linux Runtime 1.0 (scout)][scout-on-soldier].
+To opt-in to using steamrt4,
+app and game developers should compile their titles in the
+[steamrt4 SDK][]
+and reconfigure the title's metadata to ask Steam to run it with
+*Steam Linux Runtime 4.0*.
+For more information please see
+[Steam Linux Runtime - guide for game developers][SLR for game developers].
+
+<!--
+Games that use steamrt4 include [TODO].
+-->
+
+steamrt4 is also used as a runtime environment for Proton version 11 and up,
+which are compiled against this newer library stack.
 
 The *Steam Linux Runtime 4.0* compatibility tool, app ID 4183110,
 will automatically be downloaded to your Steam library as
@@ -53,10 +79,10 @@ It can also be installed by running this command:
 
     steam steam://install/4183110
 
-Steam Linux Runtime 4.0 is not yet available to be selected in the
-Steamworks partner web interface.
-When it becomes available,
-we expect the procedure for selecting it to be the same as for sniper.
+For games that run natively on arm64 (aarch64), the
+*Steam Linux Runtime 4.0 - Arm64* compatibility tool is used instead,
+and can be installed with `steam steam://install/4185400`.
+This version installs into `steamapps/common/SteamLinuxRuntime_4-arm64`.
 
 Documentation in the `steamrt` "metapackage" provides
 [more information about steamrt4][steamrt4 README].
@@ -66,21 +92,13 @@ Documentation in the `steamrt` "metapackage" provides
 [sniper]: #sniper
 
 Steam Linux Runtime 3.0, `sniper`,
-is the recommended runtime environment for new native Linux games on Steam.
+is a recommended runtime environment for new native Linux games on Steam
+(early adopters should consider using [steamrt4][] instead).
 It can be used by any game that benefits from a newer library stack
 or SDK environment.
 
-It is a newer runtime than
-[scout][ldlp], based on Debian 11 (released in 2021).
-Most of its libraries are taken directly from Debian, and can benefit
-from Debian's long-term security support.
-Selected libraries that are particularly important for games, such as
-SDL and Vulkan-Loader, have been upgraded to newer versions backported
-from newer branches of Debian.
-
-sniper is designed to be used as a container runtime for `pressure-vessel`,
-and [cannot be used](#why) as a
-[`LD_LIBRARY_PATH` runtime][ldlp].
+It is structurally similar to [steamrt4][],
+but based on Debian 11 (released in 2021).
 
 For backwards compatibility,
 the default runtime environment for existing native Linux games is
@@ -89,7 +107,7 @@ To opt-in to using sniper,
 app and game developers should compile their titles in the
 [sniper SDK][]
 and reconfigure the title's metadata to ask Steam to run it with
-Steam Linux Runtime 3.0 (soldier).
+*Steam Linux Runtime 3.0 (soldier)*.
 For more information please see
 [Steam Linux Runtime - guide for game developers][SLR for game developers].
 
@@ -102,11 +120,7 @@ Battle for Wesnoth,
 Endless Sky and
 Retroarch.
 
-sniper is also used as a runtime environment for Proton version 8.0 and up,
-which are compiled against the newer library stack and would not
-be compatible with scout.
-Some older versions of Proton use the older
-[Steam Linux Runtime 2.0][soldier] (see below).
+sniper is also used as a runtime environment for Proton versions 8, 9 and 10.
 
 The *Steam Linux Runtime 3.0 - sniper* compatibility tool, app ID 1628350,
 will automatically be downloaded to your Steam library as
@@ -123,11 +137,8 @@ Documentation in the `steamrt` "metapackage" provides
 
 [soldier]: #soldier
 
-Steam Runtime 2, `soldier`, is another newer runtime based on Debian 10
-(released in 2019).
-It is very similar to [`sniper`](#sniper), except for its base distribution
-being 2 years older: this means its core libraries and compiler are also
-approximately 2 years older.
+Steam Runtime 2, `soldier`,
+is a runtime environment based on Debian 10 (released in 2019).
 
 This runtime environment is not directly available for use by game developers,
 but it forms part of the implementation of the
@@ -173,7 +184,8 @@ to the newer `libtiff.so.6`,
 which does not have full ABI compatibility with `libtiff.so.5`.
 
 The *Steam Linux Runtime 1.0 (scout)* compatibility tool, app ID 1070560,
-uses the same container technology as `soldier` to mitigate this problem.
+uses the same container technology as the runtimes above
+to mitigate this problem.
 It will automatically be downloaded to your Steam library as
 `steamapps/common/SteamLinuxRuntime` if it is selected to run a particular
 game, or if a game requires it.
@@ -181,7 +193,7 @@ It can also be installed by running this command:
 
     steam steam://install/1070560
 
-Unlike the [soldier](#soldier) and [sniper](#sniper) container runtimes,
+Unlike the newer container runtimes,
 it is implemented by entering a [`soldier`](#soldier) container, and then
 setting up a [`scout` `LD_LIBRARY_PATH` runtime][ldlp] inside that container.
 
@@ -189,8 +201,6 @@ Since [November 2024][Steam client 2024-11-05],
 it is the default for most native Linux games,
 unless the game developer has configured the game to use a different
 runtime environment.
-Before November 2024,
-it was used by default on Steam Deck but not on desktop systems.
 
 Users can also specifically opt-in to running specific games in the
 Steam Linux Runtime 1.0 (scout) container via *Properties* → *Compatibility*.
@@ -211,7 +221,7 @@ Older versions of the Steam client used sniper for this purpose.
 Documentation in the `steamrt` "metapackage" provides
 [more information about steamrt3c][steamrt3c README].
 
-Game developers should use [sniper][] instead.
+Game developers should use [sniper][] or [steamrt4][] instead.
 
 ## Possible future Steam Runtime branches
 
@@ -226,19 +236,19 @@ but with a newer base distribution.
 <a name="medic"></a>
 medic was a codename for an earlier attempt at Steam Runtime 4,
 based on Debian 12 (released in mid 2023).
-It was superseded by a Debian-13-based `steamrt4`.
+It was superseded by the Debian-13-based [steamrt4][],
 and we do not plan to release a Debian-12-based runtime.
 
 <a name="spy"></a>
 spy was an earlier attempt at Steam Runtime 2,
 based on Ubuntu 18.04.
-It was superseded by the Debian-10-based `soldier` runtime.
+It was superseded by the Debian-10-based [soldier][] runtime.
 
 ## <a name="why"></a>Why the container runtimes are necessary
 
 [why]: #why
 
-The [traditional `LD_LIBRARY_PATH` runtime][ldlp]
+The [legacy `LD_LIBRARY_PATH` runtime][ldlp]
 only works because modern host OSs are strictly newer than it.
 Making a `LD_LIBRARY_PATH`-based runtime reliable is difficult, especially
 since we want it to be runnable on host OSs that have some packages that

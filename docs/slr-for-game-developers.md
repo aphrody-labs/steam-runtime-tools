@@ -57,7 +57,7 @@ whichever one appears to be newer.
 
 The Steam Linux Runtime can be used to run three categories of games:
 
-  * Native Linux games on newer runtimes such as sniper and steamrt4
+  * Native Linux games on newer runtimes such as steamrt4 and sniper
   * Native Linux games on scout
   * Windows games, using Proton
 
@@ -69,36 +69,42 @@ compatibility tool.
 ### <a name="steamrt4"></a>Native Linux games targeting Steam Runtime 4 'steamrt4'
 
 [Steam Runtime version 4][steamrt4]
-is a new runtime based on Debian 13 (2025).
-It is structurally very similar to sniper,
-but 4 years newer.
+is a modern runtime based on Debian 13 (2025).
+It can be used by any game that benefits from a newer library stack
+or SDK environment.
 
-Steam Linux Runtime 4.0 is not yet available to be selected in the
-Steamworks partner web interface.
-When it becomes available,
-we expect the procedure for selecting it to be the same as for sniper.
-
-For development, debugging and experiments,
-if it is useful to run a game under `steamrt4`,
-replacing `SteamLinuxRuntime_sniper` with `SteamLinuxRuntime_4`
-or `sniper` with `steamrt4`
-in instructions that refer to `sniper` should usually work.
-
-### <a name="sniper"></a>Native Linux games targeting Steam Runtime 3 'sniper'
-
-pressure-vessel is able to run games in a runtime that is newer than
-scout.
-[Steam Runtime version 3, codenamed sniper][sniper],
-is the first such runtime available to developers of native Linux games
-on Steam.
-It is the recommended runtime for new native Linux games,
-and is based on Debian 11 (2021).
 Most of its libraries are taken directly from Debian, and can benefit
 from Debian's long-term security support.
 Selected libraries that are particularly important for games, such as
 SDL and Vulkan-Loader, have been upgraded to newer versions backported
 from newer branches of Debian.
-Games that use this runtime can be tested for Steam Deck compatibility.
+
+Games that target steamrt4 should be compiled in the [steamrt4 SDK][].
+
+For backwards compatibility,
+the default runtime environment when configuring a game in the Steamworks
+partner web interface is
+[Steam Linux Runtime 1.0 (scout)](#scout).
+To opt-in to using steamrt4,
+your app must first set up a Launch Option that supports Linux.
+Once that is set up, you can use the Installation → Linux Runtime
+menu item to select the `Steam Linux Runtime 4.0` runtime.
+This can be done during initial setup for an unreleased game,
+or as part of an update from a version that targeted scout or sniper
+to a newer version that targets steamrt4.
+
+<!--
+Games that use steamrt4 include [TODO].
+-->
+
+### <a name="sniper"></a>Native Linux games targeting Steam Runtime 3 'sniper'
+
+[Steam Runtime version 3, codenamed sniper][sniper],
+was the first container runtime available to developers of native Linux
+games on Steam.
+It is a recommended runtime for new native Linux games
+(early adopters should consider using [steamrt4](#steamrt4) instead)
+and is based on Debian 11 (2021).
 
 Games that target sniper should be compiled in the [sniper SDK][].
 
@@ -109,7 +115,7 @@ partner web interface is
 To opt-in to using sniper,
 your app must first set up a Launch Option that supports Linux.
 Once that is set up, you can use the Installation → Linux Runtime
-menu item to select a runtime.
+menu item to select the `Steam Linux Runtime 3.0 (sniper)` runtime.
 This can be done during initial setup for an unreleased game,
 or as part of an update from a version that targeted scout to a
 newer version that targets sniper.
@@ -126,14 +132,16 @@ Retroarch.
 #### <a name="soldier"></a>Native Linux games targeting Steam Runtime 2 'soldier'
 
 Native Linux games that require soldier cannot be released on Steam.
-The next-generation runtime for native Linux games is intended to be
+Modern native Linux games should be compiled for
+[Steam Runtime 4 `steamrt4`](#steamrt4) or
 [Steam Runtime 3 `sniper`](#sniper).
 All older native Linux games should be compiled for
 [Steam Runtime 1 `scout`](#scout).
 
 However, for development, debugging and experiments, if it is useful
-to run a game under `soldier`, replacing `sniper` with `soldier` in
-instructions that refer to `sniper` should usually work.
+to run a game under `soldier`, replacing `steamrt4` with `soldier`
+and `SteamLinuxRuntime_4` with `SteamLinuxRuntime_soldier` in
+instructions that refer to `steamrt4` should usually work.
 
 ### <a name="scout"></a>Native Linux games targeting Steam Runtime 1 'scout'
 
@@ -141,7 +149,8 @@ All pre-2022 native Linux games on Steam are meant to be built to target
 Steam Runtime version 1, codenamed scout, which is based on
 Ubuntu 12.04 (2012).
 For new or actively-maintained games,
-consider using [Steam Runtime 3 `sniper`](#sniper) instead.
+consider using [Steam Runtime 4 `steamrt4`](#steamrt4) or
+[Steam Runtime 3 `sniper`](#sniper) instead.
 For historical reasons,
 there are two different scout-compatible compatibility tools.
 
@@ -182,14 +191,16 @@ Steam Runtime 1 'scout' Docker container provided by the [scout SDK][].
 ### Windows games, using Proton
 
 Recent versions of Proton require recent Linux shared library stacks.
-To ensure that these are available, even when running on an older
-operating system, Steam automatically runs Proton 8.0 or later
-inside a *Steam Linux Runtime 3.0 (sniper)* container.
+To ensure that these are available,
+even when running on an older operating system,
+Steam automatically runs Proton 11 or later
+inside a *Steam Linux Runtime 4.0* container.
 
-Similarly, Proton versions 5.13 to 7.0 use a
+Similarly,
+Proton versions 8 to 10 use a
+*Steam Linux Runtime 3.0 (sniper)* container,
+and Proton versions 5.13 to 7.0 use a
 *Steam Linux Runtime 2.0 (soldier)* container.
-
-Future versions of Proton might switch to Steam Runtime 4 or later.
 
 ## Suggested Steam configuration
 
@@ -221,8 +232,9 @@ To run Linux games in a *Steam Linux Runtime 1.0 (scout)* container:
   * Select `Force the use of a specific Steam Play compatibility tool`
   * Select `Steam Linux Runtime 1.0 (scout)`
 
-This will automatically download *Steam Linux Runtime 2.0 (soldier)*
-or *Steam Linux Runtime 3.0 (sniper)*,
+This will automatically download *Steam Linux Runtime 2.0 (soldier)*,
+*Steam Linux Runtime 3.0 (sniper)* or
+*Steam Linux Runtime 4.0*,
 together with Proton and/or *Steam Linux Runtime 1.0 (scout)*,
 into your default Steam library.
 
@@ -278,7 +290,9 @@ For a more scriptable version of this, run one of these commands:
   * Steam Linux Runtime 2.0 (soldier): `steam steam://install/1391110`
   * Steam Linux Runtime 3.0 (sniper): `steam steam://install/1628350`
   * Steam Linux Runtime 4.0: `steam steam://install/4183110`
+  * Steam Linux Runtime 4.0 for arm64: `steam steam://install/4185400`
   * Proton Experimental: `steam steam://install/1493710`
+  * Proton 11.0: `steam steam://install/4628710`
   * Proton 10.0: `steam steam://install/3658110`
   * Proton 9.0: `steam steam://install/2805730`
   * Proton 8.0: `steam steam://install/2348590`
@@ -286,17 +300,17 @@ For a more scriptable version of this, run one of these commands:
   * Proton 6.3: `steam steam://install/1580130`
   * Proton 5.13: `steam steam://install/1420170`
 
-### <a name="commands"></a>Running commands in sniper, soldier, etc.
+### <a name="commands"></a>Running commands in steamrt4, sniper, soldier, etc.
 
 The simplest scenario for using the Steam Linux Runtime framework is to
-run commands in a newer runtime such as sniper.
+run commands in a newer runtime such as steamrt4.
 This mimics what Steam would do for a game that has been
-[configured to run in sniper](#sniper).
+[configured to run in steamrt4](#steamrt4).
 
 To do this, run a command like:
 
 ```
-$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
+$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_4/run \
     -- \
     xterm
 ```
@@ -305,7 +319,7 @@ or more realistically for a game,
 
 ```
 $ cd /builds/my-game
-$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
+$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_4/run \
     $pressure_vessel_options \
     -- \
     ./my-game.sh \
@@ -324,7 +338,7 @@ by prefixing it to the command, like this:
 ```
 $ ~/.steam/root/ubuntu12_32/steam-runtime/amd64/usr/bin/steam-runtime-launch-options \
     -- \
-    /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
+    /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_4/run \
     $pressure_vessel_options \
     -- \
     ./my-game.sh \
@@ -339,7 +353,7 @@ use the `--terminal=tty` option:
 
 ```
 $ cd /builds/my-game
-$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
+$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_4/run \
     --terminal=tty \
     -- \
     bash
@@ -347,6 +361,11 @@ $ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
 
 Exporting the environment variable `PRESSURE_VESSEL_TERMINAL=tty` is
 equivalent to using the `--terminal=tty` option.
+
+For sniper or soldier,
+the procedure is the same,
+but replace `SteamLinuxRuntime_4` with `SteamLinuxRuntime_sniper`
+and so on.
 
 ### <a name="commands-in-scout-on-soldier"></a>Running commands in the Steam Linux Runtime 1.0 (scout) environment
 
@@ -359,8 +378,8 @@ You will also need to ensure that the *Steam Linux Runtime 1.0 (scout)*
 compatibility
 tool is visible in the container environment: Steam normally does this
 automatically, but outside Steam it can be necessary to do this yourself.
-This means the commands required are not the same as for soldier or
-sniper.
+This means the commands required are not the same as for soldier,
+sniper or steamrt4.
 
 To enter this environment, use commands like this:
 
@@ -399,7 +418,7 @@ $ export STEAM_COMPAT_DATA_PATH="/path/to/steamlibrary/compatdata/$gameid"
 $ export STEAM_COMPAT_INSTALL_PATH=$(pwd)
 $ export STEAM_COMPAT_LIBRARY_PATHS=/path/to/steamlibrary:/path/to/otherlibrary
 $ cd /builds/my-game
-$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
+$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_4/run \
     $pressure_vessel_options \
     -- \
     /path/to/steamlibrary/steamapps/common/"Proton - Experimental"/proton \
@@ -408,7 +427,12 @@ $ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
     $game_options
 ```
 
-Use `soldier` instead of `sniper` for Proton 7.0 or older.
+For Proton 8, 9 or 10,
+the procedure is the same,
+but replace `SteamLinuxRuntime_4` with `SteamLinuxRuntime_sniper`.
+
+For Proton 7.0 or older,
+use `SteamLinuxRuntime_soldier` instead.
 
 ## Logging
 
@@ -527,7 +551,7 @@ the same environment variable, or use the command-line option like this:
 
 ```
 $ cd /builds/my-game
-$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
+$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_4/run \
     --shell=instead \
     -- \
     ./my-game.sh \
@@ -576,7 +600,8 @@ The special token `%command%` should be typed literally.
 
 <details><summary>The equivalent for non-Steam games</summary>
 
-The `SteamLinuxRuntime_sniper/run` and
+The `SteamLinuxRuntime_4/run`,
+`SteamLinuxRuntime_sniper/run` and
 `SteamLinuxRuntime_soldier/run` scripts also accept this environment
 variable, so it can be used in commands like these:
 
@@ -584,7 +609,7 @@ variable, so it can be used in commands like these:
 $ export STEAM_COMPAT_MOUNTS=/path/to/steamlibrary
 $ export STEAM_COMPAT_LAUNCHER_SERVICE=container-runtime
 $ cd /builds/native-linux-game
-$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
+$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_4/run \
     $pressure_vessel_options \
     -- \
     ./my-game.sh \
@@ -631,7 +656,7 @@ After configuring this, while a game is running, you can list game sessions
 where this has taken effect like this:
 
 ```
-$ .../SteamLinuxRuntime_sniper/pressure-vessel/bin/steam-runtime-launch-client --list
+$ .../SteamLinuxRuntime_4/pressure-vessel/bin/steam-runtime-launch-client --list
 --bus-name=com.steampowered.App123
 --bus-name=com.steampowered.App123.Instance31679
 ```
@@ -639,7 +664,7 @@ $ .../SteamLinuxRuntime_sniper/pressure-vessel/bin/steam-runtime-launch-client -
 and then connect to one of them with a command like:
 
 ```
-$ .../SteamLinuxRuntime_sniper/pressure-vessel/bin/steam-runtime-launch-client \
+$ .../SteamLinuxRuntime_4/pressure-vessel/bin/steam-runtime-launch-client \
     --bus-name=com.steampowered.App123 \
     -- \
     bash
@@ -670,7 +695,7 @@ For example, it is possible to re-run the crashed game under [gdbserver][]
 with a command like:
 
 ```
-$ .../SteamLinuxRuntime_sniper/pressure-vessel/bin/steam-runtime-launch-client \
+$ .../SteamLinuxRuntime_4/pressure-vessel/bin/steam-runtime-launch-client \
     --bus-name=com.steampowered.App123 \
     -- \
     gdbserver 127.0.0.1:12345 ./my-game-executable
@@ -682,7 +707,7 @@ To exit the "game" when you have finished debugging, instruct the
 command server to terminate:
 
 ```
-$ .../SteamLinuxRuntime_sniper/pressure-vessel/bin/steam-runtime-launch-client \
+$ .../SteamLinuxRuntime_4/pressure-vessel/bin/steam-runtime-launch-client \
     --bus-name=com.steampowered.App123 \
     --terminate
 ```
@@ -832,7 +857,7 @@ might use a command like this:
 ```
 $ export STEAM_COMPAT_MOUNTS=/builds:/resources
 $ cd /builds/my-game
-$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
+$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_4/run \
     -- \
     ./my-game.sh \
     +set extra_texture_path /resources/my-game/textures
@@ -934,7 +959,7 @@ like this:
 
 ```
 $ cd /builds/my-game
-$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
+$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_4/run \
     --devel \
     -- \
     ./my-game.sh
@@ -976,23 +1001,23 @@ Docker images.
 
 To use the SDK, first identify the version of the Platform that you are
 using.
-This information can be found in `SteamLinuxRuntime_sniper/VERSIONS.txt`,
-in the row starting with `sniper`.
+This information can be found in `SteamLinuxRuntime_4/VERSIONS.txt`,
+in the row starting with `steamrt4`.
 Next, visit the corresponding numbered directory in
-<https://repo.steampowered.com/steamrt-images-sniper/snapshots/>
+<https://repo.steampowered.com/steamrt4/images/>
 and download the large archive named
-`com.valvesoftware.SteamRuntime.Sdk-amd64,i386-sniper-runtime.tar.gz`.
+`com.valvesoftware.SteamRuntime.Sdk-amd64,i386-steamrt4-runtime.tar.gz`.
 
-In the `SteamLinuxRuntime_sniper` directory in your
-Steam library, create a directory `SteamLinuxRuntime_sniper/sdk` and unpack the
+In the `SteamLinuxRuntime_4` directory in your
+Steam library, create a directory `SteamLinuxRuntime_4/sdk` and unpack the
 archive into it, so that you have files like
-`steamapps/common/SteamLinuxRuntime_sniper/sdk/files/lib/os-release` and
-`steamapps/common/SteamLinuxRuntime_sniper/sdk/metadata`:
+`steamapps/common/SteamLinuxRuntime_4/sdk/files/lib/os-release` and
+`steamapps/common/SteamLinuxRuntime_4/sdk/metadata`:
 
 ```
-$ cd .../SteamLinuxRuntime_sniper
+$ cd .../SteamLinuxRuntime_4
 $ mkdir -p sdk
-$ tar -C sdk -xf ~/Downloads/com.valvesoftware.SteamRuntime.Sdk-amd64,i386-sniper-runtime.tar.gz
+$ tar -C sdk -xf ~/Downloads/com.valvesoftware.SteamRuntime.Sdk-amd64,i386-steamrt4-runtime.tar.gz
 ```
 
 You can now use this runtime by selecting it from the *Container runtime*
@@ -1001,12 +1026,12 @@ drop-down list in [steam-runtime-launch-options][].
 <details><summary>The equivalent for non-Steam games</summary>
 
 For non-Steam games, this can be selected by
-passing the option `--runtime=sdk` to the `SteamLinuxRuntime_sniper/run`
+passing the option `--runtime=sdk` to the `SteamLinuxRuntime_4/run`
 script, for example:
 
 ```
 $ cd /builds/my-game
-$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
+$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_4/run \
     $pressure_vessel_options \
     --runtime=sdk \
     -- \
@@ -1019,14 +1044,24 @@ $ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
 You will find that tools like `gdb` and `strace` are available in the SDK
 environment.
 
-[soldier][] works in the same way, but with `soldier` instead of `sniper`.
+For [sniper][] the procedure is the same,
+but download from <https://repo.steampowered.com/steamrt3/images/>,
+replace `steamrt4` with `sniper` elsewhere,
+and replace `SteamLinuxRuntime_4` with `SteamLinuxRuntime_sniper` throughout.
+
+[soldier][] works in the same way, but with `soldier` and `steamrt2`.
 
 ## Running in a modified Platform or SDK environment
 
 The default `Platform` environment provided by
-*Steam Linux Runtime 2.0 (soldier)*
-and *Steam Linux Runtime 3.0 (sniper)* in the `soldier_platform_*` or
-`sniper_platform_*` directory is in a format that has been optimized
+*Steam Linux Runtime 2.0 (soldier)*,
+*Steam Linux Runtime 3.0 (sniper)*
+and *Steam Linux Runtime 4.0*
+in the
+`soldier_platform_*`,
+`sniper_platform_*`
+and `steamrt4_platform_*`
+directories is in a format that has been optimized
 for distribution through the Steampipe CDN, and cannot easily be modified:
 most files' names, permissions and checksums are checked against a manifest
 file during container setup, and some files do not exist in `*_platform_*`
@@ -1045,13 +1080,18 @@ files into place.
 
 To use a locally-modified Platform environment, proceed as if for the SDK,
 but download
-`com.valvesoftware.SteamRuntime.Platform-amd64,i386-sniper-runtime.tar.gz`
-and unpack it into `SteamLinuxRuntime_sniper/platform`,
+`com.valvesoftware.SteamRuntime.Platform-amd64,i386-steamrt4-runtime.tar.gz`
+and unpack it into `SteamLinuxRuntime_4/platform`,
 so that you have files like
-`steamapps/common/SteamLinuxRuntime_sniper/platform/files/lib/os-release` and
-`steamapps/common/SteamLinuxRuntime_sniper/platform/metadata`.
+`steamapps/common/SteamLinuxRuntime_4/platform/files/lib/os-release` and
+`steamapps/common/SteamLinuxRuntime_4/platform/metadata`.
 Then you can proceed as if for the SDK, but use `--runtime=platform`
 instead of `--runtime=sdk`.
+
+For [sniper][] the procedure is the same,
+but download from <https://repo.steampowered.com/steamrt3/images/>,
+replace `steamrt4` with `sniper` elsewhere,
+and replace `SteamLinuxRuntime_4` with `SteamLinuxRuntime_sniper` throughout.
 
 [soldier][] works in the same way, but with `soldier` instead of `sniper`.
 
@@ -1060,7 +1100,7 @@ instead of `--runtime=sdk`.
 [Upgrading pressure-vessel]: #upgrading-pressure-vessel
 
 The recommended version of `pressure-vessel` is the one that is included
-in the *Steam Linux Runtime 3.0 (sniper)* depot, and other versions are
+in the *Steam Linux Runtime 4.0* depot, and other versions are
 not necessarily compatible with the container runtime and scripts in
 the depot.
 However, it can sometimes be useful for developers and testers to upgrade
@@ -1069,7 +1109,7 @@ make use of new features or try out new bug-fixes.
 
 To do this, you can download an archive named `pressure-vessel-bin.tar.gz`
 or `pressure-vessel-bin+src.tar.gz`, unpack it, and use it to replace the
-`steamapps/common/SteamLinuxRuntime_sniper/pressure-vessel/` directory.
+`steamapps/common/SteamLinuxRuntime_4/pressure-vessel/` directory.
 
 Alternatively, [steam-runtime-launch-options][] will look for copies of
 pressure-vessel in several likely locations, including `./pressure-vessel`
@@ -1083,10 +1123,14 @@ continuous-integration system; the steps to do this are deliberately not
 documented here.
 
 To return to the recommended version of `pressure-vessel`, simply delete
-the `steamapps/common/SteamLinuxRuntime_sniper/pressure-vessel/`
+the `steamapps/common/SteamLinuxRuntime_4/pressure-vessel/`
 directory and use Steam's [Verify integrity][] feature to re-download it.
 
-[soldier][] works in the same way, but with `soldier` instead of `sniper`.
+For [sniper][] the procedure is the same,
+but replace `SteamLinuxRuntime_4` with `SteamLinuxRuntime_sniper` throughout.
+
+[soldier][] works in the same way,
+but in `SteamLinuxRuntime_soldier`.
 
 ## Attaching a debugger by using gdbserver
 
@@ -1115,7 +1159,7 @@ $ gdbserver 127.0.0.1:12345 ./my-game-executable $game_options
 
 ```
 $ cd /builds/my-game
-$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
+$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_4/run \
     $pressure_vessel_options \
     -- \
     gdbserver 127.0.0.1:12345 ./my-game-executable \
@@ -1196,7 +1240,7 @@ by using a command prefix like `gdbserver 0.0.0.0:12345`.
 
 ```
 $ cd /builds/my-game
-$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
+$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_4/run \
     $pressure_vessel_options \
     -- \
     gdbserver 0.0.0.0:12345 ./my-game-executable \
@@ -1232,7 +1276,7 @@ On the gaming device, listen on 127.0.0.1, the same as for local debugging.
 
 ```
 $ cd /builds/my-game
-$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_sniper/run \
+$ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_4/run \
     $pressure_vessel_options \
     -- \
     gdbserver 127.0.0.1:12345 ./my-game-executable \
@@ -1401,10 +1445,13 @@ or [Toolbx][].
 The SDK documentation has more information about this.
 
 Linux-native games released on Steam can be compiled for either
-[Steam Runtime 1 'scout'][scout SDK] or
-[Steam Runtime 3 'sniper'][sniper SDK].
+[Steam Runtime 1 'scout'][scout SDK],
+[Steam Runtime 3 'sniper'][sniper SDK]
+or [Steam Runtime 4 'steamrt4'][steamrt4 SDK].
 For new Linux-native games,
-the recommended runtime environment is Steam Runtime 3, `sniper`.
+the recommended runtime environment is currently Steam Runtime 3, `sniper`,
+but we expect to change this recommendation to Steam Runtime 4, `steamrt4`
+in future.
 
 Steam Runtime 2 'soldier' also has [a similar SDK][soldier SDK],
 but releasing games compiled for soldier on Steam is not supported.
@@ -1514,13 +1561,17 @@ The legacy [`LD_LIBRARY_PATH`-based scout runtime][ldlp-runtime]
 cannot guarantee the presence of anything beyond basic shell utilities
 either.
 
-Titles that are configured to run in Steam Linux Runtime 3.0 (sniper)
+Titles that are configured to run in Steam Linux Runtime 4.0 (steamrt4)
 can include Python scripts,
 starting with `#!/usr/bin/env python3` or `#!/usr/bin/python3`,
 as an alternative to shell scripts.
-sniper includes Python 3.9 and most of the standard library
+steamrt4 includes Python 3.13 and most of the standard library
 (except for a few larger modules like `tk`),
 but does not include external modules like `pip`.
+
+Similarly,
+Steam Linux Runtime 3.0 (sniper) includes Python 3.9 and most of its
+standard library.
 
 <!-- References: -->
 

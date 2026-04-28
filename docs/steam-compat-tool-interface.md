@@ -103,7 +103,8 @@ is a [VDF][] text file with one top-level entry, `manifest`.
         Any self-contained Steam container runtime environment such as
         "[Steam Linux Runtime 2.0 (soldier)][soldier]" (app ID 1391110),
         "[Steam Linux Runtime 3.0 (sniper)][sniper]" (app ID 1628350) or
-        "[Steam Linux Runtime 4.0][steamrt4]" (app ID 4183110)
+        "[Steam Linux Runtime 4.0][steamrt4]" (app ID 4183110),
+        or their arm64 equivalents.
 
     * `proton`:
 

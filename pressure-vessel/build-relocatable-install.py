@@ -898,8 +898,11 @@ def main():
                 )
                 subprocess.check_call([
                     'tar',
+                    # Note the S suffix: we only want this transformation
+                    # to be applied to filenames, and not to (relative!)
+                    # symlink targets.
                     (r'--transform='
-                     r's,^\(\.\(/\|$\)\)\?,pressure-vessel{}/,').format(
+                     r's,^\(\.\(/\|$\)\)\?,pressure-vessel{}/,S').format(
                         tail,
                     ),
                     # metadata/ is all duplicated in sources/
@@ -913,8 +916,9 @@ def main():
 
             subprocess.check_call([
                 'tar',
+                # Note the S suffix, as above.
                 (r'--transform='
-                 r's,^\(\.\(/\|$\)\)\?,pressure-vessel{}/,').format(
+                 r's,^\(\.\(/\|$\)\)\?,pressure-vessel{}/,S').format(
                     tail,
                 ),
                 '--exclude=sources',

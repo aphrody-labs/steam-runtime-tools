@@ -112,6 +112,7 @@ case "$RELOCATABLE_INSTALL_ARCHS" in
     (amd64,i386)
         # Defaults => pressure-vessel-bin.tar.gz
         set --
+        tarball_suffix="bin"
         ;;
 
     (*)
@@ -119,6 +120,7 @@ case "$RELOCATABLE_INSTALL_ARCHS" in
         --architecture-name="$primary_arch${secondary_archs:+",$secondary_archs"}" \
         --architecture-multiarch="$tuples" \
         ${NULL+}
+        tarball_suffix="$(echo "$primary_arch${secondary_archs:+",$secondary_archs"}" | tr , +)"
         ;;
 esac
 
@@ -145,6 +147,18 @@ PYTHONPATH="$(pwd)/tests" "$PYTHON" \
     ./tests/pressure-vessel/relocatable-install.py \
     "$@" \
     "$(pwd)/$dir/relocatable-install"
+
+for tarball in \
+    "pressure-vessel-${tarball_suffix}.tar.gz" \
+    "pressure-vessel-${tarball_suffix}+src.tar.gz" \
+; do
+    rm -fr "$(pwd)/$dir/pressure-vessel"
+    tar -C "$(pwd)/$dir" -xf "$(pwd)/$dir/$tarball"
+    PYTHONPATH="$(pwd)/tests" "$PYTHON" \
+        ./tests/pressure-vessel/relocatable-install.py \
+        "$@" \
+        "$(pwd)/$dir/pressure-vessel"
+done
 
 # Required during testing
 pkgtestdir=/usr/libexec/installed-tests/steam-runtime-tools-0

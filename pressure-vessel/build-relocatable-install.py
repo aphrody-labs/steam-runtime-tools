@@ -488,6 +488,16 @@ def main():
                 os.path.join(inst_pkglibexecdir, exe),
             )
 
+            # We want to symlink some of these into the PATH
+            if exe in (
+                'srt-logger',
+            ):
+                # Where to install the symlink
+                dest = os.path.join(installation, 'bin', exe)
+                # Relative path from dest to the real executable
+                rel = '../libexec/steam-runtime-tools-0/' + exe
+                symlink_force(rel, dest)
+
         for data in LIBEXEC_DATA:
             install(
                 os.path.join(path, data),

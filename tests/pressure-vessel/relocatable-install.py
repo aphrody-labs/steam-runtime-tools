@@ -80,6 +80,7 @@ class TapTest:
 EXES = [
     'pressure-vessel-wrap',
     'pv-verify',
+    'srt-logger',
     'steam-runtime-check-requirements',
     'steam-runtime-launch-client',
     'steam-runtime-launcher-service',

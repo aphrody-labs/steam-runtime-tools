@@ -131,6 +131,17 @@ def isexec(path):
 def check_dependencies(test, relocatable_install, path):
     # type: (TapTest, str, str) -> None
 
+    # Calling ldd on a symlink misleadingly resolves ${ORIGIN} based on
+    # the logical path (the symlink), even though LD_DEBUG=libs
+    # demonstrates that when the executable is really run, ${ORIGIN} is
+    # based on the physical path (the target of the symlink).
+    # Resolve logical to physical path to avoid this.
+    try:
+        path = os.path.realpath(path)
+    except OSError as e:
+        test.not_ok('realpath({}) -> {}'.format(path, e))
+        return
+
     subproc = subprocess.Popen(
         ['ldd', path],
         stdout=subprocess.PIPE,
@@ -203,7 +214,7 @@ def main():
     parser.add_argument('path')
     args = parser.parse_args()
 
-    relocatable_install = os.path.abspath(args.path)
+    relocatable_install = os.path.realpath(args.path)
 
     test = TapTest()
 

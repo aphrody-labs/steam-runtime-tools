@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260430.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260430.0) steamrt; urgency=medium
 
   * pressure-vessel:
     - In the relocatable bundle, fix the broken symlink
@@ -12,7 +12,7 @@ steam-runtime-tools (0.20260430.0) UNRELEASED; urgency=medium
     - Add `bin/srt-logger` to the top-level bin/ directory
       (steamrt/tasks#989, steamrt/tasks#1015)
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 30 Apr 2026 13:26:25 +0100
+ -- Simon McVittie <smcv@collabora.com>  Thu, 30 Apr 2026 13:30:36 +0100
 
 steam-runtime-tools (0.20260428.0) steamrt; urgency=medium
 

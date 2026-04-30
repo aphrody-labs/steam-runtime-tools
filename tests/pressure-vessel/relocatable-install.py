@@ -79,16 +79,34 @@ class TapTest:
 
 EXES = [
     'pressure-vessel-wrap',
+    'pv-verify',
+    'srt-logger',
+    'steam-runtime-check-requirements',
+    'steam-runtime-launch-client',
+    'steam-runtime-launcher-service',
+    'steam-runtime-launcher-interface-0',
+    'steam-runtime-steam-remote',
+    'steam-runtime-supervisor',
+    'steam-runtime-system-info',
 ]
 PKGLIBEXEC = [
     'pv-adverb',
+    'pv-try-setlocale',
     'srt-bwrap',
+    'srt-logger',
 ]
+# This isn't a completely comprehensive list of helpers that we
+# expect to include, only the ones that are obviously necessary
+# and (in most cases) implement --help
 HELPERS = [
     'capsule-capture-libs',
+    'exec',
+    'srt-launcher-service',
+    'true',
 ]
 SCRIPTS = [
     'pressure-vessel-unruntime',
+    'steam-runtime-launch-options',
 ]
 # https://wiki.debian.org/ArchitectureSpecificsMemo
 LD_SO = {
@@ -130,6 +148,17 @@ def isexec(path):
 
 def check_dependencies(test, relocatable_install, path):
     # type: (TapTest, str, str) -> None
+
+    # Calling ldd on a symlink misleadingly resolves ${ORIGIN} based on
+    # the logical path (the symlink), even though LD_DEBUG=libs
+    # demonstrates that when the executable is really run, ${ORIGIN} is
+    # based on the physical path (the target of the symlink).
+    # Resolve logical to physical path to avoid this.
+    try:
+        path = os.path.realpath(path)
+    except OSError as e:
+        test.not_ok('realpath({}) -> {}'.format(path, e))
+        return
 
     subproc = subprocess.Popen(
         ['ldd', path],
@@ -203,17 +232,30 @@ def main():
     parser.add_argument('path')
     args = parser.parse_args()
 
-    relocatable_install = os.path.abspath(args.path)
+    relocatable_install = os.path.realpath(args.path)
 
     test = TapTest()
 
     for exe in EXES:
         path = os.path.join(relocatable_install, 'bin', exe)
 
-        if subprocess.call([path, '--help'], stdout=2) == 0:
-            test.ok('{} --help'.format(path))
+        if isexec(path):
+            test.ok('{} exists and is executable'.format(path))
         else:
-            test.not_ok('{} --help'.format(path))
+            test.not_ok('{} not executable'.format(path))
+
+        if exe != 'steam-runtime-steam-remote':
+            status = subprocess.call([path, '--help'], stdout=2)
+
+            if exe == 'steam-runtime-launcher-interface-0':
+                expected = 125
+            else:
+                expected = 0
+
+            if status == expected:
+                test.ok('{} --help'.format(path))
+            else:
+                test.not_ok('{} --help'.format(path))
 
         check_dependencies(test, relocatable_install, path)
 
@@ -224,6 +266,11 @@ def main():
             'steam-runtime-tools-0',
             exe,
         )
+
+        if isexec(path):
+            test.ok('{} exists and is executable'.format(path))
+        else:
+            test.not_ok('{} not executable'.format(path))
 
         if subprocess.call([path, '--help'], stdout=2) == 0:
             test.ok('{} --help'.format(path))
@@ -239,6 +286,13 @@ def main():
 
     for basename in HELPERS:
         for multiarch in tuples_to_test:
+            if (
+                basename == 'srt-launcher-service'
+                and multiarch == 'i386-linux-gnu'
+            ):
+                # We intentionally don't include the i386 version of this one
+                continue
+
             ld_so = LD_SO[multiarch]
 
             exe = '{}-{}'.format(multiarch, basename)
@@ -267,7 +321,15 @@ def main():
 
     for exe in SCRIPTS:
         path = os.path.join(relocatable_install, 'bin', exe)
-        if not isexec('/bin/bash'):
+
+        if isexec(path):
+            test.ok('{} exists and is executable'.format(path))
+        else:
+            test.not_ok('{} not executable'.format(path))
+
+        if exe == 'steam-runtime-launch-options':
+            test.skip("s-r-l-o doesn't implement --help")
+        elif not isexec('/bin/bash'):
             test.skip('bash not found')
         elif subprocess.call([path, '--help'], stdout=2) == 0:
             test.ok('{} --help'.format(path))

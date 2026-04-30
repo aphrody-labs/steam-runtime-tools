@@ -976,6 +976,7 @@ class Main:
             # And also, they may be linked with different names, so use a map
             # instead of a list.
             pv_libexec_executables = {
+                'srt-logger': 'srt-logger',
                 'steam-runtime-launcher-service':
                     "{}-srt-launcher-service".format(tuples[0]),
             }

@@ -488,6 +488,16 @@ def main():
                 os.path.join(inst_pkglibexecdir, exe),
             )
 
+            # We want to symlink some of these into the PATH
+            if exe in (
+                'srt-logger',
+            ):
+                # Where to install the symlink
+                dest = os.path.join(installation, 'bin', exe)
+                # Relative path from dest to the real executable
+                rel = '../libexec/steam-runtime-tools-0/' + exe
+                symlink_force(rel, dest)
+
         for data in LIBEXEC_DATA:
             install(
                 os.path.join(path, data),
@@ -898,8 +908,11 @@ def main():
                 )
                 subprocess.check_call([
                     'tar',
+                    # Note the S suffix: we only want this transformation
+                    # to be applied to filenames, and not to (relative!)
+                    # symlink targets.
                     (r'--transform='
-                     r's,^\(\.\(/\|$\)\)\?,pressure-vessel{}/,').format(
+                     r's,^\(\.\(/\|$\)\)\?,pressure-vessel{}/,S').format(
                         tail,
                     ),
                     # metadata/ is all duplicated in sources/
@@ -913,8 +926,9 @@ def main():
 
             subprocess.check_call([
                 'tar',
+                # Note the S suffix, as above.
                 (r'--transform='
-                 r's,^\(\.\(/\|$\)\)\?,pressure-vessel{}/,').format(
+                 r's,^\(\.\(/\|$\)\)\?,pressure-vessel{}/,S').format(
                     tail,
                 ),
                 '--exclude=sources',

@@ -1,3 +1,19 @@
+steam-runtime-tools (0.20260430.0) UNRELEASED; urgency=medium
+
+  * pressure-vessel:
+    - In the relocatable bundle, fix the broken symlink
+      `pressure-vessel/bin/s-r-l-s` →
+      `pressure-vessel/../libexec/s-r-t-0/TUPLE-srt-l-s` so it correctly
+      points to `../libexec/s-r-t-0/TUPLE-srt-l-s`
+      (steamrt/tasks#998, fixing a regression in 0.20260428.0)
+    - In the relocatable bundle, add `pressure-vessel/bin/srt-logger`
+      (steamrt/tasks#1015)
+  * steam-runtime-steamrt-*:
+    - Add `bin/srt-logger` to the top-level bin/ directory
+      (steamrt/tasks#989, steamrt/tasks#1015)
+
+ -- Simon McVittie <smcv@collabora.com>  Thu, 30 Apr 2026 13:26:25 +0100
+
 steam-runtime-tools (0.20260428.0) steamrt; urgency=medium
 
   [ Antonio Ospite ]

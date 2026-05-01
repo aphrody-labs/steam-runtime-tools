@@ -819,6 +819,7 @@ main (int argc,
   process_manager_options.dump_parameters = TRUE;
   process_manager_options.exit_with_parent = TRUE;
   process_manager_options.forward_signals = TRUE;
+  process_manager_options.terminate_when_signaled = TRUE;
   process_manager_options.terminate_with_main = !!opt_terminate_with_main;
   process_manager_options.subreaper = TRUE;
 

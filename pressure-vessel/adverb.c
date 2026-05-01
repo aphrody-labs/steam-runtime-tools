@@ -54,6 +54,8 @@
 #include "utils.h"
 #include "wrap-interactive.h"
 
+#define DEFAULT_TERMINATE_TIMEOUT 2.0
+
 static const char * const *global_envp = NULL;
 static GPtrArray *global_ld_so_conf_entries = NULL;
 static SrtProcessManagerOptions *global_options = NULL;
@@ -67,7 +69,8 @@ static gchar *opt_prefix = NULL;
 static gchar *opt_regenerate_ld_so_cache = NULL;
 static gchar *opt_set_ld_library_path = NULL;
 static double opt_terminate_idle_timeout = 0.0;
-static double opt_terminate_timeout = -1.0;
+static double opt_terminate_timeout = DEFAULT_TERMINATE_TIMEOUT;
+static gboolean opt_terminate_with_main = FALSE;
 static gboolean opt_verbose = FALSE;
 static gboolean opt_version = FALSE;
 static gboolean opt_wait = FALSE;
@@ -650,18 +653,29 @@ static GOptionEntry options[] =
     G_OPTION_FLAG_HIDDEN | G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK,
     opt_ignored_cb, NULL, NULL },
 
+  { "terminate-with-main", '\0',
+    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_terminate_with_main,
+    "When the main COMMAND exits, terminate other descendant processes.",
+    NULL },
+  { "no-terminate-with-main", '\0',
+    G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &opt_terminate_with_main,
+    "When the main COMMAND exits, other descendants may continue to run "
+    "[default].",
+    NULL },
+
   { "terminate-idle-timeout", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_DOUBLE, &opt_terminate_idle_timeout,
-    "If --terminate-timeout is used, wait this many seconds before "
-    "sending SIGTERM. [default: 0.0]",
+    "When terminating descendant processes, "
+    "wait this many seconds before sending the first signal. "
+    "[Default: 0.0]",
     "SECONDS" },
   { "terminate-timeout", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_DOUBLE, &opt_terminate_timeout,
-    "Send SIGTERM and SIGCONT to descendant processes that didn't "
-    "exit within --terminate-idle-timeout. If they don't all exit within "
-    "this many seconds, send SIGKILL and SIGCONT to survivors. If 0.0, "
-    "skip SIGTERM and use SIGKILL immediately. "
-    "[Default: -1.0, meaning don't signal].",
+    "When terminating descendant processes, "
+    "send SIGTERM and SIGCONT, "
+    "then wait this many seconds before sending SIGKILL and SIGCONT. "
+    "If 0.0, skip SIGTERM and use SIGKILL immediately. "
+    "[Default: " G_STRINGIFY (DEFAULT_TERMINATE_TIMEOUT) "]",
     "SECONDS" },
 
   { "verbose", '\0',
@@ -805,7 +819,7 @@ main (int argc,
   process_manager_options.dump_parameters = TRUE;
   process_manager_options.exit_with_parent = TRUE;
   process_manager_options.forward_signals = TRUE;
-  process_manager_options.terminate_with_main = (opt_terminate_timeout >= 0.0);
+  process_manager_options.terminate_with_main = !!opt_terminate_with_main;
   process_manager_options.subreaper = TRUE;
 
   if (opt_terminate_idle_timeout > 0.0)

@@ -1158,7 +1158,6 @@ main (int argc,
 
       flatpak_bwrap_add_args (adverb_argv,
                               "--exit-with-parent",
-                              "--subreaper",
                               NULL);
 
       if (!_srt_subprocess_runner_await_emulator (self->run_in_current_context,

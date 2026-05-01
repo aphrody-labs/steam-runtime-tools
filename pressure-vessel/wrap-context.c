@@ -1084,7 +1084,7 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
       "Send SIGTERM and SIGCONT to descendant processes that didn't "
       "exit within --terminate-idle-timeout. If they don't all exit within "
       "this many seconds, send SIGKILL and SIGCONT to survivors. If 0.0, "
-      "skip SIGTERM and use SIGKILL immediately. Implies --subreaper. "
+      "skip SIGTERM and use SIGKILL immediately. "
       "[Default: -1.0, meaning don't signal].",
       "SECONDS" },
     { "variable-dir", '\0',

@@ -750,7 +750,15 @@ main (int argc,
         {
           g_warning ("Unsharing process ID namespace. This is not expected "
                      "to work...");
-          flatpak_bwrap_add_arg (bwrap, "--unshare-pid");
+          /* The top-level process inside the container is pv-adverb,
+           * which reaps all child processes, so it's fine for it
+           * to act as pid 1 inside the container - and that has better
+           * handling of terminating signals than if we let bwrap provide
+           * its own pid 1 */
+          flatpak_bwrap_add_args (bwrap,
+                                  "--as-pid-1",
+                                  "--unshare-pid",
+                                  NULL);
         }
       else
         {

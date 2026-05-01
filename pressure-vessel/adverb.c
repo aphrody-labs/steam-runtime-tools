@@ -60,7 +60,6 @@ static SrtProcessManagerOptions *global_options = NULL;
 static gboolean opt_clear_env = FALSE;
 static gboolean opt_create = FALSE;
 static SrtEmulator *opt_emulator = NULL;
-static gboolean opt_exit_with_parent = FALSE;
 static gboolean opt_generate_locales = FALSE;
 static GQuark opt_ldconfig_architecture = SRT_ARCHITECTURE_QUARK_NONE;
 static gchar *opt_overrides = NULL;
@@ -564,14 +563,8 @@ static GOptionEntry options[] =
     "JSONFILE" },
 
   { "exit-with-parent", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_exit_with_parent,
-    "Terminate child process and self with SIGTERM when parent process "
-    "exits.",
-    NULL },
-  { "no-exit-with-parent", '\0',
-    G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &opt_exit_with_parent,
-    "Don't do anything special when parent process exits [default].",
-    NULL },
+    G_OPTION_FLAG_HIDDEN | G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK,
+    opt_ignored_cb, NULL, NULL },
 
   { "generate-locales", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_generate_locales,
@@ -810,7 +803,7 @@ main (int argc,
 
   process_manager_options.close_fds = TRUE;
   process_manager_options.dump_parameters = TRUE;
-  process_manager_options.exit_with_parent = !!opt_exit_with_parent;
+  process_manager_options.exit_with_parent = TRUE;
   process_manager_options.forward_signals = TRUE;
   process_manager_options.terminate_with_main = (opt_terminate_timeout >= 0.0);
   process_manager_options.subreaper = TRUE;

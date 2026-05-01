@@ -43,11 +43,19 @@ pv-adverb - wrap processes in various ways
 
 # DESCRIPTION
 
-**pv-adverb** runs *COMMAND* as a child process, with
-modifications to its execution environment as determined by the options.
+**pv-adverb** acts as the top-level process inside a Steam Linux Runtime
+container
+(the direct child of **bwrap**(1))
+with any other processes that will run inside the container,
+for example a game or an interactive shell,
+as its children.
+This means that it can supervise those processes and alter their execution
+environment.
 
-By default, it just runs *COMMAND* as a child process and reports its
-exit status.
+All file descriptors inherited by **pv-adverb** are closed,
+unless marked with **--assign-fd** or **--pass-fd** to be inherited
+by the child,
+or with options such as **--fd** to be held open by **pv-adverb** itself.
 
 # OPTIONS
 

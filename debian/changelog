@@ -1,13 +1,16 @@
 steam-runtime-tools (0.20260505.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
-    - When pv-adverb receives SIGINT, SIGTERM or SIGQUIT, terminate
-      all descendant processes in the same way as
+    - When pv-adverb receives SIGINT, SIGTERM or SIGQUIT, or when its
+      parent process (srt-bwrap) exits, terminate all descendant
+      processes in the same way as
       `steam-runtime-supervisor --terminate-when-signaled`: send SIGTERM,
       wait up to 2 seconds, send SIGKILL to any remaining processes
       (steamrt/tasks#961)
     - `pv-adverb --terminate-timeout=…` no longer implies
       `--terminate-with-main`
+    - pv-adverb is always a subreaper
+    - pv-adverb always exits when its parent process does
     - With `p-v-wrap --unshare-pid`, let pv-adverb act as process 1 in
       the new namespace. (Note that this is an experimental feature that
       does not yet interact well with Steam.)

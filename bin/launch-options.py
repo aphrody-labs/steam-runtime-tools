@@ -60,6 +60,11 @@ RUNTIMES = [
     'steamrt4',     # Steam Runtime 4, based on Debian 13
     'steamrt5',     # Steam Runtime 5, provisionally based on Debian 14+
 ]
+MAJOR_VERSIONS = {
+    'scout': '1',
+    'soldier': '2',
+    'sniper': '3',
+}
 
 # All available compatibility targets, including Windows (via Proton)
 # and native Linux (whatever the host system happens to be running, e.g.
@@ -1013,11 +1018,22 @@ class Gui:
             )
 
         for target in RUNTIMES:
+            if target.startswith('steamrt'):
+                major_version = target[len('steamrt'):]
+            else:
+                assert target in MAJOR_VERSIONS, target
+                major_version = MAJOR_VERSIONS[target]
+
             if (
                 len(command_argv) > 2
                 and command_argv[0].endswith((
+                    '/SteamLinuxRuntime_%s/run' % major_version,
                     '/SteamLinuxRuntime_%s/run' % target,
                     '/SteamLinuxRuntime_%s/run-in-%s' % (target, target),
+                    '/SteamLinuxRuntime_%s/run-in-%s' % (
+                        major_version, target,
+                    ),
+                    '/SteamLinuxRuntime_%s/_v2-entry-point' % major_version,
                     '/SteamLinuxRuntime_%s/_v2-entry-point' % target,
                 ))
                 and '--' in command_argv[:-1]

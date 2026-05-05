@@ -60,11 +60,21 @@ RUNTIMES = [
     'steamrt4',     # Steam Runtime 4, based on Debian 13
     'steamrt5',     # Steam Runtime 5, provisionally based on Debian 14+
 ]
+MAJOR_VERSIONS = {
+    'scout': '1',
+    'soldier': '2',
+    'sniper': '3',
+}
 
 # All available compatibility targets, including Windows (via Proton)
 # and native Linux (whatever the host system happens to be running, e.g.
 # SteamOS, Debian, Arch, Fedora).
-COMPAT_TARGETS = RUNTIMES + ['windows', 'host']
+COMPAT_TARGETS = RUNTIMES + [
+    'sniper-arm64',
+    'steamrt4-arm64',
+    'windows',
+    'host',
+]
 
 # Keys treated as "Enter" by GTK
 ENTER_KEYS = [
@@ -316,14 +326,19 @@ class ContainerRuntime(Runtime):
 
     def _runtime_version(self):
         # type: (...) -> typing.Any
-        if self.provides.startswith('steamrt'):
-            return int(self.provides[len('steamrt'):])
+        if self.provides.endswith('-arm64'):
+            provides = self.provides[:-len('-arm64')]
+        else:
+            provides = self.provides
+
+        if provides.startswith('steamrt'):
+            return int(provides[len('steamrt'):])
 
         return {
             'scout': 1,
             'soldier': 2,
             'sniper': 3,
-        }.get(self.provides, 0)
+        }.get(provides, 0)
 
 
 class ContainerRuntimeDepot(ContainerRuntime):
@@ -392,6 +407,10 @@ class ContainerRuntimeDepot(ContainerRuntime):
 
         if platform[0]:
             self.provides = platform[0]
+
+            if self.path.endswith('-arm64'):
+                self.provides = self.provides + '-arm64'
+
             return platform[0] + ' ' + (depot_version or platform[1])
 
         return '(unknown)'
@@ -1013,17 +1032,43 @@ class Gui:
             )
 
         for target in RUNTIMES:
+            if target.startswith('steamrt'):
+                major_version = target[len('steamrt'):]
+            else:
+                assert target in MAJOR_VERSIONS, target
+                major_version = MAJOR_VERSIONS[target]
+
             if (
                 len(command_argv) > 2
                 and command_argv[0].endswith((
+                    '/SteamLinuxRuntime_%s/run' % major_version,
+                    '/SteamLinuxRuntime_%s-arm64/run' % major_version,
                     '/SteamLinuxRuntime_%s/run' % target,
+                    '/SteamLinuxRuntime_%s-arm64/run' % target,
                     '/SteamLinuxRuntime_%s/run-in-%s' % (target, target),
+                    '/SteamLinuxRuntime_%s/run-in-%s' % (
+                        major_version, target,
+                    ),
+                    '/SteamLinuxRuntime_%s/_v2-entry-point' % major_version,
+                    '/SteamLinuxRuntime_%s-arm64/_v2-entry-point' % (
+                        major_version,
+                    ),
                     '/SteamLinuxRuntime_%s/_v2-entry-point' % target,
+                    '/SteamLinuxRuntime_%s-arm64/_v2-entry-point' % target,
                 ))
                 and '--' in command_argv[:-1]
             ):
+                if command_argv[0].endswith((
+                    '-arm64/run',
+                    '-arm64/run-in-%s' % target,
+                    '-arm64/_v2-entry-point',
+                )):
+                    arch_suffix = '-arm64'
+                else:
+                    arch_suffix = ''
+
                 if args.compatible_with == 'auto':
-                    self.app.runs_on = target
+                    self.app.runs_on = target + arch_suffix
 
                 runtime_args = []       # type: typing.List[str]
 
@@ -1039,11 +1084,15 @@ class Gui:
                     home=self.home,
                     argv=runtime_args,
                 )
-                runtime.provides = target
+                runtime.provides = target + arch_suffix
                 self.default_container_runtime = runtime
                 self.default_pressure_vessel = runtime.pressure_vessel
 
-                logger.debug('Detected SLR: %s', to_shell(runtime_args))
+                logger.debug(
+                    'Detected SLR: %s (compatible with %s)',
+                    to_shell(runtime_args),
+                    runtime.provides,
+                )
                 logger.debug(
                     'Remaining arguments: %s', to_shell(command_argv),
                 )
@@ -1181,7 +1230,10 @@ class Gui:
                         argv=[exe, '--'],
                     )
                     logger.debug(
-                        'Discovered container runtime depot: %s', path,
+                        ('Discovered container runtime depot: %s'
+                         ' (compatible with %s)'),
+                        path,
+                        container_runtime.provides or '<unknown>',
                     )
                     logger.debug(
                         'Arguments: %s', to_shell(container_runtime.argv),

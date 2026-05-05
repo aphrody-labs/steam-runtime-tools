@@ -54,22 +54,23 @@
 #include "utils.h"
 #include "wrap-interactive.h"
 
+#define DEFAULT_TERMINATE_TIMEOUT 2.0
+
 static const char * const *global_envp = NULL;
 static GPtrArray *global_ld_so_conf_entries = NULL;
 static SrtProcessManagerOptions *global_options = NULL;
 static gboolean opt_clear_env = FALSE;
 static gboolean opt_create = FALSE;
 static SrtEmulator *opt_emulator = NULL;
-static gboolean opt_exit_with_parent = FALSE;
 static gboolean opt_generate_locales = FALSE;
 static GQuark opt_ldconfig_architecture = SRT_ARCHITECTURE_QUARK_NONE;
 static gchar *opt_overrides = NULL;
 static gchar *opt_prefix = NULL;
 static gchar *opt_regenerate_ld_so_cache = NULL;
 static gchar *opt_set_ld_library_path = NULL;
-static gboolean opt_subreaper = FALSE;
 static double opt_terminate_idle_timeout = 0.0;
-static double opt_terminate_timeout = -1.0;
+static double opt_terminate_timeout = DEFAULT_TERMINATE_TIMEOUT;
+static gboolean opt_terminate_with_main = FALSE;
 static gboolean opt_verbose = FALSE;
 static gboolean opt_version = FALSE;
 static gboolean opt_wait = FALSE;
@@ -522,6 +523,16 @@ generate_locales (SrtSubprocessRunner *runner,
   return TRUE;
 }
 
+static gboolean
+opt_ignored_cb (const char *option_name,
+                const char *value,
+                void *data,
+                GError **error)
+{
+  g_warning ("%s is deprecated and no longer has any effect", option_name);
+  return TRUE;
+}
+
 static GOptionEntry options[] =
 {
   { "assign-fd", '\0',
@@ -555,14 +566,8 @@ static GOptionEntry options[] =
     "JSONFILE" },
 
   { "exit-with-parent", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_exit_with_parent,
-    "Terminate child process and self with SIGTERM when parent process "
-    "exits.",
-    NULL },
-  { "no-exit-with-parent", '\0',
-    G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &opt_exit_with_parent,
-    "Don't do anything special when parent process exits [default].",
-    NULL },
+    G_OPTION_FLAG_HIDDEN | G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK,
+    opt_ignored_cb, NULL, NULL },
 
   { "generate-locales", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_generate_locales,
@@ -645,26 +650,32 @@ static GOptionEntry options[] =
     "PATH" },
 
   { "subreaper", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_subreaper,
-    "Do not exit until all descendant processes have exited.",
+    G_OPTION_FLAG_HIDDEN | G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK,
+    opt_ignored_cb, NULL, NULL },
+
+  { "terminate-with-main", '\0',
+    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_terminate_with_main,
+    "When the main COMMAND exits, terminate other descendant processes.",
     NULL },
-  { "no-subreaper", '\0',
-    G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &opt_subreaper,
-    "Only wait for a direct child process [default].",
+  { "no-terminate-with-main", '\0',
+    G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &opt_terminate_with_main,
+    "When the main COMMAND exits, other descendants may continue to run "
+    "[default].",
     NULL },
 
   { "terminate-idle-timeout", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_DOUBLE, &opt_terminate_idle_timeout,
-    "If --terminate-timeout is used, wait this many seconds before "
-    "sending SIGTERM. [default: 0.0]",
+    "When terminating descendant processes, "
+    "wait this many seconds before sending the first signal. "
+    "[Default: 0.0]",
     "SECONDS" },
   { "terminate-timeout", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_DOUBLE, &opt_terminate_timeout,
-    "Send SIGTERM and SIGCONT to descendant processes that didn't "
-    "exit within --terminate-idle-timeout. If they don't all exit within "
-    "this many seconds, send SIGKILL and SIGCONT to survivors. If 0.0, "
-    "skip SIGTERM and use SIGKILL immediately. Implies --subreaper. "
-    "[Default: -1.0, meaning don't signal].",
+    "When terminating descendant processes, "
+    "send SIGTERM and SIGCONT, "
+    "then wait this many seconds before sending SIGKILL and SIGCONT. "
+    "If 0.0, skip SIGTERM and use SIGKILL immediately. "
+    "[Default: " G_STRINGIFY (DEFAULT_TERMINATE_TIMEOUT) "]",
     "SECONDS" },
 
   { "verbose", '\0',
@@ -731,7 +742,7 @@ main (int argc,
 
   context = g_option_context_new (
       "COMMAND [ARG...]\n"
-      "Run COMMAND [ARG...] with a lock held, a subreaper, or similar.\n");
+      "Run COMMAND [ARG...] under a subreaper, optionally holding locks etc.\n");
 
   g_option_context_add_main_entries (context, options, NULL);
 
@@ -806,11 +817,11 @@ main (int argc,
 
   process_manager_options.close_fds = TRUE;
   process_manager_options.dump_parameters = TRUE;
-  process_manager_options.exit_with_parent = !!opt_exit_with_parent;
+  process_manager_options.exit_with_parent = TRUE;
   process_manager_options.forward_signals = TRUE;
-  process_manager_options.terminate_with_main = (opt_terminate_timeout >= 0.0);
-  process_manager_options.subreaper = (opt_subreaper
-                                       || process_manager_options.terminate_with_main);
+  process_manager_options.terminate_when_signaled = TRUE;
+  process_manager_options.terminate_with_main = !!opt_terminate_with_main;
+  process_manager_options.subreaper = TRUE;
 
   if (opt_terminate_idle_timeout > 0.0)
     process_manager_options.terminate_wait_usec = opt_terminate_idle_timeout * G_TIME_SPAN_SECOND;

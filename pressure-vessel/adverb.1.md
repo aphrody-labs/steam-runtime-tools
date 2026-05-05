@@ -30,7 +30,6 @@ pv-adverb - wrap processes in various ways
 [[**--add-ld.so-path** *PATH*...]
 **--regenerate-ld.so-cache** *PATH*]
 [**--set-ld-library-path** *VALUE*]
-[**--subreaper**]
 [**--terminate-timeout** *SECONDS* [**--terminate-idle-timeout** *SECONDS*]]
 [**--unset-env** *VAR*]
 [[**--[no-]create**]
@@ -43,11 +42,24 @@ pv-adverb - wrap processes in various ways
 
 # DESCRIPTION
 
-**pv-adverb** runs *COMMAND* as a child process, with
-modifications to its execution environment as determined by the options.
+**pv-adverb** acts as the top-level process inside a Steam Linux Runtime
+container
+(the direct child of **bwrap**(1))
+with any other processes that will run inside the container,
+for example a game or an interactive shell,
+as its children.
+This means that it can supervise those processes and alter their execution
+environment.
 
-By default, it just runs *COMMAND* as a child process and reports its
-exit status.
+**pv-adverb** acts as a subreaper.
+This means that if the *COMMAND* starts background processes,
+they will be reparented to **pv-adverb** instead of to **init**
+when their parent process exits.
+
+All file descriptors inherited by **pv-adverb** are closed,
+unless marked with **--assign-fd** or **--pass-fd** to be inherited
+by the child,
+or with options such as **--fd** to be held open by **pv-adverb** itself.
 
 # OPTIONS
 
@@ -300,19 +312,6 @@ but before executing *COMMAND*.
 </dd>
 <dt>
 
-**--subreaper**
-
-</dt><dd>
-
-If the *COMMAND* starts background processes, arrange for them to
-be reparented to **pv-adverb** instead of to **init**
-when their parent process exits, and do not exit until all such
-descendant processes have exited.
-A non-negative **--terminate-timeout** implies this option.
-
-</dd>
-<dt>
-
 **--terminate-idle-timeout** *SECONDS*
 
 </dt><dd>
@@ -332,7 +331,7 @@ This option is ignored if **--terminate-timeout** is not used.
 </dt><dd>
 
 If non-negative, terminate background processes after the *COMMAND*
-exits. This implies **--subreaper**.
+exits.
 Non-integer decimal values are allowed.
 When this option is enabled, after *COMMAND* exits,
 **pv-adverb** will wait for up to the time specified
@@ -491,7 +490,6 @@ When running a game in a container as a single command,
         --exit-with-parent \
         --generate-locales \
         --lock-file=/path/to/runtime/.ref \
-        --subreaper \
         -- \
     /path/to/game ...
 
@@ -508,7 +506,6 @@ more like this:
         --exit-with-parent \
         --generate-locales \
         --lock-file=/path/to/runtime/.ref \
-        --subreaper \
         --terminate-timeout=10 \
         -- \
     /path/to/steam-runtime-launcher-service ...

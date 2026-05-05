@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260505.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260505.0) steamrt; urgency=medium
 
   * pressure-vessel:
     - When pv-adverb receives SIGINT, SIGTERM or SIGQUIT, or when its
@@ -15,7 +15,7 @@ steam-runtime-tools (0.20260505.0) UNRELEASED; urgency=medium
       the new namespace. (Note that this is an experimental feature that
       does not yet interact well with Steam.)
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 05 May 2026 12:37:10 +0100
+ -- Simon McVittie <smcv@collabora.com>  Tue, 05 May 2026 14:13:41 +0100
 
 steam-runtime-tools (0.20260430.0) steamrt; urgency=medium
 

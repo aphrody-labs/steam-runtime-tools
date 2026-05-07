@@ -42,7 +42,11 @@ _build/
     # Non-Meson-managed
     cache/                      Download cache for populate-depot.py
     containers/                 Container images for testing
+        scout/files/            scout /usr for builds
         scout_sysroot/          scout sysroot for builds
+        scout_sysroot_usrmerge/ scout sysroot for builds, /usr-merged
+        soldier/files/          soldier /usr for builds
+        soldier_sysroot/        soldier sysroot for builds
     host-artifacts/             Additional test logs
     scout-DESTDIR/              Staging directory for scout builds
     scout-layered/              Staging directory for scout-on-soldier

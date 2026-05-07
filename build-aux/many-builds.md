@@ -163,6 +163,15 @@ so you do not strictly need `gcc-i686-linux-gnu`.
     a symbolic link such as `_build -> ../builds/steam-runtime-tools`
     if a separate build location is desired, and then use the default.
 
+**--cross**
+:   Install additional cross-architecture things.
+    Currently this controls whether relocatable pressure-vessel bundles
+    for arm64 are created:
+    this needs to run several extra `ninja install` steps,
+    and needs to download and install `qemu-user`,
+    so by default it is not done to speed up iteration on
+    non-architecture-specific features and bug fixes.
+
 **--bwrap**
 :   Use **bwrap**(1) to do builds.
     This is the default if Podman is not found in the `PATH`.

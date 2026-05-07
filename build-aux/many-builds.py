@@ -48,9 +48,11 @@ _build/
         soldier/files/          soldier /usr for builds
         soldier_sysroot/        soldier sysroot for builds
     host-artifacts/             Additional test logs
+    pv-steamrt3c-*/             Staging directory for relocatable steamrt3c builds
     scout-DESTDIR/              Staging directory for scout builds
     scout-layered/              Staging directory for scout-on-soldier
     scout-relocatable/          Staging directory for relocatable scout builds
+    steamrt3c-DESTDIR-*/        Staging directory for steamrt3c builds
 
     # Special-purpose meson/ninja build directories
     # (not built by default)
@@ -78,6 +80,11 @@ from typing import Dict, List, Sequence, Union
 
 logger = logging.getLogger('many-builds')
 
+ARCH_TO_TUPLE = {
+    'amd64': 'x86_64-linux-gnu',
+    'arm64': 'aarch64-linux-gnu',
+    'i386': 'i386-linux-gnu',
+}
 SYSROOT_TAR = (
     'com.valvesoftware.SteamRuntime.Sdk-amd64,i386-{}-sysroot.tar.gz'
 )
@@ -107,6 +114,7 @@ class Environment:
         self,
         builddir_parent: Union[str, os.PathLike] = '_build',
         bwrap: bool = False,
+        cross: bool = False,
         docker: bool = False,
         podman: bool = False,
         srcdir: Union[str, os.PathLike] = '.',
@@ -126,6 +134,7 @@ class Environment:
         self.abs_builddir_parent = self.builddir_parent.resolve()
 
         self.bwrap = bwrap
+        self.cross = cross
         self.podman = podman
 
         if docker:
@@ -659,6 +668,139 @@ class Environment:
         )
 
     def install(self, args: List[str]) -> None:
+        if self.oci_run_argv:
+            suite = 'steamrt3c'
+            details = self.suites[suite]
+
+            for comma_archs in ('amd64,i386', 'arm64', 'arm64,amd64,i386'):
+                archs = comma_archs.split(',')
+                destdir = (
+                    self.abs_builddir_parent
+                    / f'{suite}-DESTDIR-{comma_archs}'
+                )
+
+                with suppress(FileNotFoundError):
+                    shutil.rmtree(destdir)
+
+                # True if we can run all of the architectures natively
+                can_run = True
+
+                # We install the last architecture first, so that the main
+                # architecture is installed last, overwriting shared binaries
+                # like bin/pv-verify with those from the "main" architecture.
+                for arch in reversed(archs):
+                    if arch == 'arm64':
+                        build_arch = 'amd64'
+                        host_arch = arch
+                        can_run = False
+                    else:
+                        build_arch = host_arch = ''
+
+                    self.run_in_suite(
+                        suite,
+                        [
+                            'env',
+                            f'DESTDIR={destdir}',
+                            'ninja',
+                            '-C',
+                            str(self.abs_builddir_parent / f'{suite}-{arch}'),
+                            'install',
+                        ],
+                        build_arch=build_arch,
+                        host_arch=host_arch,
+                    )
+
+                relocatable = (
+                    self.abs_builddir_parent
+                    / f'pv-{suite}-{comma_archs}'
+                )
+
+                with suppress(FileNotFoundError):
+                    shutil.rmtree(relocatable)
+
+                comma_tuples = ','.join(
+                    ARCH_TO_TUPLE[a] for a in comma_archs.split(',')
+                )
+                argv = [
+                    str(
+                        self.abs_srcdir
+                        / 'pressure-vessel'
+                        / 'build-relocatable-install.py'
+                    ),
+                    '--allow-missing-sources',
+                    f'--archive={self.abs_builddir_parent}',
+                    f'--architecture-multiarch={comma_tuples}',
+                    f'--architecture-name={comma_archs}',
+                    '--cache=' + str(self.abs_builddir_parent / 'cache'),
+                    f'--destdir={destdir}',
+                    '--no-archive-versions',
+                    f'--output={relocatable}',
+                ]
+
+                if not can_run:
+                    # The steamrt3c SDK doesn't currently contain qemu-user,
+                    # which we need to be able to run
+                    # aarch64-linux-gnu-capsule-capture-libs and collect
+                    # arm64 dependencies, and installing it could take a while.
+                    # Skip this step by default, and if enabled, install
+                    # qemu-user before proceeding.
+                    if not self.cross:
+                        continue
+
+                    argv = [
+                        'sh',
+                        '-euc',
+                        ('apt-get -y update; '
+                         'apt-get -y --no-install-recommends install '
+                         'qemu-user; '
+                         'exec "$@"'),
+                        'sh',
+                    ] + argv
+
+                build_arch = host_arch = ''
+
+                for arch in archs:
+                    # The main SDK is for amd64 and supports i386,
+                    # but in cross-architecture use cases we might need
+                    # a cross-SDK.
+                    if arch not in ('amd64', 'i386'):
+                        build_arch = 'amd64'
+
+                        if host_arch != arch:
+                            # Can't happen right now, but if we added
+                            # another architecture (riscv64 or something)
+                            # we could conceivably find ourselves needing an
+                            # arm64-riscv64-on-amd64 SDK, and run_in_suite()
+                            # can't currently handle that.
+                            raise AssertionError(
+                                f'We need a SDK supporting both {arch} and '
+                                f'{host_arch}'
+                            )
+
+                        host_arch = arch
+
+                self.run_in_suite(
+                    suite,
+                    argv,
+                    build_arch=build_arch,
+                    check=True,
+                    host_arch=host_arch,
+                )
+
+                if can_run:
+                    subprocess.run(
+                        [
+                            str(
+                                self.abs_srcdir
+                                / 'tests'
+                                / 'pressure-vessel'
+                                / 'relocatable-install.py'
+                            ),
+                            str(relocatable),
+                        ],
+                        check=True,
+                    )
+
         self.run_scout_builds('install', args)
 
         subprocess.run(
@@ -710,6 +852,10 @@ def main() -> int:
         help='Use SDK tarball via bubblewrap',
     )
     parser.add_argument(
+        '--cross', action='store_true', default=False,
+        help='Install cross-architecture things, even if it could be slow',
+    )
+    parser.add_argument(
         '--docker', action='store_true', default=False,
         help='Use SDK OCI image via Docker',
     )
@@ -736,6 +882,7 @@ def main() -> int:
     env = Environment(
         builddir_parent=args.builddir_parent,
         bwrap=args.bwrap,
+        cross=args.cross,
         docker=args.docker,
         podman=args.podman,
         srcdir=args.srcdir,

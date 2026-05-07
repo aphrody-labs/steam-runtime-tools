@@ -74,7 +74,7 @@ logger = logging.getLogger('populate-depot')
 
 
 DEFAULT_IMAGES_URI = (
-    'https://repo.steampowered.com/steamrt-images-SUITE/snapshots'
+    'https://repo.steampowered.com/steamrtMAJOR/images'
 )
 
 SUITES = {
@@ -123,6 +123,13 @@ class Runtime:
         self.version = version
         self.pinned_version: Optional[str] = None
         self.sha256: Dict[str, str] = {}
+
+        if self.suite.startswith('steamrt'):
+            major = self.suite[len('steamrt'):]
+        else:
+            major = str(SUITES[suite])
+
+        self.major = major
 
         os.makedirs(self.cache, exist_ok=True)
 
@@ -214,7 +221,8 @@ class Runtime:
         version: Optional[str] = None,
     ) -> str:
         suite = self.suite
-        uri = self.images_uri.replace('SUITE', suite)
+        major = self.major
+        uri = self.images_uri.replace('SUITE', suite).replace('MAJOR', major)
         v = version or self.pinned_version or self.version or 'latest'
         return f'{uri}/{v}/{filename}'
 
@@ -225,7 +233,12 @@ class Runtime:
     ) -> str:
         ssh_host = self.ssh_host
         suite = self.suite
-        ssh_path = self.ssh_path.replace('SUITE', suite)
+        major = self.major
+        ssh_path = self.ssh_path.replace(
+            'SUITE', suite,
+        ).replace(
+            'MAJOR', major,
+        )
         v = version or self.pinned_version or self.version or 'latest'
 
         if not ssh_host or not ssh_path:
@@ -2085,6 +2098,7 @@ def main() -> None:
         metavar='URI',
         help=(
             'Download files from the given URI. '
+            '"MAJOR" will be replaced with the major version. '
             '"SUITE" will be replaced with the suite name.'
         ),
     )
@@ -2097,6 +2111,7 @@ def main() -> None:
         '--ssh-path', default='', metavar='PATH',
         help=(
             'Use ssh and rsync to download files from PATH on HOST. '
+            '"MAJOR" will be replaced with the major version. '
             '"SUITE" will be replaced with the suite name.'
         ),
     )

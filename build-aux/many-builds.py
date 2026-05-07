@@ -225,24 +225,22 @@ class Environment:
                 else:
                     version = 'latest-container-runtime-public-beta'
 
-                subprocess.run(
-                    [
-                        self.populate_depot,
-                        '--cache', self.cache,
-                        '--depot', self.containers,
-                        '--include-sdk-sysroot',
-                        '--pressure-vessel-archive', os.path.join(
-                            self.cache, 'pressure-vessel-bin.tar.gz',
-                        ),
-                        '--no-check-steampipe-compatible',
-                        '--no-mtrees',
-                        '--no-versioned-directories',
-                        '--source-dir', empty_depot_template,
-                        f'--version={version}',
-                        suite,
-                    ],
-                    check=True,
-                )
+                argv = [
+                    self.populate_depot,
+                    '--cache', self.cache,
+                    '--depot', self.containers,
+                    '--include-sdk-sysroot',
+                    '--pressure-vessel-archive', os.path.join(
+                        self.cache, 'pressure-vessel-bin.tar.gz',
+                    ),
+                    '--no-check-steampipe-compatible',
+                    '--no-mtrees',
+                    '--no-versioned-directories',
+                    '--source-dir', empty_depot_template,
+                    f'--version={version}',
+                    suite,
+                ]
+                subprocess.run(argv, check=True)
 
     def run_in_suite(
         self,

@@ -188,7 +188,7 @@ class Environment:
 
         self.suites: Dict[str, SuiteDetails] = {}
 
-        for suite in ('scout', 'soldier', 'sniper'):
+        for suite in ('scout', 'soldier', 'sniper', 'steamrt3c'):
             self.suites[suite] = SuiteDetails(
                 suite,
                 oci=f'registry.gitlab.steamos.cloud/steamrt/{suite}/sdk:beta',
@@ -196,7 +196,7 @@ class Environment:
                 tests_need_sysroot=(suite in ('scout', 'soldier')),
             )
 
-        for suite in ('steamrt3c', 'steamrt4', 'steamrt5'):
+        for suite in ('steamrt4', 'steamrt5'):
             # Known about, but not built
             self.suites[suite] = SuiteDetails(suite)
 

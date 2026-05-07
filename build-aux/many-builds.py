@@ -134,7 +134,6 @@ class Environment:
             '--platform', 'linux/amd64',
             '-v', '/etc/passwd:/etc/passwd:ro',
             '-v', '/etc/group:/etc/group:ro',
-            '-v', '/etc/resolv.conf:/etc/resolv.conf:ro',
             '--tmpfs', '/tmp',
             '--tmpfs', '/var/tmp',
             '--tmpfs', '/home',

@@ -190,7 +190,7 @@ class Environment:
                 oci=f'registry.gitlab.steamos.cloud/steamrt/{suite}/sdk:beta',
             )
 
-        for suite in ('steamrt4', 'steamrt5'):
+        for suite in ('steamrt3c', 'steamrt4', 'steamrt5'):
             # Known about, but not built
             self.suites[suite] = SuiteDetails(suite)
 
@@ -220,7 +220,7 @@ class Environment:
                 if not details.oci:
                     continue
 
-                if suite == 'scout':
+                if suite in ('scout', 'steamrt3c'):
                     version = 'latest-steam-client-public-beta'
                 else:
                     version = 'latest-container-runtime-public-beta'

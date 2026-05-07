@@ -98,10 +98,17 @@ class Environment:
     def __init__(
         self,
         builddir_parent: Union[str, os.PathLike] = '_build',
+        bwrap: bool = False,
         docker: bool = False,
         podman: bool = False,
         srcdir: Union[str, os.PathLike] = '.',
     ) -> None:
+        if not (bwrap or docker or podman):
+            if shutil.which('podman') is not None:
+                podman = True
+            else:
+                bwrap = True
+
         self.builddir_parent = Path(builddir_parent)
         self.srcdir = Path(srcdir)
 
@@ -110,6 +117,7 @@ class Environment:
         self.abs_srcdir = self.srcdir.resolve()
         self.abs_builddir_parent = self.builddir_parent.resolve()
 
+        self.bwrap = bwrap
         self.podman = podman
 
         if docker:
@@ -567,8 +575,18 @@ class Environment:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('--builddir-parent', default='_build')
-    parser.add_argument('--docker', action='store_true', default=False)
-    parser.add_argument('--podman', action='store_true', default=False)
+    parser.add_argument(
+        '--bwrap', action='store_true', default=False,
+        help='Use SDK tarball via bubblewrap',
+    )
+    parser.add_argument(
+        '--docker', action='store_true', default=False,
+        help='Use SDK OCI image via Docker',
+    )
+    parser.add_argument(
+        '--podman', action='store_true', default=False,
+        help='Use SDK OCI image via podman [default if installed]',
+    )
     parser.add_argument('--srcdir', default='.')
     parser.add_argument(
         'command',
@@ -587,6 +605,7 @@ def main() -> int:
     args = parser.parse_args()
     env = Environment(
         builddir_parent=args.builddir_parent,
+        bwrap=args.bwrap,
         docker=args.docker,
         podman=args.podman,
         srcdir=args.srcdir,

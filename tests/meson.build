@@ -529,7 +529,7 @@ if get_option('libcurl_compat')
   ]
 endif
 
-if get_option('bin') and sdl2_dep.found()
+if get_option('bin') and sdl2_dep.found() and sdl2_ttf_dep.found()
   test_scripts += [
     {'name': 'dialog-ui.py'},
   ]

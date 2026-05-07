@@ -89,9 +89,11 @@ class SuiteDetails:
         suite: str,
         *,
         oci: str = '',
+        tests_need_sysroot: bool = False,
     ) -> None:
         self.suite = suite
         self.oci = oci
+        self.tests_need_sysroot = tests_need_sysroot
 
 
 class Environment:
@@ -188,6 +190,7 @@ class Environment:
             self.suites[suite] = SuiteDetails(
                 suite,
                 oci=f'registry.gitlab.steamos.cloud/steamrt/{suite}/sdk:beta',
+                tests_need_sysroot=(suite in ('scout', 'soldier')),
             )
 
         for suite in ('steamrt3c', 'steamrt4', 'steamrt5'):
@@ -229,7 +232,6 @@ class Environment:
                     self.populate_depot,
                     '--cache', self.cache,
                     '--depot', self.containers,
-                    '--include-sdk-sysroot',
                     '--pressure-vessel-archive', os.path.join(
                         self.cache, 'pressure-vessel-bin.tar.gz',
                     ),
@@ -238,8 +240,12 @@ class Environment:
                     '--no-versioned-directories',
                     '--source-dir', empty_depot_template,
                     f'--version={version}',
-                    suite,
                 ]
+
+                if details.tests_need_sysroot or not self.oci_run_argv:
+                    argv.append('--include-sdk-sysroot')
+
+                argv.append(suite)
                 subprocess.run(argv, check=True)
 
     def run_in_suite(

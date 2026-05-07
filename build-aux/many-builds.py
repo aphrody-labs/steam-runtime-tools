@@ -132,8 +132,6 @@ class Environment:
             '-i',
             '--security-opt', 'label=disable',
             '--platform', 'linux/amd64',
-            '-v', '/etc/passwd:/etc/passwd:ro',
-            '-v', '/etc/group:/etc/group:ro',
             '--tmpfs', '/tmp',
             '--tmpfs', '/var/tmp',
             '--tmpfs', '/home',
@@ -143,6 +141,12 @@ class Environment:
             '-v', '{}:{}'.format(real_builddir, real_builddir),
             '-w', str(self.abs_srcdir),
         ]
+
+        if not self.podman:
+            oci_run_args.extend([
+                '-v', '/etc/passwd:/etc/passwd:ro',
+                '-v', '/etc/group:/etc/group:ro',
+            ])
 
         if sys.stdout.isatty() and sys.stderr.isatty():
             oci_run_args.append('-t')

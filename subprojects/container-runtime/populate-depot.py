@@ -314,6 +314,7 @@ class Runtime:
                     'cat {}'.format(shlex.quote(path)),
                 ], stdout=subprocess.PIPE).stdout.decode('utf-8').strip()
 
+                self.pinned_version = pinned
                 path = self.get_ssh_path(filename='SHA256SUMS')
 
                 sha256sums = subprocess.run([
@@ -328,6 +329,7 @@ class Runtime:
                 with opener.open(uri) as response:
                     pinned = response.read().decode('utf-8').strip()
 
+                self.pinned_version = pinned
                 uri = self.get_uri(filename='SHA256SUMS')
 
                 with opener.open(uri) as response:
@@ -343,7 +345,6 @@ class Runtime:
                 sha256[name] = sha256_bytes.decode('ascii')
 
             self.sha256 = sha256
-            self.pinned_version = pinned
 
         return pinned
 

@@ -73,7 +73,7 @@ import tempfile
 
 from contextlib import suppress
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List, Sequence, Union
 
 
 logger = logging.getLogger('many-builds')
@@ -88,12 +88,16 @@ class SuiteDetails:
         self,
         suite: str,
         *,
+        archs: Sequence[str] = ('amd64',),
         oci: str = '',
+        cross_oci: Dict[str, str] = {},
         tests_need_platform: bool = False,
         tests_need_sysroot: bool = False,
     ) -> None:
         self.suite = suite
+        self.archs = list(archs)
         self.oci = oci
+        self.cross_oci = dict(cross_oci)
         self.tests_need_platform = tests_need_platform
         self.tests_need_sysroot = tests_need_sysroot
 
@@ -189,9 +193,26 @@ class Environment:
         self.suites: Dict[str, SuiteDetails] = {}
 
         for suite in ('scout', 'soldier', 'sniper', 'steamrt3c'):
+            cross_oci: Dict[str, str] = {}
+            registry = 'registry.gitlab.steamos.cloud'
+
+            if suite == 'steamrt3c':
+                archs = ['amd64', 'arm64', 'i386']
+                cross_oci = dict(
+                    arm64=(
+                        f'{registry}/steamrt/{suite}/sdk/arm64-on-amd64:beta'
+                    ),
+                )
+            elif suite == 'scout':
+                archs = ['amd64', 'i386']
+            else:
+                archs = ['amd64']
+
             self.suites[suite] = SuiteDetails(
                 suite,
-                oci=f'registry.gitlab.steamos.cloud/steamrt/{suite}/sdk:beta',
+                oci=f'{registry}/steamrt/{suite}/sdk:beta',
+                archs=archs,
+                cross_oci=cross_oci,
                 tests_need_platform=(suite in ('scout', 'soldier')),
                 tests_need_sysroot=(suite in ('scout', 'soldier')),
             )
@@ -264,11 +285,21 @@ class Environment:
         self,
         suite: str,
         argv: List[str],
-        check: bool = True
+        check: bool = True,
+        build_arch: str = '',
+        host_arch: str = ''
     ) -> None:
         if self.oci_run_argv:
+            if build_arch and host_arch:
+                image = self.suites[suite].oci.replace(
+                    ':',
+                    f'/{host_arch}-on-{build_arch}:',
+                )
+            else:
+                image = self.suites[suite].oci
+
             subprocess.run(
-                self.oci_run_argv + [self.suites[suite].oci] + argv,
+                self.oci_run_argv + [image] + argv,
                 check=check,
             )
         else:
@@ -301,12 +332,15 @@ class Environment:
         self.populate_depots()
 
         for suite, details in self.suites.items():
-            if details.oci:
+            for oci in [details.oci] + list(details.cross_oci.values()):
+                if not oci:
+                    continue
+
                 if self.podman:
-                    subprocess.run(['podman', 'pull', details.oci], check=True)
+                    subprocess.run(['podman', 'pull', oci], check=True)
                 elif self.docker:
                     subprocess.run(
-                        self.docker + ['pull', details.oci],
+                        self.docker + ['pull', oci],
                         check=True,
                     )
 
@@ -315,7 +349,9 @@ class Environment:
         subdir: str,
         args: List[str],
         *,
+        build_arch: str = '',
         check: bool = True,
+        host_arch: str = '',
         in_suite: str = '',
     ) -> None:
         d = self.abs_builddir_parent / subdir
@@ -332,18 +368,34 @@ class Environment:
         ] + maybe_wipe + args
 
         if in_suite:
-            self.run_in_suite(in_suite, argv, check=check)
+            self.run_in_suite(
+                in_suite,
+                argv,
+                build_arch=build_arch,
+                check=check,
+                host_arch=host_arch,
+            )
         else:
             subprocess.run(argv, check=check)
 
     def setup(self, args: List[str]) -> None:
-        dev_build = [
+        common_args = [
+            '-Doptimization=g',
+            '-Dprefix=/usr',
+        ]
+
+        minimal_args = common_args + [
+            '-Dgtk_doc=disabled',
+            '-Dlibcurl_compat=false',
+            '-Dman=disabled',
+            '-Dpressure_vessel=false',
+        ]
+
+        dev_build = common_args + [
             '-Dbin=true',
             # libcurl_compat defaults to false, but for developer builds
             # we want it true so we can get more test coverage
             '-Dlibcurl_compat=true',
-            '-Doptimization=g',
-            '-Dprefix=/usr',
             '-Dpressure_vessel=true',
             '-Dwarning_level=3',
             '-Dwerror=true',
@@ -422,11 +474,44 @@ class Environment:
             if suite == 'scout' or not details.oci:
                 continue
 
-            self.setup_one(
-                f'{suite}-amd64',
-                dev_build + ['-Dwarning_level=2'] + args,
-                in_suite=suite,
-            )
+            for arch in details.archs:
+                build_arch = host_arch = ''
+
+                if arch == 'arm64':
+                    # For now we assume an amd64 build architecture
+                    build_arch = 'amd64'
+                    host_arch = arch
+                    options = minimal_args + [
+                        '-Dmultiarch_tuple=aarch64-linux-gnu',
+                        '-Dpressure_vessel=true',
+                        '--cross-file=aarch64-linux-gnu-gcc.txt',
+                        '--libdir=lib/aarch64-linux-gnu',
+                    ]
+                elif arch == 'i386':
+                    # For now we assume an amd64 build architecture,
+                    # for which i386 is a secondary architecture
+                    # rather than needing a special cross container
+                    options = minimal_args + [
+                        '-Dmultiarch_tuple=i386-linux-gnu',
+                        '--cross-file=i686-linux-gnu-gcc.txt',
+                        '--libdir=lib/i386-linux-gnu',
+                    ]
+                else:
+                    options = dev_build
+
+                # We don't currently support cross-compiling with just bwrap,
+                # only via an expanded OCI image that has both build- and
+                # host-architecture packages
+                if host_arch and not self.oci_run_argv:
+                    continue
+
+                self.setup_one(
+                    f'{suite}-{arch}',
+                    options + ['-Dwarning_level=2'] + args,
+                    build_arch=build_arch,
+                    host_arch=host_arch,
+                    in_suite=suite,
+                )
 
         self.run_scout_builds('setup', args)
 
@@ -455,14 +540,27 @@ class Environment:
             if suite == 'scout' or not details.oci:
                 continue
 
-            self.run_in_suite(
-                suite,
-                [
-                    'ninja',
-                    '-C', str(self.abs_builddir_parent / f'{suite}-amd64'),
-                    'clean',
-                ] + args,
-            )
+            for arch in details.archs:
+                if arch == 'arm64':
+                    build_arch = 'amd64'
+                    host_arch = arch
+                else:
+                    build_arch = host_arch = ''
+
+                if host_arch and not self.oci_run_argv:
+                    continue
+
+                self.run_in_suite(
+                    suite,
+                    [
+                        'ninja',
+                        '-C',
+                        str(self.abs_builddir_parent / f'{suite}-{arch}'),
+                        'clean',
+                    ] + args,
+                    build_arch=build_arch,
+                    host_arch=host_arch,
+                )
 
         self.run_scout_builds('clean', args)
 
@@ -480,13 +578,26 @@ class Environment:
             if suite == 'scout' or not details.oci:
                 continue
 
-            self.run_in_suite(
-                suite,
-                [
-                    'ninja',
-                    '-C', str(self.abs_builddir_parent / f'{suite}-amd64'),
-                ] + args,
-            )
+            for arch in details.archs:
+                if arch == 'arm64':
+                    build_arch = 'amd64'
+                    host_arch = arch
+                else:
+                    build_arch = host_arch = ''
+
+                if host_arch and not self.oci_run_argv:
+                    continue
+
+                self.run_in_suite(
+                    suite,
+                    [
+                        'ninja',
+                        '-C',
+                        str(self.abs_builddir_parent / f'{suite}-{arch}'),
+                    ] + args,
+                    build_arch=build_arch,
+                    host_arch=host_arch,
+                )
 
         self.run_scout_builds('build', args)
 
@@ -503,13 +614,16 @@ class Environment:
             if suite == 'scout' or not details.oci:
                 continue
 
-            self.run_in_suite(
-                suite,
-                [
-                    'meson', 'test',
-                    '-C', str(self.abs_builddir_parent / f'{suite}-amd64'),
-                ] + args,
-            )
+            for arch in details.archs:
+                if arch in ('amd64', 'i386'):
+                    self.run_in_suite(
+                        suite,
+                        [
+                            'meson', 'test',
+                            '-C',
+                            str(self.abs_builddir_parent / f'{suite}-{arch}'),
+                        ] + args,
+                    )
 
         self.run_scout_builds('test', args)
 

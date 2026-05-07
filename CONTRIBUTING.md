@@ -177,6 +177,19 @@ do the build locally instead of using ssh.
         known to the primary architecture's `ldconfig`,
         and foreign architectures that are not.
 
+* When cross-compiling,
+    we use the same terminology as Meson and Debian,
+    originally from GNU projects such as gcc and Autotools:
+
+      - We are compiling on the *build machine*.
+        (Mnemonic: the Build machine is usually Big.)
+
+      - We are emitting binaries for the *host machine*.
+        (Mnemonic: the Host machine might be a Handheld.)
+
+    (Note that this is not the same as CMake,
+    which talks about compiling on a "host" machine for a "target".)
+
 * Be careful when adding dependencies, especially in library code.
 
     - glibc must be assumed to be very old:

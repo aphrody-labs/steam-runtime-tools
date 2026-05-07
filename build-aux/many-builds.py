@@ -73,7 +73,7 @@ import tempfile
 
 from contextlib import suppress
 from pathlib import Path
-from typing import List, Union
+from typing import Dict, List, Union
 
 
 logger = logging.getLogger('many-builds')
@@ -81,6 +81,17 @@ logger = logging.getLogger('many-builds')
 SYSROOT_TAR = (
     'com.valvesoftware.SteamRuntime.Sdk-amd64,i386-{}-sysroot.tar.gz'
 )
+
+
+class SuiteDetails:
+    def __init__(
+        self,
+        suite: str,
+        *,
+        oci: str = '',
+    ) -> None:
+        self.suite = suite
+        self.oci = oci
 
 
 class Environment:
@@ -163,15 +174,17 @@ class Environment:
                 ),
             ])
 
-        self.oci_images = {
-            'scout': 'registry.gitlab.steamos.cloud/steamrt/scout/sdk:beta',
-            'soldier': (
-                'registry.gitlab.steamos.cloud/steamrt/soldier/sdk:beta'
-            ),
-            'sniper': 'registry.gitlab.steamos.cloud/steamrt/sniper/sdk:beta',
-            'steamrt4': '',
-            'steamrt5': '',
-        }
+        self.suites: Dict[str, SuiteDetails] = {}
+
+        for suite in ('scout', 'soldier', 'sniper'):
+            self.suites[suite] = SuiteDetails(
+                suite,
+                oci=f'registry.gitlab.steamos.cloud/steamrt/{suite}/sdk:beta',
+            )
+
+        for suite in ('steamrt4', 'steamrt5'):
+            # Known about, but not built
+            self.suites[suite] = SuiteDetails(suite)
 
         if self.podman:
             self.oci_run_argv = ['podman', 'run'] + oci_run_args
@@ -195,8 +208,8 @@ class Environment:
                 check=True,
             )
 
-            for suite in self.oci_images:
-                if not self.oci_images[suite]:
+            for suite, details in self.suites.items():
+                if not details.oci:
                     continue
 
                 if suite == 'scout':
@@ -231,7 +244,7 @@ class Environment:
     ) -> None:
         if self.oci_run_argv:
             subprocess.run(
-                self.oci_run_argv + [self.oci_images[suite]] + argv,
+                self.oci_run_argv + [self.suites[suite].oci] + argv,
                 check=check,
             )
         else:
@@ -263,12 +276,15 @@ class Environment:
     def deps(self, args: List[str]) -> None:
         self.populate_depots()
 
-        for suite, image in self.oci_images.items():
-            if image:
+        for suite, details in self.suites.items():
+            if details.oci:
                 if self.podman:
-                    subprocess.run(['podman', 'pull', image], check=True)
+                    subprocess.run(['podman', 'pull', details.oci], check=True)
                 elif self.docker:
-                    subprocess.run(self.docker + ['pull', image], check=True)
+                    subprocess.run(
+                        self.docker + ['pull', details.oci],
+                        check=True,
+                    )
 
     def setup_one(
         self,
@@ -378,8 +394,8 @@ class Environment:
             ] + args,
         )
 
-        for suite, image in self.oci_images.items():
-            if suite == 'scout' or not image:
+        for suite, details in self.suites.items():
+            if suite == 'scout' or not details.oci:
                 continue
 
             self.setup_one(
@@ -411,8 +427,8 @@ class Environment:
                 check=False,
             )
 
-        for suite, image in self.oci_images.items():
-            if suite == 'scout' or not image:
+        for suite, details in self.suites.items():
+            if suite == 'scout' or not details.oci:
                 continue
 
             self.run_in_suite(
@@ -436,8 +452,8 @@ class Environment:
                 check=True,
             )
 
-        for suite, image in self.oci_images.items():
-            if suite == 'scout' or not image:
+        for suite, details in self.suites.items():
+            if suite == 'scout' or not details.oci:
                 continue
 
             self.run_in_suite(
@@ -459,8 +475,8 @@ class Environment:
             check=True,
         )
 
-        for suite, image in self.oci_images.items():
-            if suite == 'scout' or not image:
+        for suite, details in self.suites.items():
+            if suite == 'scout' or not details.oci:
                 continue
 
             self.run_in_suite(

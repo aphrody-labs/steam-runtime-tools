@@ -457,6 +457,7 @@ class Main:
         add_bin_directory: bool = False,
         architecture: str = 'amd64,i386',
         cache: str = '.cache',
+        check_steampipe_compatible: Optional[bool] = None,
         credential_envs: Sequence[str] = (),
         credential_hosts: Sequence[str] = (),
         depot: str = 'depot',
@@ -524,8 +525,12 @@ class Main:
 
         self.opener = urllib.request.build_opener(*openers)
 
+        if check_steampipe_compatible is None:
+            check_steampipe_compatible = not include_sdk_sysroot
+
         self.add_bin_directory = add_bin_directory
         self.cache = cache
+        self.check_steampipe_compatible = check_steampipe_compatible
         self.default_architecture = architecture
         self.default_suite = suite
         self.default_version = version
@@ -701,7 +706,7 @@ class Main:
         if self.steam_app_id and self.steam_depot_id:
             self.write_steampipe_config()
 
-        if not self.include_sdk_sysroot:
+        if self.check_steampipe_compatible:
             depot = Path(self.depot)
 
             for dir_path, dirs, files in os.walk(
@@ -2115,6 +2120,14 @@ def main() -> None:
             '"MAJOR" will be replaced with the major version. '
             '"SUITE" will be replaced with the suite name.'
         ),
+    )
+
+    parser.add_argument(
+        '--check-steampipe-compatible', action='store_true', default=None,
+    )
+    parser.add_argument(
+        '--no-check-steampipe-compatible',
+        dest='check_steampipe_compatible', action='store_false', default=None,
     )
 
     parser.add_argument(

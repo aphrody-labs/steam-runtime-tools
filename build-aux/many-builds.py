@@ -206,6 +206,7 @@ class Environment:
                         '--pressure-vessel-archive', os.path.join(
                             self.cache, 'pressure-vessel-bin.tar.gz',
                         ),
+                        '--no-check-steampipe-compatible',
                         '--no-mtrees',
                         '--no-versioned-directories',
                         '--source-dir', empty_depot_template,

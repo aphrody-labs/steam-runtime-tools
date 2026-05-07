@@ -89,10 +89,12 @@ class SuiteDetails:
         suite: str,
         *,
         oci: str = '',
+        tests_need_platform: bool = False,
         tests_need_sysroot: bool = False,
     ) -> None:
         self.suite = suite
         self.oci = oci
+        self.tests_need_platform = tests_need_platform
         self.tests_need_sysroot = tests_need_sysroot
 
 
@@ -190,6 +192,7 @@ class Environment:
             self.suites[suite] = SuiteDetails(
                 suite,
                 oci=f'registry.gitlab.steamos.cloud/steamrt/{suite}/sdk:beta',
+                tests_need_platform=(suite in ('scout', 'soldier')),
                 tests_need_sysroot=(suite in ('scout', 'soldier')),
             )
 
@@ -221,6 +224,15 @@ class Environment:
 
             for suite, details in self.suites.items():
                 if not details.oci:
+                    continue
+
+                if (
+                    self.oci_run_argv
+                    and not (
+                        details.tests_need_platform
+                        or details.tests_need_sysroot
+                    )
+                ):
                     continue
 
                 if suite in ('scout', 'steamrt3c'):

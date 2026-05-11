@@ -35,9 +35,9 @@ _build/
     clang/                      Build for host system with clang
     host/                       Build for host system, with pressure-vessel
     scout-i386/                 Build for scout, i386
-    scout-x86_64/               Build for scout, x86_64, with pressure-vessel
-    soldier-x86_64/             Build for soldier, x86_64, with pressure-vessel
-    sniper-x86_64/              Build for sniper, x86_64, with pressure-vessel
+    scout-amd64/                Build for scout, x86_64, with pressure-vessel
+    soldier-amd64/              Build for soldier, x86_64, with pressure-vessel
+    sniper-amd64/               Build for sniper, x86_64, with pressure-vessel
 
     # Non-Meson-managed
     cache/                      Download cache for populate-depot.py
@@ -407,7 +407,7 @@ class Environment:
                 continue
 
             self.setup_one(
-                f'{suite}-x86_64',
+                f'{suite}-amd64',
                 dev_build + ['-Dwarning_level=2'] + args,
                 in_suite=suite,
             )
@@ -443,7 +443,7 @@ class Environment:
                 suite,
                 [
                     'ninja',
-                    '-C', str(self.abs_builddir_parent / f'{suite}-x86_64'),
+                    '-C', str(self.abs_builddir_parent / f'{suite}-amd64'),
                     'clean',
                 ] + args,
             )
@@ -468,7 +468,7 @@ class Environment:
                 suite,
                 [
                     'ninja',
-                    '-C', str(self.abs_builddir_parent / f'{suite}-x86_64'),
+                    '-C', str(self.abs_builddir_parent / f'{suite}-amd64'),
                 ] + args,
             )
 
@@ -491,7 +491,7 @@ class Environment:
                 suite,
                 [
                     'meson', 'test',
-                    '-C', str(self.abs_builddir_parent / f'{suite}-x86_64'),
+                    '-C', str(self.abs_builddir_parent / f'{suite}-amd64'),
                 ] + args,
             )
 

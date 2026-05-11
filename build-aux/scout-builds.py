@@ -83,7 +83,7 @@ def setup(args):
 
     setup_one(
         args,
-        'scout-x86_64',
+        'scout-amd64',
         common_options + [
             '-Dpressure_vessel=true',
             '--native-file=build-aux/meson/scout.txt',
@@ -105,7 +105,7 @@ def setup(args):
 def clean(args):
     # type: (typing.Any) -> None
 
-    for arch in ('i386', 'x86_64'):
+    for arch in ('i386', 'amd64'):
         subprocess.check_call(
             [
                 'ninja',
@@ -119,7 +119,7 @@ def clean(args):
 def build(args):
     # type: (typing.Any) -> None
 
-    for arch in ('i386', 'x86_64'):
+    for arch in ('i386', 'amd64'):
         subprocess.check_call(
             [
                 'ninja',
@@ -132,7 +132,7 @@ def build(args):
 def test(args):
     # type: (typing.Any) -> None
 
-    for arch in ('i386', 'x86_64'):
+    for arch in ('i386', 'amd64'):
         subprocess.check_call(
             [
                 'meson',
@@ -155,7 +155,7 @@ def install(args):
         if e.errno != errno.ENOENT:
             raise
 
-    for arch in ('i386', 'x86_64'):
+    for arch in ('i386', 'amd64'):
         subprocess.check_call(
             [
                 'env',

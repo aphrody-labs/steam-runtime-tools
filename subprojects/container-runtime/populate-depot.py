@@ -74,7 +74,7 @@ logger = logging.getLogger('populate-depot')
 
 
 DEFAULT_IMAGES_URI = (
-    'https://repo.steampowered.com/steamrt-images-SUITE/snapshots'
+    'https://repo.steampowered.com/steamrtMAJOR/images'
 )
 
 SUITES = {
@@ -123,6 +123,13 @@ class Runtime:
         self.version = version
         self.pinned_version: Optional[str] = None
         self.sha256: Dict[str, str] = {}
+
+        if self.suite.startswith('steamrt'):
+            major = self.suite[len('steamrt'):]
+        else:
+            major = str(SUITES[suite])
+
+        self.major = major
 
         os.makedirs(self.cache, exist_ok=True)
 
@@ -214,7 +221,8 @@ class Runtime:
         version: Optional[str] = None,
     ) -> str:
         suite = self.suite
-        uri = self.images_uri.replace('SUITE', suite)
+        major = self.major
+        uri = self.images_uri.replace('SUITE', suite).replace('MAJOR', major)
         v = version or self.pinned_version or self.version or 'latest'
         return f'{uri}/{v}/{filename}'
 
@@ -225,7 +233,12 @@ class Runtime:
     ) -> str:
         ssh_host = self.ssh_host
         suite = self.suite
-        ssh_path = self.ssh_path.replace('SUITE', suite)
+        major = self.major
+        ssh_path = self.ssh_path.replace(
+            'SUITE', suite,
+        ).replace(
+            'MAJOR', major,
+        )
         v = version or self.pinned_version or self.version or 'latest'
 
         if not ssh_host or not ssh_path:
@@ -301,6 +314,7 @@ class Runtime:
                     'cat {}'.format(shlex.quote(path)),
                 ], stdout=subprocess.PIPE).stdout.decode('utf-8').strip()
 
+                self.pinned_version = pinned
                 path = self.get_ssh_path(filename='SHA256SUMS')
 
                 sha256sums = subprocess.run([
@@ -315,6 +329,7 @@ class Runtime:
                 with opener.open(uri) as response:
                     pinned = response.read().decode('utf-8').strip()
 
+                self.pinned_version = pinned
                 uri = self.get_uri(filename='SHA256SUMS')
 
                 with opener.open(uri) as response:
@@ -330,7 +345,6 @@ class Runtime:
                 sha256[name] = sha256_bytes.decode('ascii')
 
             self.sha256 = sha256
-            self.pinned_version = pinned
 
         return pinned
 
@@ -443,6 +457,7 @@ class Main:
         add_bin_directory: bool = False,
         architecture: str = 'amd64,i386',
         cache: str = '.cache',
+        check_steampipe_compatible: Optional[bool] = None,
         credential_envs: Sequence[str] = (),
         credential_hosts: Sequence[str] = (),
         depot: str = 'depot',
@@ -510,8 +525,12 @@ class Main:
 
         self.opener = urllib.request.build_opener(*openers)
 
+        if check_steampipe_compatible is None:
+            check_steampipe_compatible = not include_sdk_sysroot
+
         self.add_bin_directory = add_bin_directory
         self.cache = cache
+        self.check_steampipe_compatible = check_steampipe_compatible
         self.default_architecture = architecture
         self.default_suite = suite
         self.default_version = version
@@ -687,7 +706,7 @@ class Main:
         if self.steam_app_id and self.steam_depot_id:
             self.write_steampipe_config()
 
-        if not self.include_sdk_sysroot:
+        if self.check_steampipe_compatible:
             depot = Path(self.depot)
 
             for dir_path, dirs, files in os.walk(
@@ -2085,6 +2104,7 @@ def main() -> None:
         metavar='URI',
         help=(
             'Download files from the given URI. '
+            '"MAJOR" will be replaced with the major version. '
             '"SUITE" will be replaced with the suite name.'
         ),
     )
@@ -2097,8 +2117,17 @@ def main() -> None:
         '--ssh-path', default='', metavar='PATH',
         help=(
             'Use ssh and rsync to download files from PATH on HOST. '
+            '"MAJOR" will be replaced with the major version. '
             '"SUITE" will be replaced with the suite name.'
         ),
+    )
+
+    parser.add_argument(
+        '--check-steampipe-compatible', action='store_true', default=None,
+    )
+    parser.add_argument(
+        '--no-check-steampipe-compatible',
+        dest='check_steampipe_compatible', action='store_false', default=None,
     )
 
     parser.add_argument(

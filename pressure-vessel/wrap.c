@@ -109,7 +109,6 @@ main (int argc,
   SrtLogFlags log_flags;
   PvWrapLogFlags pv_log_flags = PV_WRAP_LOG_FLAGS_NONE;
   SrtSteamCompatFlags compat_flags;
-  PvWorkaroundFlags workarounds;
   const GQuark *tuples;
   gsize n_tuples = 0;
 
@@ -433,9 +432,6 @@ main (int argc,
   pkglibexecdir = _srt_subprocess_runner_get_helpers_path (self->run_in_current_context);
   g_return_val_if_fail (pkglibexecdir != NULL, FALSE);
 
-  workarounds = pv_get_workarounds (self->bwrap_flags,
-                                    _srt_const_strv (self->original_environ));
-
   if (self->options.test)
     {
       ret = 0;
@@ -635,7 +631,7 @@ main (int argc,
                                       _srt_const_strv (self->original_environ),
                                       self->run_in_current_context,
                                       flags,
-                                      workarounds,
+                                      self->workarounds,
                                       error);
 
       if (self->runtime == NULL)
@@ -675,7 +671,9 @@ main (int argc,
 
       if (!pv_wrap_use_host_os (real_root_fd,
                                 self->exports, bwrap_filesystem_arguments,
-                                arbitrary_dirent_order, workarounds, error))
+                                arbitrary_dirent_order,
+                                self->workarounds,
+                                error))
         goto out;
     }
 
@@ -717,7 +715,8 @@ main (int argc,
 
       if (!pv_wrap_use_home (home_mode, self->current_home, private_home,
                              self->exports, bwrap_home_arguments, container_env,
-                             workarounds, error))
+                             self->workarounds,
+                             error))
         goto out;
     }
 
@@ -825,7 +824,7 @@ main (int argc,
            framework_paths->path != NULL;
            framework_paths++)
         {
-          if (workarounds & framework_paths->ignore_if)
+          if (self->workarounds & framework_paths->ignore_if)
             g_warning ("Not sharing %s with container to work around %s",
                        framework_paths->path, framework_paths->bug);
           else
@@ -948,7 +947,8 @@ main (int argc,
       g_warn_if_fail (g_strv_length (exports_bwrap->envp) == 0);
       if (!pv_bwrap_append_adjusted_exports (bwrap, exports_bwrap,
                                              self->current_home,
-                                             interpreter_root, workarounds,
+                                             interpreter_root,
+                                             self->workarounds,
                                              error))
         goto out;
 
@@ -973,7 +973,8 @@ main (int argc,
 
       if (!pv_bwrap_append_adjusted_exports (bwrap, sharing_bwrap,
                                              self->current_home,
-                                             interpreter_root, workarounds,
+                                             interpreter_root,
+                                             self->workarounds,
                                              error))
         goto out;
     }
@@ -1039,7 +1040,7 @@ main (int argc,
    * we get an assertion failure if we try.
    * However, if we're working around a setuid bwrap, we need to keep this
    * around a little bit longer. */
-  if (!(workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID))
+  if (!(self->workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID))
     g_clear_pointer (&container_env, _srt_env_overlay_unref);
 
   if (bwrap != NULL)
@@ -1107,7 +1108,7 @@ main (int argc,
           flatpak_bwrap_add_arg (adverb_argv, adverb_in_container);
         }
 
-      if (workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID)
+      if (self->workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID)
         {
           /* If bwrap is setuid, then it might have filtered some
            * environment variables out of the environment.

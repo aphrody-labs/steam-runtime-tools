@@ -133,6 +133,7 @@ pv_wrap_context_init (PvWrapContext *self)
   self->original_environ = g_get_environ ();
   self->current_home_fd = -1;
   self->bwrap_flags = SRT_BWRAP_FLAGS_NONE;
+  self->workarounds = PV_WORKAROUND_FLAGS_NONE;
 
   pv_wrap_options_init (&self->options);
 
@@ -1427,6 +1428,10 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
 
       g_debug ("OK (%s)", self->bwrap_executable);
     }
+
+  self->workarounds = pv_get_workarounds (self->bwrap_flags,
+                                          _srt_const_strv (self->original_environ));
+
   return TRUE;
 }
 

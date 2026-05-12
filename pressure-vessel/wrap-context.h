@@ -16,6 +16,7 @@
 #include "pressure-vessel/runtime.h"
 
 #include "pressure-vessel/wrap-interactive.h"
+#include "pressure-vessel/utils.h"
 
 typedef struct _PvWrapContext PvWrapContext;
 typedef struct _PvWrapContextClass PvWrapContextClass;
@@ -130,6 +131,7 @@ struct _PvWrapContext
 
   PvWrapOptions options;
 
+  PvWorkaroundFlags workarounds;
   SrtBwrapFlags bwrap_flags;
 
   gboolean is_flatpak_env;

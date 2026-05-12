@@ -34,10 +34,13 @@ _build/
     # (built by default)
     clang/                      Build for host system with clang
     host/                       Build for host system, with pressure-vessel
-    scout-i386/                 Build for scout, i386
     scout-amd64/                Build for scout, x86_64, with pressure-vessel
+    scout-i386/                 Build for scout, i386
     soldier-amd64/              Build for soldier, x86_64, with pressure-vessel
     sniper-amd64/               Build for sniper, x86_64, with pressure-vessel
+    steamrt3c-amd64/            Build for steamrt3c, x86_64, with pressure-vessel
+    steamrt3c-arm64/            Build for steamrt3c, arm64, with pressure-vessel
+    steamrt3c-i386/             Build for steamrt3c, i386
 
     # Non-Meson-managed
     cache/                      Download cache for populate-depot.py

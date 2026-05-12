@@ -701,7 +701,7 @@ main (int argc,
 
       if (!pv_wrap_use_host_os (real_root_fd,
                                 self->exports, bwrap_filesystem_arguments,
-                                arbitrary_dirent_order, error))
+                                arbitrary_dirent_order, workarounds, error))
         goto out;
     }
 
@@ -743,7 +743,7 @@ main (int argc,
 
       if (!pv_wrap_use_home (home_mode, self->current_home, private_home,
                              self->exports, bwrap_home_arguments, container_env,
-                             error))
+                             workarounds, error))
         goto out;
     }
 

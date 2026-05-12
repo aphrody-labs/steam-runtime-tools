@@ -49,6 +49,8 @@ typedef enum
   PV_WORKAROUND_FLAGS_BWRAP_SETUID = (1 << 5),
   /* https://github.com/canonical/steam-snap/issues/397 */
   PV_WORKAROUND_FLAGS_STEAMSNAP_397 = (1 << 6),
+  /* https://github.com/ValveSoftware/steam-for-linux/issues/10571 */
+  PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS = (1 << 7),
   PV_WORKAROUND_FLAGS_NONE = 0
 } PvWorkaroundFlags;
 
@@ -60,6 +62,7 @@ typedef enum
    | PV_WORKAROUND_FLAGS_STEAMSNAP_369 \
    | PV_WORKAROUND_FLAGS_STEAMSNAP_370 \
    | PV_WORKAROUND_FLAGS_STEAMSNAP_397 \
+   | PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS \
    | PV_WORKAROUND_FLAGS_NONE)
 
 PvWorkaroundFlags pv_get_workarounds (SrtBwrapFlags bwrap_flags,

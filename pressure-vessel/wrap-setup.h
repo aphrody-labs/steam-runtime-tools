@@ -36,6 +36,7 @@
 #include "wrap-home.h"
 #include "wrap-openxr.h"
 #include "wrap-pipewire.h"
+#include "utils.h"
 
 gchar *pv_wrap_check_bwrap (SrtSubprocessRunner *runner,
                             gboolean only_prepare,
@@ -55,6 +56,7 @@ gboolean pv_wrap_use_host_os (int root_fd,
                               FlatpakExports *exports,
                               FlatpakBwrap *bwrap,
                               SrtDirentCompareFunc arbitrary_dirent_order,
+                              PvWorkaroundFlags workarounds,
                               GError **error);
 
 gboolean pv_export_root_dirs_like_filesystem_host (int root_fd,

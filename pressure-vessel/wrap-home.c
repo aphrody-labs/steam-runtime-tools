@@ -319,6 +319,7 @@ pv_wrap_use_home (PvHomeMode mode,
                   FlatpakExports *exports,
                   FlatpakBwrap *bwrap_home_arguments,
                   SrtEnvOverlay *container_env,
+                  PvWorkaroundFlags workarounds,
                   GError **error)
 {
   size_t i;
@@ -339,9 +340,18 @@ pv_wrap_use_home (PvHomeMode mode,
                                    real_home);
 
         for (i = 0; i < G_N_ELEMENTS (shared_like_home_absolute); i++)
-          pv_exports_expose_or_log (exports,
-                                    FLATPAK_FILESYSTEM_MODE_READ_WRITE,
-                                    shared_like_home_absolute[i]);
+          {
+            const char *path = shared_like_home_absolute[i];
+
+            if ((workarounds & PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS)
+                && !g_str_equal (path, "/var/tmp"))
+              g_info ("Not sharing %s with container due to limit-shared-dirs",
+                      path);
+            else
+              pv_exports_expose_or_log (exports,
+                                        FLATPAK_FILESYSTEM_MODE_READ_WRITE,
+                                        shared_like_home_absolute[i]);
+          }
 
         for (i = 0; i < G_N_ELEMENTS (shared_like_home_relative); i++)
           {

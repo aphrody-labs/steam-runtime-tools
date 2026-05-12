@@ -67,6 +67,7 @@ typedef struct
   const PayloadCommandTest *payload_command_test;
   PvRuntimeFlags runtime_flags;
   PvAppendPreloadFlags preload_flags;
+  PvWorkaroundFlags workarounds;
 } Config;
 
 typedef struct
@@ -117,6 +118,10 @@ static const Config aarch64_config =
 static const Config x86_config =
 {
   .architectures = x86_archs,
+};
+static const Config limit_shared_dirs_config =
+{
+  .workarounds = PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS,
 };
 
 static int
@@ -2970,6 +2975,7 @@ test_use_home_shared (Fixture *f,
     "run/dbus/",
     "run/gfx/",
     "run/host/",
+    "run/media/",
     "run/pressure-vessel/",
     "run/systemd/",
     "rw/",
@@ -3007,7 +3013,10 @@ test_use_home_shared (Fixture *f,
 
   fixture_populate_dir (f, f->mock_host->fd, paths, G_N_ELEMENTS (paths));
   ret = pv_wrap_use_home (PV_HOME_MODE_SHARED, "/home/user", NULL, exports,
-                          f->bwrap, container_env, &local_error);
+                          f->bwrap,
+                          container_env,
+                          f->config->workarounds,
+                          &local_error);
   g_assert_no_error (local_error);
   g_assert_true (ret);
   flatpak_exports_append_bwrap_args (exports, f->bwrap);
@@ -3025,10 +3034,23 @@ test_use_home_shared (Fixture *f,
 
   /* Various FHS and FHS-adjacent directories go along with the home
    * directory */
-  assert_bwrap_contains (f->bwrap, "--bind", "/home", "/home");
-  assert_bwrap_contains (f->bwrap, "--bind", "/media", "/media");
-  assert_bwrap_contains (f->bwrap, "--bind", "/mnt", "/mnt");
-  assert_bwrap_contains (f->bwrap, "--bind", "/srv", "/srv");
+  if (f->config->workarounds & PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS)
+    {
+      assert_bwrap_does_not_contain (f->bwrap, "/home");
+      assert_bwrap_does_not_contain (f->bwrap, "/media");
+      assert_bwrap_does_not_contain (f->bwrap, "/mnt");
+      assert_bwrap_does_not_contain (f->bwrap, "/run/media");
+      assert_bwrap_does_not_contain (f->bwrap, "/srv");
+    }
+  else
+    {
+      assert_bwrap_contains (f->bwrap, "--bind", "/home", "/home");
+      assert_bwrap_contains (f->bwrap, "--bind", "/media", "/media");
+      assert_bwrap_contains (f->bwrap, "--bind", "/mnt", "/mnt");
+      assert_bwrap_contains (f->bwrap, "--bind", "/run/media", "/run/media");
+      assert_bwrap_contains (f->bwrap, "--bind", "/srv", "/srv");
+    }
+
   assert_bwrap_contains (f->bwrap, "--bind", "/var/tmp", "/var/tmp");
 
   /* Some directories that are commonly symlinks get handled, by
@@ -3063,9 +3085,8 @@ test_use_home_shared (Fixture *f,
   assert_bwrap_does_not_contain (f->bwrap, "/run/pressure-vessel");
   assert_bwrap_does_not_contain (f->bwrap, "/sys");
 
-  /* We would export these if they existed, but they don't */
+  /* We would export this if it existed, but it doesn't */
   assert_bwrap_does_not_contain (f->bwrap, "/opt");
-  assert_bwrap_does_not_contain (f->bwrap, "/run/media");
 
   env_bwrap = flatpak_bwrap_new (flatpak_bwrap_empty_env);
 
@@ -3157,7 +3178,9 @@ test_use_host_os (Fixture *f,
   g_assert_nonnull (f->context->exports);
   fixture_populate_dir (f, f->mock_host->fd, paths, G_N_ELEMENTS (paths));
   ret = pv_wrap_use_host_os (f->mock_host->fd, f->context->exports, f->bwrap,
-                             _srt_dirent_strcmp, &local_error);
+                             _srt_dirent_strcmp,
+                             f->config->workarounds,
+                             &local_error);
   g_assert_no_error (local_error);
   g_assert_true (ret);
   flatpak_exports_append_bwrap_args (f->context->exports, f->bwrap);
@@ -3177,15 +3200,29 @@ test_use_host_os (Fixture *f,
   assert_bwrap_contains (f->bwrap, "--bind", "/tmp", "/tmp");
   assert_bwrap_contains (f->bwrap, "--bind", "/var", "/var");
 
-  /* We do export miscellaneous top-level directories */
-  assert_bwrap_contains (f->bwrap, "--bind", "/games", "/games");
-  assert_bwrap_contains (f->bwrap, "--bind", "/home", "/home");
-  assert_bwrap_contains (f->bwrap, "--bind", "/opt", "/opt");
+  /* We usually do export miscellaneous top-level directories */
+  if (f->config->workarounds & PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS)
+    {
+      assert_bwrap_does_not_contain (f->bwrap, "/games");
+      assert_bwrap_does_not_contain (f->bwrap, "/home");
+      assert_bwrap_does_not_contain (f->bwrap, "/opt");
+    }
+  else
+    {
+      assert_bwrap_contains (f->bwrap, "--bind", "/games", "/games");
+      assert_bwrap_contains (f->bwrap, "--bind", "/home", "/home");
+      assert_bwrap_contains (f->bwrap, "--bind", "/opt", "/opt");
+    }
 
   /* We do export most of the contents of /run, but not /run itself */
   assert_bwrap_contains (f->bwrap, "--bind", "/run/dbus", "/run/dbus");
-  assert_bwrap_contains (f->bwrap, "--bind", "/run/media", "/run/media");
   assert_bwrap_contains (f->bwrap, "--bind", "/run/systemd", "/run/systemd");
+
+  /* /run/media is special-cased as more like /media */
+  if (f->config->workarounds & PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS)
+    assert_bwrap_does_not_contain (f->bwrap, "/run/media");
+  else
+    assert_bwrap_contains (f->bwrap, "--bind", "/run/media", "/run/media");
 
   /* We don't export these in pv_wrap_use_host_os() for various reasons */
   assert_bwrap_does_not_contain (f->bwrap, "/app");
@@ -3276,9 +3313,13 @@ main (int argc,
               setup_ld_preload, test_remap_ld_preload_flatpak_no_runtime, teardown);
   g_test_add ("/supported-archs", Fixture, NULL,
               setup, test_supported_archs, teardown);
-  g_test_add ("/use-home/shared", Fixture, NULL,
+  g_test_add ("/use-home/shared/default", Fixture, &default_config,
               setup, test_use_home_shared, teardown);
-  g_test_add ("/use-host-os", Fixture, NULL,
+  g_test_add ("/use-home/shared/limited", Fixture, &limit_shared_dirs_config,
+              setup, test_use_home_shared, teardown);
+  g_test_add ("/use-host-os/default", Fixture, &default_config,
+              setup, test_use_host_os, teardown);
+  g_test_add ("/use-host-os/limited", Fixture, &limit_shared_dirs_config,
               setup, test_use_host_os, teardown);
 
   g_test_add ("/aarch64/remap-ld-preload", Fixture, &aarch64_config,

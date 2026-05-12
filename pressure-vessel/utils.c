@@ -116,7 +116,7 @@ pv_get_workarounds (SrtBwrapFlags bwrap_flags,
   {
     PvWorkaroundFlags flag;
     /* Arbitrary length, extend as necessary */
-    const char * const names[2];
+    const char * const names[4];
   } workarounds[] =
   {
     { PV_WORKAROUND_FLAGS_ALL, { "all" } },
@@ -127,6 +127,9 @@ pv_get_workarounds (SrtBwrapFlags bwrap_flags,
     { PV_WORKAROUND_FLAGS_STEAMSNAP_370, { "steam-snap#370", "steamsnap370" } },
     { PV_WORKAROUND_FLAGS_STEAMSNAP_397, { "steam-snap#397", "steamsnap397" } },
     { PV_WORKAROUND_FLAGS_BWRAP_SETUID, { "bwrap-setuid" } },
+    { PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS,
+      { "limit-shared-dirs", "limit-shared-directories",
+        "steam-for-linux#10571", "steamforlinux10571" } },
   };
   PvWorkaroundFlags flags = PV_WORKAROUND_FLAGS_NONE;
   const char *value;

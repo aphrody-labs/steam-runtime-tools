@@ -52,9 +52,6 @@ typedef enum
   PV_WORKAROUND_FLAGS_NONE = 0
 } PvWorkaroundFlags;
 
-/* Workarounds for old snapd bugs, no longer used by default */
-#define PV_WORKAROUND_FLAGS_OLD_SNAP \
-
 #define PV_WORKAROUND_FLAGS_ALL \
   (PV_WORKAROUND_FLAGS_BWRAP_NO_PERMS \
    | PV_WORKAROUND_FLAGS_BWRAP_SETUID \

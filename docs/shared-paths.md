@@ -127,6 +127,9 @@ with the game's container:
 * `/boot` is irrelevant to a user-level application.
     It is never shared.
 
+* `/efi` is irrelevant to a user-level application.
+    It is never shared.
+
 * `/root` is irrelevant to a user-level application.
     It is never shared.
 
@@ -231,6 +234,7 @@ the container:
     except for:
     * `/app`
     * `/boot`
+    * `/efi`
     * `/root`
 * `$STEAM_RUNTIME`
 * `$STEAM_RUNTIME_SCOUT`
@@ -392,6 +396,7 @@ This assumes Steam is not running [under Flatpak][].
 ### Non-FHS paths
 
 * `/app`: [never shared][]
+* `/efi`: [never shared][]
 * `/gnu`: [always shared][]
 * `/nix`: [always shared][]
 * `/overrides`: used internally by [the runtime][]

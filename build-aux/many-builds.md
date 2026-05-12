@@ -77,13 +77,28 @@ also install:
 
 * lib32gcc-$(gcc -dumpversion)-dev
 
-By default (when not using the **--docker** or **--podman** options),
-`many-builds.py` also has
-[the same user namespace requirements as Flatpak](https://github.com/flatpak/flatpak/wiki/User-namespace-requirements).
-The same requirements apply to running tests for pressure-vessel.
+If **podman**(1) is available in the `PATH`,
+the default is to use Podman containers and the Steam Runtime SDK
+for all builds.
+This mode can also be explicitly requested with **--podman**,
+and is expected to be the most convenient for users of **podman**(1),
+**toolbox**(1) and **distrobox**(1).
 
-When using **--podman**,
-instead **podman**(1) must be installed.
+If `podman` is not in the `PATH`,
+the default is to use bubblewrap containers.
+This mode can be explicitly requested with **--bwrap**.
+
+It is also possible to use Docker containers for the Steam Runtime SDK
+via the **--docker** option,
+although this is not recommended,
+because it normally requires root-equivalent privileges.
+
+Running tests for pressure-vessel requires running bubblewrap,
+even if the build was done in a Podman or Docker container.
+Any configuration that involves running bubblewrap has
+[the same user namespace requirements as Flatpak](https://github.com/flatpak/flatpak/wiki/User-namespace-requirements).
+The configuration with unprivileged (non-setuid) bubblewrap is strongly
+recommended.
 
 ## Optional packages
 
@@ -148,15 +163,29 @@ so you do not strictly need `gcc-i686-linux-gnu`.
     a symbolic link such as `_build -> ../builds/steam-runtime-tools`
     if a separate build location is desired, and then use the default.
 
+**--cross**
+:   Install additional cross-architecture things.
+    Currently this controls whether relocatable pressure-vessel bundles
+    for arm64 are created:
+    this needs to run several extra `ninja install` steps,
+    and needs to download and install `qemu-user`,
+    so by default it is not done to speed up iteration on
+    non-architecture-specific features and bug fixes.
+
+**--bwrap**
+:   Use **bwrap**(1) to do builds.
+    This is the default if Podman is not found in the `PATH`.
+
 **--docker**
-:   Use **docker**(1) to do builds. The default is to use **bwrap**(1).
+:   Use **docker**(1) to do builds.
     Building with Docker requires that the invoking user is either in
     the `docker` Unix group or able to run **sudo**(8), either of which
     is equivalent to full root privileges, so this mode cannot be used on
     machines where gaining full root privileges would be unacceptable.
 
 **--podman**
-:   Use **podman**(1) to do builds. The default is to use **bwrap**(1).
+:   Use **podman**(1) to do builds.
+    This is the default if Podman is found in the `PATH`.
     Building with Podman requires newuidmap, newgidmap and a uid range
     configured for the current user in /etc/subuid and /etc/subgid:
     see [Troubleshooting](https://github.com/containers/podman/blob/main/troubleshooting.md)
@@ -171,10 +200,12 @@ the necessary Steam Linux Runtime container runtime images to be able
 to test **pressure-vessel-wrap**, and the necessary SDK image to be
 able to compile for Steam Runtime 1 'scout'.
 
-By default, the same SDK sysroot tarball that will be used for testing
-is used for compilation. If the **--docker** or **--podman** options
-are used, the official OCI container for the Steam Runtime 1 SDK will
-be downloaded and used for compilation.
+In the **--podman** or **--docker** mode,
+only the SDK sysroot tarballs that will be used for testing are downloaded,
+and the SDKs used for compilation are in the form of official
+Steam Runtime OCI images for Podman or Docker.
+In the **--bwrap** mode,
+the necessary sysroot tarballs for compilation are also downloaded.
 
 ## setup
 

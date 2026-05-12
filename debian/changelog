@@ -1,11 +1,21 @@
-steam-runtime-tools (0.20260506.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260512.0) UNRELEASED; urgency=medium
 
-  * steam-runtime-launch-options:
-    - Parse command-line correctly for games that run under steamrt4
-      or later
-    - Distinguish between x86 and arm64 runtimes
+  * Developer tools:
+    - steam-runtime-launch-options: Parse command-line correctly for games
+      that run under steamrt4 or later
+    - s-r-launch-options: Distinguish between x86 and arm64 runtimes
+    - populate-depot: Modernize download URL for images
+    - populate-depot: Fix a race condition that could result in a cache miss
+    - many-builds: Use Podman by default, if available
+    - many-builds: Docker/Podman improvements
+    - many-builds: Build pressure-vessel against steamrt3c, not just scout
+      (steamrt/tasks#90)
+    - many-builds: Cross-build pressure-vessel for arm64, and optionally
+      build pressure-vessel-arm64{,+amd64+i386}.tar.gz (steamrt/tasks#823)
+  * tests:
+    - Don't try to test dialog-ui when compiling in steamrt3c
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 06 May 2026 11:38:08 +0100
+ -- Simon McVittie <smcv@collabora.com>  Tue, 12 May 2026 11:24:48 +0100
 
 steam-runtime-tools (0.20260505.0) steamrt; urgency=medium
 

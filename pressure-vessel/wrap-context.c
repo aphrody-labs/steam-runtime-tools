@@ -74,6 +74,7 @@ pv_wrap_options_init (PvWrapOptions *self)
   self->runtime = NULL;
   self->runtime_base = NULL;
   self->share_home = TRISTATE_MAYBE;
+  self->share_root_dirs = TRISTATE_MAYBE;
   self->share_pid = TRUE;
   self->shell = PV_SHELL_NONE;
   self->single_thread = FALSE;
@@ -1431,6 +1432,18 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
 
   self->workarounds = pv_get_workarounds (self->bwrap_flags,
                                           _srt_const_strv (self->original_environ));
+
+  /* Currently we don't implement an individual command-line option
+   * or environment variable for this, so in practice its value will
+   * be MAYBE at this point */
+  if (self->options.share_root_dirs == TRISTATE_MAYBE)
+    {
+      if (self->options.for_steam_client
+          && !(self->workarounds & PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS))
+        self->options.share_root_dirs = TRISTATE_YES;
+      else
+        self->options.share_root_dirs = TRISTATE_NO;
+    }
 
   return TRUE;
 }

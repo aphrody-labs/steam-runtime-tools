@@ -90,6 +90,7 @@ typedef struct
   PvShell shell;
   PvTerminal terminal;
   Tristate share_home;
+  Tristate share_root_dirs;
 
   gboolean batch;
   gboolean copy_runtime;

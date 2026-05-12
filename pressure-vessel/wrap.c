@@ -718,6 +718,18 @@ main (int argc,
                              self->workarounds,
                              error))
         goto out;
+
+      /* If runtime == NULL then we would already have shared the same
+       * root directories, above, in case they're functionally necessary
+       * (for example /opt might contain important libraries). */
+      if (self->options.runtime != NULL
+          && self->options.share_root_dirs == TRISTATE_YES
+          && !pv_export_root_dirs_like_filesystem_host (real_root_fd,
+                                                        self->exports,
+                                                        FLATPAK_FILESYSTEM_MODE_READ_WRITE,
+                                                        arbitrary_dirent_order,
+                                                        error))
+        goto out;
     }
 
   if (!self->options.share_pid)

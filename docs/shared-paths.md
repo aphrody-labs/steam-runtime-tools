@@ -309,13 +309,20 @@ a medium-term temporary directory in the game-specific private home
 directory, such as `~/.var/app/com.steampowered.App1234/.cache/tmp`
 (this is consistent with Flatpak's behaviour).
 
-## Usually not shared
+## <a name="usually-not-shared"></a>Only shared for Steam Client
 
+[Only shared for Steam Client]: #only-shared-for-steam-client
 [Usually not shared]: #usually-not-shared
 
 All top-level directories that are not otherwise mentioned are generally
-not shared with the container. This includes any custom top-level
-directory such as `/large-disk-drive`.
+not shared with the containers used to run apps/games.
+This includes any custom top-level directory such as `/large-disk-drive`.
+
+However,
+when the container runtime framework is used to run the Steam Client,
+custom top-level directories usually *are* shared.
+This is done to make it possible to add custom Steam Library directories
+in those locations.
 
 Users can instruct the container runtime framework to share locations
 in this category between the host system and the container by setting
@@ -401,7 +408,7 @@ This assumes Steam is not running [under Flatpak][].
 * `/nix`: [always shared][]
 * `/overrides`: used internally by [the runtime][]
 * Custom non-FHS top-level directories, e.g. `/large-disk-drive`:
-    [usually not shared][]
+    [only shared for Steam Client][]
 
 <!-- References: -->
 

@@ -747,6 +747,8 @@ pv_wrap_options_parse_environment (PvWrapOptions *self,
                                                   self->deterministic);
   self->devel = _srt_boolean_environment ("PRESSURE_VESSEL_DEVEL",
                                           self->devel);
+  self->for_steam_client = _srt_boolean_environment ("STEAM_COMPAT_FOR_STEAM_CLIENT",
+                                                     self->for_steam_client);
 
   value = g_getenv ("PRESSURE_VESSEL_EMULATOR");
 
@@ -863,6 +865,10 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
       "Share filesystem directories with the container. "
       "They must currently be given as absolute paths.",
       "PATH" },
+    { "for-steam-client", '\0',
+      G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &self->for_steam_client,
+      "Container will be used to run the Steam Client",
+      NULL },
     { "freedesktop-app-id", '\0',
       G_OPTION_FLAG_NONE, G_OPTION_ARG_STRING, &self->freedesktop_app_id,
       "Make --unshare-home use ~/.var/app/ID as home directory, where ID "

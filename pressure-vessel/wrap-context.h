@@ -80,6 +80,7 @@ typedef struct
   gboolean copy_runtime;
   gboolean deterministic;
   gboolean devel;
+  gboolean for_steam_client;
   gboolean gc_runtimes;
   gboolean generate_locales;
   gboolean import_ca_certs;

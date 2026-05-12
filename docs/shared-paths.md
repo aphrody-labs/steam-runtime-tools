@@ -274,7 +274,7 @@ If the home directory is shared, then the following locations are also
 shared read/write:
 
 * `/home`: Other users' home directories (if accessible by the current user),
-    sometimes also sed to contain mount points for non-system partitions
+    sometimes also used to contain mount points for non-system partitions
     or drives (for example `/home/shared/large-disk-drive`)
 * `/opt`: FHS directory for third-party software
 * `/media`: FHS parent directory for removable media

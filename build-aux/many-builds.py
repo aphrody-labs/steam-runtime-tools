@@ -88,6 +88,10 @@ ARCH_TO_TUPLE = {
     'arm64': 'aarch64-linux-gnu',
     'i386': 'i386-linux-gnu',
 }
+# The GNU type and the multiarch tuple are usually equal...
+ARCH_TO_GNU_TYPE = ARCH_TO_TUPLE.copy()
+# ... except on i386 (and 32-bit ARM, but we don't support that)
+ARCH_TO_GNU_TYPE['i386'] = 'i686-linux-gnu'
 SYSROOT_TAR = (
     'com.valvesoftware.SteamRuntime.Sdk-amd64,i386-{}-sysroot.tar.gz'
 )
@@ -488,25 +492,27 @@ class Environment:
 
             for arch in details.archs:
                 build_arch = host_arch = ''
+                multiarch = ARCH_TO_TUPLE[arch]
+                gnu_type = ARCH_TO_GNU_TYPE[arch]
 
-                if arch == 'arm64':
+                if arch not in ('amd64', 'i386'):
                     # For now we assume an amd64 build architecture
                     build_arch = 'amd64'
                     host_arch = arch
                     options = minimal_args + [
-                        '-Dmultiarch_tuple=aarch64-linux-gnu',
+                        f'-Dmultiarch_tuple={multiarch}',
                         '-Dpressure_vessel=true',
-                        '--cross-file=aarch64-linux-gnu-gcc.txt',
-                        '--libdir=lib/aarch64-linux-gnu',
+                        f'--cross-file={gnu_type}-gcc.txt',
+                        f'--libdir=lib/{multiarch}',
                     ]
                 elif arch == 'i386':
                     # For now we assume an amd64 build architecture,
                     # for which i386 is a secondary architecture
                     # rather than needing a special cross container
                     options = minimal_args + [
-                        '-Dmultiarch_tuple=i386-linux-gnu',
-                        '--cross-file=i686-linux-gnu-gcc.txt',
-                        '--libdir=lib/i386-linux-gnu',
+                        f'-Dmultiarch_tuple={multiarch}',
+                        f'--cross-file={gnu_type}-gcc.txt',
+                        f'--libdir=lib/{multiarch}',
                     ]
                 else:
                     options = dev_build
@@ -553,7 +559,7 @@ class Environment:
                 continue
 
             for arch in details.archs:
-                if arch == 'arm64':
+                if arch not in ('amd64', 'i386'):
                     build_arch = 'amd64'
                     host_arch = arch
                 else:
@@ -591,7 +597,7 @@ class Environment:
                 continue
 
             for arch in details.archs:
-                if arch == 'arm64':
+                if arch not in ('amd64', 'i386'):
                     build_arch = 'amd64'
                     host_arch = arch
                 else:
@@ -692,7 +698,7 @@ class Environment:
                 # architecture is installed last, overwriting shared binaries
                 # like bin/pv-verify with those from the "main" architecture.
                 for arch in reversed(archs):
-                    if arch == 'arm64':
+                    if arch not in ('amd64', 'i386'):
                         build_arch = 'amd64'
                         host_arch = arch
                         can_run = False

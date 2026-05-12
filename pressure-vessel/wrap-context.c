@@ -16,6 +16,8 @@
 #include "pressure-vessel/exports.h"
 #include "pressure-vessel/supported-architectures.h"
 #include "pressure-vessel/utils.h"
+#include "pressure-vessel/wrap-flatpak.h"
+#include "pressure-vessel/wrap-setup.h"
 
 static Tristate
 tristate_environment (const gchar *name)
@@ -130,6 +132,7 @@ pv_wrap_context_init (PvWrapContext *self)
   self->is_flatpak_env = g_file_test ("/.flatpak-info", G_FILE_TEST_IS_REGULAR);
   self->original_environ = g_get_environ ();
   self->current_home_fd = -1;
+  self->bwrap_flags = SRT_BWRAP_FLAGS_NONE;
 
   pv_wrap_options_init (&self->options);
 
@@ -224,6 +227,7 @@ pv_wrap_context_dispose (GObject *object)
   pv_wrap_options_clear (&self->options);
 
   g_clear_object (&self->current_root);
+  g_clear_pointer (&self->flatpak_subsandbox, flatpak_bwrap_free);
   g_clear_object (&self->run_in_current_context);
   g_clear_object (&self->runtime);
 
@@ -241,6 +245,7 @@ pv_wrap_context_finalize (GObject *object)
   g_clear_pointer (&self->paths_not_exported, g_hash_table_unref);
   g_strfreev (self->original_argv);
   g_strfreev (self->original_environ);
+  g_free (self->bwrap_executable);
   g_free (self->current_home);
   g_clear_fd (&self->current_home_fd, NULL);
 
@@ -1346,6 +1351,7 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
 
 gboolean
 pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
+                                         PvWrapTestFlags test_flags,
                                          GError **error)
 {
   g_autoptr(SrtEmulatorServer) server = NULL;
@@ -1395,6 +1401,32 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
                                                                   NULL,   /* sysroot */
                                                                   SRT_TEST_FLAGS_NONE,
                                                                   NULL);  /* cwd */
+
+  if (test_flags & PV_WRAP_TEST_FLAGS_MOCK_BWRAP)
+    {
+      self->bwrap_executable = g_strdup ("/path/to/srt-bwrap");
+      self->bwrap_flags = SRT_BWRAP_FLAGS_NONE;
+    }
+  else if (self->is_flatpak_env)
+    {
+      /* If we are in a Flatpak environment we can't use bwrap directly */
+      if (!pv_wrap_check_flatpak (bindir, &self->flatpak_subsandbox, error))
+        return FALSE;
+    }
+  else
+    {
+      g_debug ("Checking for bwrap...");
+
+      self->bwrap_executable = pv_wrap_check_bwrap (self->run_in_current_context,
+                                                    self->options.only_prepare,
+                                                    &self->bwrap_flags,
+                                                    error);
+
+      if (self->bwrap_executable == NULL)
+        return FALSE;
+
+      g_debug ("OK (%s)", self->bwrap_executable);
+    }
   return TRUE;
 }
 

@@ -2321,7 +2321,9 @@ test_payload_command (Fixture *f,
 
   /* Pretend we had finished parsing arguments, because we need this
    * in order to have f->context->run_in_current_context */
-  ok = pv_wrap_context_after_parsing_arguments (f->context, &local_error);
+  ok = pv_wrap_context_after_parsing_arguments (f->context,
+                                                PV_WRAP_TEST_FLAGS_MOCK_BWRAP,
+                                                &local_error);
 
   if (test->expect_error == PAYLOAD_COMMAND_TEST_ERROR_OPTIONS_AFTER_PARSING)
     {

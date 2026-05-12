@@ -38,8 +38,8 @@ _build/
     scout-i386/                 Build for scout, i386
     soldier-amd64/              Build for soldier, x86_64, with pressure-vessel
     sniper-amd64/               Build for sniper, x86_64, with pressure-vessel
-    steamrt3c-amd64/            Build for steamrt3c, x86_64, with pressure-vessel
-    steamrt3c-arm64/            Build for steamrt3c, arm64, with pressure-vessel
+    steamrt3c-amd64/            Build for steamrt3c, x86_64, with PV
+    steamrt3c-arm64/            Build for steamrt3c, arm64, with PV
     steamrt3c-i386/             Build for steamrt3c, i386
 
     # Non-Meson-managed
@@ -51,7 +51,7 @@ _build/
         soldier/files/          soldier /usr for builds
         soldier_sysroot/        soldier sysroot for builds
     host-artifacts/             Additional test logs
-    pv-steamrt3c-*/             Staging directory for relocatable steamrt3c builds
+    pv-steamrt3c-*/             Staging dir. for relocatable steamrt3c builds
     scout-DESTDIR/              Staging directory for scout builds
     scout-layered/              Staging directory for scout-on-soldier
     scout-relocatable/          Staging directory for relocatable scout builds

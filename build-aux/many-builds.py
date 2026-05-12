@@ -679,7 +679,6 @@ class Environment:
     def install(self, args: List[str]) -> None:
         if self.oci_run_argv:
             suite = 'steamrt3c'
-            details = self.suites[suite]
 
             for comma_archs in ('amd64,i386', 'arm64', 'arm64,amd64,i386'):
                 archs = comma_archs.split(',')

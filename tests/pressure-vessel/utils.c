@@ -675,11 +675,11 @@ test_workarounds (Fixture *f,
   };
   static const char * const config_env[] =
   {
-    "PRESSURE_VESSEL_WORKAROUNDS=old-bwrap,steam-snap#356", NULL
+    "PRESSURE_VESSEL_WORKAROUNDS=old-bwrap,steam-snap#356,limit-shared-dirs", NULL
   };
   static const char * const order_env[] =
   {
-    "PRESSURE_VESSEL_WORKAROUNDS=steam-snap#356 +steamsnap369 -steamsnap356", NULL
+    "PRESSURE_VESSEL_WORKAROUNDS=steam-snap#356 +steamsnap369 -steamsnap356 +steam-for-linux#10571", NULL
   };
 
   g_assert_cmpint (pv_get_workarounds (SRT_BWRAP_FLAGS_HAS_PERMS, NULL),
@@ -696,9 +696,11 @@ test_workarounds (Fixture *f,
                    ==, (PV_WORKAROUND_FLAGS_STEAMSNAP_397));
   g_assert_cmpint (pv_get_workarounds (SRT_BWRAP_FLAGS_HAS_PERMS, config_env),
                    ==, (PV_WORKAROUND_FLAGS_BWRAP_NO_PERMS
-                        | PV_WORKAROUND_FLAGS_STEAMSNAP_356));
+                        | PV_WORKAROUND_FLAGS_STEAMSNAP_356
+                        | PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS));
   g_assert_cmpint (pv_get_workarounds (SRT_BWRAP_FLAGS_HAS_PERMS, order_env),
-                   ==, (PV_WORKAROUND_FLAGS_STEAMSNAP_369));
+                   ==, (PV_WORKAROUND_FLAGS_STEAMSNAP_369
+                        | PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS));
 }
 
 int

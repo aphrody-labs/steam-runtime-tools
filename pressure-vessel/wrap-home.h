@@ -26,6 +26,7 @@
 
 #include "flatpak-bwrap-private.h"
 #include "flatpak-exports-private.h"
+#include "utils.h"
 
 #include "steam-runtime-tools/env-overlay-internal.h"
 
@@ -51,4 +52,5 @@ gboolean pv_wrap_use_home (PvHomeMode mode,
                            FlatpakExports *exports,
                            FlatpakBwrap *bwrap_home_arguments,
                            SrtEnvOverlay *container_env,
+                           PvWorkaroundFlags workarounds,
                            GError **error);

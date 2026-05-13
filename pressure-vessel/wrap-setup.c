@@ -471,6 +471,7 @@ pv_wrap_use_host_os (int root_fd,
                      FlatpakExports *exports,
                      FlatpakBwrap *bwrap,
                      SrtDirentCompareFunc arbitrary_dirent_order,
+                     PvWorkaroundFlags workarounds,
                      GError **error)
 {
   static const char * const export_os_mutable[] = { "/etc", "/tmp", "/var" };
@@ -516,12 +517,19 @@ pv_wrap_use_host_os (int root_fd,
    *  (all handled by pv_bwrap_bind_usr() above)
    * /var (handled by export_os_mutable above)
    */
-  if (!pv_export_root_dirs_like_filesystem_host (root_fd,
-                                                 exports,
-                                                 FLATPAK_FILESYSTEM_MODE_READ_WRITE,
-                                                 arbitrary_dirent_order,
-                                                 error))
-    return FALSE;
+  if (workarounds & PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS)
+    {
+      g_info ("Not exporting various subdirectories of the root due to "
+              "limit-shared-dirs workaround flag");
+    }
+  else if (!pv_export_root_dirs_like_filesystem_host (root_fd,
+                                                      exports,
+                                                      FLATPAK_FILESYSTEM_MODE_READ_WRITE,
+                                                      arbitrary_dirent_order,
+                                                      error))
+    {
+      return FALSE;
+    }
 
   return TRUE;
 }

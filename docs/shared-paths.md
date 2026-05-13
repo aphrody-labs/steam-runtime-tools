@@ -225,7 +225,10 @@ the container:
 * `/var`
 * `/usr`
 * `/bin`, `/lib*`, `/sbin` (if the OS is not merged-/usr)
-* Every top-level directory not mentioned here, except for:
+* Every top-level directory not mentioned here
+    (unless
+    [ignored by `PRESSURE_VESSEL_WORKAROUNDS=limit-shared-dirs`][limiting shared directories]),
+    except for:
     * `/app`
     * `/boot`
     * `/root`
@@ -271,10 +274,11 @@ also affects several non-home locations for which similar behaviour is
 desired.
 
 If the home directory is shared, then the following locations are also
-shared read/write:
+shared read/write,
+unless ignored by `PRESSURE_VESSEL_WORKAROUNDS=limit-shared-dirs`:
 
 * `/home`: Other users' home directories (if accessible by the current user),
-    sometimes also sed to contain mount points for non-system partitions
+    sometimes also used to contain mount points for non-system partitions
     or drives (for example `/home/shared/large-disk-drive`)
 * `/opt`: FHS directory for third-party software
 * `/media`: FHS parent directory for removable media
@@ -287,6 +291,13 @@ shared read/write:
 
 If the home directory is not shared, then those locations are not
 share either.
+
+If the
+[`limit-shared-dirs` workaround][limiting shared directories]
+is requested by environment variable
+`PRESSURE_VESSEL_WORKAROUNDS=limit-shared-dirs`,
+then those locations are also not shared,
+except for `/var/tmp`.
 
 `/var/tmp` is treated specially.
 If it is not shared, then it is a bind-mount or symbolic link pointing to
@@ -309,6 +320,35 @@ the `STEAM_COMPAT_MOUNTS`, `PRESSURE_VESSEL_FILESYSTEMS_RW` and/or
 These environment variables cannot be used for locations that are
 [never shared][].
 
+## Limiting shared directories
+
+If the container runtime framework is run with environment variable
+`PRESSURE_VESSEL_WORKAROUNDS=limit-shared-dirs`,
+or with `limit-shared-dirs` or one of its aliases added to a list of
+workarounds separated by commas and/or spaces,
+then several directories are no longer shared.
+This is a workaround for automounted network filesystems that might be
+unreachable;
+a more robust solution for this is to avoid mounting filesystems that
+cannot be relied on to work,
+and instead use non-filesystem-based network abstractions such as
+[gvfs][] or [KIO][] to access potentially unreliable network resources.
+
+Users can override this by setting the `STEAM_COMPAT_MOUNTS`,
+`PRESSURE_VESSEL_FILESYSTEMS_RW` and/or
+`PRESSURE_VESSEL_FILESYSTEMS_RO` environment variables
+to the subset of these filesystems that do work reliably.
+
+For example,
+if `PRESSURE_VESSEL_WORKAROUNDS=limit-shared-dirs` is combined with
+`STEAM_COMPAT_MOUNTS=/srv:/home:/hdd`,
+then `/srv`,
+`/home` and
+`/hdd`
+will be shared with the container,
+but `/mnt` and `/media` will not,
+which could be useful if `/mnt/fileserver` is an unreliable NFS mount.
+
 ## Summary
 
 This assumes Steam is not running [under Flatpak][].
@@ -321,11 +361,15 @@ This assumes Steam is not running [under Flatpak][].
 * `/etc`: managed by [the runtime][], some files come from the host
 * `/home`
     * The current user's [home directory][] is usually shared
-    * The rest of `/home` [follows the home directory][]
+    * The rest of `/home` [follows the home directory][],
+        if not [limiting shared directories][]
 * `/lib`, `/libQUAL`: part of [the runtime][]
-* `/media`: [follows the home directory][]
-* `/mnt`: [follows the home directory][]
-* `/opt`: [follows the home directory][]
+* `/media`: [follows the home directory][],
+    if not [limiting shared directories][]
+* `/mnt`: [follows the home directory][],
+    if not [limiting shared directories][]
+* `/opt`: [follows the home directory][],
+    if not [limiting shared directories][]
 * `/proc`: [always shared][]
 * `/sbin`: part of [the runtime][]
 * `/usr`: part of [the runtime][]
@@ -335,9 +379,11 @@ This assumes Steam is not running [under Flatpak][].
 * `/var/tmp`: [follows the home directory][]
 * `/root`: [never shared][]
 * `/run`: [never shared][] in general, but many locations inside it are shared
-* `/run/media`: [follows the home directory][]
+* `/run/media`: [follows the home directory][],
+    if not [limiting shared directories][]
 * `/sbin`: part of [the runtime][]
-* `/srv`: [follows the home directory][]
+* `/srv`: [follows the home directory][],
+    if not [limiting shared directories][]
 * `/sys`: [always shared][]
 * `/tmp`:
     * `/tmp/.X11-unix` is [never shared][], but individual sockets appear there
@@ -356,3 +402,5 @@ This assumes Steam is not running [under Flatpak][].
 
 [Steam Flatpak app]: https://github.com/flathub/com.valvesoftware.Steam
 [Steam container runtime framework]: container-runtime.md
+[KIO]: https://invent.kde.org/frameworks/kio
+[gvfs]: https://gitlab.gnome.org/GNOME/gvfs

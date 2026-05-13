@@ -1,5 +1,26 @@
-steam-runtime-tools (0.20260512.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260513.0) UNRELEASED; urgency=medium
 
+  * pressure-vessel:
+    - Add an option so the experimental steamrt3c-based Steam client
+      can have defaults that are appropriate for the Steam Client,
+      even if they don't match what would be appropriate for games
+      (steamrt/tasks#838, steamrt/tasks#959, steamrt/tasks#995)
+    - When used to run the Steam Client, share most non-FHS top-level
+      directories by default (for example /data or /storage) so that the
+      user can create a Steam Library on them if desired
+      (steamrt/tasks#959)
+    - Add PRESSURE_VESSEL_WORKAROUNDS=limit-shared-dirs workaround option.
+      When this is used, we don't automatically share most top-level
+      directories like /srv, /mnt, /media, /run/media with the container,
+      which can be used to work around automount points for unreachable
+      networked filesystems or detached external drives.
+      Often it will need to be combined with PRESSURE_VESSEL_FILESYSTEMS_RW
+      to share any filesystems that *are* necessary, for example:
+      env PRESSURE_VESSEL_WORKAROUNDS=limit-shared-dirs \
+          PRESSURE_VESSEL_FILESYSTEMS_RW=/games:/mnt/local-drive \
+          steam
+      (steamrt/tasks#959, steam-for-linux#10571)
+  * Documentation fixes
   * Developer tools:
     - steam-runtime-launch-options: Parse command-line correctly for games
       that run under steamrt4 or later
@@ -15,7 +36,7 @@ steam-runtime-tools (0.20260512.0) UNRELEASED; urgency=medium
   * tests:
     - Don't try to test dialog-ui when compiling in steamrt3c
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 12 May 2026 11:24:48 +0100
+ -- Simon McVittie <smcv@collabora.com>  Wed, 13 May 2026 12:12:36 +0100
 
 steam-runtime-tools (0.20260505.0) steamrt; urgency=medium
 

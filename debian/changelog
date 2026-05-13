@@ -8,7 +8,7 @@ steam-runtime-tools (0.20260513.0) UNRELEASED; urgency=medium
     - When used to run the Steam Client, share most non-FHS top-level
       directories by default (for example /data or /storage) so that the
       user can create a Steam Library on them if desired
-      (steamrt/tasks#959)
+      (steamrt/tasks#959, steam-for-linux#13007)
     - Add PRESSURE_VESSEL_WORKAROUNDS=limit-shared-dirs workaround option.
       When this is used, we don't automatically share most top-level
       directories like /srv, /mnt, /media, /run/media with the container,

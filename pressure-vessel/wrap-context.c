@@ -16,6 +16,8 @@
 #include "pressure-vessel/exports.h"
 #include "pressure-vessel/supported-architectures.h"
 #include "pressure-vessel/utils.h"
+#include "pressure-vessel/wrap-flatpak.h"
+#include "pressure-vessel/wrap-setup.h"
 
 static Tristate
 tristate_environment (const gchar *name)
@@ -72,6 +74,7 @@ pv_wrap_options_init (PvWrapOptions *self)
   self->runtime = NULL;
   self->runtime_base = NULL;
   self->share_home = TRISTATE_MAYBE;
+  self->share_root_dirs = TRISTATE_MAYBE;
   self->share_pid = TRUE;
   self->shell = PV_SHELL_NONE;
   self->single_thread = FALSE;
@@ -130,6 +133,8 @@ pv_wrap_context_init (PvWrapContext *self)
   self->is_flatpak_env = g_file_test ("/.flatpak-info", G_FILE_TEST_IS_REGULAR);
   self->original_environ = g_get_environ ();
   self->current_home_fd = -1;
+  self->bwrap_flags = SRT_BWRAP_FLAGS_NONE;
+  self->workarounds = PV_WORKAROUND_FLAGS_NONE;
 
   pv_wrap_options_init (&self->options);
 
@@ -224,6 +229,7 @@ pv_wrap_context_dispose (GObject *object)
   pv_wrap_options_clear (&self->options);
 
   g_clear_object (&self->current_root);
+  g_clear_pointer (&self->flatpak_subsandbox, flatpak_bwrap_free);
   g_clear_object (&self->run_in_current_context);
   g_clear_object (&self->runtime);
 
@@ -241,6 +247,7 @@ pv_wrap_context_finalize (GObject *object)
   g_clear_pointer (&self->paths_not_exported, g_hash_table_unref);
   g_strfreev (self->original_argv);
   g_strfreev (self->original_environ);
+  g_free (self->bwrap_executable);
   g_free (self->current_home);
   g_clear_fd (&self->current_home_fd, NULL);
 
@@ -747,6 +754,8 @@ pv_wrap_options_parse_environment (PvWrapOptions *self,
                                                   self->deterministic);
   self->devel = _srt_boolean_environment ("PRESSURE_VESSEL_DEVEL",
                                           self->devel);
+  self->for_steam_client = _srt_boolean_environment ("STEAM_COMPAT_FOR_STEAM_CLIENT",
+                                                     self->for_steam_client);
 
   value = g_getenv ("PRESSURE_VESSEL_EMULATOR");
 
@@ -863,6 +872,10 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
       "Share filesystem directories with the container. "
       "They must currently be given as absolute paths.",
       "PATH" },
+    { "for-steam-client", '\0',
+      G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &self->for_steam_client,
+      "Container will be used to run the Steam Client",
+      NULL },
     { "freedesktop-app-id", '\0',
       G_OPTION_FLAG_NONE, G_OPTION_ARG_STRING, &self->freedesktop_app_id,
       "Make --unshare-home use ~/.var/app/ID as home directory, where ID "
@@ -1340,6 +1353,7 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
 
 gboolean
 pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
+                                         PvWrapTestFlags test_flags,
                                          GError **error)
 {
   g_autoptr(SrtEmulatorServer) server = NULL;
@@ -1389,6 +1403,48 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
                                                                   NULL,   /* sysroot */
                                                                   SRT_TEST_FLAGS_NONE,
                                                                   NULL);  /* cwd */
+
+  if (test_flags & PV_WRAP_TEST_FLAGS_MOCK_BWRAP)
+    {
+      self->bwrap_executable = g_strdup ("/path/to/srt-bwrap");
+      self->bwrap_flags = SRT_BWRAP_FLAGS_NONE;
+    }
+  else if (self->is_flatpak_env)
+    {
+      /* If we are in a Flatpak environment we can't use bwrap directly */
+      if (!pv_wrap_check_flatpak (bindir, &self->flatpak_subsandbox, error))
+        return FALSE;
+    }
+  else
+    {
+      g_debug ("Checking for bwrap...");
+
+      self->bwrap_executable = pv_wrap_check_bwrap (self->run_in_current_context,
+                                                    self->options.only_prepare,
+                                                    &self->bwrap_flags,
+                                                    error);
+
+      if (self->bwrap_executable == NULL)
+        return FALSE;
+
+      g_debug ("OK (%s)", self->bwrap_executable);
+    }
+
+  self->workarounds = pv_get_workarounds (self->bwrap_flags,
+                                          _srt_const_strv (self->original_environ));
+
+  /* Currently we don't implement an individual command-line option
+   * or environment variable for this, so in practice its value will
+   * be MAYBE at this point */
+  if (self->options.share_root_dirs == TRISTATE_MAYBE)
+    {
+      if (self->options.for_steam_client
+          && !(self->workarounds & PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS))
+        self->options.share_root_dirs = TRISTATE_YES;
+      else
+        self->options.share_root_dirs = TRISTATE_NO;
+    }
+
   return TRUE;
 }
 

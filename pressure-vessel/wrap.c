@@ -81,7 +81,6 @@ main (int argc,
   int ret = 2;
   gsize i;
   PvHomeMode home_mode;
-  g_autoptr(FlatpakBwrap) flatpak_subsandbox = NULL;
   g_autoptr(SrtEnvOverlay) container_env = NULL;
   g_autoptr(FlatpakBwrap) bwrap = NULL;
   g_autoptr(FlatpakBwrap) bwrap_filesystem_arguments = NULL;
@@ -91,8 +90,6 @@ main (int argc,
   g_autoptr(FlatpakBwrap) final_argv = NULL;
   g_autoptr(SrtSysroot) real_root = NULL;
   g_autoptr(SrtSysroot) interpreter_root = NULL;
-  g_autofree gchar *bwrap_executable = NULL;
-  SrtBwrapFlags bwrap_flags = SRT_BWRAP_FLAGS_NONE;
   g_autofree gchar *cwd_p = NULL;
   g_autofree gchar *cwd_l = NULL;
   g_autofree gchar *cwd_p_host = NULL;
@@ -104,7 +101,6 @@ main (int argc,
   SrtDirentCompareFunc arbitrary_dirent_order;
   const char *pkglibexecdir;
   const char *steam_app_id;
-  const char *tools_dir;
   g_autoptr(GPtrArray) adverb_preload_argv = NULL;
   int real_root_fd;
   int result;
@@ -113,7 +109,6 @@ main (int argc,
   SrtLogFlags log_flags;
   PvWrapLogFlags pv_log_flags = PV_WRAP_LOG_FLAGS_NONE;
   SrtSteamCompatFlags compat_flags;
-  PvWorkaroundFlags workarounds;
   const GQuark *tuples;
   gsize n_tuples = 0;
 
@@ -361,7 +356,9 @@ main (int argc,
    * us exit 1. */
   ret = 1;
 
-  if (!pv_wrap_context_after_parsing_arguments (self, error))
+  if (!pv_wrap_context_after_parsing_arguments (self,
+                                                PV_WRAP_TEST_FLAGS_NONE,
+                                                error))
     goto out;
 
   if ((result = _srt_set_compatible_resource_limits (0)) < 0)
@@ -432,35 +429,8 @@ main (int argc,
         }
     }
 
-  g_return_val_if_fail (self->run_in_current_context != NULL, FALSE);
-  tools_dir = _srt_subprocess_runner_get_bin_path (self->run_in_current_context);
-  g_return_val_if_fail (tools_dir != NULL, FALSE);
   pkglibexecdir = _srt_subprocess_runner_get_helpers_path (self->run_in_current_context);
   g_return_val_if_fail (pkglibexecdir != NULL, FALSE);
-
-  /* If we are in a Flatpak environment we can't use bwrap directly */
-  if (self->is_flatpak_env)
-    {
-      if (!pv_wrap_check_flatpak (tools_dir, &flatpak_subsandbox, error))
-        goto out;
-    }
-  else
-    {
-      g_debug ("Checking for bwrap...");
-
-      bwrap_executable = pv_wrap_check_bwrap (self->run_in_current_context,
-                                              self->options.only_prepare,
-                                              &bwrap_flags,
-                                              error);
-
-      if (bwrap_executable == NULL)
-        goto out;
-
-      g_debug ("OK (%s)", bwrap_executable);
-    }
-
-  workarounds = pv_get_workarounds (bwrap_flags,
-                                    _srt_const_strv (self->original_environ));
 
   if (self->options.test)
     {
@@ -469,16 +439,16 @@ main (int argc,
     }
 
   /* Invariant: we are in exactly one of these two modes */
-  g_assert (((flatpak_subsandbox != NULL)
+  g_assert (((self->flatpak_subsandbox != NULL)
              + (!self->is_flatpak_env))
             == 1);
 
-  if (flatpak_subsandbox == NULL)
+  if (self->flatpak_subsandbox == NULL)
     {
       /* Start with an empty environment and populate it later */
       bwrap = flatpak_bwrap_new (flatpak_bwrap_empty_env);
-      g_assert (bwrap_executable != NULL);
-      flatpak_bwrap_add_arg (bwrap, bwrap_executable);
+      g_assert (self->bwrap_executable != NULL);
+      flatpak_bwrap_add_arg (bwrap, self->bwrap_executable);
       bwrap_filesystem_arguments = flatpak_bwrap_new (flatpak_bwrap_empty_env);
       self->exports = flatpak_exports_new ();
     }
@@ -490,7 +460,7 @@ main (int argc,
   /* Invariant: we have bwrap or exports iff we also have the other */
   g_assert ((bwrap != NULL) == (self->exports != NULL));
   g_assert ((bwrap != NULL) == (bwrap_filesystem_arguments != NULL));
-  g_assert ((bwrap != NULL) == (bwrap_executable != NULL));
+  g_assert ((bwrap != NULL) == (self->bwrap_executable != NULL));
 
   container_env = _srt_env_overlay_new ();
 
@@ -502,7 +472,7 @@ main (int argc,
       g_assert (bwrap_filesystem_arguments != NULL);
 
       if ((_srt_util_get_log_flags () & SRT_LOG_FLAGS_LEVEL)
-          && (bwrap_flags & SRT_BWRAP_FLAGS_HAS_LEVEL_PREFIX))
+          && (self->bwrap_flags & SRT_BWRAP_FLAGS_HAS_LEVEL_PREFIX))
         flatpak_bwrap_add_arg (bwrap, "--level-prefix");
 
       /* Protect the controlling terminal from the app/game, unless we are
@@ -610,7 +580,7 @@ main (int argc,
       if (self->options.deterministic || self->options.single_thread)
         flags |= PV_RUNTIME_FLAGS_SINGLE_THREAD;
 
-      if (flatpak_subsandbox != NULL)
+      if (self->flatpak_subsandbox != NULL)
         flags |= PV_RUNTIME_FLAGS_FLATPAK_SUBSANDBOX;
 
       if (interpreter_root != NULL)
@@ -655,13 +625,13 @@ main (int argc,
 
       self->runtime = pv_runtime_new (runtime_path,
                                       self->options.variable_dir,
-                                      bwrap_executable,
+                                      self->bwrap_executable,
                                       self->options.architectures,
                                       graphics_providers,
                                       _srt_const_strv (self->original_environ),
                                       self->run_in_current_context,
                                       flags,
-                                      workarounds,
+                                      self->workarounds,
                                       error);
 
       if (self->runtime == NULL)
@@ -674,19 +644,19 @@ main (int argc,
                             error))
         goto out;
 
-      if (flatpak_subsandbox != NULL)
+      if (self->flatpak_subsandbox != NULL)
         {
           const char *app = pv_runtime_get_modified_app (self->runtime);
           const char *usr = pv_runtime_get_modified_usr (self->runtime);
 
-          flatpak_bwrap_add_args (flatpak_subsandbox,
+          flatpak_bwrap_add_args (self->flatpak_subsandbox,
                                   "--app-path", app == NULL ? "" : app,
                                   "--share-pids",
                                   "--usr-path", usr,
                                   NULL);
         }
     }
-  else if (flatpak_subsandbox != NULL)
+  else if (self->flatpak_subsandbox != NULL)
     {
       /* Nothing special to do here: we'll just create the subsandbox
        * without changing the runtime, which means we inherit the
@@ -701,7 +671,9 @@ main (int argc,
 
       if (!pv_wrap_use_host_os (real_root_fd,
                                 self->exports, bwrap_filesystem_arguments,
-                                arbitrary_dirent_order, workarounds, error))
+                                arbitrary_dirent_order,
+                                self->workarounds,
+                                error))
         goto out;
     }
 
@@ -716,7 +688,7 @@ main (int argc,
 
   g_debug ("Making home directory available...");
 
-  if (flatpak_subsandbox != NULL)
+  if (self->flatpak_subsandbox != NULL)
     {
       if (home_mode == PV_HOME_MODE_SHARED)
         {
@@ -743,7 +715,20 @@ main (int argc,
 
       if (!pv_wrap_use_home (home_mode, self->current_home, private_home,
                              self->exports, bwrap_home_arguments, container_env,
-                             workarounds, error))
+                             self->workarounds,
+                             error))
+        goto out;
+
+      /* If runtime == NULL then we would already have shared the same
+       * root directories, above, in case they're functionally necessary
+       * (for example /opt might contain important libraries). */
+      if (self->options.runtime != NULL
+          && self->options.share_root_dirs == TRISTATE_YES
+          && !pv_export_root_dirs_like_filesystem_host (real_root_fd,
+                                                        self->exports,
+                                                        FLATPAK_FILESYSTEM_MODE_READ_WRITE,
+                                                        arbitrary_dirent_order,
+                                                        error))
         goto out;
     }
 
@@ -765,7 +750,7 @@ main (int argc,
         }
       else
         {
-          g_assert (flatpak_subsandbox != NULL);
+          g_assert (self->flatpak_subsandbox != NULL);
           /* steam-runtime-launch-client currently hard-codes this */
           g_warning ("Process ID namespace is always shared when using a "
                      "Flatpak subsandbox");
@@ -775,7 +760,7 @@ main (int argc,
   if (self->exports != NULL)
     pv_share_temp_dir (self->exports, container_env);
 
-  if (flatpak_subsandbox != NULL)
+  if (self->flatpak_subsandbox != NULL)
     {
       /* We special case libshared-library-guard because usually
        * its blockedlist file is located in `/app` and we need
@@ -811,7 +796,7 @@ main (int argc,
 
   pv_bind_and_propagate_from_environ (self, home_mode, container_env);
 
-  if (flatpak_subsandbox == NULL)
+  if (self->flatpak_subsandbox == NULL)
     {
       const PvAppFrameworkPath *framework_paths;
 
@@ -851,7 +836,7 @@ main (int argc,
            framework_paths->path != NULL;
            framework_paths++)
         {
-          if (workarounds & framework_paths->ignore_if)
+          if (self->workarounds & framework_paths->ignore_if)
             g_warning ("Not sharing %s with container to work around %s",
                        framework_paths->path, framework_paths->bug);
           else
@@ -908,7 +893,7 @@ main (int argc,
     }
   else
     {
-      flatpak_bwrap_add_args (flatpak_subsandbox,
+      flatpak_bwrap_add_args (self->flatpak_subsandbox,
                               "--directory", cwd_p,
                               NULL);
     }
@@ -974,7 +959,8 @@ main (int argc,
       g_warn_if_fail (g_strv_length (exports_bwrap->envp) == 0);
       if (!pv_bwrap_append_adjusted_exports (bwrap, exports_bwrap,
                                              self->current_home,
-                                             interpreter_root, workarounds,
+                                             interpreter_root,
+                                             self->workarounds,
                                              error))
         goto out;
 
@@ -999,11 +985,12 @@ main (int argc,
 
       if (!pv_bwrap_append_adjusted_exports (bwrap, sharing_bwrap,
                                              self->current_home,
-                                             interpreter_root, workarounds,
+                                             interpreter_root,
+                                             self->workarounds,
                                              error))
         goto out;
     }
-  else if (flatpak_subsandbox != NULL)
+  else if (self->flatpak_subsandbox != NULL)
     {
       pv_wrap_set_icons_env_vars (container_env, _srt_const_strv (self->original_environ));
     }
@@ -1042,9 +1029,9 @@ main (int argc,
        * variables would be wrong, because s-r-launch-client needs to see the
        * current execution environment's DBUS_SESSION_BUS_ADDRESS
        * (if different). For this reason we convert them to `--setenv`. */
-      g_assert (flatpak_subsandbox != NULL);
+      g_assert (self->flatpak_subsandbox != NULL);
 
-      if (!pv_bwrap_container_env_to_subsandbox_argv (flatpak_subsandbox,
+      if (!pv_bwrap_container_env_to_subsandbox_argv (self->flatpak_subsandbox,
                                                       container_env,
                                                       error))
         goto out;
@@ -1065,7 +1052,7 @@ main (int argc,
    * we get an assertion failure if we try.
    * However, if we're working around a setuid bwrap, we need to keep this
    * around a little bit longer. */
-  if (!(workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID))
+  if (!(self->workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID))
     g_clear_pointer (&container_env, _srt_env_overlay_unref);
 
   if (bwrap != NULL)
@@ -1088,7 +1075,7 @@ main (int argc,
 
       if (_srt_util_is_debugging ())
         {
-          g_debug ("%s options before bundling:", bwrap_executable);
+          g_debug ("%s options before bundling:", self->bwrap_executable);
 
           for (i = 0; i < bwrap->argv->len; i++)
             {
@@ -1133,7 +1120,7 @@ main (int argc,
           flatpak_bwrap_add_arg (adverb_argv, adverb_in_container);
         }
 
-      if (workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID)
+      if (self->workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID)
         {
           /* If bwrap is setuid, then it might have filtered some
            * environment variables out of the environment.
@@ -1217,26 +1204,26 @@ main (int argc,
   g_warn_if_fail (g_strv_length (payload_command->envp) == 0);
   flatpak_bwrap_append_bwrap (argv_in_container, payload_command);
 
-  if (flatpak_subsandbox != NULL)
+  if (self->flatpak_subsandbox != NULL)
     {
       for (i = 0; i < argv_in_container->fds->len; i++)
         {
           g_autofree char *fd_str = g_strdup_printf ("--forward-fd=%d",
                                                      g_array_index (argv_in_container->fds, int, i));
-          flatpak_bwrap_add_arg (flatpak_subsandbox, fd_str);
+          flatpak_bwrap_add_arg (self->flatpak_subsandbox, fd_str);
         }
 
       for (i = 0; i < inherit_fds->len; i++)
         {
           g_autofree char *fd_str = g_strdup_printf ("--forward-fd=%d",
                                                      g_array_index (inherit_fds, int, i));
-          flatpak_bwrap_add_arg (flatpak_subsandbox, fd_str);
+          flatpak_bwrap_add_arg (self->flatpak_subsandbox, fd_str);
         }
 
-      flatpak_bwrap_add_arg (flatpak_subsandbox, "--");
+      flatpak_bwrap_add_arg (self->flatpak_subsandbox, "--");
 
-      g_warn_if_fail (g_strv_length (flatpak_subsandbox->envp) == 0);
-      flatpak_bwrap_append_bwrap (final_argv, flatpak_subsandbox);
+      g_warn_if_fail (g_strv_length (self->flatpak_subsandbox->envp) == 0);
+      flatpak_bwrap_append_bwrap (final_argv, self->flatpak_subsandbox);
     }
   else
     {

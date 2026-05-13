@@ -1333,6 +1333,7 @@ test_options_defaults (Fixture *f,
       g_assert_cmpint (options->copy_runtime, ==, FALSE);
       g_assert_cmpint (options->deterministic, ==, FALSE);
       g_assert_cmpint (options->devel, ==, FALSE);
+      g_assert_cmpint (options->for_steam_client, ==, FALSE);
       g_assert_cmpint (options->gc_runtimes, ==, TRUE);
       g_assert_cmpint (options->generate_locales, ==, TRUE);
       g_assert_cmpint (options->import_openxr_1_runtimes, ==, FALSE);
@@ -1435,6 +1436,7 @@ test_options_false (Fixture *f,
   g_assert_cmpint (options->copy_runtime, ==, FALSE);
   g_assert_cmpint (options->deterministic, ==, FALSE);
   g_assert_cmpint (options->devel, ==, FALSE);
+  g_assert_cmpint (options->for_steam_client, ==, FALSE);
   g_assert_cmpint (options->gc_runtimes, ==, FALSE);
   g_assert_cmpint (options->generate_locales, ==, FALSE);
   g_assert_cmpint (options->import_openxr_1_runtimes, ==, FALSE);
@@ -1471,6 +1473,7 @@ test_options_true (Fixture *f,
     "--env-if-host=TWO=two",
     "--filesystem=/foo",
     "--filesystem=/bar",
+    "--for-steam-client",
     "--freedesktop-app-id=com.example.Foo",
     "--gc-runtimes",
     "--generate-locales",
@@ -1564,6 +1567,7 @@ test_options_true (Fixture *f,
   g_assert_cmpint (options->copy_runtime, ==, TRUE);
   g_assert_cmpint (options->deterministic, ==, TRUE);
   g_assert_cmpint (options->devel, ==, TRUE);
+  g_assert_cmpint (options->for_steam_client, ==, TRUE);
   g_assert_cmpint (options->gc_runtimes, ==, TRUE);
   g_assert_cmpint (options->generate_locales, ==, TRUE);
   g_assert_cmpint (options->import_openxr_1_runtimes, ==, TRUE);
@@ -2317,7 +2321,9 @@ test_payload_command (Fixture *f,
 
   /* Pretend we had finished parsing arguments, because we need this
    * in order to have f->context->run_in_current_context */
-  ok = pv_wrap_context_after_parsing_arguments (f->context, &local_error);
+  ok = pv_wrap_context_after_parsing_arguments (f->context,
+                                                PV_WRAP_TEST_FLAGS_MOCK_BWRAP,
+                                                &local_error);
 
   if (test->expect_error == PAYLOAD_COMMAND_TEST_ERROR_OPTIONS_AFTER_PARSING)
     {

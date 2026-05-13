@@ -16,6 +16,7 @@
 #include "pressure-vessel/runtime.h"
 
 #include "pressure-vessel/wrap-interactive.h"
+#include "pressure-vessel/utils.h"
 
 typedef struct _PvWrapContext PvWrapContext;
 typedef struct _PvWrapContextClass PvWrapContextClass;
@@ -33,6 +34,20 @@ typedef enum
   PV_WRAP_EXPORT_FLAGS_OS_QUIET = (1 << 0),
   PV_WRAP_EXPORT_FLAGS_NONE = 0
 } PvWrapExportFlags;
+
+/*
+ * PvWrapTestFlags:
+ * @PV_WRAP_TEST_FLAGS_MOCK_BWRAP: Use a mock path for bwrap, instead of
+ *  really checking for it
+ * @PV_WRAP_TEST_FLAGS_NONE: None of the above
+ *
+ * Flags used during testing. Use @PV_WRAP_TEST_FLAGS_NONE in production.
+ */
+typedef enum
+{
+  PV_WRAP_TEST_FLAGS_MOCK_BWRAP = (1 << 0),
+  PV_WRAP_TEST_FLAGS_NONE = 0
+} PvWrapTestFlags;
 
 typedef enum
 {
@@ -75,11 +90,13 @@ typedef struct
   PvShell shell;
   PvTerminal terminal;
   Tristate share_home;
+  Tristate share_root_dirs;
 
   gboolean batch;
   gboolean copy_runtime;
   gboolean deterministic;
   gboolean devel;
+  gboolean for_steam_client;
   gboolean gc_runtimes;
   gboolean generate_locales;
   gboolean import_ca_certs;
@@ -102,16 +119,21 @@ struct _PvWrapContext
 {
   GObject parent_instance;
 
+  FlatpakBwrap *flatpak_subsandbox;
   FlatpakExports *exports;
   GHashTable *paths_not_exported;
   PvRuntime *runtime;
   SrtSysroot *current_root;
   gchar **original_argv;
   gchar **original_environ;
+  gchar *bwrap_executable;
   gchar *current_home;
   SrtSubprocessRunner *run_in_current_context;
 
   PvWrapOptions options;
+
+  PvWorkaroundFlags workarounds;
+  SrtBwrapFlags bwrap_flags;
 
   gboolean is_flatpak_env;
   int original_argc;
@@ -156,6 +178,7 @@ gboolean pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
                                                        GError **error);
 
 gboolean pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
+                                                  PvWrapTestFlags test_flags,
                                                   GError **error);
 
 gboolean pv_wrap_context_export_if_allowed (PvWrapContext *self,

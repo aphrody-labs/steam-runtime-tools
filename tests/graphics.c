@@ -494,24 +494,24 @@ setup (Fixture *f,
   if (config != NULL && config->icd_mode == ICD_MODE_XDG_DIRS)
     {
       f->fake_icds_envp = g_environ_setenv (f->fake_icds_envp,
-                                            "XDG_CONFIG_HOME", "/confhome", TRUE);
+                                            _SRT_XDG_CONFIG_HOME_VAR, "/confhome", TRUE);
       f->fake_icds_envp = g_environ_setenv (f->fake_icds_envp,
-                                            "XDG_CONFIG_DIRS", "/confdir", TRUE);
+                                            _SRT_XDG_CONFIG_DIRS_VAR, "/confdir", TRUE);
       f->fake_icds_envp = g_environ_setenv (f->fake_icds_envp,
-                                            "XDG_DATA_HOME", "/datahome", TRUE);
+                                            _SRT_XDG_DATA_HOME_VAR, "/datahome", TRUE);
       f->fake_icds_envp = g_environ_setenv (f->fake_icds_envp,
-                                            "XDG_DATA_DIRS", "/datadir", TRUE);
+                                            _SRT_XDG_DATA_DIRS_VAR, "/datadir", TRUE);
     }
   else
     {
       f->fake_icds_envp = g_environ_unsetenv (f->fake_icds_envp,
-                                              "XDG_CONFIG_HOME");
+                                              _SRT_XDG_CONFIG_HOME_VAR);
       f->fake_icds_envp = g_environ_unsetenv (f->fake_icds_envp,
-                                              "XDG_CONFIG_DIRS");
+                                              _SRT_XDG_CONFIG_DIRS_VAR);
       f->fake_icds_envp = g_environ_unsetenv (f->fake_icds_envp,
-                                              "XDG_DATA_HOME");
+                                              _SRT_XDG_DATA_HOME_VAR);
       f->fake_icds_envp = g_environ_unsetenv (f->fake_icds_envp,
-                                              "XDG_DATA_DIRS");
+                                              _SRT_XDG_DATA_DIRS_VAR);
     }
 
   if (config != NULL && config->icd_mode == ICD_MODE_EXPLICIT_FILENAMES)
@@ -2510,8 +2510,8 @@ test_icd_openxr_search_paths_default (Fixture *f,
 
   envp = g_environ_setenv (envp, "HOME", "/home/test", TRUE);
 
-  envp = g_environ_unsetenv (envp, "XDG_CONFIG_HOME");
-  envp = g_environ_unsetenv (envp, "XDG_CONFIG_DIRS");
+  envp = g_environ_unsetenv (envp, _SRT_XDG_CONFIG_HOME_VAR);
+  envp = g_environ_unsetenv (envp, _SRT_XDG_CONFIG_DIRS_VAR);
 
   search_paths = _srt_graphics_get_openxr_1_runtime_search_paths (_srt_const_strv (envp));
   g_assert_cmpstrv (search_paths, expected_search_paths);
@@ -2536,8 +2536,8 @@ test_icd_openxr_search_paths_override (Fixture *f,
 
   envp = g_environ_setenv (envp, "HOME", "/home/test", TRUE);
 
-  envp = g_environ_setenv (envp, "XDG_CONFIG_HOME", "/config-home", TRUE);
-  envp = g_environ_setenv (envp, "XDG_CONFIG_DIRS", "/config-1:/config-2", TRUE);
+  envp = g_environ_setenv (envp, _SRT_XDG_CONFIG_HOME_VAR, "/config-home", TRUE);
+  envp = g_environ_setenv (envp, _SRT_XDG_CONFIG_DIRS_VAR, "/config-1:/config-2", TRUE);
 
   search_paths = _srt_graphics_get_openxr_1_runtime_search_paths (_srt_const_strv (envp));
   g_assert_cmpstrv (search_paths, expected_search_paths);
@@ -2625,8 +2625,8 @@ test_icd_openxr_loading (Fixture *f,
 
   g_test_message ("Entering %s", G_STRFUNC);
 
-  envp = g_environ_setenv (envp, "XDG_CONFIG_HOME", "/openxr/config-home", TRUE);
-  envp = g_environ_setenv (envp, "XDG_CONFIG_DIRS", "/openxr/doesnotexist", TRUE);
+  envp = g_environ_setenv (envp, _SRT_XDG_CONFIG_HOME_VAR, "/openxr/config-home", TRUE);
+  envp = g_environ_setenv (envp, _SRT_XDG_CONFIG_DIRS_VAR, "/openxr/doesnotexist", TRUE);
 
   sysroot = _srt_sysroot_new (f->sysroot, NULL);
 
@@ -3265,8 +3265,8 @@ test_openxr_layer_parsing (Fixture *f,
       sysroot = g_build_filename (f->sysroots, test->sysroot, NULL);
       envp = g_environ_setenv (envp, "SRT_TEST_SYSROOT", sysroot, TRUE);
       envp = g_environ_unsetenv (envp, "HOME");
-      envp = g_environ_unsetenv (envp, "XDG_CONFIG_DIRS");
-      envp = g_environ_unsetenv (envp, "XDG_DATA_DIRS");
+      envp = g_environ_unsetenv (envp, _SRT_XDG_CONFIG_DIRS_VAR);
+      envp = g_environ_unsetenv (envp, _SRT_XDG_DATA_DIRS_VAR);
 
       if (test->xr_api_layer_path != NULL)
         envp = g_environ_setenv (envp, "XR_API_LAYER_PATH", test->xr_api_layer_path, TRUE);
@@ -3742,10 +3742,10 @@ test_layer_vulkan (Fixture *f,
       vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
                                                 "HOME", test->home);
       vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
-                                                "XDG_CONFIG_DIRS",
+                                                _SRT_XDG_CONFIG_DIRS_VAR,
                                                 test->xdg_config_dirs);
       vulkan_layer_envp = environ_set_or_unset (vulkan_layer_envp,
-                                                "XDG_DATA_DIRS",
+                                                _SRT_XDG_DATA_DIRS_VAR,
                                                 test->xdg_data_dirs);
 
       info = srt_system_info_new (NULL);

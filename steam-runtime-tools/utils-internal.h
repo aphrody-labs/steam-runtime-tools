@@ -41,6 +41,24 @@
 #include <steam-runtime-tools/macros.h>
 #include <steam-runtime-tools/glib-backports-internal.h>
 
+/* Reference:
+ * https://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html */
+#define _SRT_XDG_CACHE_HOME_VAR "XDG_CACHE_HOME"
+#define _SRT_XDG_CACHE_HOME_DEFAULT_SUBDIR ".cache"
+
+#define _SRT_XDG_CONFIG_HOME_VAR "XDG_CONFIG_HOME"
+#define _SRT_XDG_CONFIG_HOME_DEFAULT_SUBDIR ".config"
+#define _SRT_XDG_CONFIG_DIRS_VAR "XDG_CONFIG_DIRS"
+#define _SRT_XDG_CONFIG_DIRS_DEFAULT "/etc/xdg"
+
+#define _SRT_XDG_DATA_HOME_VAR "XDG_DATA_HOME"
+#define _SRT_XDG_DATA_HOME_DEFAULT_SUBDIR ".local/share"
+#define _SRT_XDG_DATA_DIRS_VAR "XDG_DATA_DIRS"
+#define _SRT_XDG_DATA_DIRS_DEFAULT "/usr/local/share:/usr/share"
+
+#define _SRT_XDG_STATE_HOME_VAR "XDG_STATE_HOME"
+#define _SRT_XDG_STATE_HOME_DEFAULT_SUBDIR ".local/state"
+
 #ifdef __has_feature
 #define _srt_compiler_has_feature __has_feature
 #else

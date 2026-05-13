@@ -148,12 +148,12 @@ const gchar *mime_cache =
   else if (f->testing_beta_client)
     {
       f->steam_install = g_build_filename (f->home, "beta-client", NULL);
-      f->steam_data = g_build_filename (f->home, ".local", "share",
+      f->steam_data = g_build_filename (f->home, _SRT_XDG_DATA_HOME_DEFAULT_SUBDIR,
                                         "Steam", NULL);
     }
   else
     {
-      f->steam_install = g_build_filename (f->home, ".local", "share",
+      f->steam_install = g_build_filename (f->home, _SRT_XDG_DATA_HOME_DEFAULT_SUBDIR,
                                            "Steam", NULL);
       f->steam_data = g_strdup (f->steam_install);
     }
@@ -272,10 +272,10 @@ const gchar *mime_cache =
         }
     }
 
-  local_share = g_build_filename (f->home, ".local", "share", NULL);
+  local_share = g_build_filename (f->home, _SRT_XDG_DATA_HOME_DEFAULT_SUBDIR, NULL);
   f->env = g_get_environ ();
   f->env = g_environ_setenv (f->env, "HOME", f->home, TRUE);
-  f->env = g_environ_setenv (f->env, "XDG_DATA_HOME", local_share, TRUE);
+  f->env = g_environ_setenv (f->env, _SRT_XDG_DATA_HOME_VAR, local_share, TRUE);
   /* Make sure we don't find /etc/os-release or /usr/lib/os-release
    * if we happen to be in a Steam Runtime container */
   f->sysroot = g_strdup (f->home);

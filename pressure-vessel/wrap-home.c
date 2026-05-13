@@ -27,6 +27,8 @@
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "libglnx.h"
 
+#include "steam-runtime-tools/utils-internal.h"
+
 #include "exports.h"
 #include "flatpak-utils-base-private.h"
 #include "flatpak-utils-private.h"
@@ -54,10 +56,10 @@ use_tmpfs_home (FlatpakExports *exports,
 {
   const gchar *home = g_get_home_dir ();
   g_autofree char *real_home = realpath (home, NULL);
-  g_autofree gchar *cache = g_build_filename (real_home, ".cache", NULL);
+  g_autofree gchar *cache = g_build_filename (real_home, _SRT_XDG_CACHE_HOME_DEFAULT_SUBDIR, NULL);
   g_autofree gchar *cache2 = g_build_filename (real_home, "cache", NULL);
   g_autofree gchar *tmp = g_build_filename (cache, "tmp", NULL);
-  g_autofree gchar *config = g_build_filename (real_home, ".config", NULL);
+  g_autofree gchar *config = g_build_filename (real_home, _SRT_XDG_CONFIG_HOME_DEFAULT_SUBDIR, NULL);
   g_autofree gchar *config2 = g_build_filename (real_home, "config", NULL);
   g_autofree gchar *local = g_build_filename (real_home, ".local", NULL);
   g_autofree gchar *data = g_build_filename (local, "share", NULL);
@@ -84,15 +86,15 @@ use_tmpfs_home (FlatpakExports *exports,
                           "--dir", config,
                           "--dir", local,
                           "--dir", data,
-                          "--symlink", ".cache", cache2,
-                          "--symlink", ".config", config2,
-                          "--symlink", ".local/share", data2,
+                          "--symlink", _SRT_XDG_CACHE_HOME_DEFAULT_SUBDIR, cache2,
+                          "--symlink", _SRT_XDG_CONFIG_HOME_DEFAULT_SUBDIR, config2,
+                          "--symlink", _SRT_XDG_DATA_HOME_DEFAULT_SUBDIR, data2,
                           "--symlink", tmp, "/var/tmp",
                           NULL);
 
-  _srt_env_overlay_set (container_env, "XDG_CACHE_HOME", cache);
-  _srt_env_overlay_set (container_env, "XDG_CONFIG_HOME", config);
-  _srt_env_overlay_set (container_env, "XDG_DATA_HOME", data);
+  _srt_env_overlay_set (container_env, _SRT_XDG_CACHE_HOME_VAR, cache);
+  _srt_env_overlay_set (container_env, _SRT_XDG_CONFIG_HOME_VAR, config);
+  _srt_env_overlay_set (container_env, _SRT_XDG_DATA_HOME_VAR, data);
 
   return expose_steam (exports, FLATPAK_FILESYSTEM_MODE_READ_ONLY,
                        PV_HOME_MODE_TRANSIENT, real_home, NULL, error);
@@ -106,10 +108,10 @@ use_fake_home (FlatpakExports *exports,
                GError **error)
 {
   const gchar *real_home = g_get_home_dir ();
-  g_autofree gchar *cache = g_build_filename (fake_home, ".cache", NULL);
+  g_autofree gchar *cache = g_build_filename (fake_home, _SRT_XDG_CACHE_HOME_DEFAULT_SUBDIR, NULL);
   g_autofree gchar *cache2 = g_build_filename (fake_home, "cache", NULL);
   g_autofree gchar *tmp = g_build_filename (cache, "tmp", NULL);
-  g_autofree gchar *config = g_build_filename (fake_home, ".config", NULL);
+  g_autofree gchar *config = g_build_filename (fake_home, _SRT_XDG_CONFIG_HOME_DEFAULT_SUBDIR, NULL);
   g_autofree gchar *config2 = g_build_filename (fake_home, "config", NULL);
   g_autofree gchar *local = g_build_filename (fake_home, ".local", NULL);
   g_autofree gchar *data = g_build_filename (local, "share", NULL);
@@ -131,30 +133,33 @@ use_fake_home (FlatpakExports *exports,
     {
       g_unlink (cache2);
 
-      if (symlink (".cache", cache2) != 0)
+      if (symlink (_SRT_XDG_CACHE_HOME_DEFAULT_SUBDIR, cache2) != 0)
         return glnx_throw_errno_prefix (error,
-                                        "Unable to create symlink %s -> .cache",
-                                        cache2);
+                                        "Unable to create symlink %s -> %s",
+                                        cache2,
+                                        _SRT_XDG_CACHE_HOME_DEFAULT_SUBDIR);
     }
 
   if (!g_file_test (config2, G_FILE_TEST_EXISTS))
     {
       g_unlink (config2);
 
-      if (symlink (".config", config2) != 0)
+      if (symlink (_SRT_XDG_CONFIG_HOME_DEFAULT_SUBDIR, config2) != 0)
         return glnx_throw_errno_prefix (error,
-                                        "Unable to create symlink %s -> .config",
-                                        config2);
+                                        "Unable to create symlink %s -> %s",
+                                        config2,
+                                        _SRT_XDG_CONFIG_HOME_DEFAULT_SUBDIR);
     }
 
   if (!g_file_test (data2, G_FILE_TEST_EXISTS))
     {
       g_unlink (data2);
 
-      if (symlink (".local/share", data2) != 0)
+      if (symlink (_SRT_XDG_DATA_HOME_DEFAULT_SUBDIR, data2) != 0)
         return glnx_throw_errno_prefix (error,
-                                        "Unable to create symlink %s -> .local/share",
-                                        data2);
+                                        "Unable to create symlink %s -> %s",
+                                        data2,
+                                        _SRT_XDG_DATA_HOME_DEFAULT_SUBDIR);
     }
 
   /* If the logical path to real_home has a symlink among its ancestors
@@ -172,9 +177,9 @@ use_fake_home (FlatpakExports *exports,
                           "--bind", tmp, "/var/tmp",
                           NULL);
 
-  _srt_env_overlay_set (container_env, "XDG_CACHE_HOME", cache);
-  _srt_env_overlay_set (container_env, "XDG_CONFIG_HOME", config);
-  _srt_env_overlay_set (container_env, "XDG_DATA_HOME", data);
+  _srt_env_overlay_set (container_env, _SRT_XDG_CACHE_HOME_VAR, cache);
+  _srt_env_overlay_set (container_env, _SRT_XDG_CONFIG_HOME_VAR, config);
+  _srt_env_overlay_set (container_env, _SRT_XDG_DATA_HOME_VAR, data);
 
   pv_exports_expose_or_log (exports, FLATPAK_FILESYSTEM_MODE_READ_WRITE,
                             fake_home);
@@ -301,15 +306,15 @@ static const char * const shared_like_home_relative[] =
    * We handle .config even if XDG_DATA_HOME is different, and so on,
    * because it's common (albeit wrong) for applications to ignore the
    * environment variable and hard-code its default. */
-  ".cache",
-  ".config",
-  ".local/share",
-  ".local/state",
+  _SRT_XDG_CACHE_HOME_DEFAULT_SUBDIR,
+  _SRT_XDG_CONFIG_HOME_DEFAULT_SUBDIR,
+  _SRT_XDG_DATA_HOME_DEFAULT_SUBDIR,
+  _SRT_XDG_STATE_HOME_DEFAULT_SUBDIR,
   ".var",
 
   /* Steam-specific */
-  ".config/cef_user_data",
-  ".local/share/Steam",
+  _SRT_XDG_CONFIG_HOME_DEFAULT_SUBDIR "/cef_user_data",
+  _SRT_XDG_DATA_HOME_DEFAULT_SUBDIR "/Steam",
 };
 
 gboolean

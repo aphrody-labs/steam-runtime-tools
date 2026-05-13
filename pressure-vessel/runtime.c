@@ -8560,8 +8560,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                             _SRT_GRAPHICS_OPENXR_1_IMPLICIT_LAYER_SUFFIX);
 
           pv_runtime_prepend_to_xdg_dirs (self, container_env, override_share,
-                                          "XDG_DATA_DIRS",
-                                          "/usr/local/share:/usr/share");
+                                          _SRT_XDG_DATA_DIRS_VAR,
+                                          _SRT_XDG_DATA_DIRS_DEFAULT);
         }
       else
         {
@@ -8591,7 +8591,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                             override_config,
                                             _SRT_GRAPHICS_OPENXR_1_RUNTIME_SUFFIX);
           pv_runtime_prepend_to_xdg_dirs (self, container_env, override_config,
-                                          "XDG_CONFIG_DIRS", "/etc/xdg");
+                                          _SRT_XDG_CONFIG_DIRS_VAR,
+                                          _SRT_XDG_CONFIG_DIRS_DEFAULT);
         }
 
       /* Make sure the host's XR_RUNTIME_PATH doesn't leak into the container. */

@@ -402,7 +402,7 @@ _srt_steam_check (const char * const *envp,
                         SRT_STEAM_ISSUES_UNKNOWN);
 
   home = _srt_environ_getenv (envp, "HOME");
-  user_data = _srt_environ_getenv (envp, "XDG_DATA_HOME");
+  user_data = _srt_environ_getenv (envp, _SRT_XDG_DATA_HOME_VAR);
 
   if (home == NULL)
     home = g_get_home_dir ();

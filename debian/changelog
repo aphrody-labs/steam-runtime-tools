@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260513.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260513.0) steamrt; urgency=medium
 
   * pressure-vessel:
     - Add an option so the experimental steamrt3c-based Steam client
@@ -36,7 +36,7 @@ steam-runtime-tools (0.20260513.0) UNRELEASED; urgency=medium
   * tests:
     - Don't try to test dialog-ui when compiling in steamrt3c
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 13 May 2026 12:12:36 +0100
+ -- Simon McVittie <smcv@collabora.com>  Wed, 13 May 2026 18:56:43 +0100
 
 steam-runtime-tools (0.20260505.0) steamrt; urgency=medium
 

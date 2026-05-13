@@ -268,7 +268,8 @@ main (int argc,
   else if (self->options.freedesktop_app_id)
     {
       home_mode = PV_HOME_MODE_PRIVATE;
-      private_home = g_build_filename (self->current_home, ".var", "app",
+      private_home = g_build_filename (g_quark_to_string (self->current_home),
+                                       ".var", "app",
                                        self->options.freedesktop_app_id,
                                        NULL);
     }
@@ -277,7 +278,8 @@ main (int argc,
       home_mode = PV_HOME_MODE_PRIVATE;
       self->options.freedesktop_app_id = g_strdup_printf ("com.steampowered.App%s",
                                                           steam_app_id);
-      private_home = g_build_filename (self->current_home, ".var", "app",
+      private_home = g_build_filename (g_quark_to_string (self->current_home),
+                                       ".var", "app",
                                        self->options.freedesktop_app_id,
                                        NULL);
     }
@@ -713,7 +715,9 @@ main (int argc,
 
       bwrap_home_arguments = flatpak_bwrap_new (flatpak_bwrap_empty_env);
 
-      if (!pv_wrap_use_home (home_mode, self->current_home, private_home,
+      if (!pv_wrap_use_home (home_mode,
+                             g_quark_to_string (self->current_home),
+                             private_home,
                              self->exports, bwrap_home_arguments, container_env,
                              self->workarounds,
                              error))
@@ -958,7 +962,7 @@ main (int argc,
       flatpak_exports_append_bwrap_args (self->exports, exports_bwrap);
       g_warn_if_fail (g_strv_length (exports_bwrap->envp) == 0);
       if (!pv_bwrap_append_adjusted_exports (bwrap, exports_bwrap,
-                                             self->current_home,
+                                             g_quark_to_string (self->current_home),
                                              interpreter_root,
                                              self->workarounds,
                                              error))
@@ -984,7 +988,7 @@ main (int argc,
       g_warn_if_fail (g_strv_length (sharing_bwrap->envp) == 0);
 
       if (!pv_bwrap_append_adjusted_exports (bwrap, sharing_bwrap,
-                                             self->current_home,
+                                             g_quark_to_string (self->current_home),
                                              interpreter_root,
                                              self->workarounds,
                                              error))

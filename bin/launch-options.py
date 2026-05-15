@@ -255,23 +255,33 @@ class Runtime(Component):
         self.provides = ''
 
 
+def _get_ldlp_runtime_version(path):
+    # type: (str) -> str
+
+    try:
+        with open(os.path.join(path, 'version.txt')) as reader:
+            version = reader.read().strip()
+    except Exception:
+        logger.debug('Failed to get LDLP runtime version', exc_info=True)
+        version = ''
+
+    if version.startswith('steam-runtime_'):
+        version = 'scout ' + version[len('steam-runtime_'):]
+
+    return version
+
+
 class LdlpRuntime(Runtime):
     def __init__(
         self,
         path,           # type: str
         home,           # type: str
+        version=''      # type: str
     ):  # type: (...) -> None
         super().__init__(path, home=home)
 
-        try:
-            with open(os.path.join(path, 'version.txt')) as reader:
-                version = reader.read().strip()
-        except Exception:
-            logger.debug('Failed to get LDLP runtime version', exc_info=True)
-            version = ''
-
-        if version.startswith('steam-runtime_'):
-            version = 'scout ' + version[len('steam-runtime_'):]
+        if not version:
+            version = _get_ldlp_runtime_version(path)
 
         if not self.provides:
             self.provides = 'scout'
@@ -313,13 +323,13 @@ class LayeredRuntime(LdlpRuntime):
         home,           # type: str
         argv,           # type: typing.List[str]
     ):  # type: (...) -> None
-        super().__init__(path, home=home)
+        version = _get_ldlp_runtime_version(
+            os.path.join(path, 'steam-runtime'),
+        ) or '(unknown version)'
+
+        super().__init__(path, home=home, version=version)
+
         self.argv = argv
-
-        if path.startswith(self.home + '/'):
-            path = '~' + path[len(self.home):]
-
-        self.description = path
         self.provides = 'scout'
         self.runs_on = 'soldier'
 

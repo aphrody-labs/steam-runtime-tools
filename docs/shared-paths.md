@@ -294,7 +294,7 @@ unless ignored by `PRESSURE_VESSEL_WORKAROUNDS=limit-shared-dirs`:
 * `/var/tmp`: Medium-term temporary directory
 
 If the home directory is not shared, then those locations are not
-share either.
+shared either.
 
 If the
 [`limit-shared-dirs` workaround][limiting shared directories]

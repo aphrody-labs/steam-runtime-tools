@@ -72,6 +72,7 @@ MAJOR_VERSIONS = {
 COMPAT_TARGETS = RUNTIMES + [
     'sniper-arm64',
     'steamrt4-arm64',
+    'steamrt5-arm64',
     'windows',
     'host',
 ]
@@ -179,10 +180,16 @@ class Proton(Component):
             self.runs_on = 'soldier'
         elif '1628350' in content:
             self.runs_on = 'sniper'
+        elif '3810310' in content:
+            self.runs_on = 'sniper-arm64'
         elif '4183110' in content:
             self.runs_on = 'steamrt4'
+        elif '4185400' in content:
+            self.runs_on = 'steamrt4-arm64'
         elif '4185420' in content:
             self.runs_on = 'steamrt5'
+        elif '4185440' in content:
+            self.runs_on = 'steamrt5-arm64'
         else:
             self.runs_on = 'scout'
 

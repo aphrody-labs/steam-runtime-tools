@@ -1339,7 +1339,7 @@ class Gui:
                     'Discovered possible LD_LIBRARY_PATH runtime: %s', path,
                 )
 
-                if path not in self.container_runtimes:
+                if path not in self.ldlp_runtimes:
                     self.ldlp_runtimes[path] = LdlpRuntime(
                         path,
                         home=self.home,

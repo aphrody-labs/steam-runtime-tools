@@ -323,15 +323,22 @@ class LayeredRuntime(LdlpRuntime):
         home,           # type: str
         argv,           # type: typing.List[str]
     ):  # type: (...) -> None
-        version = _get_ldlp_runtime_version(
-            os.path.join(path, 'steam-runtime'),
-        ) or '(unknown version)'
+        sr_path = os.path.join(path, 'steam-runtime')
+        version = _get_ldlp_runtime_version(sr_path)
+
+        included_runtime = None     # type: typing.Optional[LdlpRuntime]
+
+        if version:
+            included_runtime = LdlpRuntime(path, home=home, version=version)
+        else:
+            version = '(unknown version)'
 
         super().__init__(path, home=home, version=version)
 
         self.argv = argv
         self.provides = 'scout'
         self.runs_on = 'soldier'
+        self.included_runtime = included_runtime
 
 
 class ContainerRuntime(Runtime):

@@ -333,6 +333,8 @@ These environment variables cannot be used for locations that are
 
 ## Limiting shared directories
 
+[limiting shared directories]: #limiting-shared-directories
+
 If the container runtime framework is run with environment variable
 `PRESSURE_VESSEL_WORKAROUNDS=limit-shared-dirs`,
 or with `limit-shared-dirs` or one of its aliases added to a list of

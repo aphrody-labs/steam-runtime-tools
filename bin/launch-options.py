@@ -273,8 +273,8 @@ class LdlpRuntime(Runtime):
         if version.startswith('steam-runtime_'):
             version = 'scout ' + version[len('steam-runtime_'):]
 
-            if not self.provides:
-                self.provides = 'scout'
+        if not self.provides:
+            self.provides = 'scout'
 
         if path.startswith(self.home + '/'):
             path = '~' + path[len(self.home):]

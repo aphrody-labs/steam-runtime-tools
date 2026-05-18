@@ -1,3 +1,15 @@
+steam-runtime-tools (0.20260518.0) UNRELEASED; urgency=medium
+
+  * Documentation fixes
+  * Developer tools:
+    - s-r-launch-options: Mark layered runtimes with their version number
+      (steamrt/tasks#663)
+    - s-r-launch-options: Handle new LegacySteamRuntime compatibility tool
+      (steamrt/tasks#664)
+    - s-r-launch-options: Recognise versions of Proton that run on arm64 SLR
+
+ -- Simon McVittie <smcv@collabora.com>  Mon, 18 May 2026 11:34:18 +0100
+
 steam-runtime-tools (0.20260513.0) steamrt; urgency=medium
 
   * pressure-vessel:

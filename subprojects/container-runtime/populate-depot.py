@@ -113,6 +113,16 @@ def _compute_sha256(path: Path) -> str:
     return hasher.hexdigest()
 
 
+def _check_sha256(path: Path, expected: str) -> bool:
+    """
+    Return True if the file at *path* matches the expected SHA-256 digest.
+    """
+    try:
+        return _compute_sha256(path) == expected
+    except OSError:
+        return False
+
+
 class Runtime:
     def __init__(
         self,
@@ -273,14 +283,9 @@ class Runtime:
         dest = os.path.join(self.cache, filename)
 
         if filename in self.sha256:
-            try:
-                digest = _compute_sha256(Path(dest))
-            except OSError:
-                pass
-            else:
-                if digest == self.sha256[filename]:
-                    logger.info('Using cached %r', dest)
-                    return dest
+            if _check_sha256(Path(dest), self.sha256[filename]):
+                logger.info('Using cached %r', dest)
+                return dest
 
         if self.ssh_host and self.ssh_path:
             path = self.get_ssh_path(filename)

@@ -95,6 +95,24 @@ class InvocationError(Exception):
     pass
 
 
+def _compute_sha256(path: Path) -> str:
+    """
+    Return the SHA-256 hex digest of the file at *path*.
+    """
+    with open(path, 'rb') as reader:
+        hasher = hashlib.sha256()
+
+        while True:
+            blob = reader.read(4096)
+
+            if not blob:
+                break
+
+            hasher.update(blob)
+
+    return hasher.hexdigest()
+
+
 class Runtime:
     def __init__(
         self,
@@ -256,18 +274,7 @@ class Runtime:
 
         if filename in self.sha256:
             try:
-                with open(dest, 'rb') as reader:
-                    hasher = hashlib.sha256()
-
-                    while True:
-                        blob = reader.read(4096)
-
-                        if not blob:
-                            break
-
-                        hasher.update(blob)
-
-                    digest = hasher.hexdigest()
+                digest = _compute_sha256(Path(dest))
             except OSError:
                 pass
             else:
@@ -1563,17 +1570,7 @@ class Main:
                         if file_id in sha256:
                             digest = sha256[file_id]
                         else:
-                            hasher = hashlib.sha256()
-                            with open(member, 'rb') as f:
-                                while True:
-                                    blob = f.read(4096)
-
-                                    if not blob:
-                                        break
-
-                                    hasher.update(blob)
-
-                            digest = hasher.hexdigest()
+                            digest = _compute_sha256(member)
                             sha256[file_id] = digest
 
                         short_hash = digest[:2] + '/' + digest[2:8]

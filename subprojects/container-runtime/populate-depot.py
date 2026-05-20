@@ -326,6 +326,10 @@ class Runtime:
                         logger.warning("Integrity check failed for %r", dest)
                         logger.warning("Downloaded %d of %s bytes",
                                        downloaded, length or "(unknown)")
+
+                # Sleep before attempting again to give the server a chance to
+                # recover from possible quota limits
+                time.sleep(20)
             else:
                 raise RuntimeError(
                     'SHA-256 mismatch for {!r} after {} attempts,'

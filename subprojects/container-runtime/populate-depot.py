@@ -91,6 +91,9 @@ ARCH_TO_TUPLE = {
 }
 
 
+MAX_DOWNLOAD_ATTEMPTS = 3
+
+
 class InvocationError(Exception):
     pass
 
@@ -300,13 +303,38 @@ class Runtime:
             ], check=True)
         else:
             uri = self.get_uri(filename)
-            logger.info('Downloading %r...', uri)
+            expected_sha256 = self.sha256.get(filename)
 
-            with opener.open(uri) as response:
-                with open(dest + '.new', 'wb') as writer:
-                    shutil.copyfileobj(response, writer)
+            if expected_sha256 is None:
+                raise RuntimeError(
+                    'No SHA-256 checksum available for {!r},'
+                    ' cannot verify download'.format(filename)
+                )
 
-                os.rename(dest + '.new', dest)
+            for attempt in range(MAX_DOWNLOAD_ATTEMPTS):
+                logger.info('Downloading %r...', uri)
+                with opener.open(uri) as response:
+                    length = response.length
+                    with open(dest + '.new', 'wb') as writer:
+                        shutil.copyfileobj(response, writer)
+                        downloaded = writer.tell()
+
+                    # out of `with open()` to make sure writer has been closed
+                    if _check_sha256(Path(dest + '.new'), expected_sha256):
+                        break
+                    else:
+                        logger.warning("Integrity check failed for %r", dest)
+                        logger.warning("Downloaded %d of %s bytes",
+                                       downloaded, length or "(unknown)")
+            else:
+                raise RuntimeError(
+                    'SHA-256 mismatch for {!r} after {} attempts,'
+                    ' possible truncated download'.format(
+                        filename, MAX_DOWNLOAD_ATTEMPTS,
+                    )
+                )
+
+            os.rename(dest + '.new', dest)
 
         return dest
 

@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260518.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260522.0) steamrt; urgency=medium
 
   * Documentation fixes
   * Developer tools:
@@ -8,7 +8,7 @@ steam-runtime-tools (0.20260518.0) UNRELEASED; urgency=medium
       (steamrt/tasks#664)
     - s-r-launch-options: Recognise versions of Proton that run on arm64 SLR
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 18 May 2026 11:34:18 +0100
+ -- Simon McVittie <smcv@collabora.com>  Fri, 22 May 2026 18:00:28 +0100
 
 steam-runtime-tools (0.20260513.0) steamrt; urgency=medium
 

@@ -226,6 +226,7 @@ fixture_create_runtime (Fixture *f,
   gsize i;
 
   g_assert_null (f->context->runtime);
+  g_assert_nonnull (f->context->original_environ);
 
   tuples[0] = g_quark_from_static_string ("arm-linux-gnueabihf");
   tuples[1] = g_quark_from_static_string ("arm-linux-gnueabi");
@@ -269,7 +270,7 @@ fixture_create_runtime (Fixture *f,
                                         archs_arr,
                                         graphics_providers,
                                         "/home/me",
-                                        _srt_peek_environ_nonnull (),
+                                        _srt_const_strv (f->context->original_environ),
                                         runner,
                                         flags,
                                         PV_WORKAROUND_FLAGS_NONE,

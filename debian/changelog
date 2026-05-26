@@ -1,3 +1,16 @@
+steam-runtime-tools (0.20260526.0) UNRELEASED; urgency=medium
+
+  [ Antonio Ospite ]
+  * Tests/CI:
+    - populate-depot: Make downloading files from HTTP more robust
+      (steamrt/tasks#1001)
+
+  [ Simon McVittie ]
+  * pressure-vessel:
+    - Internal refactoring (steamrt/tasks#995)
+
+ -- Simon McVittie <smcv@collabora.com>  Tue, 26 May 2026 18:25:02 +0100
+
 steam-runtime-tools (0.20260522.0) steamrt; urgency=medium
 
   * Documentation fixes

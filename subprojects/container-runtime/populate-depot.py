@@ -91,8 +91,39 @@ ARCH_TO_TUPLE = {
 }
 
 
+MAX_DOWNLOAD_ATTEMPTS = 3
+
+
 class InvocationError(Exception):
     pass
+
+
+def _compute_sha256(path: Path) -> str:
+    """
+    Return the SHA-256 hex digest of the file at *path*.
+    """
+    with open(path, 'rb') as reader:
+        hasher = hashlib.sha256()
+
+        while True:
+            blob = reader.read(4096)
+
+            if not blob:
+                break
+
+            hasher.update(blob)
+
+    return hasher.hexdigest()
+
+
+def _check_sha256(path: Path, expected: str) -> bool:
+    """
+    Return True if the file at *path* matches the expected SHA-256 digest.
+    """
+    try:
+        return _compute_sha256(path) == expected
+    except OSError:
+        return False
 
 
 class Runtime:
@@ -255,25 +286,9 @@ class Runtime:
         dest = os.path.join(self.cache, filename)
 
         if filename in self.sha256:
-            try:
-                with open(dest, 'rb') as reader:
-                    hasher = hashlib.sha256()
-
-                    while True:
-                        blob = reader.read(4096)
-
-                        if not blob:
-                            break
-
-                        hasher.update(blob)
-
-                    digest = hasher.hexdigest()
-            except OSError:
-                pass
-            else:
-                if digest == self.sha256[filename]:
-                    logger.info('Using cached %r', dest)
-                    return dest
+            if _check_sha256(Path(dest), self.sha256[filename]):
+                logger.info('Using cached %r', dest)
+                return dest
 
         if self.ssh_host and self.ssh_path:
             path = self.get_ssh_path(filename)
@@ -288,13 +303,42 @@ class Runtime:
             ], check=True)
         else:
             uri = self.get_uri(filename)
-            logger.info('Downloading %r...', uri)
+            expected_sha256 = self.sha256.get(filename)
 
-            with opener.open(uri) as response:
-                with open(dest + '.new', 'wb') as writer:
-                    shutil.copyfileobj(response, writer)
+            if expected_sha256 is None:
+                raise RuntimeError(
+                    'No SHA-256 checksum available for {!r},'
+                    ' cannot verify download'.format(filename)
+                )
 
-                os.rename(dest + '.new', dest)
+            for attempt in range(MAX_DOWNLOAD_ATTEMPTS):
+                logger.info('Downloading %r...', uri)
+                with opener.open(uri) as response:
+                    length = response.length
+                    with open(dest + '.new', 'wb') as writer:
+                        shutil.copyfileobj(response, writer)
+                        downloaded = writer.tell()
+
+                    # out of `with open()` to make sure writer has been closed
+                    if _check_sha256(Path(dest + '.new'), expected_sha256):
+                        break
+                    else:
+                        logger.warning("Integrity check failed for %r", dest)
+                        logger.warning("Downloaded %d of %s bytes",
+                                       downloaded, length or "(unknown)")
+
+                # Sleep before attempting again to give the server a chance to
+                # recover from possible quota limits
+                time.sleep(20)
+            else:
+                raise RuntimeError(
+                    'SHA-256 mismatch for {!r} after {} attempts,'
+                    ' possible truncated download'.format(
+                        filename, MAX_DOWNLOAD_ATTEMPTS,
+                    )
+                )
+
+            os.rename(dest + '.new', dest)
 
         return dest
 
@@ -1563,17 +1607,7 @@ class Main:
                         if file_id in sha256:
                             digest = sha256[file_id]
                         else:
-                            hasher = hashlib.sha256()
-                            with open(member, 'rb') as f:
-                                while True:
-                                    blob = f.read(4096)
-
-                                    if not blob:
-                                        break
-
-                                    hasher.update(blob)
-
-                            digest = hasher.hexdigest()
+                            digest = _compute_sha256(member)
                             sha256[file_id] = digest
 
                         short_hash = digest[:2] + '/' + digest[2:8]

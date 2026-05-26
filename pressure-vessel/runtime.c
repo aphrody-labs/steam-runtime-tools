@@ -5771,8 +5771,6 @@ collect_graphics_libraries_patterns (PvRuntime *self,
   {
     /* Mesa GLX, etc. */
     "gl:",
-    /* On Ubuntu, this is packaged with its dependencies missing */
-    "quiet:if-exists:even-if-older:soname-match:libnvidia-pkcs11*.so.*",
   };
   static const char * const sonames[] =
   {

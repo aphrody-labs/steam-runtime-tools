@@ -6091,6 +6091,13 @@ static const LibraryFamily library_families[] =
   },
   /* Other library families of interest */
   {
+    "libcrypto.so.3",
+    {
+      "if-exists:soname:libssl.so.3",
+      NULL
+    }
+  },
+  {
     "libxkbcommon.so.0",
     {
       "if-exists:soname:libxkbcommon-x11.so.0",

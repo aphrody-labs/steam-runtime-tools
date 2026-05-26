@@ -153,7 +153,7 @@ pv_wrap_context_get_property (GObject *object,
   switch (prop_id)
     {
       case PROP_CURRENT_HOME:
-        g_value_set_string (value, self->current_home);
+        g_value_set_string (value, g_quark_to_string (self->current_home));
         break;
 
       case PROP_CURRENT_ROOT:
@@ -177,8 +177,8 @@ pv_wrap_context_set_property (GObject *object,
     {
       case PROP_CURRENT_HOME:
         /* Construct-only */
-        g_return_if_fail (self->current_home == NULL);
-        self->current_home = g_value_dup_string (value);
+        g_return_if_fail (self->current_home == 0);
+        self->current_home = g_quark_from_string (g_value_get_string (value));
         break;
 
       case PROP_CURRENT_ROOT:
@@ -200,11 +200,11 @@ pv_wrap_context_constructed (GObject *object)
 
   G_OBJECT_CLASS (pv_wrap_context_parent_class)->constructed (object);
 
-  if (self->current_home == NULL)
-    self->current_home = g_strdup (g_get_home_dir ());
+  if (self->current_home == 0)
+    self->current_home = g_quark_from_string (g_get_home_dir ());
 
   self->current_home_fd = _srt_sysroot_open (self->current_root,
-                                             self->current_home,
+                                             g_quark_to_string (self->current_home),
                                              (SRT_RESOLVE_FLAGS_READABLE
                                               | SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY),
                                              NULL,
@@ -214,7 +214,8 @@ pv_wrap_context_constructed (GObject *object)
   if (self->current_home_fd < 0)
     {
       g_warning ("Cannot open current home directory \"%s\": %s",
-                 self->current_home, local_error->message);
+                 g_quark_to_string (self->current_home),
+                 local_error->message);
       g_clear_error (&local_error);
     }
 }
@@ -248,7 +249,6 @@ pv_wrap_context_finalize (GObject *object)
   g_strfreev (self->original_argv);
   g_strfreev (self->original_environ);
   g_free (self->bwrap_executable);
-  g_free (self->current_home);
   g_clear_fd (&self->current_home_fd, NULL);
 
   G_OBJECT_CLASS (pv_wrap_context_parent_class)->finalize (object);

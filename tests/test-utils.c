@@ -67,12 +67,12 @@ _srt_global_setup_private_xdg_dirs (void)
   g_assert_no_error (error);
   fake_home_path = g_build_filename (fake_home_parent.path, "home", NULL);
 
-  xdg_data_home = g_build_filename (fake_home_path, ".local", "share", NULL);
+  xdg_data_home = g_build_filename (fake_home_path, _SRT_XDG_DATA_HOME_DEFAULT_SUBDIR, NULL);
 
-  g_setenv ("XDG_CONFIG_HOME", xdg_data_home, TRUE);
-  g_setenv ("XDG_CONFIG_DIRS", xdg_data_home, TRUE);
-  g_setenv ("XDG_DATA_HOME", xdg_data_home, TRUE);
-  g_setenv ("XDG_DATA_DIRS", xdg_data_home, TRUE);
+  g_setenv (_SRT_XDG_CONFIG_HOME_VAR, xdg_data_home, TRUE);
+  g_setenv (_SRT_XDG_CONFIG_DIRS_VAR, xdg_data_home, TRUE);
+  g_setenv (_SRT_XDG_DATA_HOME_VAR, xdg_data_home, TRUE);
+  g_setenv (_SRT_XDG_DATA_DIRS_VAR, xdg_data_home, TRUE);
 
   g_free (xdg_data_home);
 

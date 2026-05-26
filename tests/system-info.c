@@ -1664,7 +1664,8 @@ steam_symlink (Fixture *f,
    * folder that is not the expected homedir/.local/share */
   g_remove (dot_steam_bin32);
   data_home = g_build_filename (fake_home->home, "DataHome", NULL);
-  fake_home->env = g_environ_setenv (fake_home->env, "XDG_DATA_HOME", data_home, TRUE);
+  fake_home->env = g_environ_setenv (fake_home->env, _SRT_XDG_DATA_HOME_VAR,
+                                     data_home, TRUE);
   fake_home_apply_to_system_info (fake_home, info);
   issues = srt_system_info_get_steam_issues (info);
   g_assert_cmpint ((SRT_STEAM_ISSUES_DOT_STEAM_STEAM_NOT_SYMLINK
@@ -5529,8 +5530,8 @@ openxr_runtimes (Fixture *f,
 
   envp = g_get_environ ();
 
-  envp = g_environ_setenv (envp, "XDG_CONFIG_HOME", "/openxr/config-home", TRUE);
-  envp = g_environ_setenv (envp, "XDG_CONFIG_DIRS", "/openxr/doesnotexist", TRUE);
+  envp = g_environ_setenv (envp, _SRT_XDG_CONFIG_HOME_VAR, "/openxr/config-home", TRUE);
+  envp = g_environ_setenv (envp, _SRT_XDG_CONFIG_DIRS_VAR, "/openxr/doesnotexist", TRUE);
 
   info = srt_system_info_new (NULL);
   srt_system_info_set_sysroot (info, sysroot);

@@ -512,16 +512,6 @@ split_into_search_paths (GPtrArray *search_paths,
     g_ptr_array_add (search_paths, g_build_filename (dirs[i], suffix, NULL));
 }
 
-#define XDG_CONFIG_HOME_VAR "XDG_CONFIG_HOME"
-#define XDG_CONFIG_HOME_DEFAULT_SUBDIR ".config"
-#define XDG_CONFIG_DIRS_VAR "XDG_CONFIG_DIRS"
-#define XDG_CONFIG_DIRS_DEFAULT "/etc/xdg"
-
-#define XDG_DATA_HOME_VAR "XDG_DATA_HOME"
-#define XDG_DATA_HOME_DEFAULT_SUBDIR ".local/share"
-#define XDG_DATA_DIRS_VAR "XDG_DATA_DIRS"
-#define XDG_DATA_DIRS_DEFAULT "/usr/local/share:/usr/share"
-
 /* By default, SYSCONFDIR defaults to /usr/local/etc:
    https://registry.khronos.org/OpenXR/specs/1.1/loader.html#linux-manifest-search-paths
    but in practice, it's generally configured to be "/etc" like EXTRASYSCONFDIR.
@@ -564,12 +554,12 @@ _srt_graphics_get_openxr_1_runtime_search_paths (const char * const *envp)
 
   /* First comes $XDG_CONFIG_HOME, then $XDG_CONFIG_DIRS... */
   add_xdg_home_dir_to_search_paths (search_paths, envp,
-                                    XDG_CONFIG_HOME_VAR, home,
-                                    XDG_CONFIG_HOME_DEFAULT_SUBDIR,
+                                    _SRT_XDG_CONFIG_HOME_VAR, home,
+                                    _SRT_XDG_CONFIG_HOME_DEFAULT_SUBDIR,
                                     _SRT_GRAPHICS_OPENXR_1_RUNTIME_SUFFIX);
   split_env_path_into_search_paths (search_paths, envp,
-                                    XDG_CONFIG_DIRS_VAR,
-                                    XDG_CONFIG_DIRS_DEFAULT,
+                                    _SRT_XDG_CONFIG_DIRS_VAR,
+                                    _SRT_XDG_CONFIG_DIRS_DEFAULT,
                                     _SRT_GRAPHICS_OPENXR_1_RUNTIME_SUFFIX);
   /*
    * After this should come "the system's global configuration directory", but
@@ -1225,8 +1215,8 @@ _srt_graphics_get_openxr_1_layer_search_paths (const char * const *envp,
 
   /* XDG_CONFIG_DIRS */
   split_env_path_into_search_paths (search_paths, envp,
-                                    XDG_CONFIG_DIRS_VAR,
-                                    XDG_CONFIG_DIRS_DEFAULT,
+                                    _SRT_XDG_CONFIG_DIRS_VAR,
+                                    _SRT_XDG_CONFIG_DIRS_DEFAULT,
                                     suffix);
 
   /* We assume that the loader was built with SYSCONFDIR and
@@ -1237,16 +1227,16 @@ _srt_graphics_get_openxr_1_layer_search_paths (const char * const *envp,
 
   /* XDG_DATA_DIRS */
   split_env_path_into_search_paths (search_paths, envp,
-                                    XDG_DATA_DIRS_VAR,
-                                    XDG_DATA_DIRS_DEFAULT,
+                                    _SRT_XDG_DATA_DIRS_VAR,
+                                    _SRT_XDG_DATA_DIRS_DEFAULT,
                                     suffix);
 
   /* XDG_DATA_HOME.
    * The OpenXR spec says this is/should be searched *after* XDG_DATA_DIRS,
    * contrary to normal expectations */
   add_xdg_home_dir_to_search_paths (search_paths, envp,
-                                    XDG_DATA_HOME_VAR, home,
-                                    XDG_DATA_HOME_DEFAULT_SUBDIR,
+                                    _SRT_XDG_DATA_HOME_VAR, home,
+                                    _SRT_XDG_DATA_HOME_DEFAULT_SUBDIR,
                                     suffix);
 
   g_ptr_array_add (search_paths, NULL);

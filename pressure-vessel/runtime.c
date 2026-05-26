@@ -139,6 +139,7 @@ struct _PvRuntime
   SrtDirentCompareFunc arbitrary_dirent_order;
   GCompareFunc arbitrary_str_order;
 
+  GQuark home;
   PvRuntimeFlags flags;
   PvWorkaroundFlags workarounds;
   int overrides_fd;
@@ -163,6 +164,7 @@ enum {
   PROP_ARCHITECTURES,
   PROP_BUBBLEWRAP,
   PROP_GRAPHICS_PROVIDERS,
+  PROP_HOME,
   PROP_SOURCE,
   PROP_ORIGINAL_ENVIRON,
   PROP_FLAGS,
@@ -904,6 +906,10 @@ pv_runtime_get_property (GObject *object,
         g_value_set_boxed (value, self->providers);
         break;
 
+      case PROP_HOME:
+        g_value_set_string (value, g_quark_to_string (self->home));
+        break;
+
       case PROP_ORIGINAL_ENVIRON:
         g_value_set_boxed (value, self->original_environ);
         break;
@@ -966,6 +972,13 @@ pv_runtime_set_property (GObject *object,
         /* Construct-only */
         g_return_if_fail (self->providers == NULL);
         self->providers = g_value_dup_boxed (value);
+        break;
+
+      case PROP_HOME:
+        /* Construct-only */
+        g_return_if_fail (self->home == 0);
+
+        self->home = g_quark_from_string (g_value_get_string (value));
         break;
 
       case PROP_ORIGINAL_ENVIRON:
@@ -1883,6 +1896,13 @@ pv_runtime_class_init (PvRuntimeClass *cls)
                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                          G_PARAM_STATIC_STRINGS));
 
+  properties[PROP_HOME] =
+    g_param_spec_string ("home", "Home directory",
+                         "The original home directory to use",
+                         NULL,
+                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
+                          G_PARAM_STATIC_STRINGS));
+
   properties[PROP_ORIGINAL_ENVIRON] =
     g_param_spec_boxed ("original-environ", "Original environ",
                         "The original environ to use",
@@ -1934,6 +1954,7 @@ pv_runtime_new (const char *source,
                 const char *bubblewrap,
                 GArray *architectures,
                 GPtrArray *providers,
+                const char *home,
                 const char * const *original_environ,
                 SrtSubprocessRunner *run_in_current_context,
                 PvRuntimeFlags flags,
@@ -1949,6 +1970,7 @@ pv_runtime_new (const char *source,
                          "architectures", architectures,
                          "bubblewrap", bubblewrap,
                          "graphics-providers", providers,
+                         "home", home,
                          "original-environ", original_environ,
                          "run-in-current-context", run_in_current_context,
                          "variable-dir", variable_dir,
@@ -8560,8 +8582,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                             _SRT_GRAPHICS_OPENXR_1_IMPLICIT_LAYER_SUFFIX);
 
           pv_runtime_prepend_to_xdg_dirs (self, container_env, override_share,
-                                          "XDG_DATA_DIRS",
-                                          "/usr/local/share:/usr/share");
+                                          _SRT_XDG_DATA_DIRS_VAR,
+                                          _SRT_XDG_DATA_DIRS_DEFAULT);
         }
       else
         {
@@ -8591,7 +8613,8 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
                                             override_config,
                                             _SRT_GRAPHICS_OPENXR_1_RUNTIME_SUFFIX);
           pv_runtime_prepend_to_xdg_dirs (self, container_env, override_config,
-                                          "XDG_CONFIG_DIRS", "/etc/xdg");
+                                          _SRT_XDG_CONFIG_DIRS_VAR,
+                                          _SRT_XDG_CONFIG_DIRS_DEFAULT);
         }
 
       /* Make sure the host's XR_RUNTIME_PATH doesn't leak into the container. */

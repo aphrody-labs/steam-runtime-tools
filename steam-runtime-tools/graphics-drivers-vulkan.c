@@ -481,20 +481,20 @@ _srt_graphics_get_vulkan_search_paths (SrtSysroot *sysroot,
     home = g_get_home_dir ();
 
   /* 1. $XDG_CONFIG_HOME or $HOME/.config (since 1.2.198) */
-  value = _srt_environ_getenv (envp, "XDG_CONFIG_HOME");
+  value = _srt_environ_getenv (envp, _SRT_XDG_CONFIG_HOME_VAR);
 
   if (value != NULL)
     g_ptr_array_add (search_paths, g_build_filename (value, suffix, NULL));
   else if (home != NULL)
-    g_ptr_array_add (search_paths, g_build_filename (home, ".config", suffix, NULL));
+    g_ptr_array_add (search_paths, g_build_filename (home, _SRT_XDG_CONFIG_HOME_DEFAULT_SUBDIR, suffix, NULL));
 
   /* 1a. $XDG_CONFIG_DIRS or /etc/xdg */
-  value = _srt_environ_getenv (envp, "XDG_CONFIG_DIRS");
+  value = _srt_environ_getenv (envp, _SRT_XDG_CONFIG_DIRS_VAR);
 
   /* Constant and non-configurable fallback, as per
    * https://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html */
   if (value == NULL)
-    value = "/etc/xdg";
+    value = _SRT_XDG_CONFIG_DIRS_DEFAULT;
 
   dirs = g_strsplit (value, G_SEARCHPATH_SEPARATOR_S, -1);
   for (i = 0; dirs[i] != NULL; i++)
@@ -554,7 +554,7 @@ _srt_graphics_get_vulkan_search_paths (SrtSysroot *sysroot,
    * https://github.com/ValveSoftware/steam-for-linux/issues/8337
    * So for now we continue to follow the misinterpretation, to make the
    * Steam Overlay more likely to work in pressure-vessel containers. */
-  value = _srt_environ_getenv (envp, "XDG_DATA_HOME");
+  value = _srt_environ_getenv (envp, _SRT_XDG_DATA_HOME_VAR);
 
   if (value != NULL)
     g_ptr_array_add (search_paths, g_build_filename (value, suffix, NULL));
@@ -563,7 +563,7 @@ _srt_graphics_get_vulkan_search_paths (SrtSysroot *sysroot,
   if (home != NULL)
     {
       g_ptr_array_add (search_paths,
-                       g_build_filename (home, ".local", "share", suffix, NULL));
+                       g_build_filename (home, _SRT_XDG_DATA_HOME_DEFAULT_SUBDIR, suffix, NULL));
 
       if (value != NULL)
         {
@@ -582,12 +582,12 @@ _srt_graphics_get_vulkan_search_paths (SrtSysroot *sysroot,
     }
 
   /* 5. $XDG_DATA_DIRS or /usr/local/share:/usr/share */
-  value = _srt_environ_getenv (envp, "XDG_DATA_DIRS");
+  value = _srt_environ_getenv (envp, _SRT_XDG_DATA_DIRS_VAR);
 
   /* Constant and non-configurable fallback, as per
    * https://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html */
   if (value == NULL)
-    value = "/usr/local/share" G_SEARCHPATH_SEPARATOR_S "/usr/share";
+    value = _SRT_XDG_DATA_DIRS_DEFAULT;
 
   dirs = g_strsplit (value, G_SEARCHPATH_SEPARATOR_S, -1);
   for (i = 0; dirs[i] != NULL; i++)

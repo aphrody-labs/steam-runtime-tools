@@ -295,9 +295,10 @@ pv_wrap_set_icons_env_vars (SrtEnvOverlay *container_env,
     {
       /* We assume that this function is called after use_tmpfs_home() or
        * use_fake_home(), if we are going to. */
-      container_xdg_data_home = _srt_env_overlay_get (container_env, "XDG_DATA_HOME");
+      container_xdg_data_home = _srt_env_overlay_get (container_env,
+                                                      _SRT_XDG_DATA_HOME_VAR);
       if (container_xdg_data_home == NULL)
-        container_xdg_data_home = "~/.local/share";
+        container_xdg_data_home = "~/" _SRT_XDG_DATA_HOME_DEFAULT_SUBDIR;
       data_home_icons = g_build_filename (container_xdg_data_home, "icons", NULL);
 
       /* Note that unlike most path-searching implementations, libXcursor and
@@ -321,21 +322,21 @@ pv_wrap_set_icons_env_vars (SrtEnvOverlay *container_env,
   _srt_search_path_append (new_xcursor_path, "/run/host/share/icons");
   _srt_env_overlay_set (container_env, "XCURSOR_PATH", new_xcursor_path->str);
 
-  initial_xdg_data_dirs = _srt_env_overlay_get (container_env, "XDG_DATA_DIRS");
+  initial_xdg_data_dirs = _srt_env_overlay_get (container_env, _SRT_XDG_DATA_DIRS_VAR);
   if (initial_xdg_data_dirs == NULL)
-    initial_xdg_data_dirs = _srt_environ_getenv (original_environ, "XDG_DATA_DIRS");
+    initial_xdg_data_dirs = _srt_environ_getenv (original_environ, _SRT_XDG_DATA_DIRS_VAR);
 
   /* Reference:
    * https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html */
   if (initial_xdg_data_dirs == NULL)
-    initial_xdg_data_dirs = "/usr/local/share:/usr/share";
+    initial_xdg_data_dirs = _SRT_XDG_DATA_DIRS_DEFAULT;
 
   /* Append the host "share" directories to "XDG_DATA_DIRS".
    * Currently this is only useful to load the provider's icons */
   _srt_search_path_append (new_data_dirs, initial_xdg_data_dirs);
   _srt_search_path_append (new_data_dirs, "/run/host/user-share");
   _srt_search_path_append (new_data_dirs, "/run/host/share");
-  _srt_env_overlay_set (container_env, "XDG_DATA_DIRS", new_data_dirs->str);
+  _srt_env_overlay_set (container_env, _SRT_XDG_DATA_DIRS_VAR, new_data_dirs->str);
 }
 
 /*
@@ -732,10 +733,10 @@ static const EnvMount known_required_env[] =
     { "STEAM_COMPAT_TOOL_PATHS", ENV_MOUNT_FLAGS_COLON_DELIMITED },
     { "STEAM_EXTRA_COMPAT_TOOLS_PATHS", ENV_MOUNT_FLAGS_COLON_DELIMITED },
     { "STEAM_RUNTIME_SCOUT", ENV_MOUNT_FLAGS_NONE },
-    { "XDG_CACHE_HOME", ENV_MOUNT_FLAGS_IF_HOME_SHARED },
-    { "XDG_CONFIG_HOME", ENV_MOUNT_FLAGS_IF_HOME_SHARED },
-    { "XDG_DATA_HOME", ENV_MOUNT_FLAGS_IF_HOME_SHARED },
-    { "XDG_STATE_HOME", ENV_MOUNT_FLAGS_IF_HOME_SHARED },
+    { _SRT_XDG_CACHE_HOME_VAR, ENV_MOUNT_FLAGS_IF_HOME_SHARED },
+    { _SRT_XDG_CONFIG_HOME_VAR, ENV_MOUNT_FLAGS_IF_HOME_SHARED },
+    { _SRT_XDG_DATA_HOME_VAR, ENV_MOUNT_FLAGS_IF_HOME_SHARED },
+    { _SRT_XDG_STATE_HOME_VAR, ENV_MOUNT_FLAGS_IF_HOME_SHARED },
 };
 
 static void

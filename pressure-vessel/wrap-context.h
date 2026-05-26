@@ -127,11 +127,11 @@ struct _PvWrapContext
   gchar **original_argv;
   gchar **original_environ;
   gchar *bwrap_executable;
-  gchar *current_home;
   SrtSubprocessRunner *run_in_current_context;
 
   PvWrapOptions options;
 
+  GQuark current_home;
   PvWorkaroundFlags workarounds;
   SrtBwrapFlags bwrap_flags;
 

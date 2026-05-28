@@ -168,19 +168,21 @@ even when the host operating system changes.
 Games that use this runtime can be tested for Steam Deck compatibility.
 It is referred to internally as [scout-on-soldier][scout-on-soldier].
 
-The *Legacy Runtime 1.0* is a non-default runtime environment for scout
+The [Legacy Steam Runtime][] is a non-default runtime environment for scout
 games.
 This means that Steam will use libraries from the host operating system
 (which vary widely between Linux distributions,
 between distribution versions and over time),
 with the [`LD_LIBRARY_PATH`-based scout runtime][ldlp-runtime] added for
 backward compatibility.
-This is equivalent to Steam's pre-2024 default behaviour.
+This is equivalent to Steam's pre-2024 default behaviour,
+and was labelled as *Legacy Runtime 1.0* in older versions of the
+Steam Client.
 Because this environment is not long-term-stable,
 games that rely on this runtime cannot pass Steam Deck compatibility testing.
 
 The user can select the *Steam Linux Runtime 1.0 (scout)* or
-*Legacy Runtime 1.0* compatibility tool in the game's properties,
+*Legacy Steam Runtime* compatibility tool in the game's properties,
 overriding the default set by the game developer.
 
 Games targeting either of these environments should be built in the
@@ -289,6 +291,7 @@ For a more scriptable version of this, run one of these commands:
   * Steam Linux Runtime 3.0 (sniper): `steam steam://install/1628350`
   * Steam Linux Runtime 2.0 (soldier): `steam steam://install/1391110`
   * Steam Linux Runtime 1.0 (scout): `steam steam://install/1070560`
+  * Legacy Steam Runtime: `steam steam://install/4690330`
   * Proton Experimental: `steam steam://install/1493710`
   * Proton 11.0: `steam steam://install/4628710`
   * Proton 10.0: `steam steam://install/3658110`
@@ -1577,6 +1580,7 @@ standard library.
 [Debian Policy]: https://www.debian.org/doc/debian-policy/ch-files.html#scripts
 [Debian's /etc/bash.bashrc]: https://sources.debian.org/src/bash/5.1-2/debian/etc.bash.bashrc/
 [Docker]: https://www.docker.com/
+[Legacy Steam Runtime]: legacy-steam-runtime.md
 [Linux joystick implementation in SDL]: https://github.com/libsdl-org/SDL/blob/main/src/joystick/linux/SDL_sysjoystick.c
 [Maelstrom]: https://store.steampowered.com/app/4239950/Maelstrom/
 [Paths shared between host system and container runtime]: shared-paths.md

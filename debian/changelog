@@ -10,7 +10,7 @@ steam-runtime-tools (0.20260528.0) UNRELEASED; urgency=medium
     - Treat host libcrypto.so.3 and libssl.so.3 as a related family,
       so that if we capture libcrypto.so.3 as a dependency of
       libnvidia-pkcs11*.so.*, we'll use a matching libssl.so.3
-      (steamrt/tasks#1035)
+      (steamrt/tasks#1035, steam-runtime#825)
     - Internal refactoring (steamrt/tasks#995)
 
  -- Simon McVittie <smcv@collabora.com>  Thu, 28 May 2026 11:39:18 +0100

@@ -284,11 +284,11 @@ an easy way to test that the compatibility tool is working correctly.
 
 For a more scriptable version of this, run one of these commands:
 
-  * Steam Linux Runtime 1.0 (scout): `steam steam://install/1070560`
-  * Steam Linux Runtime 2.0 (soldier): `steam steam://install/1391110`
-  * Steam Linux Runtime 3.0 (sniper): `steam steam://install/1628350`
   * Steam Linux Runtime 4.0: `steam steam://install/4183110`
   * Steam Linux Runtime 4.0 for arm64: `steam steam://install/4185400`
+  * Steam Linux Runtime 3.0 (sniper): `steam steam://install/1628350`
+  * Steam Linux Runtime 2.0 (soldier): `steam steam://install/1391110`
+  * Steam Linux Runtime 1.0 (scout): `steam steam://install/1070560`
   * Proton Experimental: `steam steam://install/1493710`
   * Proton 11.0: `steam steam://install/4628710`
   * Proton 10.0: `steam steam://install/3658110`

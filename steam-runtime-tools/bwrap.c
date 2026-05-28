@@ -328,7 +328,8 @@ _srt_check_bwrap (SrtSubprocessRunner *runner,
    * have all the features we could want */
   if (!test_bwrap_executable (runner, bwrap,
                               (SRT_BWRAP_FLAGS_HAS_LEVEL_PREFIX
-                               | SRT_BWRAP_FLAGS_HAS_PERMS),
+                               | SRT_BWRAP_FLAGS_HAS_PERMS
+                               | SRT_BWRAP_FLAGS_HAS_NOT_A_SECURITY_BOUNDARY),
                               &flags,
                               NULL))
     {
@@ -340,6 +341,10 @@ _srt_check_bwrap (SrtSubprocessRunner *runner,
        *  also have had --perms */
 
       test_bwrap_executable (runner, bwrap, SRT_BWRAP_FLAGS_HAS_PERMS,
+                             &flags, NULL);
+
+      test_bwrap_executable (runner, bwrap,
+                             SRT_BWRAP_FLAGS_HAS_NOT_A_SECURITY_BOUNDARY,
                              &flags, NULL);
 
       /* If we gain other features to check for, try them here,

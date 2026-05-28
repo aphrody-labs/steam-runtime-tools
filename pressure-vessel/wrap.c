@@ -397,6 +397,9 @@ main (int argc,
           && (self->bwrap_flags & SRT_BWRAP_FLAGS_HAS_LEVEL_PREFIX))
         flatpak_bwrap_add_arg (bwrap, "--level-prefix");
 
+      if (self->bwrap_flags & SRT_BWRAP_FLAGS_HAS_NOT_A_SECURITY_BOUNDARY)
+        flatpak_bwrap_add_arg (bwrap, "--not-a-security-boundary");
+
       /* Protect the controlling terminal from the app/game, unless we are
        * running an interactive shell in which case that would break its
        * job control. */

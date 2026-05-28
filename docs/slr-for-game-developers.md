@@ -1007,18 +1007,22 @@ in the row starting with `steamrt4`.
 Next, visit the corresponding numbered directory in
 <https://repo.steampowered.com/steamrt4/images/>
 and download the large archive named
-`com.valvesoftware.SteamRuntime.Sdk-amd64,i386-steamrt4-runtime.tar.gz`.
+`com.valvesoftware.SteamRuntime.Sdk-amd64,i386-steamrt4-sysroot.tar.gz`.
 
 In the `SteamLinuxRuntime_4` directory in your
-Steam library, create a directory `SteamLinuxRuntime_4/sdk` and unpack the
+Steam library,
+create a directory `SteamLinuxRuntime_4/sdk/files` and unpack the
 archive into it, so that you have files like
-`steamapps/common/SteamLinuxRuntime_4/sdk/files/lib/os-release` and
+`steamapps/common/SteamLinuxRuntime_4/sdk/files/usr/lib/os-release`,
+and create an empty file
 `steamapps/common/SteamLinuxRuntime_4/sdk/metadata`:
 
 ```
 $ cd .../SteamLinuxRuntime_4
-$ mkdir -p sdk
-$ tar -C sdk -xf ~/Downloads/com.valvesoftware.SteamRuntime.Sdk-amd64,i386-steamrt4-runtime.tar.gz
+$ rm -fr sdk/files
+$ mkdir -p sdk/files
+$ tar -C sdk -xf ~/Downloads/com.valvesoftware.SteamRuntime.Sdk-amd64,i386-steamrt4-sysroot.tar.gz
+$ touch sdk/metadata
 ```
 
 You can now use this runtime by selecting it from the *Container runtime*

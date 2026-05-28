@@ -1670,6 +1670,10 @@ class Gui:
 
             search_path.append(os.getenv('PRESSURE_VESSEL_RUNTIME_BASE'))
 
+            if container_runtime is not None:
+                path = container_runtime.path
+                self._search(path, seen, in_runtime=True)
+
             for search in search_path:
                 if search is None:
                     continue

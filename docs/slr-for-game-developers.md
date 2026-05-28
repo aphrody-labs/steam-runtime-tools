@@ -1003,7 +1003,13 @@ Docker images.
 To use the SDK, first identify the version of the Platform that you are
 using.
 This information can be found in `SteamLinuxRuntime_4/VERSIONS.txt`,
-in the row starting with `steamrt4`.
+in the row starting with `depot`:
+
+```
+$ grep '^depot' .../SteamLinuxRuntime_4/VERSIONS.txt
+depot	4.0.20260507.232683			# Overall version number
+```
+
 Next, visit the corresponding numbered directory in
 <https://repo.steampowered.com/steamrt4/images/>
 and download the large archive named

@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260526.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260528.0) UNRELEASED; urgency=medium
 
   [ Antonio Ospite ]
   * Tests/CI:
@@ -7,9 +7,13 @@ steam-runtime-tools (0.20260526.0) UNRELEASED; urgency=medium
 
   [ Simon McVittie ]
   * pressure-vessel:
+    - Treat host libcrypto.so.3 and libssl.so.3 as a related family,
+      so that if we capture libcrypto.so.3 as a dependency of
+      libnvidia-pkcs11*.so.*, we'll use a matching libssl.so.3
+      (steamrt/tasks#1035)
     - Internal refactoring (steamrt/tasks#995)
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 26 May 2026 18:25:02 +0100
+ -- Simon McVittie <smcv@collabora.com>  Thu, 28 May 2026 11:39:18 +0100
 
 steam-runtime-tools (0.20260522.0) steamrt; urgency=medium
 

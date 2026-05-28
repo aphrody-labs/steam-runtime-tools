@@ -92,9 +92,8 @@ This can be done during initial setup for an unreleased game,
 or as part of an update from a version that targeted scout or sniper
 to a newer version that targets steamrt4.
 
-<!--
-Games that use steamrt4 include [TODO].
--->
+Games that use steamrt4 include
+[Maelstrom][].
 
 ### <a name="sniper"></a>Native Linux games targeting Steam Runtime 3 'sniper'
 
@@ -1579,6 +1578,7 @@ standard library.
 [Debian's /etc/bash.bashrc]: https://sources.debian.org/src/bash/5.1-2/debian/etc.bash.bashrc/
 [Docker]: https://www.docker.com/
 [Linux joystick implementation in SDL]: https://github.com/libsdl-org/SDL/blob/main/src/joystick/linux/SDL_sysjoystick.c
+[Maelstrom]: https://store.steampowered.com/app/4239950/Maelstrom/
 [Paths shared between host system and container runtime]: shared-paths.md
 [Podman]: https://podman.io/
 [Proton documentation]: https://github.com/ValveSoftware/Proton/

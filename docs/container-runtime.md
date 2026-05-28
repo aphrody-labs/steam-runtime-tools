@@ -64,9 +64,8 @@ and reconfigure the title's metadata to ask Steam to run it with
 For more information please see
 [Steam Linux Runtime - guide for game developers][SLR for game developers].
 
-<!--
-Games that use steamrt4 include [TODO].
--->
+Games that use steamrt4 include
+[Maelstrom][].
 
 steamrt4 is also used as a runtime environment for Proton version 11 and up,
 which are compiled against this newer library stack.
@@ -299,6 +298,7 @@ contributed to the Linux kernel.
 [Dota 2]: https://store.steampowered.com/app/570/Dota_2/
 [Endless Sky]: https://endless-sky.github.io/
 [Flatpak]: https://flatpak.org/
+[Maelstrom]: https://store.steampowered.com/app/4239950/Maelstrom/
 [Retroarch]: https://www.retroarch.com/
 [SLR for game developers]: slr-for-game-developers.md
 [Steam Runtime issues]: https://github.com/ValveSoftware/steam-runtime/issues

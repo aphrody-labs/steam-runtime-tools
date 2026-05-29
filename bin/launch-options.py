@@ -527,22 +527,24 @@ class DirectoryRuntime(ContainerRuntime):
         except GLib.Error:
             pass
 
-        try:
-            with open(
-                os.path.join(files, 'lib', 'os-release')
-            ) as reader:
-                for line in reader:
-                    if line.startswith('PRETTY_NAME='):
-                        pretty_name = line.split('=', 1)[1].strip()
-                        pretty_name = GLib.shell_unquote(pretty_name)
-                    elif line.startswith('BUILD_ID='):
-                        build_id = line.split('=', 1)[1].strip()
-                        build_id = GLib.shell_unquote(build_id)
-                    elif line.startswith('VARIANT='):
-                        variant = line.split('=', 1)[1].strip()
-                        variant = GLib.shell_unquote(variant)
-        except (GLib.Error, EnvironmentError):
-            pass
+        for path in (
+            os.path.join(files, 'lib', 'os-release'),
+            os.path.join(files, 'usr', 'lib', 'os-release'),
+        ):
+            try:
+                with open(path) as reader:
+                    for line in reader:
+                        if line.startswith('PRETTY_NAME='):
+                            pretty_name = line.split('=', 1)[1].strip()
+                            pretty_name = GLib.shell_unquote(pretty_name)
+                        elif line.startswith('BUILD_ID='):
+                            build_id = line.split('=', 1)[1].strip()
+                            build_id = GLib.shell_unquote(build_id)
+                        elif line.startswith('VARIANT='):
+                            variant = line.split('=', 1)[1].strip()
+                            variant = GLib.shell_unquote(variant)
+            except (GLib.Error, EnvironmentError):
+                pass
 
         if pretty_name is None:
             pretty_name = name
@@ -1669,6 +1671,10 @@ class Gui:
             search_path.append('.')
 
             search_path.append(os.getenv('PRESSURE_VESSEL_RUNTIME_BASE'))
+
+            if container_runtime is not None:
+                path = container_runtime.path
+                self._search(path, seen, in_runtime=True)
 
             for search in search_path:
                 if search is None:

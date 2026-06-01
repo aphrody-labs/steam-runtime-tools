@@ -16,7 +16,7 @@ steam-runtime-tools (0.20260601.0) UNRELEASED; urgency=medium
     - s-r-launch-options: Look for other Platform/SDK directories in
       default SLR, fixing the "run in SDK for debugging" use-case
       that we document for game developers
-      (steamrt/tasks#892, stamrt/tasks#653)
+      (steamrt/tasks#892, steamrt/tasks#653)
     - s-r-launch-options: Improve labelling of alternative runtimes
   * Documentation updates
     (steamrt/tasks#653, steamrt/tasks#664, steamrt/tasks#854,

@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260528.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260601.0) UNRELEASED; urgency=medium
 
   [ Antonio Ospite ]
   * Tests/CI:
@@ -12,10 +12,17 @@ steam-runtime-tools (0.20260528.0) UNRELEASED; urgency=medium
       libnvidia-pkcs11*.so.*, we'll use a matching libssl.so.3
       (steamrt/tasks#1035, steam-runtime#825)
     - Internal refactoring (steamrt/tasks#995)
+  * Developer tools:
+    - s-r-launch-options: Look for other Platform/SDK directories in
+      default SLR, fixing the "run in SDK for debugging" use-case
+      that we document for game developers
+      (steamrt/tasks#892, stamrt/tasks#653)
+    - s-r-launch-options: Improve labelling of alternative runtimes
   * Documentation updates
-    (steamrt/tasks#664, steamrt/tasks#854)
+    (steamrt/tasks#653, steamrt/tasks#664, steamrt/tasks#854,
+    steamrt/tasks#892)
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 28 May 2026 14:28:37 +0100
+ -- Simon McVittie <smcv@collabora.com>  Mon, 01 Jun 2026 11:14:20 +0100
 
 steam-runtime-tools (0.20260522.0) steamrt; urgency=medium
 

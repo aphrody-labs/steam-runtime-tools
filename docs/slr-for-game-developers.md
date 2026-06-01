@@ -1003,22 +1003,50 @@ Docker images.
 To use the SDK, first identify the version of the Platform that you are
 using.
 This information can be found in `SteamLinuxRuntime_4/VERSIONS.txt`,
-in the row starting with `steamrt4`.
-Next, visit the corresponding numbered directory in
-<https://repo.steampowered.com/steamrt4/images/>
-and download the large archive named
-`com.valvesoftware.SteamRuntime.Sdk-amd64,i386-steamrt4-runtime.tar.gz`.
+in the row starting with `depot`:
+
+```
+$ grep '^depot' .../SteamLinuxRuntime_4/VERSIONS.txt
+depot	4.0.20260507.232683			# Overall version number
+```
+
+Next,
+use Podman or Docker to download the corresponding SDK and start a
+temporary container,
+for example:
+
+```
+$ version=4.0.20260507.232683
+$ sdk=registry.gitlab.steamos.cloud/steamrt/steamrt4/sdk:$version
+$ podman pull "$sdk"
+$ podman run --detach --name=temp-sdk --replace --rm "$sdk" tini sleep infinity
+```
 
 In the `SteamLinuxRuntime_4` directory in your
-Steam library, create a directory `SteamLinuxRuntime_4/sdk` and unpack the
-archive into it, so that you have files like
-`steamapps/common/SteamLinuxRuntime_4/sdk/files/lib/os-release` and
+Steam library,
+Steam library,
+create a directory `SteamLinuxRuntime_4/sdk/files`
+and export the SDK contents into it,
+so that you have files like
+`steamapps/common/SteamLinuxRuntime_4/sdk/files/usr/lib/os-release`,
+and create an empty file
 `steamapps/common/SteamLinuxRuntime_4/sdk/metadata`:
 
 ```
 $ cd .../SteamLinuxRuntime_4
-$ mkdir -p sdk
-$ tar -C sdk -xf ~/Downloads/com.valvesoftware.SteamRuntime.Sdk-amd64,i386-steamrt4-runtime.tar.gz
+$ rm -fr sdk/files
+$ mkdir -p sdk/files
+$ podman export temp-sdk | tar -C sdk/files -xf-
+$ grep BUILD_ID sdk/files/usr/lib/os-release
+BUILD_ID="4.0.20260507.232683"
+$ touch sdk/metadata
+```
+
+After exporting the runtime's root filesystem,
+you can remove the temporary container:
+
+```
+$ podman stop temp-sdk
 ```
 
 You can now use this runtime by selecting it from the *Container runtime*
@@ -1046,11 +1074,36 @@ You will find that tools like `gdb` and `strace` are available in the SDK
 environment.
 
 For [sniper][] the procedure is the same,
-but download from <https://repo.steampowered.com/steamrt3/images/>,
-replace `steamrt4` with `sniper` elsewhere,
+but replace `steamrt4` with `sniper`,
 and replace `SteamLinuxRuntime_4` with `SteamLinuxRuntime_sniper` throughout.
 
-[soldier][] works in the same way, but with `soldier` and `steamrt2`.
+[soldier][] works in the same way,
+but with `soldier`.
+
+<details><summary>Doing the same without using Podman or Docker</summary>
+
+Building a game for the Steam Runtime usually involves using
+Podman or Docker,
+either directly or via Toolbox or Distrobox.
+If you are using one of those tools already,
+using the same tool to download SDK files is convenient because they
+are likely to be cached locally already,
+reducing redundant downloading.
+However,
+the same thing can be achieved without using Podman or Docker:
+instead of using `podman export`,
+you can download the large archive named
+`com.valvesoftware.SteamRuntime.Sdk-amd64,i386-steamrt4-sysroot.tar.gz`
+from the appropriate version-numbered subdirectory of
+<https://repo.steampowered.com/steamrt4/images/>
+and unpack that into `sdk/files`.
+
+Or for sniper or soldier,
+you can download a similar archive from a subdirectory of
+<https://repo.steampowered.com/steamrt3/images/> or
+<https://repo.steampowered.com/steamrt2/images/>.
+
+</details>
 
 ## Running in a modified Platform or SDK environment
 
@@ -1073,28 +1126,39 @@ During game or runtime development, it is sometimes useful to use a
 modified runtime.
 This is unsupported, and should not be used as a production environment.
 
-To use a locally-modified SDK environment, start by downloading and
-unpacking the SDK as described above.
-You can modify the `sdk` directory before running the game, for example
-by unpacking a `.deb` file with `dpkg-deb -x` and copying the necessary
+To use a locally-modified SDK environment, start by downloading
+the SDK and starting a temporary container as described above.
+The simplest way to modify the temporary container is by using
+`podman exec` after running `podman run --detach ...`,
+but before `podman export`,
+for example by installing additional packages:
+
+```
+$ podman run --detach --name=temp-sdk --replace --rm "$sdk" tini sleep infinity
+$ podman exec -it temp-sdk apt-get update
+$ podman exec -it temp-sdk apt-get -y install cgdb
+```
+
+or equivalent `docker` commands.
+Alternatively,
+you can build and export a modified container in whatever way is convenient,
+for example using a `Dockerfile`,
+or edit the files in `sdk/files/` directly,
+for example by unpacking a compatible .deb file with `dpkg-deb -x`
+and copying the necessary
 files into place.
 
 To use a locally-modified Platform environment, proceed as if for the SDK,
-but download
-`com.valvesoftware.SteamRuntime.Platform-amd64,i386-steamrt4-runtime.tar.gz`
-and unpack it into `SteamLinuxRuntime_4/platform`,
-so that you have files like
-`steamapps/common/SteamLinuxRuntime_4/platform/files/lib/os-release` and
-`steamapps/common/SteamLinuxRuntime_4/platform/metadata`.
+but download a Platform container such as
+`registry.gitlab.steamos.cloud/steamrt/steamrt4/platform`
+instead of the corresponding SDK container,
+unpack into `platform/files`,
+and create `platform/metadata`.
 Then you can proceed as if for the SDK, but use `--runtime=platform`
 instead of `--runtime=sdk`.
 
-For [sniper][] the procedure is the same,
-but download from <https://repo.steampowered.com/steamrt3/images/>,
-replace `steamrt4` with `sniper` elsewhere,
-and replace `SteamLinuxRuntime_4` with `SteamLinuxRuntime_sniper` throughout.
-
-[soldier][] works in the same way, but with `soldier` instead of `sniper`.
+As with the unmodified SDK,
+similar steps can be used for sniper or soldier.
 
 ## Upgrading pressure-vessel
 

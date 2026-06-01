@@ -7,9 +7,13 @@ steam-runtime-tools (0.20260601.0) UNRELEASED; urgency=medium
 
   [ Simon McVittie ]
   * pressure-vessel:
+    - Avoid capturing host libnvidia-pkcs11*.so.*, which as far as we
+      can find out are intended for data-centre use cases rather than
+      gaming, and can pull in a newer OpenSSL which harms SLR container
+      robustness (steamrt/tasks#1035, steam-runtime#825)
     - Treat host libcrypto.so.3 and libssl.so.3 as a related family,
-      so that if we capture libcrypto.so.3 as a dependency of
-      libnvidia-pkcs11*.so.*, we'll use a matching libssl.so.3
+      so that if we do capture libcrypto.so.3 for some other reason,
+      we'll use a matching libssl.so.3
       (steamrt/tasks#1035, steam-runtime#825)
     - Internal refactoring (steamrt/tasks#995)
   * Developer tools:
@@ -22,7 +26,7 @@ steam-runtime-tools (0.20260601.0) UNRELEASED; urgency=medium
     (steamrt/tasks#653, steamrt/tasks#664, steamrt/tasks#854,
     steamrt/tasks#892)
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 01 Jun 2026 11:14:20 +0100
+ -- Simon McVittie <smcv@collabora.com>  Mon, 01 Jun 2026 12:34:12 +0100
 
 steam-runtime-tools (0.20260522.0) steamrt; urgency=medium
 

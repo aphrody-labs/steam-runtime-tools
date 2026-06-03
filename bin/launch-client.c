@@ -641,6 +641,9 @@ choose_implementation (GPtrArray *possible_names,
                        gchar **service_bus_name_p,
                        GError **error)
 {
+  gboolean tried_flatpak = FALSE;
+  gboolean tried_srls = FALSE;
+  const char *detail;
   gsize i;
 
   if (possible_names->len == 0)
@@ -670,6 +673,8 @@ choose_implementation (GPtrArray *possible_names,
       if (g_str_equal (name, host_api.service_bus_name)
           || g_str_equal (name, subsandbox_api.service_bus_name))
         {
+          tried_flatpak = TRUE;
+
           /* The Flatpak services are stateless and might be
            * service-activatable */
           reply = g_dbus_connection_call_sync (*session_bus_p,
@@ -698,6 +703,8 @@ choose_implementation (GPtrArray *possible_names,
         }
       else
         {
+          tried_srls = TRUE;
+
           /* steam-runtime-launcher-service is stateful, so we want to bind
            * to a specific unique bus name (specific instance) and expect signals
            * from there.
@@ -733,8 +740,15 @@ choose_implementation (GPtrArray *possible_names,
       g_info ("Unable to connect to %s: %s", name, local_error->message);
     }
 
+  if (tried_srls)
+    detail = " (is steam-runtime-launcher-service running?)";
+  else if (tried_flatpak)
+    detail = " (is Flatpak installed?)";
+  else
+    detail = "";
+
   glnx_throw (error,
-              "Unable to connect to any of the specified bus names");
+              "Unable to connect to any of the specified bus names%s", detail);
   return FALSE;
 }
 

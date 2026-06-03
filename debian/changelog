@@ -1,8 +1,11 @@
 steam-runtime-tools (0.20260603.0) UNRELEASED; urgency=medium
 
   * s-r-launch-client: Provide a more helpful error if unable to connect
+  * Tests/CI:
+    - Stop working around transient issues in Debian testing
+      (steamrt/tasks#1000)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 03 Jun 2026 12:34:29 +0100
+ -- Simon McVittie <smcv@collabora.com>  Wed, 03 Jun 2026 13:37:04 +0100
 
 steam-runtime-tools (0.20260601.0) steamrt; urgency=medium
 

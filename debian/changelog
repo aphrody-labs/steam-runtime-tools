@@ -1,3 +1,9 @@
+steam-runtime-tools (0.20260603.0) UNRELEASED; urgency=medium
+
+  * s-r-launch-client: Provide a more helpful error if unable to connect
+
+ -- Simon McVittie <smcv@collabora.com>  Wed, 03 Jun 2026 12:34:29 +0100
+
 steam-runtime-tools (0.20260601.0) steamrt; urgency=medium
 
   [ Antonio Ospite ]

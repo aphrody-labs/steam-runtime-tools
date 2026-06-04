@@ -63,6 +63,6 @@ The Steam Runtime contains many third-party software packages under
 various open-source licenses.
 
 For full source code, please see the version-numbered subdirectories of
-<https://repo.steampowered.com/steamrt-images-scout/snapshots/> and
-<https://repo.steampowered.com/steamrt-images-soldier/snapshots/>
+<https://repo.steampowered.com/steamrt1/images/>
+<https://repo.steampowered.com/steamrt2/images/>
 corresponding to the version numbers listed in VERSIONS.txt.

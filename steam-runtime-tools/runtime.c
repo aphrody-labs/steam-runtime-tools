@@ -615,6 +615,45 @@ out:
 }
 
 /*
+ * _srt_runtime_check_version:
+ * @version: A non-%NULL version number
+ * @error: Used to raise an error if not an official version number
+ *
+ * Check whether @version could possibly be a Steam Runtime version number.
+ * Official Steam Runtime version numbers start with a digit,
+ * and consist of digits, letters and dots.
+ *
+ * In official Steam Runtime containers,
+ * the `BUILD_ID` field in `os-release(5)` is a valid version number.
+ * In unofficial test-builds, a prefix is added.
+ *
+ * Returns: %TRUE if @version is valid
+ */
+gboolean
+_srt_runtime_check_version (const char *version,
+                            GError **error)
+{
+  const char *p;
+
+  g_return_val_if_fail (version != NULL, FALSE);
+
+  if (!g_ascii_isdigit (version[0]))
+    return glnx_throw (error,
+                       "Runtime version \"%s\" does not start with a digit",
+                       version);
+
+  for (p = version + 1; *p != '\0'; p++)
+    {
+      if (!g_ascii_isalnum (*p) && *p != '.')
+        return glnx_throw (error,
+                           "Runtime version \"%s\" contains non-dot, non-alnum",
+                           version);
+    }
+
+  return TRUE;
+}
+
+/*
  * _srt_runtime_check_container:
  * @self: information about the runtime
  * @os_info: information about the container OS
@@ -645,22 +684,9 @@ _srt_runtime_check_container (SrtRuntime *self,
     self->issues |= SRT_RUNTIME_ISSUES_UNEXPECTED_VERSION;
 
   if (self->version == NULL)
-    {
-      self->issues |= SRT_RUNTIME_ISSUES_NOT_RUNTIME;
-    }
-  else
-    {
-      const char *p;
-
-      for (p = self->version; *p != '\0'; p++)
-        {
-          if (p == self->version + 1 && *p == 'c')
-            continue;
-
-          if (!g_ascii_isdigit (*p) && *p != '.')
-            self->issues |= SRT_RUNTIME_ISSUES_UNOFFICIAL;
-        }
-    }
+    self->issues |= SRT_RUNTIME_ISSUES_NOT_RUNTIME;
+  else if (!_srt_runtime_check_version (self->version, NULL))
+    self->issues |= SRT_RUNTIME_ISSUES_UNOFFICIAL;
 
   return TRUE;
 }

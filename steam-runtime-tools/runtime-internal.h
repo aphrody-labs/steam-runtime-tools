@@ -77,3 +77,7 @@ typedef enum {
 G_GNUC_INTERNAL
 GStrv _srt_environ_escape_steam_runtime (GStrv env,
                                          SrtEscapeRuntimeFlags flags);
+
+G_GNUC_INTERNAL
+gboolean _srt_runtime_check_version (const char *version,
+                                     GError **error);

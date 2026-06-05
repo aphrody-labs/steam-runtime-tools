@@ -291,7 +291,9 @@ class Runtime:
 
     def get_uri(
         self,
-        filename: str,
+        filename: str = '',
+        *,
+        suffix: str = '',
         version: Optional[str] = None,
     ) -> str:
         suite = self.suite
@@ -299,11 +301,17 @@ class Runtime:
         uri = self.images_uri.replace('SUITE', suite).replace('MAJOR', major)
         v = version or self.pinned_version or self.version or 'latest'
         self.check_valid_version_or_alias(v)
-        return f'{uri}/{v}/{filename}'
+
+        if filename:
+            return f'{uri}/{v}/{filename}{suffix}'
+        else:
+            return f'{uri}/{v}{suffix}'
 
     def get_ssh_path(
         self,
-        filename: str,
+        filename: str = '',
+        *,
+        suffix: str = '',
         version: Optional[str] = None,
     ) -> str:
         ssh_host = self.ssh_host
@@ -320,7 +328,10 @@ class Runtime:
         if not ssh_host or not ssh_path:
             raise RuntimeError('ssh host/path not configured')
 
-        return f'{ssh_path}/{v}/{filename}'
+        if filename:
+            return f'{ssh_path}/{v}/{filename}{suffix}'
+        else:
+            return f'{ssh_path}/{v}{suffix}'
 
     def fetch(
         self,
@@ -405,18 +416,28 @@ class Runtime:
             if v[0].isdigit():
                 # We already have a concrete version number, use it as-is
                 pinned = v
-            elif self.ssh_host and self.ssh_path:
-                path = self.get_ssh_path(filename='VERSION.txt')
-                logger.info('Determining version number from %r...', path)
-                pinned = subprocess.run([
-                    'ssh', self.ssh_host,
-                    'cat {}'.format(shlex.quote(path)),
-                ], stdout=subprocess.PIPE).stdout.decode('utf-8').strip()
             else:
-                uri = self.get_uri(filename='VERSION.txt')
-                logger.info('Determining version number from %r...', uri)
-                with opener.open(uri) as response:
-                    pinned = response.read().decode('utf-8').strip()
+                try:
+                    # First try e.g. steamrt4/images/latest-public-beta.txt
+                    pinned = self.__pin_version_internal(
+                        suffix='.txt',
+                        opener=opener,
+                    )
+                except (
+                    urllib.error.URLError,
+                    subprocess.CalledProcessError,
+                ):
+                    # Fall back to e.g.
+                    # steamrt4/images/latest-public-beta/VERSION.txt
+                    logger.warning(
+                        "Couldn't pin version number the new way, "
+                        "falling back...",
+                        exc_info=True,
+                    )
+                    pinned = self.__pin_version_internal(
+                        filename='VERSION.txt',
+                        opener=opener,
+                    )
 
             self.check_valid_version(pinned)
             self.pinned_version = pinned
@@ -447,6 +468,28 @@ class Runtime:
             self.sha256 = sha256
 
         return pinned
+
+    def __pin_version_internal(
+        self,
+        *,
+        opener: urllib.request.OpenerDirector,
+        filename: str = '',
+        suffix: str = '',
+    ) -> str:
+        if self.ssh_host and self.ssh_path:
+            path = self.get_ssh_path(filename=filename, suffix=suffix)
+            logger.info('Determining version number from %r...', path)
+
+            return subprocess.run([
+                'ssh', self.ssh_host,
+                'cat {}'.format(shlex.quote(path)),
+            ], stdout=subprocess.PIPE).stdout.decode('utf-8').strip()
+        else:
+            uri = self.get_uri(filename=filename, suffix=suffix)
+            logger.info('Determining version number from %r...', uri)
+
+            with opener.open(uri) as response:
+                return response.read().decode('utf-8').strip()
 
 
 RUN_IN_DIR_SOURCE = '''\

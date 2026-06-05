@@ -127,6 +127,47 @@ def _check_sha256(path: Path, expected: str) -> bool:
 
 
 class Runtime:
+    @staticmethod
+    def check_valid_version(v: str) -> None:
+        if not v or not v[0].isdigit():
+            raise ValueError(
+                f'Runtime version {v!r} does not start with a digit'
+            )
+
+        for c in v:
+            if c != '.' and not c.isalnum():
+                raise ValueError(
+                    f'Runtime version {v!r} contains non-dot, non-alnum'
+                )
+
+            if ord(c) >= 128:
+                raise ValueError(f'Runtime version {v!r} contains non-ASCII')
+
+    @staticmethod
+    def check_valid_alias(a: str) -> None:
+        if not a or not a[0].isalpha():
+            raise ValueError(
+                f'Runtime alias {a!r} does not start with a letter'
+            )
+
+        for c in a:
+            if c != '-' and not c.isalnum():
+                raise ValueError(
+                    f'Runtime alias {a!r} contains non-dash, non-alnum'
+                )
+
+            if ord(c) >= 128:
+                raise ValueError(f'Runtime alias {a!r} contains non-ASCII')
+
+    @staticmethod
+    def check_valid_version_or_alias(v: str) -> None:
+        if not v:
+            raise ValueError('Runtime version or alias cannot be empty')
+        elif v[0].isdigit():
+            Runtime.check_valid_version(v)
+        else:
+            Runtime.check_valid_alias(v)
+
     def __init__(
         self,
         name,
@@ -151,6 +192,10 @@ class Runtime:
         self.suite = suite
         self.ssh_host = ssh_host
         self.ssh_path = ssh_path
+
+        if version:
+            self.check_valid_version_or_alias(version)
+
         self.version = version
         self.pinned_version: Optional[str] = None
         self.sha256: Dict[str, str] = {}
@@ -226,6 +271,9 @@ class Runtime:
         ssh_host: str = '',
         ssh_path: str = '',
     ):
+        if default_version:
+            cls.check_valid_version_or_alias(default_version)
+
         return cls(
             name,
             architecture=details.get(
@@ -250,6 +298,7 @@ class Runtime:
         major = self.major
         uri = self.images_uri.replace('SUITE', suite).replace('MAJOR', major)
         v = version or self.pinned_version or self.version or 'latest'
+        self.check_valid_version_or_alias(v)
         return f'{uri}/{v}/{filename}'
 
     def get_ssh_path(
@@ -266,6 +315,7 @@ class Runtime:
             'MAJOR', major,
         )
         v = version or self.pinned_version or self.version or 'latest'
+        self.check_valid_version_or_alias(v)
 
         if not ssh_host or not ssh_path:
             raise RuntimeError('ssh host/path not configured')
@@ -278,6 +328,11 @@ class Runtime:
         opener: urllib.request.OpenerDirector,
         version: Optional[str] = None,
     ) -> str:
+        assert filename
+
+        if version is not None:
+            self.check_valid_version_or_alias(version)
+
         dest = os.path.join(self.cache, filename)
 
         if filename in self.sha256:
@@ -358,6 +413,7 @@ class Runtime:
                 with opener.open(uri) as response:
                     pinned = response.read().decode('utf-8').strip()
 
+            self.check_valid_version(pinned)
             self.pinned_version = pinned
 
             if self.ssh_host and self.ssh_path:
@@ -566,6 +622,9 @@ class Main:
 
         if check_steampipe_compatible is None:
             check_steampipe_compatible = not include_sdk_sysroot
+
+        if version:
+            Runtime.check_valid_version_or_alias(version)
 
         self.add_bin_directory = add_bin_directory
         self.cache = cache
@@ -1993,6 +2052,71 @@ class Main:
 
 
 class SelfTest(unittest.TestCase):
+    def test_valid_alias(self) -> None:
+        check = Runtime.check_valid_alias
+
+        for good in [
+            'x',
+            'latest',
+            'latest-steam-client-general-availability',
+            'best-before-end-2024',
+        ]:
+            self.assertIsNone(
+                check(good),
+                msg=f'{good!r} should be a valid alias',
+            )
+
+        for bad in [
+            '',
+            '1',
+            '..',
+            'a b',
+            'a/b',
+            'a\u06f5',      # U+06F5 EXTENDED ARABIC-INDIC DIGIT FIVE
+            '\u00E4',       # U+00E4 LATIN SMALL LETTER A WITH DIAERESIS
+            'a\u00E4',
+            'a\u2026',      # U+2026 HORIZONTAL ELLIPSIS
+        ]:
+            with self.assertRaises(
+                ValueError,
+                msg=f'{bad!r} should not be a valid alias',
+            ):
+                check(bad)
+
+    def test_valid_version(self) -> None:
+        check = Runtime.check_valid_version
+
+        for good in [
+            '0',
+            '0.20260123.4',
+            '3c.0.20260123.123456',
+            '6z.hypothetical.2038.01.19',
+        ]:
+            self.assertIsNone(
+                check(good),
+                msg=f'{good!r} should be a valid version',
+            )
+
+        for bad in [
+            '',
+            'latest',
+            '..',
+            '1 2',
+            '1/2',
+            '0+this.is.not.dpkg',
+            '0~this.is.not.dpkg',
+            'smcv-task1234-3c.0.20260123.123456',
+            '\u06f5',       # U+06F5 EXTENDED ARABIC-INDIC DIGIT FIVE
+            '0\u06f5',
+            '0\u00E4',      # U+00E4 LATIN SMALL LETTER A WITH DIAERESIS
+            '0\u2026',      # U+2026 HORIZONTAL ELLIPSIS
+        ]:
+            with self.assertRaises(
+                ValueError,
+                msg=f'{bad!r} should not be a valid version',
+            ):
+                check(bad)
+
     def test_filename_is_friendly(self) -> None:
         # This happens to be the easiest way to create a Main object
         # with all required parameters

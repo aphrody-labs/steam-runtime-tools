@@ -13,6 +13,7 @@ import shlex
 import shutil
 import subprocess
 import urllib
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import (Path, PurePosixPath)
@@ -97,15 +98,21 @@ class PressureVesselRelease:
     def get_uri(
         self,
         filename: str,
+        suffix: str = '',
         version: str | None = None,
     ) -> str:
         uri = self.uri
         v = version or self.pinned_version or self.version or 'latest'
-        return f'{uri}/{v}/{filename}'
+
+        if filename:
+            return f'{uri}/{v}/{filename}{suffix}'
+        else:
+            return f'{uri}/{v}{suffix}'
 
     def get_ssh_path(
         self,
         filename: str,
+        suffix: str = '',
         version: str | None = None,
     ) -> str:
         ssh_host = self.ssh_host
@@ -115,7 +122,10 @@ class PressureVesselRelease:
         if not ssh_host or ssh_path is None:
             raise RuntimeError('ssh host/path not configured')
 
-        return f'{ssh_path}/{v}/{filename}'
+        if filename:
+            return f'{ssh_path}/{v}/{filename}{suffix}'
+        else:
+            return f'{ssh_path}/{v}{suffix}'
 
     def fetch(
         self,
@@ -124,6 +134,8 @@ class PressureVesselRelease:
         dest: Path | None = None,
         version: str | None = None,
     ) -> Path:
+        assert filename
+
         if dest is None:
             dest = self.cache / filename
 
@@ -169,23 +181,53 @@ class PressureVesselRelease:
                 self.pinned_version = v
                 return v
 
-            if self.ssh_host and self.ssh_path:
-                path = self.get_ssh_path(filename='VERSION.txt')
-                logger.info('Determining version number from %r...', path)
-                pinned = subprocess.run([
-                    'ssh', self.ssh_host,
-                    'cat {}'.format(shlex.quote(path)),
-                ], stdout=subprocess.PIPE).stdout.decode('utf-8').strip()
-            else:
-                uri = self.get_uri(filename='VERSION.txt')
-                logger.info('Determining version number from %r...', uri)
-                with opener.open(uri) as response:
-                    pinned = response.read().decode('utf-8').strip()
+            try:
+                # First try e.g. pressure-vessel/snapshots/latest.txt
+                pinned = self.__pin_version_internal(
+                    suffix='.txt',
+                    opener=opener,
+                )
+            except (
+                urllib.error.URLError,
+                subprocess.CalledProcessError,
+            ):
+                # Fall back to e.g.
+                # pressure-vessel/snapshots/latest/VERSION.txt
+                logger.warning(
+                    "Couldn't pin version number the new way, falling back...",
+                    exc_info=True,
+                )
+                pinned = self.__pin_version_internal(
+                    filename='VERSION.txt',
+                    opener=opener,
+                )
 
             self.check_valid_version(pinned)
             self.pinned_version = pinned
 
         return pinned
+
+    def __pin_version_internal(
+        self,
+        *,
+        opener: urllib.request.OpenerDirector,
+        filename: str = '',
+        suffix: str = '',
+    ) -> str:
+        if self.ssh_host and self.ssh_path:
+            path = self.get_ssh_path(filename=filename, suffix=suffix)
+            logger.info('Determining version number from %r...', path)
+
+            return subprocess.run([
+                'ssh', self.ssh_host,
+                'cat {}'.format(shlex.quote(path)),
+            ], stdout=subprocess.PIPE).stdout.decode('utf-8').strip()
+        else:
+            uri = self.get_uri(filename=filename, suffix=suffix)
+            logger.info('Determining version number from %r...', uri)
+
+            with opener.open(uri) as response:
+                return response.read().decode('utf-8').strip()
 
 
 class Main:

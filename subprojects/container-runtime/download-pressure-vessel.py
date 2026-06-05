@@ -32,6 +32,42 @@ class InvocationError(Exception):
 
 
 class PressureVesselRelease:
+    @staticmethod
+    def check_valid_version(v: str) -> None:
+        # This is the same rule used to validate Steam Runtime version numbers
+        if not v or not v[0].isdigit():
+            raise ValueError(
+                f'PV version {v!r} does not start with a digit'
+            )
+
+        for c in v:
+            if c != '.' and not c.isalnum():
+                raise ValueError(
+                    f'PV version {v!r} contains non-dot, non-alnum'
+                )
+
+            if ord(c) >= 128:
+                raise ValueError(f'PV version {v!r} contains non-ASCII')
+
+    @staticmethod
+    def check_valid_alias(a: str) -> None:
+        # This is the same rule used to validate Steam Runtime aliases,
+        # although in practice we're unlikely to create aliases other
+        # than 'latest' for pressure-vessel
+        if not a or not a[0].isalpha():
+            raise ValueError(
+                f'PV alias {a!r} does not start with a letter'
+            )
+
+        for c in a:
+            if c != '-' and not c.isalnum():
+                raise ValueError(
+                    f'PV alias {a!r} contains non-dash, non-alnum'
+                )
+
+            if ord(c) >= 128:
+                raise ValueError(f'PV alias {a!r} contains non-ASCII')
+
     def __init__(
         self,
         *,
@@ -46,6 +82,13 @@ class PressureVesselRelease:
         self.ssh_host = ssh_host
         self.ssh_path: PurePosixPath | None = None
         self.uri = uri
+
+        if version:
+            if version[0].isdigit():
+                self.check_valid_version(version)
+            else:
+                self.check_valid_alias(version)
+
         self.version = version
 
         if ssh_path:
@@ -131,6 +174,7 @@ class PressureVesselRelease:
                 with opener.open(uri) as response:
                     pinned = response.read().decode('utf-8').strip()
 
+            self.check_valid_version(pinned)
             self.pinned_version = pinned
 
         return pinned

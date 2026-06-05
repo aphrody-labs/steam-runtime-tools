@@ -458,7 +458,7 @@ class Uploader:
         # should have happened
         with open(str(upload / 'SHA256SUMS')) as reader:
             self.check_call([
-                'env', '--chdir', '{}'.format(version),
+                'env', '--chdir', version,
                 'sha256sum', '--strict', '--quiet', '-c',
             ], stdin=reader)
 

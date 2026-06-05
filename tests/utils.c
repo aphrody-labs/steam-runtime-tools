@@ -1603,6 +1603,71 @@ test_rlimit (Fixture *f,
 }
 
 static void
+test_runtime_check_version (Fixture *f,
+                            gconstpointer context)
+{
+  static const char * const good[] =
+    {
+      "0",
+      "0.20260123.4",
+      "3c.0.20260123.123456",
+      "6z.hypothetical.2038.01.19",
+    };
+  static const char * const bad[] =
+    {
+      "",
+      "latest",
+      "..",
+      "1 2",
+      "1/2",
+      "0+this.is.not.dpkg",
+      "0~this.is.not.dpkg",
+      "smcv-task1234-3c.0.20260123.123456",
+      "0\xe2\x80\xa6",    /* U+2026 HORIZONTAL ELLIPSIS */
+    };
+  gboolean ok;
+  const char *result;
+  g_autoptr(GError) error = NULL;
+
+  for (size_t i = 0; i < G_N_ELEMENTS (good); i++)
+    {
+      ok = _srt_runtime_check_version (good[i], &error);
+
+      if (ok)
+        result = "OK";
+      else if (error != NULL)
+        result = error->message;
+      else
+        result = "(internal error!)";
+
+      g_test_message ("Valid version \"%s\" => %s", good[i], result);
+      g_assert_no_error (error);
+      g_assert_true (ok);
+      g_assert_true (_srt_runtime_check_version (good[i], NULL));
+    }
+
+  for (size_t i = 0; i < G_N_ELEMENTS (bad); i++)
+    {
+      ok = _srt_runtime_check_version (bad[i], &error);
+
+      if (ok)
+        result = "(unexpectedly OK!)";
+      else if (error != NULL)
+        result = error->message;
+      else
+        result = "(internal error!)";
+
+      g_test_message ("Invalid version \"%s\" => %s", bad[i], result);
+      g_assert_nonnull (error);
+      g_assert_nonnull (g_quark_to_string (error->domain));
+      g_assert_nonnull (error->message);
+      g_assert_false (ok);
+      g_clear_error (&error);
+      g_assert_false (_srt_runtime_check_version (bad[i], NULL));
+    }
+}
+
+static void
 test_same_file (Fixture *f,
                 gconstpointer context)
 {
@@ -1983,6 +2048,8 @@ main (int argc,
               setup, test_recursive_list, teardown);
   g_test_add ("/utils/rlimit", Fixture, NULL,
               setup, test_rlimit, teardown);
+  g_test_add ("/utils/runtime-check-version", Fixture, NULL,
+              setup, test_runtime_check_version, teardown);
   g_test_add ("/utils/same-file", Fixture, NULL,
               setup, test_same_file, teardown);
   g_test_add ("/search-path-append", Fixture, NULL,

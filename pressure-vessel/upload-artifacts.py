@@ -364,6 +364,7 @@ class Uploader:
         with open(str(upload / 'VERSION.txt')) as reader:
             version = reader.read().strip()
 
+        quoted_version = shlex.quote(version)
         app1070560 = Path('_build', 'upload', 'app1070560')
         app1070560.mkdir()
 
@@ -377,9 +378,9 @@ class Uploader:
             'mkdir', version,
         ])
         self.check_call(
-            'if [ -d latest ]; then cp -al latest/sources {}; fi'.format(
-                shlex.quote(version)
-            ),
+            ('if [ -d latest ]; then'
+             f' cp -al latest/sources {quoted_version};'
+             ' fi'),
             shell=True,
         )
 

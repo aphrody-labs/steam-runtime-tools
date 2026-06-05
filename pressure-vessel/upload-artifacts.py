@@ -454,18 +454,17 @@ class Uploader:
                 logger.info('%r', argv)
                 subprocess.check_call(argv)
 
-        if not self.dry_run:
-            # Check that our rsync options didn't optimize away a change that
-            # should have happened
-            with open(str(upload / 'SHA256SUMS')) as reader:
-                self.check_call([
-                    'env', '--chdir', '{}'.format(version),
-                    'sha256sum', '--strict', '--quiet', '-c',
-                ], stdin=reader)
-
+        # Check that our rsync options didn't optimize away a change that
+        # should have happened
+        with open(str(upload / 'SHA256SUMS')) as reader:
             self.check_call([
-                'ln', '-fns', version, 'latest',
-            ])
+                'env', '--chdir', '{}'.format(version),
+                'sha256sum', '--strict', '--quiet', '-c',
+            ], stdin=reader)
+
+        self.check_call([
+            'ln', '-fns', version, 'latest',
+        ])
 
 
 def main() -> None:

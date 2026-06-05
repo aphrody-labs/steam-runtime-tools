@@ -364,6 +364,7 @@ class Uploader:
         with open(str(upload / 'VERSION.txt')) as reader:
             version = reader.read().strip()
 
+        quoted_version = shlex.quote(version)
         app1070560 = Path('_build', 'upload', 'app1070560')
         app1070560.mkdir()
 
@@ -377,9 +378,9 @@ class Uploader:
             'mkdir', version,
         ])
         self.check_call(
-            'if [ -d latest ]; then cp -al latest/sources {}; fi'.format(
-                shlex.quote(version)
-            ),
+            ('if [ -d latest ]; then'
+             f' cp -al latest/sources {quoted_version};'
+             ' fi'),
             shell=True,
         )
 
@@ -454,18 +455,21 @@ class Uploader:
                 logger.info('%r', argv)
                 subprocess.check_call(argv)
 
-        if not self.dry_run:
-            # Check that our rsync options didn't optimize away a change that
-            # should have happened
-            with open(str(upload / 'SHA256SUMS')) as reader:
-                self.check_call([
-                    'env', '--chdir', '{}'.format(version),
-                    'sha256sum', '--strict', '--quiet', '-c',
-                ], stdin=reader)
-
+        # Check that our rsync options didn't optimize away a change that
+        # should have happened
+        with open(str(upload / 'SHA256SUMS')) as reader:
             self.check_call([
-                'ln', '-fns', version, 'latest',
-            ])
+                'env', '--chdir', version,
+                'sha256sum', '--strict', '--quiet', '-c',
+            ], stdin=reader)
+
+        self.check_call([
+            'ln', '-fns', version, 'latest',
+        ])
+        self.check_call(
+            f'echo {quoted_version} > latest.txt',
+            shell=True,
+        )
 
 
 def main() -> None:

@@ -1623,6 +1623,8 @@ test_runtime_check_version (Fixture *f,
       "0+this.is.not.dpkg",
       "0~this.is.not.dpkg",
       "smcv-task1234-3c.0.20260123.123456",
+      "\xdb\xb5",         /* U+06F5 EXTENDED ARABIC-INDIC DIGIT FIVE */
+      "0\xc3\xa4",        /* U+00E4 LATIN SMALL LETTER A WITH DIAERESIS */
       "0\xe2\x80\xa6",    /* U+2026 HORIZONTAL ELLIPSIS */
     };
   gboolean ok;

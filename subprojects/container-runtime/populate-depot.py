@@ -352,8 +352,15 @@ class Runtime:
                     'ssh', self.ssh_host,
                     'cat {}'.format(shlex.quote(path)),
                 ], stdout=subprocess.PIPE).stdout.decode('utf-8').strip()
+            else:
+                uri = self.get_uri(filename='VERSION.txt')
+                logger.info('Determining version number from %r...', uri)
+                with opener.open(uri) as response:
+                    pinned = response.read().decode('utf-8').strip()
 
-                self.pinned_version = pinned
+            self.pinned_version = pinned
+
+            if self.ssh_host and self.ssh_path:
                 path = self.get_ssh_path(filename='SHA256SUMS')
 
                 sha256sums = subprocess.run([
@@ -361,14 +368,7 @@ class Runtime:
                     'cat {}'.format(shlex.quote(path)),
                 ], stdout=subprocess.PIPE).stdout
                 assert sha256sums is not None
-
             else:
-                uri = self.get_uri(filename='VERSION.txt')
-                logger.info('Determining version number from %r...', uri)
-                with opener.open(uri) as response:
-                    pinned = response.read().decode('utf-8').strip()
-
-                self.pinned_version = pinned
                 uri = self.get_uri(filename='SHA256SUMS')
 
                 with opener.open(uri) as response:

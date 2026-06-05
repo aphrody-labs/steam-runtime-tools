@@ -466,6 +466,10 @@ class Uploader:
         self.check_call([
             'ln', '-fns', version, 'latest',
         ])
+        self.check_call(
+            f'echo {quoted_version} > latest.txt',
+            shell=True,
+        )
 
 
 def main() -> None:

@@ -161,6 +161,14 @@ class PressureVesselRelease:
         pinned = self.pinned_version
 
         if pinned is None:
+            v = self.version or 'latest'
+
+            if v[0].isdigit():
+                # We already have a concrete version number, use it as-is
+                self.check_valid_version(v)
+                self.pinned_version = v
+                return v
+
             if self.ssh_host and self.ssh_path:
                 path = self.get_ssh_path(filename='VERSION.txt')
                 logger.info('Determining version number from %r...', path)

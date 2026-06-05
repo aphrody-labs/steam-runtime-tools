@@ -400,7 +400,12 @@ class Runtime:
         sha256: Dict[str, str] = {}
 
         if pinned is None:
-            if self.ssh_host and self.ssh_path:
+            v = self.version or 'latest'
+
+            if v[0].isdigit():
+                # We already have a concrete version number, use it as-is
+                pinned = v
+            elif self.ssh_host and self.ssh_path:
                 path = self.get_ssh_path(filename='VERSION.txt')
                 logger.info('Determining version number from %r...', path)
                 pinned = subprocess.run([

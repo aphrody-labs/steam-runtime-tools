@@ -1,6 +1,6 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  * Taken from Flatpak
- * Last updated: Flatpak 1.16.1
+ * Last updated: Flatpak 1.18.0
  * Copyright © 2014-2019 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -255,7 +255,7 @@ flatpak_run_add_session_dbus_args (FlatpakBwrap   *app_bwrap)
   g_autofree char *dbus_session_socket = NULL;
 
 #if 0
-  unrestricted = (context->sockets & FLATPAK_CONTEXT_SOCKET_SESSION_BUS) != 0;
+  unrestricted = (sockets & FLATPAK_CONTEXT_SOCKET_SESSION_BUS) != 0;
 #else
   unrestricted = TRUE;
 #endif
@@ -347,7 +347,7 @@ flatpak_run_add_system_dbus_args (FlatpakBwrap   *app_bwrap)
   g_autofree char *dbus_system_socket = NULL;
 
 #if 0
-  unrestricted = (context->sockets & FLATPAK_CONTEXT_SOCKET_SYSTEM_BUS) != 0;
+  unrestricted = (sockets & FLATPAK_CONTEXT_SOCKET_SYSTEM_BUS) != 0;
 #else
   unrestricted = TRUE;
 #endif

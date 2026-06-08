@@ -1,6 +1,6 @@
 /*
  * Taken from Flatpak
- * Last updated: Flatpak 1.16.1
+ * Last updated: Flatpak 1.18.0
  * Copyright © 2014 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -32,16 +32,18 @@
 G_BEGIN_DECLS
 
 #if 0
-gboolean flatpak_run_add_session_dbus_args (FlatpakBwrap   *app_bwrap,
-                                            FlatpakBwrap   *proxy_arg_bwrap,
-                                            FlatpakContext *context,
-                                            FlatpakRunFlags flags,
-                                            const char     *app_id);
+gboolean flatpak_run_add_session_dbus_args (FlatpakBwrap          *app_bwrap,
+                                            FlatpakBwrap          *proxy_arg_bwrap,
+                                            FlatpakContextSockets  sockets,
+                                            FlatpakContext        *context,
+                                            FlatpakRunFlags        flags,
+                                            const char            *app_id);
 
-gboolean flatpak_run_add_system_dbus_args (FlatpakBwrap   *app_bwrap,
-                                           FlatpakBwrap   *proxy_arg_bwrap,
-                                           FlatpakContext *context,
-                                           FlatpakRunFlags flags);
+gboolean flatpak_run_add_system_dbus_args (FlatpakBwrap          *app_bwrap,
+                                           FlatpakBwrap          *proxy_arg_bwrap,
+                                           FlatpakContextSockets  sockets,
+                                           FlatpakContext        *context,
+                                           FlatpakRunFlags        flags);
 
 gboolean flatpak_run_add_a11y_dbus_args (FlatpakBwrap    *app_bwrap,
                                          FlatpakBwrap    *proxy_arg_bwrap,

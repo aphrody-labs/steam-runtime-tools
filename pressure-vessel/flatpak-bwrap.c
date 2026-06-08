@@ -1,6 +1,6 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  * Taken from Flatpak
- * Last updated: Flatpak 1.16.1
+ * Last updated: Flatpak 1.18.0
  *
  * Copyright © 2014-2018 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
@@ -152,6 +152,26 @@ flatpak_bwrap_add_fd (FlatpakBwrap *bwrap,
                       int           fd)
 {
   g_array_append_val (bwrap->fds, fd);
+}
+
+gboolean
+flatpak_bwrap_add_args_data_fd_dup (FlatpakBwrap  *bwrap,
+                                    const char    *op,
+                                    int            fd,
+                                    const char    *path_optional,
+                                    GError       **error)
+{
+  glnx_autofd int fd_dup = -1;
+
+  fd_dup = fcntl (fd, F_DUPFD_CLOEXEC, 3);
+  if (fd_dup < 0)
+    return glnx_throw_errno_prefix (error, "Failed to dup fd %d", fd);
+
+  flatpak_bwrap_add_args_data_fd (bwrap,
+                                  op,
+                                  g_steal_fd (&fd_dup),
+                                  path_optional);
+  return TRUE;
 }
 
 void
@@ -533,7 +553,8 @@ flatpak_bwrap_child_setup (GArray *fd_array,
          us use the same fd_array multiple times */
       if (lseek (fd, 0, SEEK_SET) < 0)
         {
-          /* Ignore the error, this happens on e.g. pipe fds */
+          /* Ignore the error, not all fds are seekable
+           * (for example pipes and O_PATH fds are not) */
         }
 
       fcntl (fd, F_SETFD, 0);

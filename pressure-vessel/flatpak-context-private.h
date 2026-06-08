@@ -1,6 +1,6 @@
 /*
  * Taken from Flatpak
- * Last updated: Flatpak 1.16.1
+ * Last updated: Flatpak 1.18.0
  *
  * Copyright © 2014-2018 Red Hat, Inc
  * Copyright © 2024 GNOME Foundation, Inc.
@@ -33,13 +33,13 @@
 #include "flatpak-exports-private.h"
 #if 0
 #include "flatpak-usb-private.h"
+#endif
 
 typedef enum {
   FLATPAK_SESSION_BUS,
   FLATPAK_SYSTEM_BUS,
   FLATPAK_A11Y_BUS,
 } FlatpakBus;
-#endif
 
 typedef enum {
   FLATPAK_POLICY_NONE,
@@ -61,7 +61,7 @@ typedef enum {
   FLATPAK_CONTEXT_SOCKET_PULSEAUDIO  = 1 << 2,
   FLATPAK_CONTEXT_SOCKET_SESSION_BUS = 1 << 3,
   FLATPAK_CONTEXT_SOCKET_SYSTEM_BUS  = 1 << 4,
-  FLATPAK_CONTEXT_SOCKET_FALLBACK_X11 = 1 << 5, /* For backwards compat, also set SOCKET_X11 */
+  FLATPAK_CONTEXT_SOCKET_FALLBACK_X11 = 1 << 5, /* For backwards compat, not used internally */
   FLATPAK_CONTEXT_SOCKET_SSH_AUTH    = 1 << 6,
   FLATPAK_CONTEXT_SOCKET_PCSC        = 1 << 7,
   FLATPAK_CONTEXT_SOCKET_CUPS        = 1 << 8,
@@ -86,18 +86,23 @@ typedef enum {
   FLATPAK_CONTEXT_FEATURE_PER_APP_DEV_SHM = 1 << 4,
 } FlatpakContextFeatures;
 
+typedef enum {
+  FLATPAK_CONTEXT_CONDITION_TRUE          = 1 << 0,
+  FLATPAK_CONTEXT_CONDITION_FALSE         = 1 << 1,
+  FLATPAK_CONTEXT_CONDITION_HAS_INPUT_DEV = 1 << 2,
+  FLATPAK_CONTEXT_CONDITION_HAS_USB_DEV   = 1 << 3,
+  FLATPAK_CONTEXT_CONDITION_HAS_WAYLAND   = 1 << 4,
+  FLATPAK_CONTEXT_CONDITION_HAS_USB_PORTAL = 1 << 5,
+} FlatpakContextConditions;
+
 #if 0
 
 struct FlatpakContext
 {
-  FlatpakContextShares   shares;
-  FlatpakContextShares   shares_valid;
-  FlatpakContextSockets  sockets;
-  FlatpakContextSockets  sockets_valid;
-  FlatpakContextDevices  devices;
-  FlatpakContextDevices  devices_valid;
-  FlatpakContextFeatures features;
-  FlatpakContextFeatures features_valid;
+  GHashTable            *shares_permissions;
+  GHashTable            *socket_permissions;
+  GHashTable            *device_permissions;
+  GHashTable            *features_permissions;
   GHashTable            *env_vars;
   GHashTable            *persistent;
   GHashTable            *filesystems;
@@ -108,6 +113,9 @@ struct FlatpakContext
   GHashTable            *enumerable_usb_devices;
   GHashTable            *hidden_usb_devices;
 };
+
+/* Gets a single condition as param and returns whether the condition is true. */
+typedef gboolean (*FlatpakContextConditionEvaluator) (FlatpakContextConditions condition);
 
 extern const char *flatpak_context_sockets[];
 extern const char *flatpak_context_devices[];
@@ -134,7 +142,6 @@ gboolean       flatpak_context_load_metadata (FlatpakContext *context,
 void           flatpak_context_save_metadata (FlatpakContext *context,
                                               gboolean        flatten,
                                               GKeyFile       *metakey);
-void           flatpak_context_allow_host_fs (FlatpakContext *context);
 void           flatpak_context_set_session_bus_policy (FlatpakContext *context,
                                                        const char     *name,
                                                        FlatpakPolicy   policy);
@@ -149,7 +156,7 @@ char *         flatpak_context_devices_to_usb_list (GHashTable *devices,
                                                     gboolean hidden);
 void           flatpak_context_to_args (FlatpakContext *context,
                                         GPtrArray      *args);
-FlatpakRunFlags flatpak_context_get_run_flags (FlatpakContext *context);
+FlatpakRunFlags flatpak_context_features_to_run_flags (FlatpakContextFeatures features);
 void           flatpak_context_add_bus_filters (FlatpakContext *context,
                                                 const char     *app_id,
                                                 FlatpakBus      bus,
@@ -164,9 +171,6 @@ gboolean       flatpak_context_adds_permissions (FlatpakContext *old_context,
 void           flatpak_context_reset_permissions (FlatpakContext *context);
 void           flatpak_context_reset_non_permissions (FlatpakContext *context);
 void           flatpak_context_make_sandboxed (FlatpakContext *context);
-
-gboolean       flatpak_context_allows_features (FlatpakContext        *context,
-                                                FlatpakContextFeatures features);
 
 FlatpakContext *flatpak_context_load_for_deploy (FlatpakDeploy *deploy,
                                                  GError       **error);
@@ -208,6 +212,16 @@ gboolean flatpak_context_get_allowed_exports (FlatpakContext *context,
                                               char         ***allowed_extensions_out,
                                               char         ***allowed_prefixes_out,
                                               gboolean       *require_exact_match_out);
+
+
+FlatpakContextShares flatpak_context_compute_allowed_shares (FlatpakContext                   *context,
+                                                              FlatpakContextConditionEvaluator  evaluator);
+FlatpakContextSockets flatpak_context_compute_allowed_sockets (FlatpakContext                   *context,
+                                                               FlatpakContextConditionEvaluator  evaluator);
+FlatpakContextDevices flatpak_context_compute_allowed_devices (FlatpakContext                   *context,
+                                                               FlatpakContextConditionEvaluator  evaluator);
+FlatpakContextFeatures flatpak_context_compute_allowed_features (FlatpakContext                   *context,
+                                                                FlatpakContextConditionEvaluator  evaluator);
 
 #endif
 

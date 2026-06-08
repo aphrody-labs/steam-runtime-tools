@@ -1,6 +1,6 @@
 /*
  * Taken from Flatpak
- * Last updated: Flatpak 1.16.1
+ * Last updated: Flatpak 1.18.0
  * Copyright © 2014-2018 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -46,6 +46,8 @@ void flatpak_exports_add_host_etc_expose (FlatpakExports       *exports,
                                           FlatpakFilesystemMode mode);
 void flatpak_exports_add_host_os_expose (FlatpakExports       *exports,
                                          FlatpakFilesystemMode mode);
+void flatpak_exports_add_host_root_expose (FlatpakExports       *exports,
+                                           FlatpakFilesystemMode mode);
 gboolean flatpak_exports_add_path_expose (FlatpakExports         *exports,
                                           FlatpakFilesystemMode   mode,
                                           const char             *path,

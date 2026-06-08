@@ -1,6 +1,6 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  * Taken from Flatpak
- * Last updated: Flatpak 1.16.1
+ * Last updated: Flatpak 1.18.0
  * Copyright © 2014-2019 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -26,7 +26,7 @@
 
 #include "flatpak-utils-private.h"
 
-/* Try to find a default server from a pulseaudio confguration file */
+/* Try to find a default server from a pulseaudio configuration file */
 static char *
 flatpak_run_get_pulseaudio_server_user_config (const char *path)
 {

@@ -1,6 +1,6 @@
 /*
  * Taken from Flatpak
- * Last updated: Flatpak 1.16.1
+ * Last updated: Flatpak 1.18.0
  * Copyright © 2015 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -47,17 +47,20 @@ typedef enum {
   FLATPAK_RUN_FLAG_SANDBOX            = (1 << 14),
   FLATPAK_RUN_FLAG_NO_DOCUMENTS_PORTAL = (1 << 15),
   FLATPAK_RUN_FLAG_BLUETOOTH          = (1 << 16),
-  FLATPAK_RUN_FLAG_CANBUS            = (1 << 17),
+  FLATPAK_RUN_FLAG_CANBUS             = (1 << 17),
   FLATPAK_RUN_FLAG_DO_NOT_REAP        = (1 << 18),
   FLATPAK_RUN_FLAG_NO_PROC            = (1 << 19),
   FLATPAK_RUN_FLAG_PARENT_EXPOSE_PIDS = (1 << 20),
   FLATPAK_RUN_FLAG_PARENT_SHARE_PIDS  = (1 << 21),
+  FLATPAK_RUN_FLAG_CLEAR_ENV          = (1 << 22),
 } FlatpakRunFlags;
 
-typedef struct FlatpakDir          FlatpakDir;
-typedef struct FlatpakDeploy       FlatpakDeploy;
-typedef struct FlatpakOciRegistry  FlatpakOciRegistry;
-typedef struct _FlatpakOciManifest FlatpakOciManifest;
-typedef struct _FlatpakOciImage    FlatpakOciImage;
+typedef struct FlatpakDir             FlatpakDir;
+typedef struct FlatpakDeploy          FlatpakDeploy;
+typedef struct FlatpakImageCollection FlatpakImageCollection;
+typedef struct _FlatpakImageSource    FlatpakImageSource;
+typedef struct FlatpakOciRegistry     FlatpakOciRegistry;
+typedef struct _FlatpakOciManifest    FlatpakOciManifest;
+typedef struct _FlatpakOciImage       FlatpakOciImage;
 
 #endif /* __FLATPAK_COMMON_TYPES_H__ */

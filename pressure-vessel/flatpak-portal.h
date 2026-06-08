@@ -1,6 +1,6 @@
 /*
  * Taken from Flatpak
- * Last updated: Flatpak 1.16.1
+ * Last updated: Flatpak 1.18.0
  *
  * Copyright © 2018 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
@@ -49,6 +49,11 @@ typedef enum {
   FLATPAK_SPAWN_SANDBOX_FLAGS_SHARE_GPU = 1 << 2,
   FLATPAK_SPAWN_SANDBOX_FLAGS_ALLOW_DBUS = 1 << 3,
   FLATPAK_SPAWN_SANDBOX_FLAGS_ALLOW_A11Y = 1 << 4,
+  FLATPAK_SPAWN_SANDBOX_FLAGS_SHARE_INPUT = 1 << 5,
+  FLATPAK_SPAWN_SANDBOX_FLAGS_SHARE_USB = 1 << 6,
+  FLATPAK_SPAWN_SANDBOX_FLAGS_SHARE_KVM = 1 << 7,
+  FLATPAK_SPAWN_SANDBOX_FLAGS_SHARE_SHM = 1 << 8,
+  FLATPAK_SPAWN_SANDBOX_FLAGS_SHARE_DEVICES = 1 << 9,
   FLATPAK_SPAWN_SANDBOX_FLAGS_NONE = 0
 } FlatpakSpawnSandboxFlags;
 
@@ -76,6 +81,11 @@ typedef enum {
                                          FLATPAK_SPAWN_SANDBOX_FLAGS_SHARE_SOUND | \
                                          FLATPAK_SPAWN_SANDBOX_FLAGS_SHARE_GPU | \
                                          FLATPAK_SPAWN_SANDBOX_FLAGS_ALLOW_DBUS | \
-                                         FLATPAK_SPAWN_SANDBOX_FLAGS_ALLOW_A11Y)
+                                         FLATPAK_SPAWN_SANDBOX_FLAGS_ALLOW_A11Y | \
+                                         FLATPAK_SPAWN_SANDBOX_FLAGS_SHARE_INPUT | \
+                                         FLATPAK_SPAWN_SANDBOX_FLAGS_SHARE_USB | \
+                                         FLATPAK_SPAWN_SANDBOX_FLAGS_SHARE_KVM | \
+                                         FLATPAK_SPAWN_SANDBOX_FLAGS_SHARE_SHM | \
+                                         FLATPAK_SPAWN_SANDBOX_FLAGS_SHARE_DEVICES)
 
 #endif /* __FLATPAK_PORTAL_H__ */

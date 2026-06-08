@@ -1,6 +1,6 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  * Taken from Flatpak
- * Last updated: Flatpak 1.16.1
+ * Last updated: Flatpak 1.18.0
  * Copyright © 2014-2019 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -172,6 +172,7 @@ struct _FlatpakExports
   FlatpakFilesystemMode host_etc;
   FlatpakFilesystemMode host_os;
   int                   host_fd;
+  FlatpakFilesystemMode host_root;
   FlatpakExportsTestFlags test_flags;
 };
 
@@ -656,6 +657,20 @@ flatpak_exports_append_bwrap_args (FlatpakExports *exports,
           S_ISDIR (buf.st_mode))
         flatpak_bwrap_add_args (bwrap,
                                 etc_bind_mode, "/etc", "/run/host/etc", NULL);
+    }
+
+  g_assert (exports->host_root >= FLATPAK_FILESYSTEM_MODE_NONE);
+  g_assert (exports->host_root <= FLATPAK_FILESYSTEM_MODE_LAST);
+
+  if (exports->host_root != FLATPAK_FILESYSTEM_MODE_NONE)
+    {
+      const char *root_bind_mode = "--bind";
+
+      if (exports->host_root == FLATPAK_FILESYSTEM_MODE_READ_ONLY)
+        root_bind_mode = "--ro-bind";
+
+      flatpak_bwrap_add_args (bwrap,
+                              root_bind_mode, "/", "/run/host/root", NULL);
     }
 
   /* As per the os-release specification https://www.freedesktop.org/software/systemd/man/os-release.html
@@ -1153,4 +1168,14 @@ flatpak_exports_add_host_os_expose (FlatpakExports       *exports,
   g_return_if_fail (mode <= FLATPAK_FILESYSTEM_MODE_LAST);
 
   exports->host_os = mode;
+}
+
+void
+flatpak_exports_add_host_root_expose (FlatpakExports       *exports,
+                                      FlatpakFilesystemMode mode)
+{
+  g_return_if_fail (mode > FLATPAK_FILESYSTEM_MODE_NONE);
+  g_return_if_fail (mode <= FLATPAK_FILESYSTEM_MODE_LAST);
+
+  exports->host_root = mode;
 }

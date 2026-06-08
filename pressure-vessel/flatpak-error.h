@@ -1,6 +1,6 @@
 /* flatpak-error.c
  * Adapted from Flatpak
- * Last updated: Flatpak 1.16.1
+ * Last updated: Flatpak 1.18.0
  *
  * Copyright (C) 2015 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.0-or-later
@@ -69,7 +69,7 @@ G_BEGIN_DECLS
  * @FLATPAK_ERROR_AUTHENTICATION_FAILED: An authentication operation failed, for example, no
  *                                       correct password was supplied. (Since: 1.7.3)
  * @FLATPAK_ERROR_NOT_AUTHORIZED: An operation tried to access a ref, or information about it that it
- *                                was not authorized. For example, when succesfully authenticating with a
+ *                                was not authorized. For example, when successfully authenticating with a
  *                                server but the user doesn't have permissions for a private ref. (Since: 1.7.3)
  *
  * Error codes for library functions.

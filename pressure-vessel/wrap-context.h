@@ -18,6 +18,35 @@
 #include "pressure-vessel/wrap-interactive.h"
 #include "pressure-vessel/utils.h"
 
+static inline gboolean usage_error (GError **error,
+                                    const char *format,
+                                    ...) G_GNUC_PRINTF (2, 3);
+
+/*
+ * Same as glnx_throw(), but the error is %G_OPTION_ERROR_FAILED,
+ * so that our main() will report it as a command-line usage error.
+ */
+static inline gboolean
+usage_error (GError **error,
+             const char *format,
+             ...)
+{
+  if (error != NULL)
+    {
+      va_list ap;
+
+      va_start (ap, format);
+      g_propagate_error (error,
+                         g_error_new_valist (G_OPTION_ERROR,
+                                             G_OPTION_ERROR_FAILED,
+                                             format,
+                                             ap));
+      va_end (ap);
+    }
+
+  return FALSE;
+}
+
 typedef struct _PvWrapContext PvWrapContext;
 typedef struct _PvWrapContextClass PvWrapContextClass;
 

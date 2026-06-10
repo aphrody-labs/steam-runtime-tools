@@ -67,9 +67,6 @@ static const GDebugKey pv_debug_keys[] =
   { "container", PV_WRAP_LOG_FLAGS_CONTAINER },
 };
 
-#define usage_error(error, ...) \
-  g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED, __VA_ARGS__)
-
 int
 main (int argc,
       char *argv[])

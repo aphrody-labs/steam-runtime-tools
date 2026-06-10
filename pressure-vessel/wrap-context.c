@@ -1348,9 +1348,6 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
   return TRUE;
 }
 
-#define usage_error(error, ...) \
-  g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED, __VA_ARGS__)
-
 gboolean
 pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
                                          PvWrapTestFlags test_flags,
@@ -1371,10 +1368,7 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
 
   if (self->options.terminal == PV_TERMINAL_NONE
       && self->options.shell != PV_SHELL_NONE)
-    {
-      usage_error (error, "--terminal=none is incompatible with --shell");
-      return FALSE;
-    }
+    return usage_error (error, "--terminal=none is incompatible with --shell");
 
   bindir = _srt_find_executable_dir (error);
 

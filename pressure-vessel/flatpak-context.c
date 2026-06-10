@@ -1,6 +1,11 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
+ *
+ * Taken from Flatpak
+ * Last updated: Flatpak 1.18.0
+ *
  * Copyright © 2014-2018 Red Hat, Inc
  * Copyright © 2024 GNOME Foundation, Inc.
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -36,17 +41,22 @@
 #include <unistd.h>
 #include <gio/gunixfdlist.h>
 
+#if 0
 #include <glib/gi18n-lib.h>
+#endif
 
 #include <gio/gio.h>
 #include "libglnx.h"
 
 #include "flatpak-error.h"
 #include "flatpak-metadata-private.h"
+#if 0
 #include "flatpak-usb-private.h"
+#endif
 #include "flatpak-utils-base-private.h"
 #include "flatpak-utils-private.h"
 
+#if 0
 /* Same order as enum */
 const char *flatpak_context_shares[] = {
   "network",
@@ -4481,3 +4491,4 @@ flatpak_context_compute_allowed_features (FlatpakContext                   *cont
                                               flatpak_context_features,
                                               evaluator);
 }
+#endif

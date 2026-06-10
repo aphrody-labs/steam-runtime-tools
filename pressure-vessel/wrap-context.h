@@ -148,6 +148,8 @@ struct _PvWrapContext
 {
   GObject parent_instance;
 
+  SrtDirentCompareFunc arbitrary_dirent_order;
+  GCompareFunc arbitrary_str_order;
   FlatpakBwrap *flatpak_subsandbox;
   FlatpakExports *exports;
   GHashTable *paths_not_exported;

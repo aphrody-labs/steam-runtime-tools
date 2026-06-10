@@ -130,6 +130,8 @@ G_DEFINE_TYPE (PvWrapContext, pv_wrap_context, G_TYPE_OBJECT)
 static void
 pv_wrap_context_init (PvWrapContext *self)
 {
+  self->arbitrary_dirent_order = NULL;
+  self->arbitrary_str_order = NULL;
   self->is_flatpak_env = g_file_test ("/.flatpak-info", G_FILE_TEST_IS_REGULAR);
   self->original_environ = g_get_environ ();
   self->current_home_fd = -1;
@@ -1357,6 +1359,12 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
   g_autofree char *bindir = NULL;
   const char *prefix;
   const char *pkglibexecdir = NULL;
+
+  if (self->options.deterministic)
+    {
+      self->arbitrary_dirent_order = _srt_dirent_strcmp;
+      self->arbitrary_str_order = _srt_generic_strcmp0;
+    }
 
   if (self->options.terminal == PV_TERMINAL_AUTO)
     {

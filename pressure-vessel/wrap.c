@@ -95,7 +95,6 @@ main (int argc,
   glnx_autofd int original_stderr = -1;
   glnx_autofd int tty_stdin = -1;
   glnx_autofd int tty_stdout = -1;
-  SrtDirentCompareFunc arbitrary_dirent_order;
   const char *pkglibexecdir;
   const char *steam_app_id;
   g_autoptr(GPtrArray) adverb_preload_argv = NULL;
@@ -363,11 +362,6 @@ main (int argc,
   if ((result = _srt_set_compatible_resource_limits (0)) < 0)
     g_warning ("Unable to set normal resource limits: %s",
                g_strerror (-result));
-
-  if (self->options.deterministic)
-    arbitrary_dirent_order = _srt_dirent_strcmp;
-  else
-    arbitrary_dirent_order = NULL;
 
   if (self->options.terminal != PV_TERMINAL_TTY && !self->options.devel)
     {
@@ -671,7 +665,7 @@ main (int argc,
 
       if (!pv_wrap_use_host_os (real_root_fd,
                                 self->exports, bwrap_filesystem_arguments,
-                                arbitrary_dirent_order,
+                                self->arbitrary_dirent_order,
                                 self->workarounds,
                                 error))
         goto out;
@@ -729,7 +723,7 @@ main (int argc,
           && !pv_export_root_dirs_like_filesystem_host (real_root_fd,
                                                         self->exports,
                                                         FLATPAK_FILESYSTEM_MODE_READ_WRITE,
-                                                        arbitrary_dirent_order,
+                                                        self->arbitrary_dirent_order,
                                                         error))
         goto out;
     }

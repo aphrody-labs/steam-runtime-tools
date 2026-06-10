@@ -225,4 +225,7 @@ FlatpakContextFeatures flatpak_context_compute_allowed_features (FlatpakContext 
 
 #endif
 
+/* pressure-vessel-specific: This is exported for wrap-setup.c */
+extern const char *dont_mount_in_root[];
+
 #endif /* __FLATPAK_CONTEXT_H__ */

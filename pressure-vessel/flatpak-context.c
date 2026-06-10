@@ -3678,6 +3678,7 @@ flatpak_context_make_sandboxed (FlatpakContext *context)
   g_hash_table_remove_all (context->a11y_bus_policy);
   g_hash_table_remove_all (context->generic_policy);
 }
+#endif
 
 const char *dont_mount_in_root[] = {
   ".",
@@ -3691,6 +3692,7 @@ const char *dont_mount_in_root[] = {
   "lib",
   "lib32",
   "lib64",
+  "overrides",    /* pressure-vessel-specific */
   "proc",
   "root",
   "run",
@@ -3702,6 +3704,7 @@ const char *dont_mount_in_root[] = {
   NULL
 };
 
+#if 0
 static void
 log_cannot_export_error (FlatpakFilesystemMode  mode,
                          const char            *path,

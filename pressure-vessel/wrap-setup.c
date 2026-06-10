@@ -43,32 +43,6 @@
 #include "flatpak-utils-private.h"
 #include "utils.h"
 
-/* Taken from Flatpak flatpak-context.c, except where noted.
- * Last updated: Flatpak 1.14.6 */
-static const char *dont_mount_in_root[] = {
-  ".",
-  "..",
-  "app",
-  "bin",
-  "boot",
-  "dev",
-  "efi",
-  "etc",
-  "lib",
-  "lib32",
-  "lib64",
-  "overrides",    /* pressure-vessel-specific */
-  "proc",
-  "root",
-  "run",
-  "sbin",
-  "sys",
-  "tmp",
-  "usr",
-  "var",
-  NULL
-};
-
 gchar *
 pv_wrap_check_bwrap (SrtSubprocessRunner *runner,
                      gboolean only_prepare,

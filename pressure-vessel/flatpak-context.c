@@ -1931,7 +1931,7 @@ flatpak_context_parse_filesystem (const char             *filesystem_and_mode,
   g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,
                /* pressure-vessel change: we don't support xdg-data/foo,
                 * etc. and we also don't use _() */
-               "Unknown filesystem location %s, valid locations are: host, host-os, host-etc, ~/dir, /dir", filesystem);
+               "Unknown filesystem location %s, valid locations are: host, host-os, host-etc, host-root, ~/dir, /dir", filesystem);
   return FALSE;
 }
 

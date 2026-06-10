@@ -858,6 +858,7 @@ pv_wrap_setup_export_filesystems (PvWrapContext *self,
                                   GError **error)
 {
   g_auto(SrtHashTableIter) iter = SRT_HASH_TABLE_ITER_CLEARED;
+  FlatpakFilesystemMode share_host_root = FLATPAK_FILESYSTEM_MODE_NONE;
   const char *filesystem;
   const void *mode_pointer;
 
@@ -869,6 +870,10 @@ pv_wrap_setup_export_filesystems (PvWrapContext *self,
                                     self->arbitrary_str_order);
 
   g_debug ("Processing --filesystem arguments...");
+
+  if (pv_wrap_context_has_filesystem (self, "host-root", &share_host_root)
+      && share_host_root > FLATPAK_FILESYSTEM_MODE_NONE)
+    flatpak_exports_add_host_root_expose (self->exports, share_host_root);
 
   while (_srt_hash_table_iter_next (&iter, &filesystem, &mode_pointer))
     {
@@ -882,7 +887,7 @@ pv_wrap_setup_export_filesystems (PvWrapContext *self,
            * - host-etc, host-os: ignored, PvRuntime does the equivalent
            * - host-reset: ignored, can't actually happen because we don't
            *   implement --nofilesystem
-           * - host-root: not implemented yet
+           * - host-root: see above
            */
         }
       else if (g_str_has_prefix (filesystem, "~/"))

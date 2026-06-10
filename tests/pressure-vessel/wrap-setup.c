@@ -1526,9 +1526,6 @@ test_options_invalid (Fixture *f,
     "home:ro",
     "home:rw",
     "host-reset",
-    "host-root",
-    "host-root:ro",
-    "host-root:rw",
     "host:reset",
     "xdg-cache",
     "xdg-config",
@@ -1685,6 +1682,7 @@ test_options_true (Fixture *f,
     "--filesystem=/ro:ro",
     "--filesystem=/rw:rw",
     "--filesystem=/without/mode",
+    "--filesystem=host-root:ro",
     "--for-steam-client",
     "--freedesktop-app-id=com.example.Foo",
     "--gc-runtimes",
@@ -1743,6 +1741,7 @@ test_options_true (Fixture *f,
     "host",
     "host-etc",
     "host-os",
+    "host-root",
     "~/create",
     NULL
   };
@@ -1800,7 +1799,8 @@ test_options_true (Fixture *f,
         g_assert_cmpint (mode, ==, FLATPAK_FILESYSTEM_MODE_CREATE);
       else if (g_str_equal (fs, "/ro")
                || g_str_equal (fs, "host")
-               || g_str_equal (fs, "host-os"))
+               || g_str_equal (fs, "host-os")
+               || g_str_equal (fs, "host-root"))
         g_assert_cmpint (mode, ==, FLATPAK_FILESYSTEM_MODE_READ_ONLY);
       else
         g_assert_cmpint (mode, ==, FLATPAK_FILESYSTEM_MODE_READ_WRITE);

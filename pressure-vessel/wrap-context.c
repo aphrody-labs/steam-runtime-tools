@@ -432,9 +432,6 @@ opt_filesystem_cb (const char *option_name,
     return usage_error (error,
                         "%s=\"%s\" not currently implemented (use --share-home instead)",
                         option_name, value);
-  else if (g_str_equal (filesystem, "host-root"))
-    return usage_error (error, "%s=\"%s\" not currently implemented",
-                        option_name, value);
 
   pv_wrap_options_take_filesystem (self, g_steal_pointer (&filesystem), mode);
   return TRUE;
@@ -954,7 +951,7 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
       "Share filesystem directories with the container, "
       "specified as absolute paths, "
       "paths starting with '~/', "
-      "or the special token host "
+      "or one of the special tokens host or host-root, "
       "optionally followed by :ro or :rw.",
       /* In fact host-etc, host-os are also accepted but intentionally not
        * documented here, because they're ignored. */

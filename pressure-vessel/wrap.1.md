@@ -140,11 +140,18 @@ available in the container as `/run/host/etc` and so on
 and when not using a runtime,
 the current `/etc` and `/usr` are used directly.
 
+The special token `host-root` results in the entire host filesystem
+being mounted read/write at `/run/host/root`,
+as described in systemd's [Container Interface][] document.
+This is enabled by default when running the Steam Client.
+Note that as with Flatpak, paths within this hierarchy should always be
+resolved using **openat2**(2) with the `RESOLVE_IN_ROOT` flag,
+or an equivalent interface such as steam-runtime-tools'
+`_srt_resolve_in_sysroot()` or libglnx's `glnx_chaseat()`.
+
 The special token `home` is not currently accepted.
 `--share-home` has a similar meaning,
 but also shares related directories such as `/run/media` and `/srv`.
-
-The special token `host-root` is not currently accepted.
 
 </dd>
 <dt>
@@ -1801,6 +1808,7 @@ then type `"$@"` (including the double quotes) to run the game itself.
 * <https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/docs/container-runtime.md>
 * <https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/docs/slr-for-game-developers.md>
 
+[Container Interface]: https://systemd.io/CONTAINER_INTERFACE/
 [developer mode]: https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/docs/slr-for-game-developers.md#developer-mode
 [steam-runtime emulator.json(5)]: https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/docs/steam-runtime-emulator.json.5.md
 

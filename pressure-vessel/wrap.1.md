@@ -118,7 +118,8 @@ or a similarly tightly-integrated component.
 
 This changes some defaults to be appropriate for the Steam Client:
 currently it means that the equivalent of `flatpak run --filesystem=host`
-is assumed.
+is assumed,
+and `/sys` is mounted read/write instead of read-only.
 
 Other parameters that are appropriate for the Steam Client might be
 affected by this option in future.

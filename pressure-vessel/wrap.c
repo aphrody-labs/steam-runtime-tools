@@ -485,7 +485,7 @@ main (int argc,
 
       /* Start with just the root tmpfs (which appears automatically)
        * and the standard API filesystems */
-      if (self->options.devel)
+      if (self->options.for_steam_client || self->options.devel)
         sysfs_mode = FLATPAK_FILESYSTEM_MODE_READ_WRITE;
 
       pv_bwrap_add_api_filesystems (bwrap_filesystem_arguments,

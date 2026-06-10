@@ -843,18 +843,8 @@ main (int argc,
 
       /* Make arbitrary filesystems available. This is not as complete as
        * Flatpak yet. */
-      if (self->options.filesystems != NULL)
-        {
-          g_debug ("Processing --filesystem arguments...");
-
-          for (i = 0; self->options.filesystems[i] != NULL; i++)
-            pv_wrap_context_export_if_allowed (self,
-                                               FLATPAK_FILESYSTEM_MODE_READ_WRITE,
-                                               self->options.filesystems[i],
-                                               self->options.filesystems[i],
-                                               "--filesystem", "", "",
-                                               PV_WRAP_EXPORT_FLAGS_NONE);
-        }
+      if (!pv_wrap_setup_export_filesystems (self, error))
+        goto out;
 
       /* Make sure the current working directory (the game we are going to
        * run) is available. Some games write here. */

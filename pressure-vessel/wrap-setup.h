@@ -78,3 +78,6 @@ void pv_share_temp_dir (FlatpakExports *exports,
 void pv_bind_and_propagate_from_environ (PvWrapContext *self,
                                          PvHomeMode home_mode,
                                          SrtEnvOverlay *container_env);
+
+gboolean pv_wrap_setup_export_filesystems (PvWrapContext *self,
+                                           GError **error);

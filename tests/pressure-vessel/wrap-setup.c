@@ -1310,8 +1310,11 @@ test_options_defaults (Fixture *f,
        * strings that were removed from argv during parsing */
       g_auto(GStrv) argv_copy = _srt_strdupv (original_argv);
       g_autofree gchar **argv = g_memdup2 (argv_copy, sizeof (original_argv));
+      g_autofree gchar *private_home = NULL;
       g_autoptr(GError) local_error = NULL;
       int argc = G_N_ELEMENTS (original_argv) - 1;
+      PvHomeMode home_mode = PV_HOME_MODE_TRANSIENT;
+      gboolean ok;
 
       g_assert_null (options->env_if_host);
       g_assert_null (options->filesystems);
@@ -1352,13 +1355,24 @@ test_options_defaults (Fixture *f,
       g_assert_cmpint (options->version, ==, FALSE);
       g_assert_cmpint (options->version_only, ==, FALSE);
 
-      pv_wrap_context_parse_argv (f->context, &argc, &argv, &local_error);
+      ok = pv_wrap_context_parse_argv (f->context, &argc, &argv, &local_error);
       g_assert_no_error (local_error);
+      g_assert_true (ok);
 
       g_assert_cmpint (f->context->original_argc,
                        ==, G_N_ELEMENTS (original_argv) - 1);
       g_assert_cmpstrv (f->context->original_argv, (gchar **) original_argv);
       g_assert_cmpstrv (argv, (gchar **) expected_argv);
+
+      ok = pv_wrap_context_choose_home_mode (f->context,
+                                             &home_mode,
+                                             &private_home,
+                                             NULL,
+                                             &local_error);
+      g_assert_no_error (local_error);
+      g_assert_true (ok);
+      g_assert_cmpint (home_mode, ==, PV_HOME_MODE_SHARED);
+      g_assert_null (private_home);
     }
 }
 
@@ -1382,6 +1396,7 @@ test_options_false (Fixture *f,
     "--no-import-vulkan-layers",
     "--no-systemd-scope",
     "--runtime=",
+    "--steam-app-id=123",   /* necessary so we will accept --unshare-home */
     "--terminal=none",
     "--terminate-idle-timeout=0",
     "--terminate-timeout=0",
@@ -1404,11 +1419,27 @@ test_options_false (Fixture *f,
    * strings that were removed from argv during parsing */
   g_auto(GStrv) argv_copy = _srt_strdupv (original_argv);
   g_autofree gchar **argv = g_memdup2 (argv_copy, sizeof (original_argv));
+  g_autofree gchar *private_home = NULL;
   g_autoptr(GError) local_error = NULL;
   int argc = G_N_ELEMENTS (original_argv) - 1;
+  PvHomeMode home_mode = PV_HOME_MODE_SHARED;
+  const char *steam_app_id = NULL;
+  gboolean ok;
 
-  pv_wrap_context_parse_argv (f->context, &argc, &argv, &local_error);
+  ok = pv_wrap_context_parse_argv (f->context, &argc, &argv, &local_error);
   g_assert_no_error (local_error);
+  g_assert_true (ok);
+
+  ok = pv_wrap_context_choose_home_mode (f->context,
+                                         &home_mode,
+                                         &private_home,
+                                         &steam_app_id,
+                                         &local_error);
+  g_assert_no_error (local_error);
+  g_assert_true (ok);
+  g_assert_cmpint (home_mode, ==, PV_HOME_MODE_PRIVATE);
+  g_assert_cmpstr (steam_app_id, ==, "123");
+  g_assert_cmpstr (private_home, ==, "/home/me/.var/app/com.steampowered.App123");
 
   g_assert_cmpint (f->context->original_argc,
                    ==, G_N_ELEMENTS (original_argv) - 1);
@@ -1417,14 +1448,14 @@ test_options_false (Fixture *f,
 
   g_assert_null (options->env_if_host);
   g_assert_null (options->filesystems);
-  g_assert_cmpstr (options->freedesktop_app_id, ==, NULL);
+  g_assert_cmpstr (options->freedesktop_app_id, ==, "com.steampowered.App123");
   g_assert_cmpstr (options->graphics_provider, ==, "");
   g_assert_cmpstr (options->home, ==, NULL);
   g_assert_cmpuint (options->pass_fds->len, ==, 0);
   g_assert_cmpuint (options->preload_modules->len, ==, 0);
   g_assert_cmpstr (options->runtime, ==, "");
   g_assert_cmpstr (options->runtime_base, ==, NULL);
-  g_assert_cmpstr (options->steam_app_id, ==, NULL);
+  g_assert_cmpstr (options->steam_app_id, ==, "123");
   g_assert_cmpstr (options->variable_dir, ==, NULL);
   g_assert_cmpstr (options->write_final_argv, ==, NULL);
   g_assert_cmpfloat (options->terminate_idle_timeout, <=, 0);
@@ -1533,13 +1564,31 @@ test_options_true (Fixture *f,
    * strings that were removed from argv during parsing */
   g_auto(GStrv) argv_copy = _srt_strdupv (original_argv);
   g_autofree gchar **argv = g_memdup2 (argv_copy, sizeof (original_argv));
+  g_autofree gchar *private_home = NULL;
   g_autoptr(GError) local_error = NULL;
   int argc = G_N_ELEMENTS (original_argv) - 1;
+  PvHomeMode home_mode = PV_HOME_MODE_TRANSIENT;
+  const char *steam_app_id = NULL;
   const WrapPreloadModule *module;
   gsize i = 0;
+  gboolean ok;
 
-  pv_wrap_context_parse_argv (f->context, &argc, &argv, &local_error);
+  ok = pv_wrap_context_parse_argv (f->context, &argc, &argv, &local_error);
   g_assert_no_error (local_error);
+  g_assert_true (ok);
+
+  ok = pv_wrap_context_choose_home_mode (f->context,
+                                         &home_mode,
+                                         &private_home,
+                                         &steam_app_id,
+                                         &local_error);
+  g_assert_no_error (local_error);
+  g_assert_true (ok);
+  /* --share-home takes precedence over --home */
+  g_assert_cmpint (home_mode, ==, PV_HOME_MODE_SHARED);
+  g_assert_cmpstr (steam_app_id, ==, "12345");
+  /* --share-home takes precedence over --home */
+  g_assert_cmpstr (private_home, ==, NULL);
 
   g_assert_cmpint (f->context->original_argc,
                    ==, G_N_ELEMENTS (original_argv) - 1);

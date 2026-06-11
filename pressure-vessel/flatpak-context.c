@@ -3704,8 +3704,8 @@ const char *dont_mount_in_root[] = {
   NULL
 };
 
-#if 0
-static void
+/* pressure-vessel-specific: Exported for exports.c */
+void
 log_cannot_export_error (FlatpakFilesystemMode  mode,
                          const char            *path,
                          const GError          *error)
@@ -3739,9 +3739,13 @@ log_cannot_export_error (FlatpakFilesystemMode  mode,
                _("Not sharing \"%s\" with sandbox: %s"),
                path, error->message);
         break;
+
+      default:
+        g_warn_if_reached ();
     }
 }
 
+#if 0
 static void
 flatpak_context_export (FlatpakContext *context,
                         FlatpakExports *exports,

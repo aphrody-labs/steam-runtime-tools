@@ -228,4 +228,9 @@ FlatpakContextFeatures flatpak_context_compute_allowed_features (FlatpakContext 
 /* pressure-vessel-specific: This is exported for wrap-setup.c */
 extern const char *dont_mount_in_root[];
 
+/* pressure-vessel-specific: This is exported for exports.c */
+void log_cannot_export_error (FlatpakFilesystemMode  mode,
+                              const char            *path,
+                              const GError          *error);
+
 #endif /* __FLATPAK_CONTEXT_H__ */

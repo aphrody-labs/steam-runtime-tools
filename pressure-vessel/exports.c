@@ -138,47 +138,6 @@ pv_export_symlink_targets (FlatpakExports *exports,
   export_targets_data.log_replace_with = NULL;
 }
 
-/* Originally from flatpak-context, last updated: Flatpak 1.14.6 */
-static void
-log_cannot_export_error (FlatpakFilesystemMode  mode,
-                         const char            *path,
-                         const GError          *error)
-{
-  GLogLevelFlags level = G_LOG_LEVEL_MESSAGE;
-
-  /* By default we don't show a log message if the reason we are not sharing
-   * something with the sandbox is simply "it doesn't exist" (or something
-   * very close): otherwise it would be very noisy to launch apps that
-   * opportunistically share things they might benefit from, like Steam
-   * having access to $XDG_RUNTIME_DIR/app/com.discordapp.Discord if it
-   * happens to exist. */
-  if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND))
-    level = G_LOG_LEVEL_INFO;
-  /* Some callers specifically suppress warnings for particular errors
-   * by setting this code. */
-  else if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_FAILED_HANDLED))
-    level = G_LOG_LEVEL_INFO;
-
-  switch (mode)
-    {
-      case FLATPAK_FILESYSTEM_MODE_NONE:
-        g_log (G_LOG_DOMAIN, level, _("Not replacing \"%s\" with tmpfs: %s"),
-               path, error->message);
-        break;
-
-      case FLATPAK_FILESYSTEM_MODE_CREATE:
-      case FLATPAK_FILESYSTEM_MODE_READ_ONLY:
-      case FLATPAK_FILESYSTEM_MODE_READ_WRITE:
-        g_log (G_LOG_DOMAIN, level,
-               _("Not sharing \"%s\" with sandbox: %s"),
-               path, error->message);
-        break;
-
-      default:
-        g_warn_if_reached ();
-    }
-}
-
 /*
  * pv_exports_expose_or_log:
  * @exports: The #FlatpakExports

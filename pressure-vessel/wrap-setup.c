@@ -883,16 +883,24 @@ gboolean
 pv_wrap_setup_export_filesystems (PvWrapContext *self,
                                   GError **error)
 {
+  g_auto(SrtHashTableIter) iter = SRT_HASH_TABLE_ITER_CLEARED;
+  const char *filesystem;
+  const void *mode_pointer;
+
   if (self->options.filesystems == NULL)
     return TRUE;
 
+  _srt_hash_table_iter_init_sorted (&iter,
+                                    self->options.filesystems,
+                                    self->arbitrary_str_order);
+
   g_debug ("Processing --filesystem arguments...");
 
-  for (size_t i = 0; self->options.filesystems[i] != NULL; i++)
+  while (_srt_hash_table_iter_next (&iter, &filesystem, &mode_pointer))
     pv_wrap_context_export_if_allowed (self,
-                                       FLATPAK_FILESYSTEM_MODE_READ_WRITE,
-                                       self->options.filesystems[i],
-                                       self->options.filesystems[i],
+                                       GPOINTER_TO_INT (mode_pointer),
+                                       filesystem,
+                                       filesystem,
                                        "--filesystem", "", "",
                                        PV_WRAP_EXPORT_FLAGS_NONE);
 

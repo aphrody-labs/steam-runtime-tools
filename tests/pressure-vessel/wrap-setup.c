@@ -1609,8 +1609,8 @@ test_options_true (Fixture *f,
   };
   static const char * const expected_filesystems[] =
   {
-    "/foo",
     "/bar",
+    "/foo",
     NULL
   };
   const PvWrapOptions *options = &f->context->options;
@@ -1619,6 +1619,7 @@ test_options_true (Fixture *f,
   g_auto(GStrv) argv_copy = _srt_strdupv (original_argv);
   g_autofree gchar **argv = g_memdup2 (argv_copy, sizeof (original_argv));
   g_autofree gchar *private_home = NULL;
+  g_autofree void **filesystem_keys = NULL;
   g_autoptr(GError) local_error = NULL;
   int argc = G_N_ELEMENTS (original_argv) - 1;
   PvHomeMode home_mode = PV_HOME_MODE_TRANSIENT;
@@ -1626,6 +1627,7 @@ test_options_true (Fixture *f,
   const WrapPreloadModule *module;
   gsize i = 0;
   gboolean ok;
+  guint n;
 
   ok = pv_wrap_context_parse_argv (f->context, &argc, &argv, &local_error);
   g_assert_no_error (local_error);
@@ -1649,8 +1651,22 @@ test_options_true (Fixture *f,
   g_assert_cmpstrv (f->context->original_argv, (gchar **) original_argv);
   g_assert_cmpstrv (argv, (gchar **) expected_argv);
 
+  filesystem_keys = g_hash_table_get_keys_as_array (options->filesystems, &n);
+  qsort (filesystem_keys, n, sizeof (char *), _srt_indirect_strcmp0);
+  g_assert_cmpstrv ((char **) filesystem_keys, (char **) expected_filesystems);
+
+  for (i = 0; i < n; i++)
+    {
+      const char *fs = expected_filesystems[i];
+      FlatpakFilesystemMode mode;
+
+      mode = FLATPAK_FILESYSTEM_MODE_NONE;
+      g_assert_true (pv_wrap_context_has_filesystem (f->context, fs, &mode));
+      g_assert_cmpint (mode, ==, FLATPAK_FILESYSTEM_MODE_READ_WRITE);
+      g_assert_true (pv_wrap_context_has_filesystem (f->context, fs, NULL));
+    }
+
   g_assert_cmpstrv (options->env_if_host, (gchar **) expected_env_if_host);
-  g_assert_cmpstrv (options->filesystems, (gchar **) expected_filesystems);
   g_assert_cmpstr (options->freedesktop_app_id, ==, "com.example.Foo");
   g_assert_cmpstr (options->graphics_provider, ==, "/gfx");
   g_assert_cmpstr (options->home, ==, "/home/steam");

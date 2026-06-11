@@ -273,28 +273,6 @@ main (int argc,
       goto out;
     }
 
-  if (self->options.filesystems != NULL)
-    {
-      for (i = 0; self->options.filesystems[i] != NULL; i++)
-        {
-          if (strchr (self->options.filesystems[i], ':') != NULL ||
-              strchr (self->options.filesystems[i], '\\') != NULL)
-            {
-              usage_error (error,
-                           "':' and '\\' in --filesystem argument "
-                           "not handled yet");
-              goto out;
-            }
-          else if (!g_path_is_absolute (self->options.filesystems[i]))
-            {
-              usage_error (error,
-                           "--filesystem argument must be an absolute "
-                           "path, not \"%s\"", self->options.filesystems[i]);
-              goto out;
-            }
-        }
-    }
-
   if (self->options.copy_runtime && self->options.variable_dir == NULL)
     {
       usage_error (error, "--copy-runtime requires --variable-dir");

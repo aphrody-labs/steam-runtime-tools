@@ -98,7 +98,7 @@ pv_wrap_options_clear (PvWrapOptions *self)
   g_clear_object (&self->emulator);
   g_clear_pointer (&self->emulator_manifest, g_free);
   g_clear_pointer (&self->env_if_host, g_strfreev);
-  g_clear_pointer (&self->filesystems, g_strfreev);
+  g_clear_pointer (&self->filesystems, g_hash_table_unref);
   g_clear_pointer (&self->freedesktop_app_id, g_free);
   g_clear_pointer (&self->graphics_provider, g_free);
   g_clear_pointer (&self->home, g_free);
@@ -329,6 +329,54 @@ pv_wrap_context_get_helpers_dir_in_container (PvWrapContext *self)
     return _srt_subprocess_runner_get_helpers_path (self->run_in_current_context);
 }
 
+/*
+ * @fs: (type filename) (transfer full):
+ */
+void
+pv_wrap_options_take_filesystem (PvWrapOptions *self,
+                                 char *fs,
+                                 FlatpakFilesystemMode mode)
+{
+  if (self->filesystems == NULL)
+    self->filesystems = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                               g_free, NULL);
+
+  g_hash_table_replace (self->filesystems,
+                        g_steal_pointer (&fs),
+                        GINT_TO_POINTER (mode));
+}
+
+/*
+ * pv_wrap_context_has_filesystem:
+ * @self: The context
+ * @fs: An absolute path
+ * @mode_out: (optional): Used to return the filesystem mode if set
+ *
+ * If @fs was configured to be read-only, read/write or
+ * explicitly unshared, set `*mode_out` and return %TRUE.
+ * If no mode was specified for @fs, leave `*mode_out` unchanged
+ * and return %FALSE.
+ *
+ * Returns: %TRUE if a mode for @fs was specified
+ */
+gboolean
+pv_wrap_context_has_filesystem (PvWrapContext *self,
+                                const char *fs,
+                                FlatpakFilesystemMode *mode_out)
+{
+  void *mode_value = NULL;
+
+  if (self->options.filesystems == NULL
+      || !g_hash_table_lookup_extended (self->options.filesystems, fs,
+                                        NULL, &mode_value))
+    return FALSE;
+
+  if (mode_out != NULL)
+    *mode_out = GPOINTER_TO_INT (mode_value);
+
+  return TRUE;
+}
+
 static gboolean
 opt_copy_runtime_into_cb (const gchar *option_name,
                           const gchar *value,
@@ -357,6 +405,29 @@ opt_copy_runtime_into_cb (const gchar *option_name,
       self->variable_dir = g_strdup (value);
     }
 
+  return TRUE;
+}
+
+static gboolean
+opt_filesystem_cb (const char *option_name,
+                   const char *value,
+                   void *data,
+                   GError **error)
+{
+  PvWrapOptions *self = data;
+  FlatpakFilesystemMode mode = FLATPAK_FILESYSTEM_MODE_READ_WRITE;
+
+  if (strchr (value, ':') != NULL || strchr (value, '\\') != NULL)
+    return usage_error (error,
+                        "':' and '\\' in %s argument \"%s\" not handled yet",
+                        option_name, value);
+
+  if (!g_path_is_absolute (value))
+    return usage_error (error,
+                        "%s argument must be an absolute path, not \"%s\"",
+                        option_name, value);
+
+  pv_wrap_options_set_filesystem (self, value, mode);
   return TRUE;
 }
 
@@ -870,7 +941,7 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
       "Set VAR=VAL if COMMAND is run with /usr from the host system, "
       "but not if it is run with /usr from RUNTIME.", "VAR=VAL" },
     { "filesystem", '\0',
-      G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME_ARRAY, &self->filesystems,
+      G_OPTION_FLAG_FILENAME, G_OPTION_ARG_CALLBACK, opt_filesystem_cb,
       "Share filesystem directories with the container. "
       "They must currently be given as absolute paths.",
       "PATH" },

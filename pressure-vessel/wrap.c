@@ -77,7 +77,7 @@ main (int argc,
   GError **error = &local_error;
   int ret = 2;
   gsize i;
-  PvHomeMode home_mode;
+  PvHomeMode home_mode = PV_HOME_MODE_SHARED;
   g_autoptr(SrtEnvOverlay) container_env = NULL;
   g_autoptr(FlatpakBwrap) bwrap = NULL;
   g_autoptr(FlatpakBwrap) bwrap_filesystem_arguments = NULL;
@@ -96,7 +96,7 @@ main (int argc,
   glnx_autofd int tty_stdin = -1;
   glnx_autofd int tty_stdout = -1;
   const char *pkglibexecdir;
-  const char *steam_app_id;
+  const char *steam_app_id = NULL;
   g_autoptr(GPtrArray) adverb_preload_argv = NULL;
   int real_root_fd;
   int result;
@@ -243,61 +243,12 @@ main (int argc,
       argc--;
     }
 
-  if (self->options.steam_app_id != NULL)
-    steam_app_id = self->options.steam_app_id;
-  else
-    steam_app_id = _srt_get_steam_app_id ();
-
-  if (self->options.share_home == TRISTATE_YES)
-    {
-      home_mode = PV_HOME_MODE_SHARED;
-    }
-  else if (self->options.home)
-    {
-      home_mode = PV_HOME_MODE_PRIVATE;
-      private_home = g_strdup (self->options.home);
-    }
-  else if (self->options.share_home == TRISTATE_MAYBE)
-    {
-      home_mode = PV_HOME_MODE_SHARED;
-    }
-  else if (self->options.freedesktop_app_id)
-    {
-      home_mode = PV_HOME_MODE_PRIVATE;
-      private_home = g_build_filename (g_quark_to_string (self->current_home),
-                                       ".var", "app",
-                                       self->options.freedesktop_app_id,
-                                       NULL);
-    }
-  else if (steam_app_id != NULL)
-    {
-      home_mode = PV_HOME_MODE_PRIVATE;
-      self->options.freedesktop_app_id = g_strdup_printf ("com.steampowered.App%s",
-                                                          steam_app_id);
-      private_home = g_build_filename (g_quark_to_string (self->current_home),
-                                       ".var", "app",
-                                       self->options.freedesktop_app_id,
-                                       NULL);
-    }
-  else if (self->options.batch)
-    {
-      home_mode = PV_HOME_MODE_TRANSIENT;
-      private_home = NULL;
-      g_info ("Unsharing the home directory without choosing a valid "
-              "candidate, using tmpfs as a fallback");
-    }
-  else
-    {
-      usage_error (error,
-                   "Either --home, --freedesktop-app-id, --steam-app-id "
-                   "or $SteamAppId is required");
-      goto out;
-    }
-
-  if (home_mode == PV_HOME_MODE_PRIVATE)
-    g_assert (private_home != NULL);
-  else
-    g_assert (private_home == NULL);
+  if (!pv_wrap_context_choose_home_mode (self,
+                                         &home_mode,
+                                         &private_home,
+                                         &steam_app_id,
+                                         error))
+    goto out;
 
   if (self->options.env_if_host != NULL)
     {

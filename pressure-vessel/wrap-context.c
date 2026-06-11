@@ -1351,6 +1351,84 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
 }
 
 gboolean
+pv_wrap_context_choose_home_mode (PvWrapContext *self,
+                                  PvHomeMode *home_mode_out,
+                                  gchar **private_home_out,
+                                  const char **steam_app_id_out,
+                                  GError **error)
+{
+  g_autofree gchar *private_home = NULL;
+  PvHomeMode home_mode;
+  const char *steam_app_id;
+
+  if (self->options.steam_app_id != NULL)
+    steam_app_id = self->options.steam_app_id;
+  else
+    steam_app_id = _srt_get_steam_app_id ();
+
+  if (self->options.share_home == TRISTATE_YES)
+    {
+      home_mode = PV_HOME_MODE_SHARED;
+    }
+  else if (self->options.home)
+    {
+      home_mode = PV_HOME_MODE_PRIVATE;
+      private_home = g_strdup (self->options.home);
+    }
+  else if (self->options.share_home == TRISTATE_MAYBE)
+    {
+      home_mode = PV_HOME_MODE_SHARED;
+    }
+  else if (self->options.freedesktop_app_id)
+    {
+      home_mode = PV_HOME_MODE_PRIVATE;
+      private_home = g_build_filename (g_quark_to_string (self->current_home),
+                                       ".var", "app",
+                                       self->options.freedesktop_app_id,
+                                       NULL);
+    }
+  else if (steam_app_id != NULL)
+    {
+      home_mode = PV_HOME_MODE_PRIVATE;
+      self->options.freedesktop_app_id = g_strdup_printf ("com.steampowered.App%s",
+                                                          steam_app_id);
+      private_home = g_build_filename (g_quark_to_string (self->current_home),
+                                       ".var", "app",
+                                       self->options.freedesktop_app_id,
+                                       NULL);
+    }
+  else if (self->options.batch)
+    {
+      home_mode = PV_HOME_MODE_TRANSIENT;
+      private_home = NULL;
+      g_info ("Unsharing the home directory without choosing a valid "
+              "candidate, using tmpfs as a fallback");
+    }
+  else
+    {
+      return usage_error (error,
+                          "Either --home, --freedesktop-app-id, --steam-app-id "
+                          "or $SteamAppId is required");
+    }
+
+  if (home_mode == PV_HOME_MODE_PRIVATE)
+    g_assert (private_home != NULL);
+  else
+    g_assert (private_home == NULL);
+
+  if (home_mode_out != NULL)
+    *home_mode_out = home_mode;
+
+  if (private_home_out != NULL)
+    *private_home_out = g_steal_pointer (&private_home);
+
+  if (steam_app_id_out != NULL)
+    *steam_app_id_out = steam_app_id;
+
+  return TRUE;
+}
+
+gboolean
 pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
                                          PvWrapTestFlags test_flags,
                                          GError **error)

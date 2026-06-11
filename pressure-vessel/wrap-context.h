@@ -15,6 +15,7 @@
 #include "pressure-vessel/flatpak-exports-private.h"
 #include "pressure-vessel/runtime.h"
 
+#include "pressure-vessel/wrap-home.h"
 #include "pressure-vessel/wrap-interactive.h"
 #include "pressure-vessel/utils.h"
 
@@ -207,6 +208,12 @@ gboolean pv_wrap_options_parse_argv (PvWrapOptions *self,
 gboolean pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
                                                        SrtSysroot *interpreter_root,
                                                        GError **error);
+
+gboolean pv_wrap_context_choose_home_mode (PvWrapContext *self,
+                                           PvHomeMode *home_mode_out,
+                                           gchar **private_home_out,
+                                           const char **steam_app_id_out,
+                                           GError **error);
 
 gboolean pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
                                                   PvWrapTestFlags test_flags,

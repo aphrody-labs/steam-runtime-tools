@@ -1,21 +1,26 @@
 steam-runtime-tools (0.20260609.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
+    - When used to run the Steam Client, mount /sys read/write.
+      This is needed for adaptive brightness on Steam Deck, and for
+      status LEDs on some other devices supported by SteamOS.
+      (steamrt/tasks#1049, steamrt/tasks#1050)
     - Update Flatpak-derived code from 1.18.0 (steamrt/tasks#838)
   * s-r-launch-client: Provide a more helpful error if unable to connect
   * Library code:
     - Add a function to check for valid SteamRT version numbers
       (steamrt/tasks#945)
+  * Documentation updates (steamrt/tasks#959)
   * Tests/CI:
-    - Stop working around transient issues in Debian testing
-      (steamrt/tasks#1000)
     - When "pinning" a version of a runtime or pressure-vessel,
       prefer to read e.g. latest-public-beta.txt instead of
       latest-public-beta/VERSION.txt, to avoid aliasing that can be
       troublesome for CDN caching
       (steamrt/tasks#945, infrastructure/tasks#479)
+    - Stop working around transient issues in Debian testing
+      (steamrt/tasks#1000)
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 09 Jun 2026 18:37:54 +0100
+ -- Simon McVittie <smcv@collabora.com>  Thu, 11 Jun 2026 10:57:06 +0100
 
 steam-runtime-tools (0.20260601.0) steamrt; urgency=medium
 

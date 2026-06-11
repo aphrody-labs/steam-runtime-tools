@@ -109,6 +109,24 @@ Share *PATH* from the host system with the container.
 </dd>
 <dt>
 
+**--for-steam-client**
+
+</dt><dd>
+
+Assume that the *COMMAND* is the Steam Client,
+or a similarly tightly-integrated component.
+
+This changes some defaults to be appropriate for the Steam Client:
+currently it means that the equivalent of `flatpak run --filesystem=host`
+is assumed,
+and `/sys` is mounted read/write instead of read-only.
+
+Other parameters that are appropriate for the Steam Client might be
+affected by this option in future.
+
+</dd>
+<dt>
+
 **--freedesktop-app-id** *ID*
 
 </dt><dd>

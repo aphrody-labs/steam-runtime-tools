@@ -63,7 +63,7 @@ if they exist:
 
 * `/proc` (RW): Process management and system parameters
 
-* `/sys` (normally RO, the `--devel` option makes it RW):
+* `/sys` (RW for the Steam Client or with `--devel`, RO otherwise):
     Process management and system parameters
 
 * `/tmp` (RW, except for `/tmp/.X11-unix`):

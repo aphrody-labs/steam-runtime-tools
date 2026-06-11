@@ -1661,6 +1661,12 @@ main (int argc,
 
     if (reply == NULL)
       {
+        if (g_error_matches (local_error, G_DBUS_ERROR, G_DBUS_ERROR_FILE_NOT_FOUND))
+          launch_exit_status = LAUNCH_EX_NOT_FOUND;
+        else if (g_error_matches (local_error, G_DBUS_ERROR, G_DBUS_ERROR_ACCESS_DENIED)
+                 || g_error_matches (local_error, G_DBUS_ERROR, G_DBUS_ERROR_SPAWN_FAILED))
+          launch_exit_status = LAUNCH_EX_CANNOT_INVOKE;
+
         g_dbus_error_strip_remote_error (local_error);
         goto out;
       }

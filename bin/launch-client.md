@@ -676,8 +676,9 @@ to start.
 
 </dt><dd>
 
-Reserved to indicate inability to launch the *COMMAND*.
-This is not currently distinguished from exit status 125.
+The *COMMAND* could not be run,
+for some reason other than not existing
+(for example if it's the path to a directory or a non-executable file).
 
 </dd>
 <dt>
@@ -686,8 +687,7 @@ This is not currently distinguished from exit status 125.
 
 </dt><dd>
 
-Reserved to indicate that the *COMMAND* was not found.
-This is not currently distinguished from exit status 125.
+The *COMMAND* was not found.
 
 </dd>
 <dt>

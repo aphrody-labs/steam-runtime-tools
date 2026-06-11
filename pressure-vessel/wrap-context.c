@@ -1364,7 +1364,7 @@ pv_wrap_context_choose_home_mode (PvWrapContext *self,
   if (self->options.steam_app_id != NULL)
     steam_app_id = self->options.steam_app_id;
   else
-    steam_app_id = _srt_get_steam_app_id ();
+    steam_app_id = _srt_get_steam_app_id (_srt_const_strv (self->original_environ));
 
   if (self->options.share_home == TRISTATE_YES)
     {

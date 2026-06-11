@@ -1711,7 +1711,7 @@ main (int argc,
   if (opt_bus_names != NULL && opt_bus_names->len == 0)
     {
       g_autofree gchar *instance_name = NULL;
-      const char *steam_appid = _srt_get_steam_app_id ();
+      const char *steam_appid = _srt_get_steam_app_id (_srt_peek_environ_nonnull ());
       const char *prefix = NULL;
 
       if (steam_appid == NULL)

@@ -200,7 +200,7 @@ void _srt_get_current_dirs (gchar **cwd_p,
 
 gchar *_srt_get_random_uuid (GError **error);
 
-const char *_srt_get_steam_app_id (void);
+const char *_srt_get_steam_app_id (const char * const *environ);
 
 /*
  * _srt_ptr_array_clear_to_array:

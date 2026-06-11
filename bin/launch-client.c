@@ -759,6 +759,7 @@ static GPtrArray *opt_bus_names = NULL;
 static gboolean opt_clear_env = FALSE;
 static gchar *opt_dbus_address = NULL;
 static gchar *opt_directory = NULL;
+static gboolean opt_if_exists = FALSE;
 static gboolean opt_list = FALSE;
 static gchar *opt_shell_command = NULL;
 static gchar *opt_socket = NULL;
@@ -908,6 +909,10 @@ static const GOptionEntry options[] =
     G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, opt_inside_cb,
     "Connect to a service running inside the container for the given Steam app.",
     "APPID" },
+  { "if-exists", '\0',
+    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_if_exists,
+    "Suppress error message if the command doesn't exist.",
+    NULL },
   { "list", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_list,
     "List some of the available servers and then exit.",
@@ -1667,7 +1672,16 @@ main (int argc,
                  || g_error_matches (local_error, G_DBUS_ERROR, G_DBUS_ERROR_SPAWN_FAILED))
           launch_exit_status = LAUNCH_EX_CANNOT_INVOKE;
 
-        g_dbus_error_strip_remote_error (local_error);
+        if (opt_if_exists && launch_exit_status == LAUNCH_EX_NOT_FOUND)
+          {
+            g_debug ("Command not found, ignoring: %s", local_error->message);
+            g_clear_error (&local_error);
+          }
+        else
+          {
+            g_dbus_error_strip_remote_error (local_error);
+          }
+
         goto out;
       }
 

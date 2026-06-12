@@ -6,7 +6,15 @@ steam-runtime-tools (0.20260609.0) UNRELEASED; urgency=medium
       status LEDs on some other devices supported by SteamOS.
       (steamrt/tasks#1049, steamrt/tasks#1050)
     - Update Flatpak-derived code from 1.18.0 (steamrt/tasks#838)
-  * s-r-launch-client: Provide a more helpful error if unable to connect
+  * s-r-launch-client:
+    - Exit with status 127 if command is not found, like env(1)
+    - Exit with status 126 if command cannot be run for some other reason
+    - Add --if-exists option to suppress "not found" error message
+      (steamrt/tasks#980, steam-for-linux#13030)
+    - Provide a more helpful error if unable to connect
+  * s-r-launcher-service:
+    - Help s-r-launch-client to distinguish between inability to run the
+      command (exit status 126) or other D-Bus errors (exit status 125)
   * Library code:
     - Add a function to check for valid SteamRT version numbers
       (steamrt/tasks#945)
@@ -20,7 +28,7 @@ steam-runtime-tools (0.20260609.0) UNRELEASED; urgency=medium
     - Stop working around transient issues in Debian testing
       (steamrt/tasks#1000)
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 11 Jun 2026 10:57:06 +0100
+ -- Simon McVittie <smcv@collabora.com>  Fri, 12 Jun 2026 11:57:21 +0100
 
 steam-runtime-tools (0.20260601.0) steamrt; urgency=medium
 

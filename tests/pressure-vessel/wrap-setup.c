@@ -1490,6 +1490,55 @@ test_options_false (Fixture *f,
 }
 
 /*
+ * Check options that are implied by --for-steam-client.
+ */
+static void
+test_options_steam_client (Fixture *f,
+                           gconstpointer context)
+{
+  static const char * const original_argv[] =
+  {
+    "pressure-vessel-wrap-test",
+    "--for-steam-client",
+    NULL
+  };
+  static const char * const expected_argv[] =
+  {
+    "pressure-vessel-wrap-test",
+    NULL
+  };
+  g_autoptr(GError) local_error = NULL;
+  g_auto(GStrv) argv_copy = _srt_strdupv (original_argv);
+  g_autofree gchar **modifiable_argv = g_memdup2 (argv_copy, sizeof (original_argv));
+  const PvWrapOptions *options = &f->context->options;
+  int argc = G_N_ELEMENTS (original_argv) - 1;
+  gboolean ok;
+
+  ok = pv_wrap_context_parse_argv (f->context, &argc, &modifiable_argv,
+                                   &local_error);
+  g_assert_no_error (local_error);
+  g_assert_true (ok);
+
+  ok = pv_wrap_context_choose_home_mode (f->context, NULL, NULL, NULL,
+                                         &local_error);
+  g_assert_no_error (local_error);
+  g_assert_true (ok);
+
+  ok = pv_wrap_context_after_parsing_arguments (f->context,
+                                                PV_WRAP_TEST_FLAGS_MOCK_BWRAP,
+                                                &local_error);
+  g_assert_no_error (local_error);
+  g_assert_true (ok);
+
+  g_assert_cmpint (f->context->original_argc,
+                   ==, G_N_ELEMENTS (original_argv) - 1);
+  g_assert_cmpstrv (f->context->original_argv, (gchar **) original_argv);
+  g_assert_cmpstrv (modifiable_argv, (gchar **) expected_argv);
+
+  g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_YES);
+}
+
+/*
  * Check the effect of explicitly setting various CLI options to true
  * or non-empty.
  */
@@ -3344,6 +3393,8 @@ main (int argc,
               setup, test_options_defaults, teardown);
   g_test_add ("/options/false", Fixture, NULL,
               setup, test_options_false, teardown);
+  g_test_add ("/options/steam-client", Fixture, NULL,
+              setup, test_options_steam_client, teardown);
   g_test_add ("/options/true", Fixture, NULL,
               setup, test_options_true, teardown);
   g_test_add ("/passwd", Fixture, NULL, setup, test_passwd, teardown);

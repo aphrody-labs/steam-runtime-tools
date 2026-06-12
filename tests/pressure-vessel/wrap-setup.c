@@ -1334,6 +1334,7 @@ test_options_defaults (Fixture *f,
       g_assert_cmpint (options->shell, ==, PV_SHELL_NONE);
       g_assert_cmpint (options->terminal, ==, PV_TERMINAL_AUTO);
       g_assert_cmpint (options->share_home, ==, TRISTATE_MAYBE);
+      g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_MAYBE);
       g_assert_cmpint (options->batch, ==, FALSE);
       g_assert_cmpint (options->copy_runtime, ==, FALSE);
       g_assert_cmpint (options->deterministic, ==, FALSE);
@@ -1465,6 +1466,7 @@ test_options_false (Fixture *f,
   g_assert_cmpint (options->shell, ==, PV_SHELL_NONE);
   g_assert_cmpint (options->terminal, ==, PV_TERMINAL_NONE);
   g_assert_cmpint (options->share_home, ==, TRISTATE_NO);
+  g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_MAYBE);
   g_assert_cmpint (options->batch, ==, FALSE);
   g_assert_cmpint (options->copy_runtime, ==, FALSE);
   g_assert_cmpint (options->deterministic, ==, FALSE);
@@ -1614,6 +1616,7 @@ test_options_true (Fixture *f,
   g_assert_cmpint (options->shell, ==, PV_SHELL_INSTEAD);
   g_assert_cmpint (options->terminal, ==, PV_TERMINAL_XTERM);
   g_assert_cmpint (options->share_home, ==, TRISTATE_YES);
+  g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_MAYBE);
   g_assert_cmpint (options->batch, ==, TRUE);
   g_assert_cmpint (options->copy_runtime, ==, TRUE);
   g_assert_cmpint (options->deterministic, ==, TRUE);

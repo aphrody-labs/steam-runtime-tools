@@ -1,11 +1,21 @@
-steam-runtime-tools (0.20260609.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260612.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
     - When used to run the Steam Client, mount /sys read/write.
       This is needed for adaptive brightness on Steam Deck, and for
       status LEDs on some other devices supported by SteamOS.
       (steamrt/tasks#1049, steamrt/tasks#1050)
+    - When used to run the Steam Client, mount the entire host root
+      filesystem at /run/host/root (steamrt/tasks#838)
+    - When used to run the Steam Client, always share $HOME with
+      the container, overriding PRESSURE_VESSEL_SHARE_HOME=0
+      (steamrt/tasks#1058, steam-for-linux#10602)
+    - Implement a larger subset of Flatpak --filesystem syntax,
+      including host, host-root, the ~/foo shorthand for subdirectories
+      of $HOME, and the :ro and :rw suffixes, but not home or xdg-*
+      (steamrt/tasks#838)
     - Update Flatpak-derived code from 1.18.0 (steamrt/tasks#838)
+    - Refactoring
   * s-r-launch-client:
     - Exit with status 127 if command is not found, like env(1)
     - Exit with status 126 if command cannot be run for some other reason
@@ -28,7 +38,7 @@ steam-runtime-tools (0.20260609.0) UNRELEASED; urgency=medium
     - Stop working around transient issues in Debian testing
       (steamrt/tasks#1000)
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 12 Jun 2026 11:57:21 +0100
+ -- Simon McVittie <smcv@collabora.com>  Fri, 12 Jun 2026 16:36:25 +0100
 
 steam-runtime-tools (0.20260601.0) steamrt; urgency=medium
 

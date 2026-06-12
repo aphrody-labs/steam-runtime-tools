@@ -1334,6 +1334,7 @@ test_options_defaults (Fixture *f,
       g_assert_cmpint (options->shell, ==, PV_SHELL_NONE);
       g_assert_cmpint (options->terminal, ==, PV_TERMINAL_AUTO);
       g_assert_cmpint (options->share_home, ==, TRISTATE_MAYBE);
+      g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_MAYBE);
       g_assert_cmpint (options->batch, ==, FALSE);
       g_assert_cmpint (options->copy_runtime, ==, FALSE);
       g_assert_cmpint (options->deterministic, ==, FALSE);
@@ -1465,6 +1466,7 @@ test_options_false (Fixture *f,
   g_assert_cmpint (options->shell, ==, PV_SHELL_NONE);
   g_assert_cmpint (options->terminal, ==, PV_TERMINAL_NONE);
   g_assert_cmpint (options->share_home, ==, TRISTATE_NO);
+  g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_MAYBE);
   g_assert_cmpint (options->batch, ==, FALSE);
   g_assert_cmpint (options->copy_runtime, ==, FALSE);
   g_assert_cmpint (options->deterministic, ==, FALSE);
@@ -1485,6 +1487,58 @@ test_options_false (Fixture *f,
   g_assert_cmpint (options->verbose, ==, FALSE);
   g_assert_cmpint (options->version, ==, FALSE);
   g_assert_cmpint (options->version_only, ==, FALSE);
+}
+
+/*
+ * Check options that are implied by --for-steam-client.
+ */
+static void
+test_options_steam_client (Fixture *f,
+                           gconstpointer context)
+{
+  static const char * const original_argv[] =
+  {
+    "pressure-vessel-wrap-test",
+    "--unshare-home",
+    "--for-steam-client",
+    NULL
+  };
+  static const char * const expected_argv[] =
+  {
+    "pressure-vessel-wrap-test",
+    NULL
+  };
+  g_autoptr(GError) local_error = NULL;
+  g_auto(GStrv) argv_copy = _srt_strdupv (original_argv);
+  g_autofree gchar **modifiable_argv = g_memdup2 (argv_copy, sizeof (original_argv));
+  const PvWrapOptions *options = &f->context->options;
+  PvHomeMode home_mode = PV_HOME_MODE_TRANSIENT;
+  int argc = G_N_ELEMENTS (original_argv) - 1;
+  gboolean ok;
+
+  ok = pv_wrap_context_parse_argv (f->context, &argc, &modifiable_argv,
+                                   &local_error);
+  g_assert_no_error (local_error);
+  g_assert_true (ok);
+
+  ok = pv_wrap_context_choose_home_mode (f->context, &home_mode, NULL, NULL,
+                                         &local_error);
+  g_assert_no_error (local_error);
+  g_assert_true (ok);
+  g_assert_cmpint (home_mode, ==, PV_HOME_MODE_SHARED);
+
+  ok = pv_wrap_context_after_parsing_arguments (f->context,
+                                                PV_WRAP_TEST_FLAGS_MOCK_BWRAP,
+                                                &local_error);
+  g_assert_no_error (local_error);
+  g_assert_true (ok);
+
+  g_assert_cmpint (f->context->original_argc,
+                   ==, G_N_ELEMENTS (original_argv) - 1);
+  g_assert_cmpstrv (f->context->original_argv, (gchar **) original_argv);
+  g_assert_cmpstrv (modifiable_argv, (gchar **) expected_argv);
+
+  g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_YES);
 }
 
 /*
@@ -1614,6 +1668,7 @@ test_options_true (Fixture *f,
   g_assert_cmpint (options->shell, ==, PV_SHELL_INSTEAD);
   g_assert_cmpint (options->terminal, ==, PV_TERMINAL_XTERM);
   g_assert_cmpint (options->share_home, ==, TRISTATE_YES);
+  g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_MAYBE);
   g_assert_cmpint (options->batch, ==, TRUE);
   g_assert_cmpint (options->copy_runtime, ==, TRUE);
   g_assert_cmpint (options->deterministic, ==, TRUE);
@@ -3341,6 +3396,8 @@ main (int argc,
               setup, test_options_defaults, teardown);
   g_test_add ("/options/false", Fixture, NULL,
               setup, test_options_false, teardown);
+  g_test_add ("/options/steam-client", Fixture, NULL,
+              setup, test_options_steam_client, teardown);
   g_test_add ("/options/true", Fixture, NULL,
               setup, test_options_true, teardown);
   g_test_add ("/passwd", Fixture, NULL, setup, test_passwd, teardown);

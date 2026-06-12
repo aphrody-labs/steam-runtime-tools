@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260612.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260612.0) steamrt; urgency=medium
 
   * pressure-vessel:
     - When used to run the Steam Client, mount /sys read/write.
@@ -38,7 +38,7 @@ steam-runtime-tools (0.20260612.0) UNRELEASED; urgency=medium
     - Stop working around transient issues in Debian testing
       (steamrt/tasks#1000)
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 12 Jun 2026 16:36:25 +0100
+ -- Simon McVittie <smcv@collabora.com>  Fri, 12 Jun 2026 16:56:51 +0100
 
 steam-runtime-tools (0.20260601.0) steamrt; urgency=medium
 

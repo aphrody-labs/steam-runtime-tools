@@ -1522,25 +1522,14 @@ test_options_invalid (Fixture *f,
    * backslash-escaped colons, or backslash-escaped backslashes. */
   static const char * const invalid_fs[] =
   {
-    "/media/escaped\\:colon",
-    "/media/escaped\\\\backslash",
-    "/media/silly\\name",
-    "/media:create",
-    "/media:ro",
-    "/media:rw",
     "home",
     "home:ro",
     "home:rw",
-    "host",
-    "host-etc:rw",
-    "host-os:ro",
     "host-reset",
     "host-root",
     "host-root:ro",
     "host-root:rw",
     "host:reset",
-    "host:ro",
-    "host:rw",
     "xdg-cache",
     "xdg-config",
     "xdg-data",
@@ -1555,7 +1544,6 @@ test_options_invalid (Fixture *f,
     "xdg-templates",
     "xdg-videos",
     "~",
-    "~/Games",
   };
 
   for (size_t i = 0; i < G_N_ELEMENTS (invalid_fs); i++)
@@ -1687,8 +1675,16 @@ test_options_true (Fixture *f,
     "--devel",
     "--env-if-host=ONE=1",
     "--env-if-host=TWO=two",
-    "--filesystem=/foo",
-    "--filesystem=/bar",
+    "--filesystem=host:ro",
+    "--filesystem=host-etc:rw",         /* accepted but ignored */
+    "--filesystem=host-os:ro",          /* accepted but ignored */
+    "--filesystem=~/create:create",
+    "--filesystem=/media/escaped\\:colon",
+    "--filesystem=/media/escaped\\\\backslash",
+    "--filesystem=/media/silly\\name",
+    "--filesystem=/ro:ro",
+    "--filesystem=/rw:rw",
+    "--filesystem=/without/mode",
     "--for-steam-client",
     "--freedesktop-app-id=com.example.Foo",
     "--gc-runtimes",
@@ -1738,8 +1734,16 @@ test_options_true (Fixture *f,
   };
   static const char * const expected_filesystems[] =
   {
-    "/bar",
-    "/foo",
+    "/media/escaped:colon",
+    "/media/escaped\\backslash",
+    "/media/sillyname",
+    "/ro",
+    "/rw",
+    "/without/mode",
+    "host",
+    "host-etc",
+    "host-os",
+    "~/create",
     NULL
   };
   const PvWrapOptions *options = &f->context->options;
@@ -1791,11 +1795,18 @@ test_options_true (Fixture *f,
 
       mode = FLATPAK_FILESYSTEM_MODE_NONE;
       g_assert_true (pv_wrap_context_has_filesystem (f->context, fs, &mode));
-      g_assert_cmpint (mode, ==, FLATPAK_FILESYSTEM_MODE_READ_WRITE);
+
+      if (g_str_equal (fs, "~/create"))
+        g_assert_cmpint (mode, ==, FLATPAK_FILESYSTEM_MODE_CREATE);
+      else if (g_str_equal (fs, "/ro")
+               || g_str_equal (fs, "host")
+               || g_str_equal (fs, "host-os"))
+        g_assert_cmpint (mode, ==, FLATPAK_FILESYSTEM_MODE_READ_ONLY);
+      else
+        g_assert_cmpint (mode, ==, FLATPAK_FILESYSTEM_MODE_READ_WRITE);
+
       g_assert_true (pv_wrap_context_has_filesystem (f->context, fs, NULL));
     }
-
-  g_assert_false (pv_wrap_context_has_filesystem (f->context, "host", NULL));
 
   g_assert_cmpstrv (options->env_if_host, (gchar **) expected_env_if_host);
   g_assert_cmpstr (options->freedesktop_app_id, ==, "com.example.Foo");

@@ -121,6 +121,7 @@ extern const char *flatpak_context_sockets[];
 extern const char *flatpak_context_devices[];
 extern const char *flatpak_context_features[];
 extern const char *flatpak_context_shares[];
+#endif
 
 gboolean       flatpak_context_parse_filesystem (const char             *filesystem_and_mode,
                                                  gboolean                negated,
@@ -128,6 +129,7 @@ gboolean       flatpak_context_parse_filesystem (const char             *filesys
                                                  FlatpakFilesystemMode  *mode_out,
                                                  GError                **error);
 
+#if 0
 FlatpakContext *flatpak_context_new (void);
 void           flatpak_context_free (FlatpakContext *context);
 void           flatpak_context_dump (FlatpakContext *context,

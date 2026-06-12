@@ -1703,6 +1703,7 @@ unparse_filesystem_flags (const char           *path,
 
   return g_string_free (g_steal_pointer (&s), FALSE);
 }
+#endif
 
 static char *
 parse_filesystem_flags (const char            *filesystem,
@@ -1898,7 +1899,10 @@ flatpak_context_parse_filesystem (const char             *filesystem_and_mode,
     }
 
   if (g_strv_contains (flatpak_context_special_filesystems, filesystem) ||
+#if 0
+      /* We don't support xdg-data/foo, etc. in pressure-vessel */
       get_xdg_user_dir_from_string (filesystem, NULL, NULL, NULL) ||
+#endif
       g_str_has_prefix (filesystem, "~/") ||
       g_str_has_prefix (filesystem, "/"))
     {
@@ -1925,10 +1929,13 @@ flatpak_context_parse_filesystem (const char             *filesystem_and_mode,
     }
 
   g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,
-               _("Unknown filesystem location %s, valid locations are: host, host-os, host-etc, host-root, home, xdg-*[/…], ~/dir, /dir"), filesystem);
+               /* pressure-vessel change: we don't support xdg-data/foo,
+                * etc. and we also don't use _() */
+               "Unknown filesystem location %s, valid locations are: host, host-os, host-etc, ~/dir, /dir", filesystem);
   return FALSE;
 }
 
+#if 0
 static void
 flatpak_context_take_filesystem (FlatpakContext        *context,
                                  char                  *fs,

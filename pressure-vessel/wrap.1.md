@@ -100,11 +100,51 @@ environment variable *VAR* to *VAL*. If not, leave *VAR* unchanged.
 </dd>
 <dt>
 
-**--filesystem** *PATH*
+**--filesystem** *PATH*[:*MODE*]|*TOKEN*[:*MODE*]
 
 </dt><dd>
 
-Share *PATH* from the host system with the container.
+Share *PATH* or *TOKEN* from the host system with the container,
+similar to the corresponding option in **flatpak-run**(1).
+
+A *MODE* may optionally be specified as a suffix
+after a colon,
+either `ro` for read-only or `rw` for read/write.
+If a suffix is not specified,
+the default is `rw`.
+`create` is also accepted for compatibility with Flatpak,
+but is currently implemented as equivalent to `rw`.
+
+A *PATH* may be specified as either an absolute path,
+or a path in the home directory prefixed with `~/`.
+Other types of path implemented by Flatpak,
+such as `xdg-data/foo`,
+are not currently accepted.
+If a *PATH* contains colons or backslashes,
+they must be escaped as `\:` or `\\` respectively.
+(When run from a shell,
+this syntax is likely to require quoting or an additional layer of escaping.)
+
+The special token `host` shares all subdirectories of the root directory
+with the container.
+This is enabled by default when running the Steam Client.
+
+The special tokens `host-etc` and `host-os` are accepted,
+but are currently ignored:
+when using a runtime,
+pressure-vessel always makes `/etc`,
+`/usr`,
+and `/usr`-like filesystems such as `/bin`
+available in the container as `/run/host/etc` and so on
+(or as `/run/parent/etc` and so on when running under Flatpak),
+and when not using a runtime,
+the current `/etc` and `/usr` are used directly.
+
+The special token `home` is not currently accepted.
+`--share-home` has a similar meaning,
+but also shares related directories such as `/run/media` and `/srv`.
+
+The special token `host-root` is not currently accepted.
 
 </dd>
 <dt>
@@ -117,7 +157,7 @@ Assume that the *COMMAND* is the Steam Client,
 or a similarly tightly-integrated component.
 
 This changes some defaults to be appropriate for the Steam Client:
-currently it means that the equivalent of `flatpak run --filesystem=host`
+currently it means that the equivalent of `--filesystem=host`
 is assumed,
 and `/sys` is mounted read/write instead of read-only.
 

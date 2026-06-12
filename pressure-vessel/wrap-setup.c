@@ -885,6 +885,20 @@ pv_wrap_setup_export_filesystems (PvWrapContext *self,
            * - host-root: not implemented yet
            */
         }
+      else if (g_str_has_prefix (filesystem, "~/"))
+        {
+          g_autofree gchar *path = NULL;
+
+          path = g_build_filename (g_quark_to_string (self->current_home),
+                                   filesystem + 2,
+                                   NULL);
+          pv_wrap_context_export_if_allowed (self,
+                                             GPOINTER_TO_INT (mode_pointer),
+                                             path,
+                                             path,
+                                             "--filesystem", "", "",
+                                             PV_WRAP_EXPORT_FLAGS_NONE);
+        }
       else if (g_str_has_prefix (filesystem, "/"))
         {
           pv_wrap_context_export_if_allowed (self,

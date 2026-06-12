@@ -130,6 +130,8 @@ G_DEFINE_TYPE (PvWrapContext, pv_wrap_context, G_TYPE_OBJECT)
 static void
 pv_wrap_context_init (PvWrapContext *self)
 {
+  self->arbitrary_dirent_order = NULL;
+  self->arbitrary_str_order = NULL;
   self->is_flatpak_env = g_file_test ("/.flatpak-info", G_FILE_TEST_IS_REGULAR);
   self->original_environ = g_get_environ ();
   self->current_home_fd = -1;
@@ -1348,8 +1350,83 @@ pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
   return TRUE;
 }
 
-#define usage_error(error, ...) \
-  g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED, __VA_ARGS__)
+gboolean
+pv_wrap_context_choose_home_mode (PvWrapContext *self,
+                                  PvHomeMode *home_mode_out,
+                                  gchar **private_home_out,
+                                  const char **steam_app_id_out,
+                                  GError **error)
+{
+  g_autofree gchar *private_home = NULL;
+  PvHomeMode home_mode;
+  const char *steam_app_id;
+
+  if (self->options.steam_app_id != NULL)
+    steam_app_id = self->options.steam_app_id;
+  else
+    steam_app_id = _srt_get_steam_app_id (_srt_const_strv (self->original_environ));
+
+  if (self->options.share_home == TRISTATE_YES)
+    {
+      home_mode = PV_HOME_MODE_SHARED;
+    }
+  else if (self->options.home)
+    {
+      home_mode = PV_HOME_MODE_PRIVATE;
+      private_home = g_strdup (self->options.home);
+    }
+  else if (self->options.share_home == TRISTATE_MAYBE)
+    {
+      home_mode = PV_HOME_MODE_SHARED;
+    }
+  else if (self->options.freedesktop_app_id)
+    {
+      home_mode = PV_HOME_MODE_PRIVATE;
+      private_home = g_build_filename (g_quark_to_string (self->current_home),
+                                       ".var", "app",
+                                       self->options.freedesktop_app_id,
+                                       NULL);
+    }
+  else if (steam_app_id != NULL)
+    {
+      home_mode = PV_HOME_MODE_PRIVATE;
+      self->options.freedesktop_app_id = g_strdup_printf ("com.steampowered.App%s",
+                                                          steam_app_id);
+      private_home = g_build_filename (g_quark_to_string (self->current_home),
+                                       ".var", "app",
+                                       self->options.freedesktop_app_id,
+                                       NULL);
+    }
+  else if (self->options.batch)
+    {
+      home_mode = PV_HOME_MODE_TRANSIENT;
+      private_home = NULL;
+      g_info ("Unsharing the home directory without choosing a valid "
+              "candidate, using tmpfs as a fallback");
+    }
+  else
+    {
+      return usage_error (error,
+                          "Either --home, --freedesktop-app-id, --steam-app-id "
+                          "or $SteamAppId is required");
+    }
+
+  if (home_mode == PV_HOME_MODE_PRIVATE)
+    g_assert (private_home != NULL);
+  else
+    g_assert (private_home == NULL);
+
+  if (home_mode_out != NULL)
+    *home_mode_out = home_mode;
+
+  if (private_home_out != NULL)
+    *private_home_out = g_steal_pointer (&private_home);
+
+  if (steam_app_id_out != NULL)
+    *steam_app_id_out = steam_app_id;
+
+  return TRUE;
+}
 
 gboolean
 pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
@@ -1361,6 +1438,12 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
   const char *prefix;
   const char *pkglibexecdir = NULL;
 
+  if (self->options.deterministic)
+    {
+      self->arbitrary_dirent_order = _srt_dirent_strcmp;
+      self->arbitrary_str_order = _srt_generic_strcmp0;
+    }
+
   if (self->options.terminal == PV_TERMINAL_AUTO)
     {
       if (self->options.shell != PV_SHELL_NONE)
@@ -1371,10 +1454,7 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
 
   if (self->options.terminal == PV_TERMINAL_NONE
       && self->options.shell != PV_SHELL_NONE)
-    {
-      usage_error (error, "--terminal=none is incompatible with --shell");
-      return FALSE;
-    }
+    return usage_error (error, "--terminal=none is incompatible with --shell");
 
   bindir = _srt_find_executable_dir (error);
 

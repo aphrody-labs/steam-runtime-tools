@@ -67,9 +67,6 @@ static const GDebugKey pv_debug_keys[] =
   { "container", PV_WRAP_LOG_FLAGS_CONTAINER },
 };
 
-#define usage_error(error, ...) \
-  g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED, __VA_ARGS__)
-
 int
 main (int argc,
       char *argv[])
@@ -80,7 +77,7 @@ main (int argc,
   GError **error = &local_error;
   int ret = 2;
   gsize i;
-  PvHomeMode home_mode;
+  PvHomeMode home_mode = PV_HOME_MODE_SHARED;
   g_autoptr(SrtEnvOverlay) container_env = NULL;
   g_autoptr(FlatpakBwrap) bwrap = NULL;
   g_autoptr(FlatpakBwrap) bwrap_filesystem_arguments = NULL;
@@ -98,9 +95,8 @@ main (int argc,
   glnx_autofd int original_stderr = -1;
   glnx_autofd int tty_stdin = -1;
   glnx_autofd int tty_stdout = -1;
-  SrtDirentCompareFunc arbitrary_dirent_order;
   const char *pkglibexecdir;
-  const char *steam_app_id;
+  const char *steam_app_id = NULL;
   g_autoptr(GPtrArray) adverb_preload_argv = NULL;
   int real_root_fd;
   int result;
@@ -247,61 +243,12 @@ main (int argc,
       argc--;
     }
 
-  if (self->options.steam_app_id != NULL)
-    steam_app_id = self->options.steam_app_id;
-  else
-    steam_app_id = _srt_get_steam_app_id ();
-
-  if (self->options.share_home == TRISTATE_YES)
-    {
-      home_mode = PV_HOME_MODE_SHARED;
-    }
-  else if (self->options.home)
-    {
-      home_mode = PV_HOME_MODE_PRIVATE;
-      private_home = g_strdup (self->options.home);
-    }
-  else if (self->options.share_home == TRISTATE_MAYBE)
-    {
-      home_mode = PV_HOME_MODE_SHARED;
-    }
-  else if (self->options.freedesktop_app_id)
-    {
-      home_mode = PV_HOME_MODE_PRIVATE;
-      private_home = g_build_filename (g_quark_to_string (self->current_home),
-                                       ".var", "app",
-                                       self->options.freedesktop_app_id,
-                                       NULL);
-    }
-  else if (steam_app_id != NULL)
-    {
-      home_mode = PV_HOME_MODE_PRIVATE;
-      self->options.freedesktop_app_id = g_strdup_printf ("com.steampowered.App%s",
-                                                          steam_app_id);
-      private_home = g_build_filename (g_quark_to_string (self->current_home),
-                                       ".var", "app",
-                                       self->options.freedesktop_app_id,
-                                       NULL);
-    }
-  else if (self->options.batch)
-    {
-      home_mode = PV_HOME_MODE_TRANSIENT;
-      private_home = NULL;
-      g_info ("Unsharing the home directory without choosing a valid "
-              "candidate, using tmpfs as a fallback");
-    }
-  else
-    {
-      usage_error (error,
-                   "Either --home, --freedesktop-app-id, --steam-app-id "
-                   "or $SteamAppId is required");
-      goto out;
-    }
-
-  if (home_mode == PV_HOME_MODE_PRIVATE)
-    g_assert (private_home != NULL);
-  else
-    g_assert (private_home == NULL);
+  if (!pv_wrap_context_choose_home_mode (self,
+                                         &home_mode,
+                                         &private_home,
+                                         &steam_app_id,
+                                         error))
+    goto out;
 
   if (self->options.env_if_host != NULL)
     {
@@ -366,11 +313,6 @@ main (int argc,
   if ((result = _srt_set_compatible_resource_limits (0)) < 0)
     g_warning ("Unable to set normal resource limits: %s",
                g_strerror (-result));
-
-  if (self->options.deterministic)
-    arbitrary_dirent_order = _srt_dirent_strcmp;
-  else
-    arbitrary_dirent_order = NULL;
 
   if (self->options.terminal != PV_TERMINAL_TTY && !self->options.devel)
     {
@@ -674,7 +616,7 @@ main (int argc,
 
       if (!pv_wrap_use_host_os (real_root_fd,
                                 self->exports, bwrap_filesystem_arguments,
-                                arbitrary_dirent_order,
+                                self->arbitrary_dirent_order,
                                 self->workarounds,
                                 error))
         goto out;
@@ -732,7 +674,7 @@ main (int argc,
           && !pv_export_root_dirs_like_filesystem_host (real_root_fd,
                                                         self->exports,
                                                         FLATPAK_FILESYSTEM_MODE_READ_WRITE,
-                                                        arbitrary_dirent_order,
+                                                        self->arbitrary_dirent_order,
                                                         error))
         goto out;
     }
@@ -852,18 +794,8 @@ main (int argc,
 
       /* Make arbitrary filesystems available. This is not as complete as
        * Flatpak yet. */
-      if (self->options.filesystems != NULL)
-        {
-          g_debug ("Processing --filesystem arguments...");
-
-          for (i = 0; self->options.filesystems[i] != NULL; i++)
-            pv_wrap_context_export_if_allowed (self,
-                                               FLATPAK_FILESYSTEM_MODE_READ_WRITE,
-                                               self->options.filesystems[i],
-                                               self->options.filesystems[i],
-                                               "--filesystem", "", "",
-                                               PV_WRAP_EXPORT_FLAGS_NONE);
-        }
+      if (!pv_wrap_setup_export_filesystems (self, error))
+        goto out;
 
       /* Make sure the current working directory (the game we are going to
        * run) is available. Some games write here. */

@@ -15,8 +15,38 @@
 #include "pressure-vessel/flatpak-exports-private.h"
 #include "pressure-vessel/runtime.h"
 
+#include "pressure-vessel/wrap-home.h"
 #include "pressure-vessel/wrap-interactive.h"
 #include "pressure-vessel/utils.h"
+
+static inline gboolean usage_error (GError **error,
+                                    const char *format,
+                                    ...) G_GNUC_PRINTF (2, 3);
+
+/*
+ * Same as glnx_throw(), but the error is %G_OPTION_ERROR_FAILED,
+ * so that our main() will report it as a command-line usage error.
+ */
+static inline gboolean
+usage_error (GError **error,
+             const char *format,
+             ...)
+{
+  if (error != NULL)
+    {
+      va_list ap;
+
+      va_start (ap, format);
+      g_propagate_error (error,
+                         g_error_new_valist (G_OPTION_ERROR,
+                                             G_OPTION_ERROR_FAILED,
+                                             format,
+                                             ap));
+      va_end (ap);
+    }
+
+  return FALSE;
+}
 
 typedef struct _PvWrapContext PvWrapContext;
 typedef struct _PvWrapContextClass PvWrapContextClass;
@@ -119,6 +149,8 @@ struct _PvWrapContext
 {
   GObject parent_instance;
 
+  SrtDirentCompareFunc arbitrary_dirent_order;
+  GCompareFunc arbitrary_str_order;
   FlatpakBwrap *flatpak_subsandbox;
   FlatpakExports *exports;
   GHashTable *paths_not_exported;
@@ -176,6 +208,12 @@ gboolean pv_wrap_options_parse_argv (PvWrapOptions *self,
 gboolean pv_wrap_options_parse_environment_after_argv (PvWrapOptions *self,
                                                        SrtSysroot *interpreter_root,
                                                        GError **error);
+
+gboolean pv_wrap_context_choose_home_mode (PvWrapContext *self,
+                                           PvHomeMode *home_mode_out,
+                                           gchar **private_home_out,
+                                           const char **steam_app_id_out,
+                                           GError **error);
 
 gboolean pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
                                                   PvWrapTestFlags test_flags,

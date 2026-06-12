@@ -1475,20 +1475,21 @@ _srt_get_random_uuid (GError **error)
 
 /**
  * _srt_get_steam_app_id:
+ * @env: The environment
  *
  * Attempt to determine the Steam app-ID of the current process.
  *
- * Returns: either @cli_override or a global environment variable
+ * Returns: an environment variable from @env, or %NULL
  */
 const char *
-_srt_get_steam_app_id (void)
+_srt_get_steam_app_id (const char * const *env)
 {
   const char *value;
 
-  if ((value = g_getenv ("STEAM_COMPAT_APP_ID")) != NULL)
+  if ((value = _srt_environ_getenv (env, "STEAM_COMPAT_APP_ID")) != NULL)
     return value;
 
-  if ((value = g_getenv ("SteamAppId")) != NULL)
+  if ((value = _srt_environ_getenv (env, "SteamAppId")) != NULL)
     return value;
 
   return NULL;

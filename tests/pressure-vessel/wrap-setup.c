@@ -291,12 +291,46 @@ fixture_create_runtime (Fixture *f,
 }
 
 static void
+fixture_recreate_context (Fixture *f)
+{
+  g_autoptr(GError) local_error = NULL;
+
+  g_clear_object (&f->context);
+  f->context = pv_wrap_context_new (f->mock_host, "/home/me", &local_error);
+  g_assert_no_error (local_error);
+
+  f->context->original_environ = g_environ_setenv (f->context->original_environ,
+                                                   "HOME",
+                                                   "/home/me",
+                                                   TRUE);
+  /* Some tests need to know where Steam is installed;
+   * pretend that we have it installed in /steam */
+  f->context->original_environ = g_environ_setenv (f->context->original_environ,
+                                                   "STEAM_COMPAT_CLIENT_INSTALL_PATH",
+                                                   "/steam",
+                                                   TRUE);
+
+  if (f->config->architectures != NULL)
+    {
+      for (size_t i = 0; f->config->architectures[i] != NULL; i++)
+        {
+          GQuark arch_quark = g_quark_from_static_string (f->config->architectures[i]);
+
+          g_array_append_val (f->context->options.architectures, arch_quark);
+        }
+    }
+  else
+    {
+      _srt_architecture_array_populate_with_defaults (f->context->options.architectures);
+    }
+}
+
+static void
 setup (Fixture *f,
        gconstpointer context)
 {
   g_autoptr(GError) local_error = NULL;
   g_autofree gchar *mock_host = NULL;
-  gsize i;
 
   if (context != NULL)
     f->config = context;
@@ -323,34 +357,8 @@ setup (Fixture *f,
   f->home = g_build_filename (f->mock_host->path, "home", "me", NULL);
   glnx_shutil_mkdir_p_at (AT_FDCWD, f->home, 0755, NULL, &local_error);
   g_assert_no_error (local_error);
-  f->context = pv_wrap_context_new (f->mock_host, "/home/me", &local_error);
-  g_assert_no_error (local_error);
   f->bwrap = flatpak_bwrap_new (flatpak_bwrap_empty_env);
-
-  f->context->original_environ = g_environ_setenv (f->context->original_environ,
-                                                   "HOME",
-                                                   "/home/me",
-                                                   TRUE);
-  /* Some tests need to know where Steam is installed;
-   * pretend that we have it installed in /steam */
-  f->context->original_environ = g_environ_setenv (f->context->original_environ,
-                                                   "STEAM_COMPAT_CLIENT_INSTALL_PATH",
-                                                   "/steam",
-                                                   TRUE);
-
-  if (f->config->architectures != NULL)
-    {
-      for (i = 0; f->config->architectures[i] != NULL; i++)
-        {
-          GQuark arch_quark = g_quark_from_static_string (f->config->architectures[i]);
-
-          g_array_append_val (f->context->options.architectures, arch_quark);
-        }
-    }
-  else
-    {
-      _srt_architecture_array_populate_with_defaults (f->context->options.architectures);
-    }
+  fixture_recreate_context (f);
 
   g_assert_cmpuint (f->context->options.architectures->len, >=, 1);
   f->primary_abi = g_array_index (f->context->options.architectures, GQuark, 0);

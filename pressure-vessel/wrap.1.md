@@ -164,8 +164,10 @@ Assume that the *COMMAND* is the Steam Client,
 or a similarly tightly-integrated component.
 
 This changes some defaults to be appropriate for the Steam Client:
-currently it means that the equivalent of `--filesystem=host`
-is assumed,
+currently it means that the equivalents of
+`--filesystem=host`
+and `--filesystem=host-root` are assumed
+(unless each filesystem was explicitly specified with a `:ro` suffix),
 and `/sys` is mounted read/write instead of read-only.
 
 Other parameters that are appropriate for the Steam Client might be

@@ -1605,6 +1605,7 @@ test_options_steam_client (Fixture *f,
   static const char * const expected_filesystems[] =
   {
     "host",
+    "host-root",
     NULL
   };
   g_autoptr(GError) local_error = NULL;

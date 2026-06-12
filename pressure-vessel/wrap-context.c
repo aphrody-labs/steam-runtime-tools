@@ -1605,12 +1605,19 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
   self->workarounds = pv_get_workarounds (self->bwrap_flags,
                                           _srt_const_strv (self->original_environ));
 
-  if (!pv_wrap_context_has_filesystem (self, "host", NULL))
+  if (self->options.for_steam_client
+      && !(self->workarounds & PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS))
     {
-      if (self->options.for_steam_client
-          && !(self->workarounds & PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS))
-        pv_wrap_options_set_filesystem (&self->options, "host",
-                                        FLATPAK_FILESYSTEM_MODE_READ_WRITE);
+      static const char * const host_filesystems[] = { "host", "host-root" };
+
+      for (size_t i = 0; i < G_N_ELEMENTS (host_filesystems); i++)
+        {
+          const char *fs = host_filesystems[i];
+
+          if (!pv_wrap_context_has_filesystem (self, fs, NULL))
+            pv_wrap_options_set_filesystem (&self->options, fs,
+                                            FLATPAK_FILESYSTEM_MODE_READ_WRITE);
+        }
     }
 
   return TRUE;

@@ -1498,6 +1498,100 @@ test_options_false (Fixture *f,
 }
 
 /*
+ * Check various command-line options that are invalid or otherwise
+ * not allowed.
+ */
+static void
+test_options_invalid (Fixture *f,
+                      gconstpointer context)
+{
+  /* We don't implement all of the special tokens from Flatpak yet.
+   * We explicitly reject the ones we don't implement instead of ignoring,
+   * so that their meaning will not change if we expand coverage.
+   *
+   * Similarly we don't accept HOME-relative paths starting with "~/".
+   *
+   * Similarly we don't accept Flatpak's :ro, :rw etc. suffixes,
+   * backslash-escaped colons, or backslash-escaped backslashes. */
+  static const char * const invalid_fs[] =
+  {
+    "/media/escaped\\:colon",
+    "/media/escaped\\\\backslash",
+    "/media/silly\\name",
+    "/media:create",
+    "/media:ro",
+    "/media:rw",
+    "home",
+    "home:ro",
+    "home:rw",
+    "host",
+    "host-etc:rw",
+    "host-os:ro",
+    "host-reset",
+    "host-root",
+    "host-root:ro",
+    "host-root:rw",
+    "host:reset",
+    "host:ro",
+    "host:rw",
+    "xdg-cache",
+    "xdg-config",
+    "xdg-data",
+    "xdg-desktop",
+    "xdg-documents",
+    "xdg-download",
+    "xdg-download/Games",
+    "xdg-music",
+    "xdg-pictures",
+    "xdg-public-share",
+    "xdg-run/pipewire",
+    "xdg-templates",
+    "xdg-videos",
+    "~",
+    "~/Games",
+  };
+
+  for (size_t i = 0; i < G_N_ELEMENTS (invalid_fs); i++)
+    {
+      g_autoptr(GPtrArray) argv = g_ptr_array_new_with_free_func (g_free);
+      g_autofree gchar **modifiable_argv = NULL;
+      g_autoptr(GError) local_error = NULL;
+      const char *fs = invalid_fs[i];
+      int argc;
+      gboolean ok;
+
+      g_ptr_array_add (argv, g_strdup ("pressure-vessel-wrap-test"));
+      g_ptr_array_add (argv, g_strdup_printf ("--filesystem=%s", fs));
+      g_ptr_array_add (argv, g_strdup ("--"));
+      g_ptr_array_add (argv, g_strdup ("true"));
+      g_assert_true (argv->len < (unsigned int) INT_MAX);
+      argc = (int) argv->len;
+      g_ptr_array_add (argv, NULL);
+
+      modifiable_argv = g_memdup2 (argv->pdata, argv->len * sizeof (char *));
+
+      fixture_recreate_context (f);
+      ok = pv_wrap_context_parse_argv (f->context,
+                                       &argc, &modifiable_argv,
+                                       &local_error);
+
+      if (local_error != NULL)
+        g_test_message ("--filesystem=%s => error as expected: %s %d: %s",
+                        fs, g_quark_to_string (local_error->domain),
+                        local_error->code, local_error->message);
+      else
+        g_test_message ("--filesystem=%s => unexpectedly succeeded", fs);
+
+      g_assert_nonnull (local_error);
+      /* We accept any code: in practice it's G_OPTION_ERROR_FAILED,
+       * but it's bad style to check for generic _FAILED error codes */
+      g_assert_cmpstr (g_quark_to_string (local_error->domain),
+                       ==, g_quark_to_string (G_OPTION_ERROR));
+      g_assert_false (ok);
+    }
+}
+
+/*
  * Check options that are implied by --for-steam-client.
  */
 static void
@@ -3420,6 +3514,8 @@ main (int argc,
               setup, test_options_defaults, teardown);
   g_test_add ("/options/false", Fixture, NULL,
               setup, test_options_false, teardown);
+  g_test_add ("/options/invalid", Fixture, NULL,
+              setup, test_options_invalid, teardown);
   g_test_add ("/options/steam-client", Fixture, NULL,
               setup, test_options_steam_client, teardown);
   g_test_add ("/options/true", Fixture, NULL,

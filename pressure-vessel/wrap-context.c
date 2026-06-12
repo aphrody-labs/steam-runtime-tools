@@ -1366,6 +1366,16 @@ pv_wrap_context_choose_home_mode (PvWrapContext *self,
   else
     steam_app_id = _srt_get_steam_app_id (_srt_const_strv (self->original_environ));
 
+  if (self->options.for_steam_client && self->options.share_home != TRISTATE_YES)
+    {
+      if (self->options.share_home == TRISTATE_NO)
+        _srt_log_warning ("Overriding PRESSURE_VESSEL_SHARE_HOME=0 or "
+                          "--unshare-home: the Steam Client always needs "
+                          "the equivalent of --share-home");
+
+      self->options.share_home = TRISTATE_YES;
+    }
+
   if (self->options.share_home == TRISTATE_YES)
     {
       home_mode = PV_HOME_MODE_SHARED;

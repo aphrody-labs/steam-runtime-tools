@@ -1499,6 +1499,7 @@ test_options_steam_client (Fixture *f,
   static const char * const original_argv[] =
   {
     "pressure-vessel-wrap-test",
+    "--unshare-home",
     "--for-steam-client",
     NULL
   };
@@ -1511,6 +1512,7 @@ test_options_steam_client (Fixture *f,
   g_auto(GStrv) argv_copy = _srt_strdupv (original_argv);
   g_autofree gchar **modifiable_argv = g_memdup2 (argv_copy, sizeof (original_argv));
   const PvWrapOptions *options = &f->context->options;
+  PvHomeMode home_mode = PV_HOME_MODE_TRANSIENT;
   int argc = G_N_ELEMENTS (original_argv) - 1;
   gboolean ok;
 
@@ -1519,10 +1521,11 @@ test_options_steam_client (Fixture *f,
   g_assert_no_error (local_error);
   g_assert_true (ok);
 
-  ok = pv_wrap_context_choose_home_mode (f->context, NULL, NULL, NULL,
+  ok = pv_wrap_context_choose_home_mode (f->context, &home_mode, NULL, NULL,
                                          &local_error);
   g_assert_no_error (local_error);
   g_assert_true (ok);
+  g_assert_cmpint (home_mode, ==, PV_HOME_MODE_SHARED);
 
   ok = pv_wrap_context_after_parsing_arguments (f->context,
                                                 PV_WRAP_TEST_FLAGS_MOCK_BWRAP,

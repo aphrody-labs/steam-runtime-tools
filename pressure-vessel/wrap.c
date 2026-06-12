@@ -273,28 +273,6 @@ main (int argc,
       goto out;
     }
 
-  if (self->options.filesystems != NULL)
-    {
-      for (i = 0; self->options.filesystems[i] != NULL; i++)
-        {
-          if (strchr (self->options.filesystems[i], ':') != NULL ||
-              strchr (self->options.filesystems[i], '\\') != NULL)
-            {
-              usage_error (error,
-                           "':' and '\\' in --filesystem argument "
-                           "not handled yet");
-              goto out;
-            }
-          else if (!g_path_is_absolute (self->options.filesystems[i]))
-            {
-              usage_error (error,
-                           "--filesystem argument must be an absolute "
-                           "path, not \"%s\"", self->options.filesystems[i]);
-              goto out;
-            }
-        }
-    }
-
   if (self->options.copy_runtime && self->options.variable_dir == NULL)
     {
       usage_error (error, "--copy-runtime requires --variable-dir");
@@ -651,6 +629,8 @@ main (int argc,
     }
   else
     {
+      FlatpakFilesystemMode share_host = FLATPAK_FILESYSTEM_MODE_NONE;
+
       g_assert (!self->is_flatpak_env);
       g_assert (bwrap != NULL);
       g_assert (bwrap_filesystem_arguments != NULL);
@@ -670,10 +650,11 @@ main (int argc,
        * root directories, above, in case they're functionally necessary
        * (for example /opt might contain important libraries). */
       if (self->options.runtime != NULL
-          && self->options.share_root_dirs == TRISTATE_YES
+          && pv_wrap_context_has_filesystem (self, "host", &share_host)
+          && share_host > FLATPAK_FILESYSTEM_MODE_NONE
           && !pv_export_root_dirs_like_filesystem_host (real_root_fd,
                                                         self->exports,
-                                                        FLATPAK_FILESYSTEM_MODE_READ_WRITE,
+                                                        share_host,
                                                         self->arbitrary_dirent_order,
                                                         error))
         goto out;

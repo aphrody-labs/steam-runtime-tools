@@ -43,32 +43,6 @@
 #include "flatpak-utils-private.h"
 #include "utils.h"
 
-/* Taken from Flatpak flatpak-context.c, except where noted.
- * Last updated: Flatpak 1.14.6 */
-static const char *dont_mount_in_root[] = {
-  ".",
-  "..",
-  "app",
-  "bin",
-  "boot",
-  "dev",
-  "efi",
-  "etc",
-  "lib",
-  "lib32",
-  "lib64",
-  "overrides",    /* pressure-vessel-specific */
-  "proc",
-  "root",
-  "run",
-  "sbin",
-  "sys",
-  "tmp",
-  "usr",
-  "var",
-  NULL
-};
-
 gchar *
 pv_wrap_check_bwrap (SrtSubprocessRunner *runner,
                      gboolean only_prepare,
@@ -883,18 +857,67 @@ gboolean
 pv_wrap_setup_export_filesystems (PvWrapContext *self,
                                   GError **error)
 {
+  g_auto(SrtHashTableIter) iter = SRT_HASH_TABLE_ITER_CLEARED;
+  FlatpakFilesystemMode share_host_root = FLATPAK_FILESYSTEM_MODE_NONE;
+  const char *filesystem;
+  const void *mode_pointer;
+
   if (self->options.filesystems == NULL)
     return TRUE;
 
+  _srt_hash_table_iter_init_sorted (&iter,
+                                    self->options.filesystems,
+                                    self->arbitrary_str_order);
+
   g_debug ("Processing --filesystem arguments...");
 
-  for (size_t i = 0; self->options.filesystems[i] != NULL; i++)
-    pv_wrap_context_export_if_allowed (self,
-                                       FLATPAK_FILESYSTEM_MODE_READ_WRITE,
-                                       self->options.filesystems[i],
-                                       self->options.filesystems[i],
-                                       "--filesystem", "", "",
-                                       PV_WRAP_EXPORT_FLAGS_NONE);
+  if (pv_wrap_context_has_filesystem (self, "host-root", &share_host_root)
+      && share_host_root > FLATPAK_FILESYSTEM_MODE_NONE)
+    flatpak_exports_add_host_root_expose (self->exports, share_host_root);
+
+  while (_srt_hash_table_iter_next (&iter, &filesystem, &mode_pointer))
+    {
+      if (g_strv_contains (flatpak_context_special_filesystems, filesystem))
+        {
+          /*
+           * Either handled elsewhere or intentionally ignored:
+           * - home: not implemented yet, it isn't entirely clear how it
+           *   should interact with --share-home
+           * - host: handled in pv_export_root_dirs_like_filesystem_host()
+           * - host-etc, host-os: ignored, PvRuntime does the equivalent
+           * - host-reset: ignored, can't actually happen because we don't
+           *   implement --nofilesystem
+           * - host-root: see above
+           */
+        }
+      else if (g_str_has_prefix (filesystem, "~/"))
+        {
+          g_autofree gchar *path = NULL;
+
+          path = g_build_filename (g_quark_to_string (self->current_home),
+                                   filesystem + 2,
+                                   NULL);
+          pv_wrap_context_export_if_allowed (self,
+                                             GPOINTER_TO_INT (mode_pointer),
+                                             path,
+                                             path,
+                                             "--filesystem", "", "",
+                                             PV_WRAP_EXPORT_FLAGS_NONE);
+        }
+      else if (g_str_has_prefix (filesystem, "/"))
+        {
+          pv_wrap_context_export_if_allowed (self,
+                                             GPOINTER_TO_INT (mode_pointer),
+                                             filesystem,
+                                             filesystem,
+                                             "--filesystem", "", "",
+                                             PV_WRAP_EXPORT_FLAGS_NONE);
+        }
+      else
+        {
+          g_warning ("Unexpected filesystem arg %s", filesystem);
+        }
+    }
 
   return TRUE;
 }

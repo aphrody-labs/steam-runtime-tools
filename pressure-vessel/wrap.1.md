@@ -100,11 +100,58 @@ environment variable *VAR* to *VAL*. If not, leave *VAR* unchanged.
 </dd>
 <dt>
 
-**--filesystem** *PATH*
+**--filesystem** *PATH*[:*MODE*]|*TOKEN*[:*MODE*]
 
 </dt><dd>
 
-Share *PATH* from the host system with the container.
+Share *PATH* or *TOKEN* from the host system with the container,
+similar to the corresponding option in **flatpak-run**(1).
+
+A *MODE* may optionally be specified as a suffix
+after a colon,
+either `ro` for read-only or `rw` for read/write.
+If a suffix is not specified,
+the default is `rw`.
+`create` is also accepted for compatibility with Flatpak,
+but is currently implemented as equivalent to `rw`.
+
+A *PATH* may be specified as either an absolute path,
+or a path in the home directory prefixed with `~/`.
+Other types of path implemented by Flatpak,
+such as `xdg-data/foo`,
+are not currently accepted.
+If a *PATH* contains colons or backslashes,
+they must be escaped as `\:` or `\\` respectively.
+(When run from a shell,
+this syntax is likely to require quoting or an additional layer of escaping.)
+
+The special token `host` shares all subdirectories of the root directory
+with the container.
+This is enabled by default when running the Steam Client.
+
+The special tokens `host-etc` and `host-os` are accepted,
+but are currently ignored:
+when using a runtime,
+pressure-vessel always makes `/etc`,
+`/usr`,
+and `/usr`-like filesystems such as `/bin`
+available in the container as `/run/host/etc` and so on
+(or as `/run/parent/etc` and so on when running under Flatpak),
+and when not using a runtime,
+the current `/etc` and `/usr` are used directly.
+
+The special token `host-root` results in the entire host filesystem
+being mounted read/write at `/run/host/root`,
+as described in systemd's [Container Interface][] document.
+This is enabled by default when running the Steam Client.
+Note that as with Flatpak, paths within this hierarchy should always be
+resolved using **openat2**(2) with the `RESOLVE_IN_ROOT` flag,
+or an equivalent interface such as steam-runtime-tools'
+`_srt_resolve_in_sysroot()` or libglnx's `glnx_chaseat()`.
+
+The special token `home` is not currently accepted.
+`--share-home` has a similar meaning,
+but also shares related directories such as `/run/media` and `/srv`.
 
 </dd>
 <dt>
@@ -117,8 +164,10 @@ Assume that the *COMMAND* is the Steam Client,
 or a similarly tightly-integrated component.
 
 This changes some defaults to be appropriate for the Steam Client:
-currently it means that the equivalent of `flatpak run --filesystem=host`
-is assumed,
+currently it means that the equivalents of
+`--filesystem=host`
+and `--filesystem=host-root` are assumed
+(unless each filesystem was explicitly specified with a `:ro` suffix),
 and `/sys` is mounted read/write instead of read-only.
 
 Other parameters that are appropriate for the Steam Client might be
@@ -1761,6 +1810,7 @@ then type `"$@"` (including the double quotes) to run the game itself.
 * <https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/docs/container-runtime.md>
 * <https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/docs/slr-for-game-developers.md>
 
+[Container Interface]: https://systemd.io/CONTAINER_INTERFACE/
 [developer mode]: https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/docs/slr-for-game-developers.md#developer-mode
 [steam-runtime emulator.json(5)]: https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/docs/steam-runtime-emulator.json.5.md
 

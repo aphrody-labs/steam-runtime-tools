@@ -101,7 +101,7 @@ typedef struct
   SrtEmulator *emulator;
   gchar *emulator_manifest;
   GStrv env_if_host;
-  GStrv filesystems;
+  GHashTable *filesystems;
   gchar *freedesktop_app_id;
   gchar *graphics_provider;
   GHashTable *arch_graphics_providers;
@@ -120,7 +120,6 @@ typedef struct
   PvShell shell;
   PvTerminal terminal;
   Tristate share_home;
-  Tristate share_root_dirs;
 
   gboolean batch;
   gboolean copy_runtime;
@@ -228,6 +227,10 @@ gboolean pv_wrap_context_export_if_allowed (PvWrapContext *self,
                                             const char *after,
                                             PvWrapExportFlags flags);
 
+gboolean pv_wrap_context_has_filesystem (PvWrapContext *self,
+                                         const char *fs,
+                                         FlatpakFilesystemMode *mode_out);
+
 static inline const GQuark *
 pv_wrap_options_get_architectures (PvWrapOptions *self,
                                    gsize *n)
@@ -240,6 +243,21 @@ pv_wrap_options_has_architecture (PvWrapOptions *self,
                                   GQuark q)
 {
   return _srt_architecture_array_has (self->architectures, q);
+}
+
+void pv_wrap_options_take_filesystem (PvWrapOptions *self,
+                                      char *fs,
+                                      FlatpakFilesystemMode mode);
+
+/*
+ * @fs: (type filename) (transfer none):
+ */
+static inline void
+pv_wrap_options_set_filesystem (PvWrapOptions *self,
+                                const char *fs,
+                                FlatpakFilesystemMode mode)
+{
+  pv_wrap_options_take_filesystem (self, g_strdup (fs), mode);
 }
 
 gboolean pv_wrap_context_append_payload_command (PvWrapContext *self,

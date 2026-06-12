@@ -291,12 +291,46 @@ fixture_create_runtime (Fixture *f,
 }
 
 static void
+fixture_recreate_context (Fixture *f)
+{
+  g_autoptr(GError) local_error = NULL;
+
+  g_clear_object (&f->context);
+  f->context = pv_wrap_context_new (f->mock_host, "/home/me", &local_error);
+  g_assert_no_error (local_error);
+
+  f->context->original_environ = g_environ_setenv (f->context->original_environ,
+                                                   "HOME",
+                                                   "/home/me",
+                                                   TRUE);
+  /* Some tests need to know where Steam is installed;
+   * pretend that we have it installed in /steam */
+  f->context->original_environ = g_environ_setenv (f->context->original_environ,
+                                                   "STEAM_COMPAT_CLIENT_INSTALL_PATH",
+                                                   "/steam",
+                                                   TRUE);
+
+  if (f->config->architectures != NULL)
+    {
+      for (size_t i = 0; f->config->architectures[i] != NULL; i++)
+        {
+          GQuark arch_quark = g_quark_from_static_string (f->config->architectures[i]);
+
+          g_array_append_val (f->context->options.architectures, arch_quark);
+        }
+    }
+  else
+    {
+      _srt_architecture_array_populate_with_defaults (f->context->options.architectures);
+    }
+}
+
+static void
 setup (Fixture *f,
        gconstpointer context)
 {
   g_autoptr(GError) local_error = NULL;
   g_autofree gchar *mock_host = NULL;
-  gsize i;
 
   if (context != NULL)
     f->config = context;
@@ -323,34 +357,8 @@ setup (Fixture *f,
   f->home = g_build_filename (f->mock_host->path, "home", "me", NULL);
   glnx_shutil_mkdir_p_at (AT_FDCWD, f->home, 0755, NULL, &local_error);
   g_assert_no_error (local_error);
-  f->context = pv_wrap_context_new (f->mock_host, "/home/me", &local_error);
-  g_assert_no_error (local_error);
   f->bwrap = flatpak_bwrap_new (flatpak_bwrap_empty_env);
-
-  f->context->original_environ = g_environ_setenv (f->context->original_environ,
-                                                   "HOME",
-                                                   "/home/me",
-                                                   TRUE);
-  /* Some tests need to know where Steam is installed;
-   * pretend that we have it installed in /steam */
-  f->context->original_environ = g_environ_setenv (f->context->original_environ,
-                                                   "STEAM_COMPAT_CLIENT_INSTALL_PATH",
-                                                   "/steam",
-                                                   TRUE);
-
-  if (f->config->architectures != NULL)
-    {
-      for (i = 0; f->config->architectures[i] != NULL; i++)
-        {
-          GQuark arch_quark = g_quark_from_static_string (f->config->architectures[i]);
-
-          g_array_append_val (f->context->options.architectures, arch_quark);
-        }
-    }
-  else
-    {
-      _srt_architecture_array_populate_with_defaults (f->context->options.architectures);
-    }
+  fixture_recreate_context (f);
 
   g_assert_cmpuint (f->context->options.architectures->len, >=, 1);
   f->primary_abi = g_array_index (f->context->options.architectures, GQuark, 0);
@@ -1314,10 +1322,17 @@ test_options_defaults (Fixture *f,
       g_autoptr(GError) local_error = NULL;
       int argc = G_N_ELEMENTS (original_argv) - 1;
       PvHomeMode home_mode = PV_HOME_MODE_TRANSIENT;
+      FlatpakFilesystemMode mode;
       gboolean ok;
 
-      g_assert_null (options->env_if_host);
       g_assert_null (options->filesystems);
+      mode = (FlatpakFilesystemMode) 23;
+      g_assert_false (pv_wrap_context_has_filesystem (f->context, "host", &mode));
+      /* mode was not modified if false is returned */
+      g_assert_cmpint (mode, ==, 23);
+      g_assert_false (pv_wrap_context_has_filesystem (f->context, "host", NULL));
+
+      g_assert_null (options->env_if_host);
       g_assert_cmpstr (options->freedesktop_app_id, ==, NULL);
       g_assert_cmpstr (options->graphics_provider, ==, NULL);
       g_assert_cmpstr (options->home, ==, NULL);
@@ -1334,7 +1349,6 @@ test_options_defaults (Fixture *f,
       g_assert_cmpint (options->shell, ==, PV_SHELL_NONE);
       g_assert_cmpint (options->terminal, ==, PV_TERMINAL_AUTO);
       g_assert_cmpint (options->share_home, ==, TRISTATE_MAYBE);
-      g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_MAYBE);
       g_assert_cmpint (options->batch, ==, FALSE);
       g_assert_cmpint (options->copy_runtime, ==, FALSE);
       g_assert_cmpint (options->deterministic, ==, FALSE);
@@ -1447,6 +1461,8 @@ test_options_false (Fixture *f,
   g_assert_cmpstrv (f->context->original_argv, (gchar **) original_argv);
   g_assert_cmpstrv (argv, (gchar **) expected_argv);
 
+  g_assert_false (pv_wrap_context_has_filesystem (f->context, "host", NULL));
+
   g_assert_null (options->env_if_host);
   g_assert_null (options->filesystems);
   g_assert_cmpstr (options->freedesktop_app_id, ==, "com.steampowered.App123");
@@ -1466,7 +1482,6 @@ test_options_false (Fixture *f,
   g_assert_cmpint (options->shell, ==, PV_SHELL_NONE);
   g_assert_cmpint (options->terminal, ==, PV_TERMINAL_NONE);
   g_assert_cmpint (options->share_home, ==, TRISTATE_NO);
-  g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_MAYBE);
   g_assert_cmpint (options->batch, ==, FALSE);
   g_assert_cmpint (options->copy_runtime, ==, FALSE);
   g_assert_cmpint (options->deterministic, ==, FALSE);
@@ -1490,6 +1505,85 @@ test_options_false (Fixture *f,
 }
 
 /*
+ * Check various command-line options that are invalid or otherwise
+ * not allowed.
+ */
+static void
+test_options_invalid (Fixture *f,
+                      gconstpointer context)
+{
+  /* We don't implement all of the special tokens from Flatpak yet.
+   * We explicitly reject the ones we don't implement instead of ignoring,
+   * so that their meaning will not change if we expand coverage.
+   *
+   * Similarly we don't accept HOME-relative paths starting with "~/".
+   *
+   * Similarly we don't accept Flatpak's :ro, :rw etc. suffixes,
+   * backslash-escaped colons, or backslash-escaped backslashes. */
+  static const char * const invalid_fs[] =
+  {
+    "home",
+    "home:ro",
+    "home:rw",
+    "host-reset",
+    "host:reset",
+    "xdg-cache",
+    "xdg-config",
+    "xdg-data",
+    "xdg-desktop",
+    "xdg-documents",
+    "xdg-download",
+    "xdg-download/Games",
+    "xdg-music",
+    "xdg-pictures",
+    "xdg-public-share",
+    "xdg-run/pipewire",
+    "xdg-templates",
+    "xdg-videos",
+    "~",
+  };
+
+  for (size_t i = 0; i < G_N_ELEMENTS (invalid_fs); i++)
+    {
+      g_autoptr(GPtrArray) argv = g_ptr_array_new_with_free_func (g_free);
+      g_autofree gchar **modifiable_argv = NULL;
+      g_autoptr(GError) local_error = NULL;
+      const char *fs = invalid_fs[i];
+      int argc;
+      gboolean ok;
+
+      g_ptr_array_add (argv, g_strdup ("pressure-vessel-wrap-test"));
+      g_ptr_array_add (argv, g_strdup_printf ("--filesystem=%s", fs));
+      g_ptr_array_add (argv, g_strdup ("--"));
+      g_ptr_array_add (argv, g_strdup ("true"));
+      g_assert_true (argv->len < (unsigned int) INT_MAX);
+      argc = (int) argv->len;
+      g_ptr_array_add (argv, NULL);
+
+      modifiable_argv = g_memdup2 (argv->pdata, argv->len * sizeof (char *));
+
+      fixture_recreate_context (f);
+      ok = pv_wrap_context_parse_argv (f->context,
+                                       &argc, &modifiable_argv,
+                                       &local_error);
+
+      if (local_error != NULL)
+        g_test_message ("--filesystem=%s => error as expected: %s %d: %s",
+                        fs, g_quark_to_string (local_error->domain),
+                        local_error->code, local_error->message);
+      else
+        g_test_message ("--filesystem=%s => unexpectedly succeeded", fs);
+
+      g_assert_nonnull (local_error);
+      /* We accept any code: in practice it's G_OPTION_ERROR_FAILED,
+       * but it's bad style to check for generic _FAILED error codes */
+      g_assert_cmpstr (g_quark_to_string (local_error->domain),
+                       ==, g_quark_to_string (G_OPTION_ERROR));
+      g_assert_false (ok);
+    }
+}
+
+/*
  * Check options that are implied by --for-steam-client.
  */
 static void
@@ -1508,13 +1602,21 @@ test_options_steam_client (Fixture *f,
     "pressure-vessel-wrap-test",
     NULL
   };
+  static const char * const expected_filesystems[] =
+  {
+    "host",
+    "host-root",
+    NULL
+  };
   g_autoptr(GError) local_error = NULL;
   g_auto(GStrv) argv_copy = _srt_strdupv (original_argv);
+  g_autofree void **filesystem_keys = NULL;
   g_autofree gchar **modifiable_argv = g_memdup2 (argv_copy, sizeof (original_argv));
   const PvWrapOptions *options = &f->context->options;
   PvHomeMode home_mode = PV_HOME_MODE_TRANSIENT;
   int argc = G_N_ELEMENTS (original_argv) - 1;
   gboolean ok;
+  guint n;
 
   ok = pv_wrap_context_parse_argv (f->context, &argc, &modifiable_argv,
                                    &local_error);
@@ -1538,7 +1640,20 @@ test_options_steam_client (Fixture *f,
   g_assert_cmpstrv (f->context->original_argv, (gchar **) original_argv);
   g_assert_cmpstrv (modifiable_argv, (gchar **) expected_argv);
 
-  g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_YES);
+  filesystem_keys = g_hash_table_get_keys_as_array (options->filesystems, &n);
+  qsort (filesystem_keys, n, sizeof (char *), _srt_indirect_strcmp0);
+  g_assert_cmpstrv ((char **) filesystem_keys, (char **) expected_filesystems);
+
+  for (size_t i = 0; i < n; i++)
+    {
+      const char *fs = expected_filesystems[i];
+      FlatpakFilesystemMode mode;
+
+      mode = FLATPAK_FILESYSTEM_MODE_NONE;
+      g_assert_true (pv_wrap_context_has_filesystem (f->context, fs, &mode));
+      g_assert_cmpint (mode, ==, FLATPAK_FILESYSTEM_MODE_READ_WRITE);
+      g_assert_true (pv_wrap_context_has_filesystem (f->context, fs, NULL));
+    }
 }
 
 /*
@@ -1558,8 +1673,17 @@ test_options_true (Fixture *f,
     "--devel",
     "--env-if-host=ONE=1",
     "--env-if-host=TWO=two",
-    "--filesystem=/foo",
-    "--filesystem=/bar",
+    "--filesystem=host:ro",
+    "--filesystem=host-etc:rw",         /* accepted but ignored */
+    "--filesystem=host-os:ro",          /* accepted but ignored */
+    "--filesystem=~/create:create",
+    "--filesystem=/media/escaped\\:colon",
+    "--filesystem=/media/escaped\\\\backslash",
+    "--filesystem=/media/silly\\name",
+    "--filesystem=/ro:ro",
+    "--filesystem=/rw:rw",
+    "--filesystem=/without/mode",
+    "--filesystem=host-root:ro",
     "--for-steam-client",
     "--freedesktop-app-id=com.example.Foo",
     "--gc-runtimes",
@@ -1609,8 +1733,17 @@ test_options_true (Fixture *f,
   };
   static const char * const expected_filesystems[] =
   {
-    "/foo",
-    "/bar",
+    "/media/escaped:colon",
+    "/media/escaped\\backslash",
+    "/media/sillyname",
+    "/ro",
+    "/rw",
+    "/without/mode",
+    "host",
+    "host-etc",
+    "host-os",
+    "host-root",
+    "~/create",
     NULL
   };
   const PvWrapOptions *options = &f->context->options;
@@ -1619,6 +1752,7 @@ test_options_true (Fixture *f,
   g_auto(GStrv) argv_copy = _srt_strdupv (original_argv);
   g_autofree gchar **argv = g_memdup2 (argv_copy, sizeof (original_argv));
   g_autofree gchar *private_home = NULL;
+  g_autofree void **filesystem_keys = NULL;
   g_autoptr(GError) local_error = NULL;
   int argc = G_N_ELEMENTS (original_argv) - 1;
   PvHomeMode home_mode = PV_HOME_MODE_TRANSIENT;
@@ -1626,6 +1760,7 @@ test_options_true (Fixture *f,
   const WrapPreloadModule *module;
   gsize i = 0;
   gboolean ok;
+  guint n;
 
   ok = pv_wrap_context_parse_argv (f->context, &argc, &argv, &local_error);
   g_assert_no_error (local_error);
@@ -1649,8 +1784,32 @@ test_options_true (Fixture *f,
   g_assert_cmpstrv (f->context->original_argv, (gchar **) original_argv);
   g_assert_cmpstrv (argv, (gchar **) expected_argv);
 
+  filesystem_keys = g_hash_table_get_keys_as_array (options->filesystems, &n);
+  qsort (filesystem_keys, n, sizeof (char *), _srt_indirect_strcmp0);
+  g_assert_cmpstrv ((char **) filesystem_keys, (char **) expected_filesystems);
+
+  for (i = 0; i < n; i++)
+    {
+      const char *fs = expected_filesystems[i];
+      FlatpakFilesystemMode mode;
+
+      mode = FLATPAK_FILESYSTEM_MODE_NONE;
+      g_assert_true (pv_wrap_context_has_filesystem (f->context, fs, &mode));
+
+      if (g_str_equal (fs, "~/create"))
+        g_assert_cmpint (mode, ==, FLATPAK_FILESYSTEM_MODE_CREATE);
+      else if (g_str_equal (fs, "/ro")
+               || g_str_equal (fs, "host")
+               || g_str_equal (fs, "host-os")
+               || g_str_equal (fs, "host-root"))
+        g_assert_cmpint (mode, ==, FLATPAK_FILESYSTEM_MODE_READ_ONLY);
+      else
+        g_assert_cmpint (mode, ==, FLATPAK_FILESYSTEM_MODE_READ_WRITE);
+
+      g_assert_true (pv_wrap_context_has_filesystem (f->context, fs, NULL));
+    }
+
   g_assert_cmpstrv (options->env_if_host, (gchar **) expected_env_if_host);
-  g_assert_cmpstrv (options->filesystems, (gchar **) expected_filesystems);
   g_assert_cmpstr (options->freedesktop_app_id, ==, "com.example.Foo");
   g_assert_cmpstr (options->graphics_provider, ==, "/gfx");
   g_assert_cmpstr (options->home, ==, "/home/steam");
@@ -1668,7 +1827,6 @@ test_options_true (Fixture *f,
   g_assert_cmpint (options->shell, ==, PV_SHELL_INSTEAD);
   g_assert_cmpint (options->terminal, ==, PV_TERMINAL_XTERM);
   g_assert_cmpint (options->share_home, ==, TRISTATE_YES);
-  g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_MAYBE);
   g_assert_cmpint (options->batch, ==, TRUE);
   g_assert_cmpint (options->copy_runtime, ==, TRUE);
   g_assert_cmpint (options->deterministic, ==, TRUE);
@@ -3396,6 +3554,8 @@ main (int argc,
               setup, test_options_defaults, teardown);
   g_test_add ("/options/false", Fixture, NULL,
               setup, test_options_false, teardown);
+  g_test_add ("/options/invalid", Fixture, NULL,
+              setup, test_options_invalid, teardown);
   g_test_add ("/options/steam-client", Fixture, NULL,
               setup, test_options_steam_client, teardown);
   g_test_add ("/options/true", Fixture, NULL,

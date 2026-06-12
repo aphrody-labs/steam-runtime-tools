@@ -14,6 +14,7 @@
 
 #include "pressure-vessel/bwrap.h"
 #include "pressure-vessel/exports.h"
+#include "pressure-vessel/flatpak-context-private.h"
 #include "pressure-vessel/supported-architectures.h"
 #include "pressure-vessel/utils.h"
 #include "pressure-vessel/wrap-flatpak.h"
@@ -74,7 +75,6 @@ pv_wrap_options_init (PvWrapOptions *self)
   self->runtime = NULL;
   self->runtime_base = NULL;
   self->share_home = TRISTATE_MAYBE;
-  self->share_root_dirs = TRISTATE_MAYBE;
   self->share_pid = TRUE;
   self->shell = PV_SHELL_NONE;
   self->single_thread = FALSE;
@@ -98,7 +98,7 @@ pv_wrap_options_clear (PvWrapOptions *self)
   g_clear_object (&self->emulator);
   g_clear_pointer (&self->emulator_manifest, g_free);
   g_clear_pointer (&self->env_if_host, g_strfreev);
-  g_clear_pointer (&self->filesystems, g_strfreev);
+  g_clear_pointer (&self->filesystems, g_hash_table_unref);
   g_clear_pointer (&self->freedesktop_app_id, g_free);
   g_clear_pointer (&self->graphics_provider, g_free);
   g_clear_pointer (&self->home, g_free);
@@ -329,6 +329,54 @@ pv_wrap_context_get_helpers_dir_in_container (PvWrapContext *self)
     return _srt_subprocess_runner_get_helpers_path (self->run_in_current_context);
 }
 
+/*
+ * @fs: (type filename) (transfer full):
+ */
+void
+pv_wrap_options_take_filesystem (PvWrapOptions *self,
+                                 char *fs,
+                                 FlatpakFilesystemMode mode)
+{
+  if (self->filesystems == NULL)
+    self->filesystems = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                               g_free, NULL);
+
+  g_hash_table_replace (self->filesystems,
+                        g_steal_pointer (&fs),
+                        GINT_TO_POINTER (mode));
+}
+
+/*
+ * pv_wrap_context_has_filesystem:
+ * @self: The context
+ * @fs: An absolute path
+ * @mode_out: (optional): Used to return the filesystem mode if set
+ *
+ * If @fs was configured to be read-only, read/write or
+ * explicitly unshared, set `*mode_out` and return %TRUE.
+ * If no mode was specified for @fs, leave `*mode_out` unchanged
+ * and return %FALSE.
+ *
+ * Returns: %TRUE if a mode for @fs was specified
+ */
+gboolean
+pv_wrap_context_has_filesystem (PvWrapContext *self,
+                                const char *fs,
+                                FlatpakFilesystemMode *mode_out)
+{
+  void *mode_value = NULL;
+
+  if (self->options.filesystems == NULL
+      || !g_hash_table_lookup_extended (self->options.filesystems, fs,
+                                        NULL, &mode_value))
+    return FALSE;
+
+  if (mode_out != NULL)
+    *mode_out = GPOINTER_TO_INT (mode_value);
+
+  return TRUE;
+}
+
 static gboolean
 opt_copy_runtime_into_cb (const gchar *option_name,
                           const gchar *value,
@@ -357,6 +405,35 @@ opt_copy_runtime_into_cb (const gchar *option_name,
       self->variable_dir = g_strdup (value);
     }
 
+  return TRUE;
+}
+
+static gboolean
+opt_filesystem_cb (const char *option_name,
+                   const char *value,
+                   void *data,
+                   GError **error)
+{
+  PvWrapOptions *self = data;
+  g_autofree gchar *filesystem = NULL;
+  FlatpakFilesystemMode mode = FLATPAK_FILESYSTEM_MODE_READ_WRITE;
+
+  if (!flatpak_context_parse_filesystem (value,
+                                         FALSE,   /* not --nofilesystem */
+                                         &filesystem,
+                                         &mode,
+                                         error))
+    return FALSE;
+
+  if (g_str_equal (filesystem, "host-etc")
+      || g_str_equal (filesystem, "host-os"))
+    g_debug ("%s=\"%s\" accepted but ignored", option_name, value);
+  else if (g_str_equal (filesystem, "home"))
+    return usage_error (error,
+                        "%s=\"%s\" not currently implemented (use --share-home instead)",
+                        option_name, value);
+
+  pv_wrap_options_take_filesystem (self, g_steal_pointer (&filesystem), mode);
   return TRUE;
 }
 
@@ -870,10 +947,15 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
       "Set VAR=VAL if COMMAND is run with /usr from the host system, "
       "but not if it is run with /usr from RUNTIME.", "VAR=VAL" },
     { "filesystem", '\0',
-      G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME_ARRAY, &self->filesystems,
-      "Share filesystem directories with the container. "
-      "They must currently be given as absolute paths.",
-      "PATH" },
+      G_OPTION_FLAG_FILENAME, G_OPTION_ARG_CALLBACK, opt_filesystem_cb,
+      "Share filesystem directories with the container, "
+      "specified as absolute paths, "
+      "paths starting with '~/', "
+      "or one of the special tokens host or host-root, "
+      "optionally followed by :ro or :rw.",
+      /* In fact host-etc, host-os are also accepted but intentionally not
+       * documented here, because they're ignored. */
+      "PATH[:MODE]" },
     { "for-steam-client", '\0',
       G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &self->for_steam_client,
       "Container will be used to run the Steam Client",
@@ -1523,16 +1605,19 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
   self->workarounds = pv_get_workarounds (self->bwrap_flags,
                                           _srt_const_strv (self->original_environ));
 
-  /* Currently we don't implement an individual command-line option
-   * or environment variable for this, so in practice its value will
-   * be MAYBE at this point */
-  if (self->options.share_root_dirs == TRISTATE_MAYBE)
+  if (self->options.for_steam_client
+      && !(self->workarounds & PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS))
     {
-      if (self->options.for_steam_client
-          && !(self->workarounds & PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS))
-        self->options.share_root_dirs = TRISTATE_YES;
-      else
-        self->options.share_root_dirs = TRISTATE_NO;
+      static const char * const host_filesystems[] = { "host", "host-root" };
+
+      for (size_t i = 0; i < G_N_ELEMENTS (host_filesystems); i++)
+        {
+          const char *fs = host_filesystems[i];
+
+          if (!pv_wrap_context_has_filesystem (self, fs, NULL))
+            pv_wrap_options_set_filesystem (&self->options, fs,
+                                            FLATPAK_FILESYSTEM_MODE_READ_WRITE);
+        }
     }
 
   return TRUE;

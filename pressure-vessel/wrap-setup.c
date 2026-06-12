@@ -871,12 +871,34 @@ pv_wrap_setup_export_filesystems (PvWrapContext *self,
   g_debug ("Processing --filesystem arguments...");
 
   while (_srt_hash_table_iter_next (&iter, &filesystem, &mode_pointer))
-    pv_wrap_context_export_if_allowed (self,
-                                       GPOINTER_TO_INT (mode_pointer),
-                                       filesystem,
-                                       filesystem,
-                                       "--filesystem", "", "",
-                                       PV_WRAP_EXPORT_FLAGS_NONE);
+    {
+      if (g_strv_contains (flatpak_context_special_filesystems, filesystem))
+        {
+          /*
+           * Either handled elsewhere or intentionally ignored:
+           * - home: not implemented yet, it isn't entirely clear how it
+           *   should interact with --share-home
+           * - host: handled in pv_export_root_dirs_like_filesystem_host()
+           * - host-etc, host-os: ignored, PvRuntime does the equivalent
+           * - host-reset: ignored, can't actually happen because we don't
+           *   implement --nofilesystem
+           * - host-root: not implemented yet
+           */
+        }
+      else if (g_str_has_prefix (filesystem, "/"))
+        {
+          pv_wrap_context_export_if_allowed (self,
+                                             GPOINTER_TO_INT (mode_pointer),
+                                             filesystem,
+                                             filesystem,
+                                             "--filesystem", "", "",
+                                             PV_WRAP_EXPORT_FLAGS_NONE);
+        }
+      else
+        {
+          g_warning ("Unexpected filesystem arg %s", filesystem);
+        }
+    }
 
   return TRUE;
 }

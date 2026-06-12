@@ -1322,10 +1322,17 @@ test_options_defaults (Fixture *f,
       g_autoptr(GError) local_error = NULL;
       int argc = G_N_ELEMENTS (original_argv) - 1;
       PvHomeMode home_mode = PV_HOME_MODE_TRANSIENT;
+      FlatpakFilesystemMode mode;
       gboolean ok;
 
-      g_assert_null (options->env_if_host);
       g_assert_null (options->filesystems);
+      mode = (FlatpakFilesystemMode) 23;
+      g_assert_false (pv_wrap_context_has_filesystem (f->context, "host", &mode));
+      /* mode was not modified if false is returned */
+      g_assert_cmpint (mode, ==, 23);
+      g_assert_false (pv_wrap_context_has_filesystem (f->context, "host", NULL));
+
+      g_assert_null (options->env_if_host);
       g_assert_cmpstr (options->freedesktop_app_id, ==, NULL);
       g_assert_cmpstr (options->graphics_provider, ==, NULL);
       g_assert_cmpstr (options->home, ==, NULL);
@@ -1342,7 +1349,6 @@ test_options_defaults (Fixture *f,
       g_assert_cmpint (options->shell, ==, PV_SHELL_NONE);
       g_assert_cmpint (options->terminal, ==, PV_TERMINAL_AUTO);
       g_assert_cmpint (options->share_home, ==, TRISTATE_MAYBE);
-      g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_MAYBE);
       g_assert_cmpint (options->batch, ==, FALSE);
       g_assert_cmpint (options->copy_runtime, ==, FALSE);
       g_assert_cmpint (options->deterministic, ==, FALSE);
@@ -1455,6 +1461,8 @@ test_options_false (Fixture *f,
   g_assert_cmpstrv (f->context->original_argv, (gchar **) original_argv);
   g_assert_cmpstrv (argv, (gchar **) expected_argv);
 
+  g_assert_false (pv_wrap_context_has_filesystem (f->context, "host", NULL));
+
   g_assert_null (options->env_if_host);
   g_assert_null (options->filesystems);
   g_assert_cmpstr (options->freedesktop_app_id, ==, "com.steampowered.App123");
@@ -1474,7 +1482,6 @@ test_options_false (Fixture *f,
   g_assert_cmpint (options->shell, ==, PV_SHELL_NONE);
   g_assert_cmpint (options->terminal, ==, PV_TERMINAL_NONE);
   g_assert_cmpint (options->share_home, ==, TRISTATE_NO);
-  g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_MAYBE);
   g_assert_cmpint (options->batch, ==, FALSE);
   g_assert_cmpint (options->copy_runtime, ==, FALSE);
   g_assert_cmpint (options->deterministic, ==, FALSE);
@@ -1610,13 +1617,20 @@ test_options_steam_client (Fixture *f,
     "pressure-vessel-wrap-test",
     NULL
   };
+  static const char * const expected_filesystems[] =
+  {
+    "host",
+    NULL
+  };
   g_autoptr(GError) local_error = NULL;
   g_auto(GStrv) argv_copy = _srt_strdupv (original_argv);
+  g_autofree void **filesystem_keys = NULL;
   g_autofree gchar **modifiable_argv = g_memdup2 (argv_copy, sizeof (original_argv));
   const PvWrapOptions *options = &f->context->options;
   PvHomeMode home_mode = PV_HOME_MODE_TRANSIENT;
   int argc = G_N_ELEMENTS (original_argv) - 1;
   gboolean ok;
+  guint n;
 
   ok = pv_wrap_context_parse_argv (f->context, &argc, &modifiable_argv,
                                    &local_error);
@@ -1640,7 +1654,20 @@ test_options_steam_client (Fixture *f,
   g_assert_cmpstrv (f->context->original_argv, (gchar **) original_argv);
   g_assert_cmpstrv (modifiable_argv, (gchar **) expected_argv);
 
-  g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_YES);
+  filesystem_keys = g_hash_table_get_keys_as_array (options->filesystems, &n);
+  qsort (filesystem_keys, n, sizeof (char *), _srt_indirect_strcmp0);
+  g_assert_cmpstrv ((char **) filesystem_keys, (char **) expected_filesystems);
+
+  for (size_t i = 0; i < n; i++)
+    {
+      const char *fs = expected_filesystems[i];
+      FlatpakFilesystemMode mode;
+
+      mode = FLATPAK_FILESYSTEM_MODE_NONE;
+      g_assert_true (pv_wrap_context_has_filesystem (f->context, fs, &mode));
+      g_assert_cmpint (mode, ==, FLATPAK_FILESYSTEM_MODE_READ_WRITE);
+      g_assert_true (pv_wrap_context_has_filesystem (f->context, fs, NULL));
+    }
 }
 
 /*
@@ -1768,6 +1795,8 @@ test_options_true (Fixture *f,
       g_assert_true (pv_wrap_context_has_filesystem (f->context, fs, NULL));
     }
 
+  g_assert_false (pv_wrap_context_has_filesystem (f->context, "host", NULL));
+
   g_assert_cmpstrv (options->env_if_host, (gchar **) expected_env_if_host);
   g_assert_cmpstr (options->freedesktop_app_id, ==, "com.example.Foo");
   g_assert_cmpstr (options->graphics_provider, ==, "/gfx");
@@ -1786,7 +1815,6 @@ test_options_true (Fixture *f,
   g_assert_cmpint (options->shell, ==, PV_SHELL_INSTEAD);
   g_assert_cmpint (options->terminal, ==, PV_TERMINAL_XTERM);
   g_assert_cmpint (options->share_home, ==, TRISTATE_YES);
-  g_assert_cmpint (options->share_root_dirs, ==, TRISTATE_MAYBE);
   g_assert_cmpint (options->batch, ==, TRUE);
   g_assert_cmpint (options->copy_runtime, ==, TRUE);
   g_assert_cmpint (options->deterministic, ==, TRUE);

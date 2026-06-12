@@ -629,6 +629,8 @@ main (int argc,
     }
   else
     {
+      FlatpakFilesystemMode share_host = FLATPAK_FILESYSTEM_MODE_NONE;
+
       g_assert (!self->is_flatpak_env);
       g_assert (bwrap != NULL);
       g_assert (bwrap_filesystem_arguments != NULL);
@@ -648,10 +650,11 @@ main (int argc,
        * root directories, above, in case they're functionally necessary
        * (for example /opt might contain important libraries). */
       if (self->options.runtime != NULL
-          && self->options.share_root_dirs == TRISTATE_YES
+          && pv_wrap_context_has_filesystem (self, "host", &share_host)
+          && share_host > FLATPAK_FILESYSTEM_MODE_NONE
           && !pv_export_root_dirs_like_filesystem_host (real_root_fd,
                                                         self->exports,
-                                                        FLATPAK_FILESYSTEM_MODE_READ_WRITE,
+                                                        share_host,
                                                         self->arbitrary_dirent_order,
                                                         error))
         goto out;

@@ -98,6 +98,7 @@ const char *flatpak_context_features[] = {
   "per-app-dev-shm",
   NULL
 };
+#endif
 
 const char *flatpak_context_special_filesystems[] = {
   "home",
@@ -109,6 +110,7 @@ const char *flatpak_context_special_filesystems[] = {
   NULL
 };
 
+#if 0
 const char *flatpak_context_conditions[] = {
   "true",
   "false",

@@ -621,12 +621,14 @@ handle_launch (PvLauncher1           *object,
                                  NULL,
                                  &error))
     {
-      gint code = G_DBUS_ERROR_FAILED;
+      gint code;
 
       if (g_error_matches (error, G_SPAWN_ERROR, G_SPAWN_ERROR_ACCES))
         code = G_DBUS_ERROR_ACCESS_DENIED;
       else if (g_error_matches (error, G_SPAWN_ERROR, G_SPAWN_ERROR_NOENT))
         code = G_DBUS_ERROR_FILE_NOT_FOUND;
+      else
+        code = G_DBUS_ERROR_SPAWN_FAILED;
 
       g_dbus_method_invocation_return_error (invocation, G_DBUS_ERROR, code,
                                              "Failed to start command: %s",

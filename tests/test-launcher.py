@@ -438,6 +438,49 @@ class TestLauncher(BaseTest):
                     (128 + signal.SIGINT, -signal.SIGINT),
                 )
 
+                logger.debug('Checking execve EACCES reporting')
+                completed = run_subprocess(
+                    self.clean_up_env + self.launch + [
+                        '--socket', socket,
+                        '--',
+                        # execve() fails with EACCES when we try to
+                        # exec a directory
+                        '/dev',
+                    ],
+                    stdin=subprocess.DEVNULL,
+                    stdout=2,
+                    stderr=2,
+                )
+                self.assertEqual(completed.returncode, 126)
+
+                logger.debug('Checking execve ENOENT reporting')
+                completed = run_subprocess(
+                    self.clean_up_env + self.launch + [
+                        '--socket', socket,
+                        '--',
+                        os.path.join(temp, 'nonexistent'),
+                    ],
+                    stdin=subprocess.DEVNULL,
+                    stdout=2,
+                    stderr=2,
+                )
+                self.assertEqual(completed.returncode, 127)
+
+                logger.debug('Checking execve misc error reporting')
+                completed = run_subprocess(
+                    self.clean_up_env + self.launch + [
+                        '--socket', socket,
+                        '--',
+                        # execve() will fail with ENOTDIR, which is not an
+                        # error that we handle specially
+                        '/dev/null/ENOTDIR',
+                    ],
+                    stdin=subprocess.DEVNULL,
+                    stdout=2,
+                    stderr=2,
+                )
+                self.assertEqual(completed.returncode, 126)
+
                 logger.debug('Checking we can terminate the server')
                 completed = run_subprocess(
                     self.clean_up_env + self.launch + [

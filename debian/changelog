@@ -1,3 +1,11 @@
+steam-runtime-tools (0.20260616.0) UNRELEASED; urgency=medium
+
+  * s-r-launch-options:
+    - Implement the former pv-adverb --shell-instead, etc.
+      pv-adverb no longer implements these.
+
+ -- Simon McVittie <smcv@collabora.com>  Tue, 16 Jun 2026 20:50:40 +0100
+
 steam-runtime-tools (0.20260612.0) steamrt; urgency=medium
 
   * pressure-vessel:

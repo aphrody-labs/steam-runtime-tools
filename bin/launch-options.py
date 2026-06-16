@@ -2148,30 +2148,71 @@ class Gui:
         shell = self.shell_combo.get_active_id()
         terminal = self.terminal_combo.get_active_id()
 
-        # If we're not using a container runtime, we can try to borrow the
-        # pv-adverb from any random copy of pressure-vessel
-        # to get its "run in an xterm" code
+        # If we're not using a container runtime, then
+        # PRESSURE_VESSEL_SHELL=instead, etc. won't take effect,
+        # and we'll have to open-code the equivalent here.
         if (
-            (shell is not None or terminal is not None)
+            ((shell is not None and shell != 'none') or terminal == 'xterm')
             and not has_container_runtime
         ):
-            any_pv = self.default_pressure_vessel
+            wrapper = []        # type: typing.List[str]
 
-            if any_pv is None and self.pressure_vessels:
-                any_pv = next(iter(sorted(self.pressure_vessels.items())))[1]
+            if terminal not in ('none', 'tty'):
+                wrapper.extend(['/usr/bin/env', 'xterm', '-e'])
 
-            if any_pv is not None:
-                adverb = [any_pv.adverb]
+                if 'XCURSOR_PATH' in os.environ:
+                    # xterm unsets XCURSOR_PATH, put it back
+                    wrapper.extend([
+                        '/usr/bin/env',
+                        'XCURSOR_PATH=' + os.environ['XCURSOR_PATH'],
+                    ])
 
-                if shell is not None:
-                    adverb.append('--shell=' + shell)
+            preamble = (
+                'prgname="steam-runtime-launch-options"\n'
+            )
+            start_shell = (
+                'echo\n'
+                'echo\n'
+                'echo\n'
+                'echo "$prgname: Starting interactive shell"'
+                """ '(original command is in "$@")'\n"""
+                'echo\n'
+                'echo\n'
+                'echo\n'
+                'exec bash -i -s "$@"\n'
+            )
+            script = ''
 
-                if terminal is not None:
-                    adverb.append('--terminal=' + terminal)
+            if shell == 'none':
+                script = preamble + (
+                    'e=0\n'
+                    '"$@" || e=$?\n'
+                    'echo\n'
+                    'echo "$prgname: command exit status $e"\n'
+                    'echo "Press Enter or ^D to continue..."\n'
+                    'read reply || true\n'
+                    'exit "$e"\n'
+                )
+            elif shell == 'after':
+                script = preamble + (
+                    'e=0\n'
+                    '"$@" || e=$?\n'
+                    'echo "$prgname: command exit status $e"\n'
+                ) + start_shell
+            elif shell == 'fail':
+                script = preamble + (
+                    'if "$@"; then exit 0; else e="$?"; fi\n'
+                    'echo "$prgname: command exit status $e"\n'
+                ) + start_shell
+            elif shell == 'instead':
+                script = preamble + start_shell
 
-                adverb.append('--')
-                argv.extend(adverb)
-                lines.append(to_shell(adverb))
+            if script:
+                wrapper.extend(['/bin/sh', '-euc', script, 'sh'])
+
+            if wrapper:
+                argv.extend(wrapper)
+                lines.append(to_shell(wrapper))
 
         argv.extend(self.app.argv)
         lines.append(to_shell(self.app.argv))

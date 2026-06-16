@@ -194,10 +194,7 @@ test_resolve_in_sysroot (Fixture *f,
       { NULL, G_IO_ERROR_NOT_DIRECTORY }
     },
     {
-      /* glnx_chaseat() doesn't implement MKDIR_P, and unlike the other
-       * uses of MKDIR_P here, _srt_resolve_in_sysroot() won't create the
-       * directory in this case */
-      { "a/b/c/file", SRT_RESOLVE_FLAGS_MKDIR_P, RESOLVE_CALL_FLAGS_CANNOT_CHASE },
+      { "a/b/c/file", SRT_RESOLVE_FLAGS_MKDIR_P },
       { NULL, G_IO_ERROR_NOT_DIRECTORY }
     },
     {
@@ -308,46 +305,55 @@ test_resolve_in_sysroot (Fixture *f,
   const Config *config = context;
   g_autoptr(GError) error = NULL;
   g_auto(GLnxTmpDir) tmpdir = { FALSE };
+  g_auto(GLnxTmpDir) tmpdir_for_chase = { FALSE };
+  GLnxTmpDir *tmpdirs[] = { &tmpdir, &tmpdir_for_chase };
   gsize i;
 
-  glnx_mkdtemp ("test-XXXXXX", 0700, &tmpdir, &error);
-  g_assert_no_error (error);
-
-  for (i = 0; i < G_N_ELEMENTS (prepare_dirs); i++)
+  /* Make the two temporary directories identical, so that we can test
+   * SRT_RESOLVE_FLAGS_MKDIR_P in one and glnx_chase_and_mkdirat()
+   * in the other */
+  for (gsize j = 0; j < G_N_ELEMENTS (tmpdirs); j++)
     {
-      const char *it = prepare_dirs[i];
-
-      glnx_shutil_mkdir_p_at (tmpdir.fd, it, 0700, NULL, &error);
-      g_assert_no_error (error);
-    }
-
-  for (i = 0; i < G_N_ELEMENTS (prepare_files); i++)
-    {
-      const char *it = prepare_files[i];
-
-      glnx_file_replace_contents_at (tmpdir.fd, it,
-                                     (guint8 *) "hello", 5,
-                                     0, NULL, &error);
+      GLnxTmpDir *this_tmpdir = tmpdirs[j];
+      glnx_mkdtemp ("test-XXXXXX", 0700, this_tmpdir, &error);
       g_assert_no_error (error);
 
-      if (g_str_has_suffix (it, "/exe"))
-        g_assert_no_errno (fchmodat (tmpdir.fd, it, 0755, 0));
-      else
-        g_assert_no_errno (fchmodat (tmpdir.fd, it, 0644, 0));
-    }
+      for (i = 0; i < G_N_ELEMENTS (prepare_dirs); i++)
+        {
+          const char *it = prepare_dirs[i];
 
-  for (i = 0; i < G_N_ELEMENTS (prepare_symlinks); i++)
-    {
-      const Symlink *it = &prepare_symlinks[i];
-      g_autofree gchar *target = NULL;
+          glnx_shutil_mkdir_p_at (this_tmpdir->fd, it, 0700, NULL, &error);
+          g_assert_no_error (error);
+        }
 
-      if (it->target[0] == '/' && config->mode == MODE_DIRECT)
-        target = g_build_filename (tmpdir.path, it->target, NULL);
-      else
-        target = g_strdup (it->target);
+      for (i = 0; i < G_N_ELEMENTS (prepare_files); i++)
+        {
+          const char *it = prepare_files[i];
 
-      if (symlinkat (target, tmpdir.fd, it->name) != 0)
-        g_error ("symlinkat %s: %s", it->name, g_strerror (errno));
+          glnx_file_replace_contents_at (this_tmpdir->fd, it,
+                                         (guint8 *) "hello", 5,
+                                         0, NULL, &error);
+          g_assert_no_error (error);
+
+          if (g_str_has_suffix (it, "/exe"))
+            g_assert_no_errno (fchmodat (this_tmpdir->fd, it, 0755, 0));
+          else
+            g_assert_no_errno (fchmodat (this_tmpdir->fd, it, 0644, 0));
+        }
+
+      for (i = 0; i < G_N_ELEMENTS (prepare_symlinks); i++)
+        {
+          const Symlink *it = &prepare_symlinks[i];
+          g_autofree gchar *target = NULL;
+
+          if (it->target[0] == '/' && config->mode == MODE_DIRECT)
+            target = g_build_filename (this_tmpdir->path, it->target, NULL);
+          else
+            target = g_strdup (it->target);
+
+          if (symlinkat (target, this_tmpdir->fd, it->name) != 0)
+            g_error ("symlinkat %s: %s", it->name, g_strerror (errno));
+        }
     }
 
   for (i = 0; i < G_N_ELEMENTS (tests); i++)
@@ -357,28 +363,37 @@ test_resolve_in_sysroot (Fixture *f,
       glnx_autofd int chased_fd = -1;
       g_autofree gchar *path = NULL;
       g_autofree gchar *path_prefix = NULL;
+      g_autofree gchar *path_prefix_for_chase = NULL;
       g_autofree gchar *in_path = NULL;
+      g_autofree gchar *in_path_for_chase = NULL;
       gchar **out_path;
       g_autoptr(GError) chase_error = NULL;
       g_autoptr(GString) description = g_string_new ("");
       g_autoptr(SrtSysroot) sysroot = NULL;
+      g_autoptr(SrtSysroot) sysroot_for_chase = NULL;
       TestsOpenFdSet old_fds;
 
       path_prefix = realpath (tmpdir.path, NULL);
+      path_prefix_for_chase = realpath (tmpdir_for_chase.path, NULL);
 
       switch (config->mode)
         {
           case MODE_FDIO:
             sysroot = _srt_sysroot_new (path_prefix, &error);
             g_assert_no_error (error);
+            sysroot_for_chase = _srt_sysroot_new (path_prefix_for_chase, &error);
+            g_assert_no_error (error);
             in_path = g_strdup (it->call.path);
+            in_path_for_chase = g_strdup (it->call.path);
             g_string_append (description, " (fd I/O)");
             break;
 
           case MODE_DIRECT:
             sysroot = _srt_sysroot_new_direct (&error);
             g_assert_no_error (error);
+            sysroot_for_chase = g_object_ref (sysroot);
             in_path = g_build_filename (tmpdir.path, it->call.path, NULL);
+            in_path_for_chase = g_build_filename (tmpdir_for_chase.path, it->call.path, NULL);
             g_string_append (description, " (direct I/O)");
 
             if ((it->call.test_flags & RESOLVE_CALL_FLAGS_SKIP_IF_DIRECT)
@@ -451,10 +466,6 @@ test_resolve_in_sysroot (Fixture *f,
         {
           GlnxChaseFlags chase_flags = GLNX_CHASE_RESOLVE_IN_ROOT;
 
-          /* Ignore SRT_RESOLVE_FLAGS_MKDIR_P: there is no direct equivalent,
-           * but we call _srt_resolve_in_sysroot first, so the directory
-           * would already have been created */
-
           if (it->call.flags & SRT_RESOLVE_FLAGS_KEEP_FINAL_SYMLINK)
             chase_flags |= GLNX_CHASE_NOFOLLOW;
 
@@ -464,7 +475,11 @@ test_resolve_in_sysroot (Fixture *f,
           /* Ignore SRT_RESOLVE_FLAGS_READABLE: there is no direct equivalent,
            * but we'll use glnx_fd_reopen() later */
 
-          if (it->call.flags & SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY)
+          /* SRT_RESOLVE_FLAGS_MKDIR_P automatically implies
+           * MUST_BE_DIRECTORY, but glnx_chase_and_mkdirat() doesn't
+           * accept that flag and always behaves as though it was present */
+          if ((it->call.flags & SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY)
+              && !(it->call.flags & SRT_RESOLVE_FLAGS_MKDIR_P))
             chase_flags |= GLNX_CHASE_MUST_BE_DIRECTORY;
 
           if (it->call.flags & SRT_RESOLVE_FLAGS_MUST_BE_REGULAR)
@@ -476,8 +491,17 @@ test_resolve_in_sysroot (Fixture *f,
           /* Ignore SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE: no direct equivalent,
            * but we'll use fstat() later */
 
-          chased_fd = glnx_chaseat (sysroot->fd, in_path, chase_flags,
-                                    &chase_error);
+          if (it->call.flags & SRT_RESOLVE_FLAGS_MKDIR_P)
+            chased_fd = glnx_chase_and_mkdirat (sysroot_for_chase->fd,
+                                                in_path_for_chase,
+                                                chase_flags,
+                                                0755,
+                                                &chase_error);
+          else
+            chased_fd = glnx_chaseat (sysroot_for_chase->fd,
+                                      in_path_for_chase,
+                                      chase_flags,
+                                      &chase_error);
 
           if (chased_fd >= 0)
             g_test_message ("-> resolved successfully via glnx_chaseat()");
@@ -583,7 +607,7 @@ test_resolve_in_sysroot (Fixture *f,
             {
               g_assert_no_error (chase_error);
               g_assert_cmpint (chased_fd, >=, 0);
-              check_fd_same_as_rel_path_nofollow (chased_fd, tmpdir.fd, rel_path);
+              check_fd_same_as_rel_path_nofollow (chased_fd, tmpdir_for_chase.fd, rel_path);
             }
         }
       else
@@ -623,6 +647,7 @@ test_resolve_in_sysroot (Fixture *f,
       g_clear_fd (&chased_fd, &error);
       g_assert_no_error (error);
       g_clear_object (&sysroot);
+      g_clear_object (&sysroot_for_chase);
       tests_check_fd_leaks_leave (old_fds);
     }
 }

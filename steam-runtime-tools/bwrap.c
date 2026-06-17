@@ -85,7 +85,7 @@ test_bwrap_executable (SrtSubprocessRunner *runner,
                        SrtBwrapFlags *features_out,
                        GError **error)
 {
-  g_autoptr(GPtrArray) argv = g_ptr_array_sized_new (10);
+  g_autoptr(GPtrArray) argv = g_ptr_array_sized_new (11);
   g_autoptr(SrtCompletedSubprocess) completed = NULL;
   g_autoptr(GError) local_error = NULL;
 

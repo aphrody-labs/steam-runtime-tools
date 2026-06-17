@@ -85,11 +85,14 @@ test_bwrap_executable (SrtSubprocessRunner *runner,
                        SrtBwrapFlags *features_out,
                        GError **error)
 {
-  g_autoptr(GPtrArray) argv = g_ptr_array_new_full (41, g_free);
+  g_autoptr(GPtrArray) argv = g_ptr_array_new_full (42, g_free);
   g_autoptr(SrtCompletedSubprocess) completed = NULL;
   g_autoptr(GError) local_error = NULL;
 
   g_ptr_array_add (argv, g_strdup (bwrap_executable));
+
+  if (test_features & SRT_BWRAP_FLAGS_HAS_NOT_A_SECURITY_BOUNDARY)
+    g_ptr_array_add (argv, g_strdup ("--not-a-security-boundary"));
 
   if (test_features & SRT_BWRAP_FLAGS_HAS_LEVEL_PREFIX)
     g_ptr_array_add (argv, g_strdup ("--level-prefix"));

@@ -85,7 +85,7 @@ test_bwrap_executable (SrtSubprocessRunner *runner,
                        SrtBwrapFlags *features_out,
                        GError **error)
 {
-  g_autoptr(GPtrArray) argv = g_ptr_array_new_full (11, g_free);
+  g_autoptr(GPtrArray) argv = g_ptr_array_new_full (41, g_free);
   g_autoptr(SrtCompletedSubprocess) completed = NULL;
   g_autoptr(GError) local_error = NULL;
 
@@ -102,9 +102,63 @@ test_bwrap_executable (SrtSubprocessRunner *runner,
       g_ptr_array_add (argv, g_strdup ("/"));
     }
 
+  /* bind only the paths which might be necessary to run `true` */
+  g_ptr_array_add (argv, g_strdup ("--ro-bind"));
+  g_ptr_array_add (argv, g_strdup ("/etc"));
+  g_ptr_array_add (argv, g_strdup ("/etc"));
+
+  /* properly handle the case of a merged-/usr system */
+  static const char * const usrlike_paths[] = {
+    "/bin",
+    "/lib",
+    "/lib32",
+    "/lib64",
+    "/sbin"
+  };
+
+  for (size_t i = 0; i < G_N_ELEMENTS (usrlike_paths); i++)
+    {
+      /* Note that even if @runner is somehow configured to run a bwrap
+       * executable from a sysroot, we'll be passing the real "/lib", etc.
+       * from the current execution environment as its arguments,
+       * so it is correct to be inspecting the real "/lib",
+       * rather than the "lib" relative to runner->sysroot->fd. */
+      g_autofree char *target =
+        glnx_readlinkat_malloc (AT_FDCWD, usrlike_paths[i], NULL, NULL);
+
+      if (target != NULL)
+        {
+          g_ptr_array_add (argv, g_strdup ("--symlink"));
+          g_ptr_array_add (argv, g_steal_pointer (&target));
+          g_ptr_array_add (argv, g_strdup (usrlike_paths[i]));
+        }
+      else
+        {
+          g_ptr_array_add (argv, g_strdup("--ro-bind-try"));
+          g_ptr_array_add (argv, g_strdup (usrlike_paths[i]));
+          g_ptr_array_add (argv, g_strdup (usrlike_paths[i]));
+        }
+    }
+
+  g_ptr_array_add (argv, g_strdup ("--ro-bind"));
+  g_ptr_array_add (argv, g_strdup ("/usr"));
+  g_ptr_array_add (argv, g_strdup ("/usr"));
+
+  g_ptr_array_add (argv, g_strdup ("--ro-bind-try"));
+  g_ptr_array_add (argv, g_strdup ("/gnu/store"));
+  g_ptr_array_add (argv, g_strdup ("/gnu/store"));
+
+  g_ptr_array_add (argv, g_strdup ("--ro-bind-try"));
+  g_ptr_array_add (argv, g_strdup ("/nix/store"));
+  g_ptr_array_add (argv, g_strdup ("/nix/store"));
+
   g_ptr_array_add (argv, g_strdup ("--bind"));
-  g_ptr_array_add (argv, g_strdup ("/"));
-  g_ptr_array_add (argv, g_strdup ("/"));
+  g_ptr_array_add (argv, g_strdup ("/proc"));
+  g_ptr_array_add (argv, g_strdup ("/proc"));
+
+  g_ptr_array_add (argv, g_strdup ("--dev-bind"));
+  g_ptr_array_add (argv, g_strdup ("/dev"));
+  g_ptr_array_add (argv, g_strdup ("/dev"));
 
   g_ptr_array_add (argv, g_strdup ("true"));
   g_ptr_array_add (argv, NULL);

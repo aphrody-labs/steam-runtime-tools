@@ -174,18 +174,15 @@ test_resolve_in_sysroot (Fixture *f,
     { { "a/b/c/file", SRT_RESOLVE_FLAGS_READABLE }, { "a/b/c/file" } },
     { { "a/b/c/file/" }, { NULL, G_IO_ERROR_NOT_DIRECTORY }},
     {
-      /* glnx_chaseat() doesn't implement MUST_BE_EXECUTABLE */
-      { "a/b/c/file", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE, RESOLVE_CALL_FLAGS_CANNOT_CHASE },
+      { "a/b/c/file", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE },
       { NULL, G_IO_ERROR_FAILED }
     },
     {
-      /* glnx_chaseat() doesn't implement MUST_BE_EXECUTABLE */
-      { "a/b/c/exe", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE, RESOLVE_CALL_FLAGS_CANNOT_CHASE },
+      { "a/b/c/exe", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE },
       { "a/b/c/exe" }
     },
     {
-      /* glnx_chaseat() doesn't implement MUST_BE_EXECUTABLE */
-      { "a/b/c/d", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE, RESOLVE_CALL_FLAGS_CANNOT_CHASE },
+      { "a/b/c/d", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE },
       { "a/b/c/d" }
     },
     {
@@ -476,9 +473,8 @@ test_resolve_in_sysroot (Fixture *f,
           /* Ignore SRT_RESOLVE_FLAGS_RETURN_ABSOLUTE: no direct equivalent,
            * glnx_chaseat() doesn't output the resolved path at all */
 
-          /* No direct equivalent, use fstat() */
-          if (it->call.flags & SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE)
-            g_assert_not_reached ();
+          /* Ignore SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE: no direct equivalent,
+           * but we'll use fstat() later */
 
           chased_fd = glnx_chaseat (sysroot->fd, in_path, chase_flags,
                                     &chase_error);
@@ -490,6 +486,24 @@ test_resolve_in_sysroot (Fixture *f,
                             g_quark_to_string (chase_error->domain),
                             chase_error->code,
                             chase_error->message);
+
+          if (chased_fd >= 0
+              && (it->call.flags & SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE))
+            {
+              /* glnx_chaseat() doesn't implement MUST_BE_EXECUTABLE,
+               * so emulate it here for now.
+               * faccessat() only supports AT_EMPTY_PATH since Linux 5.8,
+               * and we still support older kernels, so we have to use
+               * this instead. */
+              g_autofree gchar *proc_fd_name = g_strdup_printf ("/proc/self/fd/%d",
+                                                                chased_fd);
+
+              if (access (proc_fd_name, X_OK) != 0)
+                {
+                  glnx_throw_errno_prefix (&chase_error, "access");
+                  g_clear_fd (&chased_fd, NULL);
+                }
+            }
 
           if (chased_fd >= 0
               && (it->call.flags & SRT_RESOLVE_FLAGS_READABLE))

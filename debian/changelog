@@ -14,7 +14,7 @@ steam-runtime-tools (0.20260618.0) UNRELEASED; urgency=medium
     - Fix a debug message
     - Improve coverage
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 18 Jun 2026 13:00:14 +0100
+ -- Simon McVittie <smcv@collabora.com>  Thu, 18 Jun 2026 13:35:57 +0100
 
 steam-runtime-tools (0.20260612.0) steamrt; urgency=medium
 

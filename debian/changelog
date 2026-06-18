@@ -1,13 +1,20 @@
-steam-runtime-tools (0.20260617.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260618.0) UNRELEASED; urgency=medium
 
   * s-r-launch-options:
     - Implement the equivalent of the former pv-adverb --shell=instead,
       etc., fixing a regression when launching games in the legacy runtime
       and requesting an interactive shell
   * Library code:
-    - Update libglnx subproject to 2026-06-11
+    - Update libglnx subproject to 2026-06-17
+  * Documentation updates
+    - Replace deprecated download URLs
+  * Tests/CI:
+    - Work around transient installability issues in Debian testing
+    - Modernize apt URLs
+    - Fix a debug message
+    - Improve coverage
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 17 Jun 2026 12:27:14 +0100
+ -- Simon McVittie <smcv@collabora.com>  Thu, 18 Jun 2026 13:00:14 +0100
 
 steam-runtime-tools (0.20260612.0) steamrt; urgency=medium
 

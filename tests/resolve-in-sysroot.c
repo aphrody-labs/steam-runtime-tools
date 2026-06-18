@@ -486,7 +486,7 @@ test_resolve_in_sysroot (Fixture *f,
           chased_fd = glnx_chaseat (sysroot->fd, in_path, chase_flags,
                                     &chase_error);
 
-          if (fd >= 0)
+          if (chased_fd >= 0)
             g_test_message ("-> resolved successfully via glnx_chaseat()");
           else
             g_test_message ("-> could not resolve: %s #%d: %s (via glnx_chaseat())",

@@ -498,8 +498,8 @@ _srt_resolve_in_sysroot (int sysroot,
 
   if (flags & SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE)
     {
-      /* faccessat doesn't support AT_EMPTY_PATH, so we have to use this
-       * instead. */
+      /* faccessat didn't support AT_EMPTY_PATH until Linux 5.8 and we
+       * still support older kernels, so do this instead. */
       g_assert (proc_fd_name != NULL);
 
       if (access (proc_fd_name, X_OK) != 0)

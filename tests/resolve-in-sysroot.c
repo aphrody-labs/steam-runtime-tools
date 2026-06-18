@@ -174,18 +174,15 @@ test_resolve_in_sysroot (Fixture *f,
     { { "a/b/c/file", SRT_RESOLVE_FLAGS_READABLE }, { "a/b/c/file" } },
     { { "a/b/c/file/" }, { NULL, G_IO_ERROR_NOT_DIRECTORY }},
     {
-      /* glnx_chaseat() doesn't implement MUST_BE_EXECUTABLE */
-      { "a/b/c/file", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE, RESOLVE_CALL_FLAGS_CANNOT_CHASE },
+      { "a/b/c/file", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE },
       { NULL, G_IO_ERROR_FAILED }
     },
     {
-      /* glnx_chaseat() doesn't implement MUST_BE_EXECUTABLE */
-      { "a/b/c/exe", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE, RESOLVE_CALL_FLAGS_CANNOT_CHASE },
+      { "a/b/c/exe", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE },
       { "a/b/c/exe" }
     },
     {
-      /* glnx_chaseat() doesn't implement MUST_BE_EXECUTABLE */
-      { "a/b/c/d", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE, RESOLVE_CALL_FLAGS_CANNOT_CHASE },
+      { "a/b/c/d", SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE },
       { "a/b/c/d" }
     },
     {
@@ -253,9 +250,6 @@ test_resolve_in_sysroot (Fixture *f,
       {
         "a/b/symlink_to_itself",
         SRT_RESOLVE_FLAGS_KEEP_FINAL_SYMLINK|SRT_RESOLVE_FLAGS_READABLE,
-        /* glnx_chaseat() doesn't implement READABLE,
-         * but glnx_fd_reopen() would fail with TOO_MANY_LINKS */
-        RESOLVE_CALL_FLAGS_CANNOT_CHASE,
       },
       { NULL, G_IO_ERROR_TOO_MANY_LINKS },
     },
@@ -468,7 +462,7 @@ test_resolve_in_sysroot (Fixture *f,
             chase_flags |= GLNX_CHASE_RESOLVE_NO_SYMLINKS;
 
           /* Ignore SRT_RESOLVE_FLAGS_READABLE: there is no direct equivalent,
-           * but we can use glnx_fd_reopen() */
+           * but we'll use glnx_fd_reopen() later */
 
           if (it->call.flags & SRT_RESOLVE_FLAGS_MUST_BE_DIRECTORY)
             chase_flags |= GLNX_CHASE_MUST_BE_DIRECTORY;
@@ -479,9 +473,8 @@ test_resolve_in_sysroot (Fixture *f,
           /* Ignore SRT_RESOLVE_FLAGS_RETURN_ABSOLUTE: no direct equivalent,
            * glnx_chaseat() doesn't output the resolved path at all */
 
-          /* No direct equivalent, use fstat() */
-          if (it->call.flags & SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE)
-            g_assert_not_reached ();
+          /* Ignore SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE: no direct equivalent,
+           * but we'll use fstat() later */
 
           chased_fd = glnx_chaseat (sysroot->fd, in_path, chase_flags,
                                     &chase_error);
@@ -494,6 +487,38 @@ test_resolve_in_sysroot (Fixture *f,
                             chase_error->code,
                             chase_error->message);
 
+          if (chased_fd >= 0
+              && (it->call.flags & SRT_RESOLVE_FLAGS_MUST_BE_EXECUTABLE))
+            {
+              /* glnx_chaseat() doesn't implement MUST_BE_EXECUTABLE,
+               * so emulate it here for now.
+               * faccessat() only supports AT_EMPTY_PATH since Linux 5.8,
+               * and we still support older kernels, so we have to use
+               * this instead. */
+              g_autofree gchar *proc_fd_name = g_strdup_printf ("/proc/self/fd/%d",
+                                                                chased_fd);
+
+              if (access (proc_fd_name, X_OK) != 0)
+                {
+                  glnx_throw_errno_prefix (&chase_error, "access");
+                  g_clear_fd (&chased_fd, NULL);
+                }
+            }
+
+          if (chased_fd >= 0
+              && (it->call.flags & SRT_RESOLVE_FLAGS_READABLE))
+            {
+              /* When using glnx_chaseat(), there's no direct equivalent
+               * of the READABLE flag: it's a separate operation. */
+              g_autoptr(GError) local_error = NULL;
+              glnx_autofd int reopened_fd = -1;
+
+              reopened_fd = glnx_fd_reopen (chased_fd, O_RDONLY, &chase_error);
+
+              g_clear_fd (&chased_fd, &local_error);
+              g_assert_no_error (local_error);
+              chased_fd = g_steal_fd (&reopened_fd);
+            }
         }
 
       if (it->expect.path != NULL)

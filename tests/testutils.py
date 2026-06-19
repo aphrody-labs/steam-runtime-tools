@@ -93,7 +93,7 @@ class BaseTest(unittest.TestCase):
     G_TEST_SRCDIR = ''
     artifacts_persist = False
     artifacts = ''
-    tmpdir = None       # type: tempfile.TemporaryDirectory
+    tmpdir = None       # type: typing.Optional[tempfile.TemporaryDirectory]
     top_builddir = ''
     top_srcdir = ''
     deb_arch = ''
@@ -458,6 +458,7 @@ class BaseTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
+        assert cls.tmpdir is not None    # initialized in setUpClass
         cls.tmpdir.cleanup()
 
 

@@ -1,3 +1,13 @@
+steam-runtime-tools (0.20260622.0) UNRELEASED; urgency=medium
+
+  [ Antonio Ospite ]
+  * Packaging:
+    - Use correct SPDX name for LGPL-2.0-or-later
+  * Tests/CI:
+    * Fix lint issues
+
+ -- Simon McVittie <smcv@collabora.com>  Mon, 22 Jun 2026 12:52:10 +0100
+
 steam-runtime-tools (0.20260618.0) steamrt; urgency=medium
 
   * s-r-launch-options:

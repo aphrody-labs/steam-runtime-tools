@@ -1,6 +1,10 @@
 steam-runtime-tools (0.20260622.0) UNRELEASED; urgency=medium
 
   [ Antonio Ospite ]
+  * pressure-vessel:
+    - Update srt-bwrap to bubblewrap commit v0.11.2-11-g2f55bae
+      (2026-06-02) for the new --not-a-security-boundary option
+      (steamrt/tasks#535)
   * Packaging:
     - Use correct SPDX name for LGPL-2.0-or-later
   * Tests/CI:

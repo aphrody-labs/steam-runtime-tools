@@ -40,10 +40,17 @@ therefore we can use:
 * `sources.list.d/*.list` one-line format
     * YES: all branches
 
-* `sources.list.d/*.list` `Signed-By` filename (apt ≥ 1.1)
+* `sources.list.d/*.list` `signed-by` a single filename (apt ≥ 1.1)
     * NO: scout
     * YES: soldier and up
     * YES: all supportable Ubuntu releases
+
+* `sources.list.d/*.list` `signed-by` more than one filename (apt ≥ 1.8)
+    * NO: scout
+    * YES: soldier and up
+    * NO: Ubuntu 18.04 or older
+    * YES: Debian 10 and up
+    * YES: Ubuntu 20.04 and up
 
 * `sources.list.d/*.sources` deb822 format (apt ≥ 1.1)
     * NO: scout

@@ -221,6 +221,9 @@ how new a Python version we can require.)
 
 Therefore we can use:
 
+* `f(x, *, keyword_only_parameters)` (3.0):
+    * YES: all
+
 * f-strings (3.6):
     * NO: scout
     * NO: Ubuntu 16.04
@@ -253,6 +256,14 @@ Therefore we can use:
     * YES: soldier and up
     * YES: any supportable Debian release
     * YES: Ubuntu 18.04 and up
+
+* `f(positional_only_parameters, /, y)` (3.8):
+    * NO: scout
+    * NO: soldier
+    * YES: Ubuntu 20.04
+    * YES: sniper and up
+    * YES: any supportable Debian release
+    * YES: Ubuntu 22.04 and up
 
 * `list[str]`, etc. (PEP 585) (3.9):
     * NO: scout

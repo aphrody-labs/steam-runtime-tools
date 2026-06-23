@@ -261,3 +261,12 @@ Therefore we can use:
     * YES: sniper and up
     * YES: any supportable Debian release
     * YES: Ubuntu 22.04 and up
+
+* `str | None`, etc. (PEP 604) (3.10):
+    * NO: scout
+    * NO: soldier
+    * NO: Ubuntu 20.04
+    * NO: sniper/steamrt3c
+    * YES: steamrt4 and up
+    * YES: any supportable Debian release
+    * YES: Ubuntu 22.04 and up

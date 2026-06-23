@@ -85,28 +85,28 @@ test_bwrap_executable (SrtSubprocessRunner *runner,
                        SrtBwrapFlags *features_out,
                        GError **error)
 {
-  g_autoptr(GPtrArray) argv = g_ptr_array_sized_new (11);
+  g_autoptr(GPtrArray) argv = g_ptr_array_new_full (11, g_free);
   g_autoptr(SrtCompletedSubprocess) completed = NULL;
   g_autoptr(GError) local_error = NULL;
 
-  g_ptr_array_add (argv, (char *) bwrap_executable);
+  g_ptr_array_add (argv, g_strdup (bwrap_executable));
 
   if (test_features & SRT_BWRAP_FLAGS_HAS_LEVEL_PREFIX)
-    g_ptr_array_add (argv, (char *) "--level-prefix");
+    g_ptr_array_add (argv, g_strdup ("--level-prefix"));
 
   if (test_features & SRT_BWRAP_FLAGS_HAS_PERMS)
     {
-      g_ptr_array_add (argv, (char *) "--perms");
-      g_ptr_array_add (argv, (char *) "0700");
-      g_ptr_array_add (argv, (char *) "--dir");
-      g_ptr_array_add (argv, (char *) "/");
+      g_ptr_array_add (argv, g_strdup ("--perms"));
+      g_ptr_array_add (argv, g_strdup ("0700"));
+      g_ptr_array_add (argv, g_strdup ("--dir"));
+      g_ptr_array_add (argv, g_strdup ("/"));
     }
 
-  g_ptr_array_add (argv, (char *) "--bind");
-  g_ptr_array_add (argv, (char *) "/");
-  g_ptr_array_add (argv, (char *) "/");
+  g_ptr_array_add (argv, g_strdup ("--bind"));
+  g_ptr_array_add (argv, g_strdup ("/"));
+  g_ptr_array_add (argv, g_strdup ("/"));
 
-  g_ptr_array_add (argv, (char *) "true");
+  g_ptr_array_add (argv, g_strdup ("true"));
   g_ptr_array_add (argv, NULL);
 
   /* @bwrap_executable is assumed to be a native binary

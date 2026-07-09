@@ -509,6 +509,34 @@ _srt_env_overlay_env_fd_cli (SrtEnvOverlay *self,
 }
 
 /*
+ * _srt_env_overlay_debug_log:
+ * @self: Variables to set and unset
+ *
+ * Log debug messages for all the variables in @self.
+ */
+void
+_srt_env_overlay_debug_log (const SrtEnvOverlay *self)
+{
+  g_autoptr(GList) vars = NULL;
+  const GList *iter;
+
+  g_return_if_fail (self != NULL);
+
+  vars = _srt_env_overlay_get_vars (self);
+
+  for (iter = vars; iter != NULL; iter = iter->next)
+    {
+      const char *var = iter->data;
+      const char *value = g_hash_table_lookup (self->values, var);
+
+      if (value != NULL)
+        g_debug ("Set environment: %s=%s", var, value);
+      else
+        g_debug ("Unset environment: %s", var);
+    }
+}
+
+/*
  * _srt_env_overlay_apply:
  * @self: Variables to set and unset
  * @envp: (transfer full): An environment block

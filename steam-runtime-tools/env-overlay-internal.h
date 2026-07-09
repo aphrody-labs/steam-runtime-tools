@@ -90,6 +90,7 @@ gboolean _srt_env_overlay_contains (const SrtEnvOverlay *self,
 const char *_srt_env_overlay_get (const SrtEnvOverlay *self,
                                   const char *var);
 
+void _srt_env_overlay_debug_log (const SrtEnvOverlay *self);
 GStrv _srt_env_overlay_apply (const SrtEnvOverlay *self,
                               GStrv envp);
 GBytes *_srt_env_overlay_to_env0 (const SrtEnvOverlay *self);

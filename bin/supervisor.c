@@ -432,7 +432,14 @@ main (int argc,
     goto out;
 
   if (opt_clear_env)
-    g_clear_pointer (&envp, g_strfreev);
+    {
+      g_debug ("Clearing environment variables");
+      g_clear_pointer (&envp, g_strfreev);
+    }
+
+
+  if (_srt_util_is_debugging ())
+    _srt_env_overlay_debug_log (env_overlay);
 
   envp = _srt_env_overlay_apply (env_overlay, envp);
   g_clear_pointer (&env_overlay, _srt_env_overlay_unref);

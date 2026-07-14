@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260707.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260714.0) UNRELEASED; urgency=medium
 
   [ Antonio Ospite ]
   * pressure-vessel:
@@ -20,9 +20,13 @@ steam-runtime-tools (0.20260707.0) UNRELEASED; urgency=medium
     * Fix lint issues
 
   [ Simon McVittie ]
+  * s-r-supervisor:
+    - When running with debug logging, report any changes
+      that we make to environment variables
+      (steamrt/tasks#1078)
   * Documentation updates
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 14 Jul 2026 13:48:42 +0100
+ -- Simon McVittie <smcv@collabora.com>  Tue, 14 Jul 2026 14:11:02 +0100
 
 steam-runtime-tools (0.20260618.0) steamrt; urgency=medium
 

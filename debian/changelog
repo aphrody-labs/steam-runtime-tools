@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260714.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260714.0) steamrt; urgency=medium
 
   [ Antonio Ospite ]
   * pressure-vessel:
@@ -26,7 +26,7 @@ steam-runtime-tools (0.20260714.0) UNRELEASED; urgency=medium
       (steamrt/tasks#1078)
   * Documentation updates
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 14 Jul 2026 14:11:02 +0100
+ -- Simon McVittie <smcv@collabora.com>  Tue, 14 Jul 2026 15:43:30 +0100
 
 steam-runtime-tools (0.20260618.0) steamrt; urgency=medium
 

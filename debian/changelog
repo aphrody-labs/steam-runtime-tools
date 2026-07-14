@@ -2,9 +2,18 @@ steam-runtime-tools (0.20260707.0) UNRELEASED; urgency=medium
 
   [ Antonio Ospite ]
   * pressure-vessel:
+    - Improve robustness of pressure-vessel if the root directory contains
+      automount points for unreachable networked filesystems or detached
+      external drives. It will still be very slow to start Steam or games,
+      but they will start eventually in some situations where they would
+      previously have failed.
+      The PRESSURE_VESSEL_WORKAROUNDS=limit-shared-dirs workaround option
+      (see 0.20260513.0 release notes) can still be used to work around
+      this if necessary.
+      (steamrt/tasks#535, bubblewrap#653, bubblewrap#650, bubblewrap#541,
+      steam-runtime#766, steam-for-linux#10571)
     - Update srt-bwrap to bubblewrap commit v0.11.2-11-g2f55bae
-      (2026-06-02) for the new --not-a-security-boundary option
-      (steamrt/tasks#535)
+      (2026-06-02) as part of the above
   * Packaging:
     - Use correct SPDX name for LGPL-2.0-or-later
   * Tests/CI:
@@ -13,7 +22,7 @@ steam-runtime-tools (0.20260707.0) UNRELEASED; urgency=medium
   [ Simon McVittie ]
   * Documentation updates
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 07 Jul 2026 13:52:12 +0100
+ -- Simon McVittie <smcv@collabora.com>  Tue, 14 Jul 2026 13:48:42 +0100
 
 steam-runtime-tools (0.20260618.0) steamrt; urgency=medium
 

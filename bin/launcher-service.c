@@ -48,9 +48,6 @@
 #include "steam-runtime-tools/utils-internal.h"
 #include "libglnx.h"
 
-/* Absence of GConnectFlags; slightly more readable than a magic number */
-#define CONNECT_FLAGS_NONE (0)
-
 /*
  * Purpose:
  * @PURPOSE_UNSPECIFIED: the default
@@ -1033,13 +1030,13 @@ pv_launcher_server_export (PvLauncherServer *self,
 
       g_signal_connect_object (self->launcher, "handle-launch",
                                G_CALLBACK (handle_launch), self,
-                               CONNECT_FLAGS_NONE);
+                               G_CONNECT_DEFAULT);
       g_signal_connect_object (self->launcher, "handle-send-signal",
                                G_CALLBACK (handle_send_signal), self,
-                               CONNECT_FLAGS_NONE);
+                               G_CONNECT_DEFAULT);
       g_signal_connect_object (self->launcher, "handle-terminate",
                                G_CALLBACK (handle_terminate), self,
-                               CONNECT_FLAGS_NONE);
+                               G_CONNECT_DEFAULT);
     }
 
   if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (self->launcher),
@@ -1167,7 +1164,7 @@ new_connection_cb (SrtPortalListener *listener,
   g_object_ref (connection);
   g_signal_connect_object (connection, "closed",
                            G_CALLBACK (peer_connection_closed_cb), server,
-                           CONNECT_FLAGS_NONE);
+                           G_CONNECT_DEFAULT);
 
   if (!pv_launcher_server_export (server, connection, &error))
     {
@@ -1787,16 +1784,16 @@ main (int argc,
 
   g_signal_connect_object (server->listener,
                            "new-peer-connection", G_CALLBACK (new_connection_cb),
-                           server, CONNECT_FLAGS_NONE);
+                           server, G_CONNECT_DEFAULT);
   g_signal_connect_object (server->listener,
                            "session-bus-connected", G_CALLBACK (on_bus_acquired),
-                           server, CONNECT_FLAGS_NONE);
+                           server, G_CONNECT_DEFAULT);
   g_signal_connect_object (server->listener,
                            "session-bus-name-lost", G_CALLBACK (on_name_lost),
-                           server, CONNECT_FLAGS_NONE);
+                           server, G_CONNECT_DEFAULT);
   g_signal_connect_object (server->listener,
                            "ready", G_CALLBACK (portal_listener_ready_cb),
-                           server, CONNECT_FLAGS_NONE);
+                           server, G_CONNECT_DEFAULT);
 
   flags = G_BUS_NAME_OWNER_FLAGS_ALLOW_REPLACEMENT;
 

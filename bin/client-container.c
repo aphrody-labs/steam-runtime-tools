@@ -190,6 +190,231 @@ container_manager_start (ContainerManager *self,
   return TRUE;
 }
 
+typedef struct
+{
+  gchar *exe;
+  gchar *bus_name;
+  const char * const *envp;
+  GPid pid;
+  guint child_watch;
+  guint respawn_timeout;
+  gboolean respawn;
+  gboolean started_once;
+} LauncherServiceManager;
+
+#define LAUNCHER_SERVICE_MANAGER_EMPTY {\
+  .respawn = TRUE, \
+}
+
+static void
+launcher_service_manager_clear (LauncherServiceManager *self)
+{
+  g_clear_pointer (&self->exe, g_free);
+  g_clear_pointer (&self->bus_name, g_free);
+  g_clear_handle_id (&self->child_watch, g_source_remove);
+  g_clear_handle_id (&self->respawn_timeout, g_source_remove);
+
+  if (self->pid > 0)
+    {
+      /* We kill the s-r-l-s instance but don't wait for it */
+      kill (self->pid, SIGTERM);
+      self->pid = 0;
+    }
+}
+
+G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (LauncherServiceManager,
+                                  launcher_service_manager_clear)
+
+static gboolean
+launcher_service_manager_init (LauncherServiceManager *self,
+                               GError **error)
+{
+  const char *prefix = NULL;
+  const char *pkglibexecdir = NULL;
+  const char *env;
+
+  g_return_val_if_fail (self->exe == NULL, FALSE);
+  g_return_val_if_fail (self->bus_name == NULL, FALSE);
+  g_return_val_if_fail (self->pid == 0, FALSE);
+  g_return_val_if_fail (!self->started_once, FALSE);
+
+  prefix = _srt_find_myself (NULL, &pkglibexecdir, error);
+
+  if (prefix == NULL)
+    return FALSE;
+
+  /* Check for environment variable override */
+  env = g_getenv ("SRT_LAUNCHER_SERVICE");
+
+  if (env != NULL)
+    {
+      self->exe = g_strdup (env);
+    }
+  else
+    {
+#ifdef _SRT_MULTIARCH
+      self->exe = g_strdup_printf ("%s/%s-srt-launcher-service",
+                                   pkglibexecdir, _SRT_MULTIARCH);
+#else
+      self->exe = g_strdup_printf ("%s/bin/steam-runtime-launcher-service",
+                                   prefix);
+#endif
+    }
+
+  self->bus_name = g_strdup_printf ("%s.Instance%u",
+                                    LAUNCHER_NAME_ALONGSIDE_STEAM,
+                                    (unsigned int) getpid ());
+  return TRUE;
+}
+
+static gboolean launcher_service_manager_start (LauncherServiceManager *self,
+                                                GError **error);
+
+static gboolean
+launcher_service_respawn_cb (void *user_data)
+{
+  LauncherServiceManager *self = user_data;
+  g_autoptr(GError) local_error = NULL;
+
+  g_info ("Restarting subprocess launcher...");
+
+  if (!launcher_service_manager_start (self, &local_error))
+    {
+      g_warning ("Unable to restart subprocess launcher: %s",
+                 local_error->message);
+      self->respawn = FALSE;
+    }
+
+  self->respawn_timeout = 0;
+  return G_SOURCE_REMOVE;
+}
+
+static void
+launcher_service_died_cb (GPid pid,
+                          int wait_status,
+                          void *user_data)
+{
+  LauncherServiceManager *self = user_data;
+
+  g_return_if_fail (pid == self->pid);
+  self->pid = 0;
+  self->child_watch = 0;
+
+  g_info ("Subprocess launcher service process %u exited, wait status %d",
+          (unsigned int) pid, wait_status);
+
+  if (self->respawn && self->respawn_timeout == 0)
+    self->respawn_timeout = g_timeout_add_seconds (1,
+                                                   launcher_service_respawn_cb,
+                                                   self);
+}
+
+static void
+launcher_service_manager_child_setup_cb (void *user_data)
+{
+  if (!_srt_raise_on_parent_death (SIGTERM, NULL))
+    _srt_async_signal_safe_error (this_program_name,
+                                  "Failed to set up parent-death signal",
+                                  LAUNCH_EX_FAILED);
+
+  g_fdwalk_set_cloexec (3);
+  _srt_child_setup_unblock_signals (NULL);
+}
+
+static gboolean
+launcher_service_manager_start (LauncherServiceManager *self,
+                                GError **error)
+{
+  g_autoptr(GPtrArray) argv = NULL;
+  g_autoptr(GString) buf = NULL;
+  glnx_autofd int stdout_fd = -1;
+
+  g_return_val_if_fail (self->exe != NULL, FALSE);
+  g_return_val_if_fail (self->bus_name != NULL, FALSE);
+  g_return_val_if_fail (self->pid == 0, FALSE);
+  g_return_val_if_fail (self->child_watch == 0, FALSE);
+
+  argv = g_ptr_array_new_full (3, g_free);
+  g_ptr_array_add (argv, g_strdup (self->exe));
+  g_ptr_array_add (argv, g_strdup ("--alongside-steam"));
+  g_ptr_array_add (argv, g_strdup_printf ("--bus-name=%s", self->bus_name));
+  g_ptr_array_add (argv, NULL);
+
+  /* We use LEAVE_DESCRIPTORS_OPEN and set CLOEXEC in the child_setup,
+   * to work around a deadlock in GLib < 2.60 */
+  if (!g_spawn_async_with_pipes (NULL,
+                                 (char **) argv->pdata,
+                                 (char **) self->envp,
+                                 (G_SPAWN_SEARCH_PATH
+                                  | G_SPAWN_DO_NOT_REAP_CHILD
+                                  | G_SPAWN_LEAVE_DESCRIPTORS_OPEN),
+                                 launcher_service_manager_child_setup_cb,
+                                 NULL,    /* child setup data */
+                                 &self->pid,
+                                 NULL,    /* stdin */
+                                 &stdout_fd,
+                                 NULL,    /* stderr */
+                                 error))
+    return FALSE;
+
+  /* Read and discard output: when EOF has been reached,
+   * the s-r-l-s is ready for use */
+  buf = g_string_new ("");
+
+  if (!_srt_string_read_fd_until_eof (buf, stdout_fd, error))
+    return FALSE;
+
+  _srt_string_chomp_newline (buf);
+  g_debug ("Output from s-r-l-s: %s", buf->str);
+
+  if (!self->started_once)
+    {
+      int wait_status = -1;
+      pid_t exited;
+
+      if (buf->len == 0)
+        {
+          g_debug ("No output from s-r-l-s, assuming it failed to start");
+          exited = waitpid (self->pid, &wait_status, 0);
+        }
+      else
+        {
+          g_debug ("Had output from s-r-l-s, hopefully it's working");
+          exited = waitpid (self->pid, &wait_status, WNOHANG);
+        }
+
+      /* The good waitpid() result is 0, meaning self->pid is still running
+       * after emitting EOF on stdout (which means it's ready). */
+
+      if (exited < 0)
+        return glnx_throw_errno_prefix (error,
+                                        "Unable to wait for child process");
+
+      if (exited > 0)
+        {
+          self->pid = 0;
+
+          if (!g_spawn_check_wait_status (wait_status, error))
+            {
+              g_prefix_error (error, "Couldn't start subprocess launcher: ");
+              return FALSE;
+            }
+
+          return glnx_throw (error,
+                             "Couldn't start subprocess launcher: "
+                             "unexpectedly exited with status 0");
+        }
+    }
+
+  self->started_once = TRUE;
+  self->child_watch = g_child_watch_add_full (G_PRIORITY_DEFAULT,
+                                              self->pid,
+                                              launcher_service_died_cb,
+                                              self,
+                                              NULL);
+  return TRUE;
+}
+
 static gchar *opt_pv_entry_point = NULL;
 static gchar **opt_pv_options = NULL;
 static int opt_verbose = 0;
@@ -240,6 +465,7 @@ run (int argc,
      GError **error)
 {
   g_auto(ContainerManager) container = CONTAINER_MANAGER_EMPTY;
+  g_auto(LauncherServiceManager) launcher_service = LAUNCHER_SERVICE_MANAGER_EMPTY;
   g_auto(GStrv) envp = NULL;
   g_autoptr(GOptionContext) context = NULL;
   glnx_autofd int original_stdout = -1;
@@ -320,10 +546,18 @@ run (int argc,
                                error))
     return FALSE;
 
-  container.envp = _srt_const_strv (envp);
+  if (!launcher_service_manager_init (&launcher_service, error))
+    return FALSE;
 
-  /* TODO: Run steam-runtime-launcher-service sidecar */
-  g_critical ("Should run steam-runtime-launcher-service now");
+  envp = g_environ_setenv (envp,
+                           "SRT_LAUNCHER_SERVICE_ALONGSIDE_STEAM",
+                           launcher_service.bus_name,
+                           TRUE);
+  container.envp = _srt_const_strv (envp);
+  launcher_service.envp = _srt_const_strv (envp);
+
+  if (!launcher_service_manager_start (&launcher_service, error))
+    return FALSE;
 
   if (!container_manager_start (&container, error))
     return FALSE;

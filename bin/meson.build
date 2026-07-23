@@ -36,6 +36,12 @@ srt_bin_programs = [
   },
   { 'name': 'launcher-interface-0', 'glib': false },
   {
+    'name': 'launcher-service',
+    'launcher-codegen': true,
+    'symlink-to-multiarch': true,
+    'threads': true,
+  },
+  {
     'name': 'logger',
     # Prefixed with srt- so that `pkill steam` will leave
     # it running for long enough to finish writing its log!
@@ -55,50 +61,6 @@ srt_bin_programs = [
   { 'name': 'system-info', 'json-glib': true },
   { 'name': 'urlopen' },
 ]
-
-# Slightly different: needs threads and codegen, and install in libexecdir
-# with an architecture prefix so we can use it during emulation
-if multiarch != ''
-  launcher_service_exe = multiarch + '-srt-launcher-service'
-  launcher_service_dir = pkglibexecdir
-  launcher_service_rpath = pkglibexec_rpath
-
-  # Note that this doesn't work in scout because its meson is too old:
-  # we fix that up in debian/rules
-  if meson.version().version_compare('>=0.61')
-    install_symlink(
-      'steam-runtime-launcher-service',
-      install_dir : get_option('bindir'),
-      # This assumes that bindir is a single path component and
-      # pkglibexecdir is a relative path, but we already make similar
-      # assumptions about RPATHs
-      pointing_to : '..' / pkglibexecdir / launcher_service_exe,
-    )
-  endif
-else
-  launcher_service_exe = 'steam-runtime-launcher-service'
-  launcher_service_dir = get_option('bindir')
-  launcher_service_rpath = bin_rpath
-endif
-
-srt_bin += executable(
-  launcher_service_exe,
-  sources: [
-    'launcher-service.c',
-  ],
-  c_args : srt_c_args,
-  dependencies : [
-    launcher_codegen_dep,
-    threads,
-    gio_unix,
-    libglnx_dep,
-    libsteamrt_static_dep,
-  ],
-  install : true,
-  install_dir: launcher_service_dir,
-  build_rpath : launcher_service_rpath,
-  install_rpath : launcher_service_rpath,
-)
 
 # Different: needs threads and UI
 if sdl2_dep.found() and sdl2_ttf_dep.found()
@@ -170,6 +132,10 @@ foreach bin_details : srt_bin_programs
     dependencies = [threads] + dependencies
   endif
 
+  if bin_details.get('launcher-codegen', false)
+    dependencies = [launcher_codegen_dep] + dependencies
+  endif
+
   if bin_details.get('sdl2-ui', false)
     dependencies += [
       libsteamrt_ui_dep,
@@ -180,6 +146,31 @@ foreach bin_details : srt_bin_programs
   endif
 
   pkglibexec = bin_details.get('pkglibexec', false)
+
+  # s-r-launcher-service gets installed into the ${pkglibexecdir}
+  # with an architecture prefix so we can use it during emulation
+  if bin_details.get('symlink-to-multiarch', false) and multiarch != ''
+    symlink_name_prefix = name_prefix
+    name_prefix = multiarch + '-srt-'
+
+    # We assume the symlink is to be installed in the ${bindir}
+    assert(not pkglibexec)
+    pkglibexec = true
+
+    # Note that this doesn't work in scout because its meson is too old:
+    # we fix that up in debian/rules
+    if meson.version().version_compare('>=0.61')
+      install_symlink(
+        symlink_name_prefix + bin_name,
+        # This assumes that bin_
+        install_dir : get_option('bindir'),
+        # This assumes that bindir is a single path component and
+        # pkglibexecdir is a relative path, but we already make similar
+        # assumptions about RPATHs
+        pointing_to : '..' / pkglibexecdir / name_prefix + bin_name,
+      )
+    endif
+  endif
 
   if pkglibexec
     install_dir = pkglibexecdir
@@ -223,11 +214,7 @@ if build_man_pages
     endif
   endforeach
 
-  foreach bin_name : (
-    sh_scripts + [
-      'launcher-service',
-    ]
-  )
+  foreach bin_name : sh_scripts
     has_man_page += { 'name': bin_name }
   endforeach
 

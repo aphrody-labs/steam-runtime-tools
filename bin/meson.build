@@ -33,6 +33,7 @@ srt_bin_programs = [
     'include_directories': pv_include_dirs,
     'threads': true,
   },
+  { 'name': 'launcher-interface-0', 'glib': false },
   {
     'name': 'logger',
     # Prefixed with srt- so that `pkill steam` will leave
@@ -52,21 +53,6 @@ srt_bin_programs = [
   { 'name': 'supervisor' },
   { 'name': 'urlopen' },
 ]
-
-# Programs that only need glibc
-libc_programs = [
-  'launcher-interface-0',
-]
-
-foreach bin_name : libc_programs
-  srt_bin += executable(
-    'steam-runtime-' + bin_name,
-    bin_name + '.c',
-    c_args : srt_c_args,
-    dependencies : [libsteamrt_libc_utils_dep],
-    install : true,
-  )
-endforeach
 
 # Programs that need GLib and json-glib
 json_programs = [
@@ -183,9 +169,15 @@ foreach bin_details : srt_bin_programs
   name_prefix = bin_details.get('prefix', 'steam-runtime-')
   sources = bin_details.get('sources', [bin_name + '.c'])
 
-  dependencies = [glib, gobject, gio_unix, libglnx_dep, libsteamrt_static_dep]
-  # Usually use the adjacent GLib, ignoring LD_LIBRARY_PATH even if set
-  use_rpath = bin_details.get('rpath', true)
+  if bin_details.get('glib', true)
+    dependencies = [glib, gobject, gio_unix, libglnx_dep, libsteamrt_static_dep]
+    # Usually use the adjacent GLib, ignoring LD_LIBRARY_PATH even if set
+    use_rpath = bin_details.get('rpath', true)
+  else
+    dependencies = [libsteamrt_libc_utils_dep]
+    # Usually don't use adjacent libraries if we only have glibc dependencies
+    use_rpath = bin_details.get('rpath', false)
+  endif
 
   if bin_details.get('threads', false)
     dependencies = [threads] + dependencies
@@ -245,8 +237,7 @@ if build_man_pages
   endforeach
 
   foreach bin_name : (
-    libc_programs
-    + json_programs
+    json_programs
     + sh_scripts
     + [
       'launcher-service',

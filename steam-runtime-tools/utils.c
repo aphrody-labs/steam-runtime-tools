@@ -1945,6 +1945,39 @@ _srt_string_read_fd_until_eof (GString *buf,
 }
 
 /*
+ * _srt_string_replace_suffix:
+ * @str: A string
+ * @suffix: A possible suffix
+ * @replacement: A replacement
+ *
+ * If @str ends with @suffix, replace @suffix with @replacement and
+ * return %TRUE. Otherwise return %FALSE.
+ *
+ * Returns: %TRUE if the suffix was replaced
+ */
+gboolean
+_srt_string_replace_suffix (GString *str,
+                            const char *suffix,
+                            const char *replacement)
+{
+  size_t len;
+
+  g_return_val_if_fail (str != NULL, FALSE);
+  g_return_val_if_fail (suffix != NULL, FALSE);
+  g_return_val_if_fail (replacement != NULL, FALSE);
+
+  len = strlen (suffix);
+
+  if (!_srt_string_ends_with_len (str, suffix, len))
+    return FALSE;
+
+  g_assert (str->len > len);
+  g_string_truncate (str, str->len - len);
+  g_string_append (str, replacement);
+  return TRUE;
+}
+
+/*
  * _srt_search_path_append:
  * @search_path: A string
  * @item: (nullable): Item to append to the search path

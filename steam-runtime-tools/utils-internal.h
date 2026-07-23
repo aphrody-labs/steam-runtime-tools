@@ -703,6 +703,10 @@ _srt_string_ends_with (const GString *str,
   return _srt_string_ends_with_len (str, suffix, strlen (suffix));
 }
 
+gboolean _srt_string_replace_suffix (GString *str,
+                                     const char *suffix,
+                                     const char *replacement);
+
 void _srt_search_path_append (GString *search_path,
                               const gchar *item);
 

@@ -1,4 +1,6 @@
 usr/lib/pressure-vessel/relocatable
 usr/libexec/steam-runtime-tools-0/pv-*
+usr/libexec/steam-runtime-tools-0/srt-client-container
 usr/share/man/man1/pressure-vessel-*
 usr/share/man/man1/pv-*
+usr/share/man/man1/srt-client-container.1

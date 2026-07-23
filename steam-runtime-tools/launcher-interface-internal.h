@@ -21,6 +21,7 @@
 
 #define LAUNCHER_INSIDE_APP_PREFIX "com.steampowered.App"
 #define LAUNCHER_NAME_ALONGSIDE_STEAM "com.steampowered.PressureVessel.LaunchAlongsideSteam"
+#define LAUNCHER_ALONGSIDE_STEAM_PREFIX LAUNCHER_NAME_ALONGSIDE_STEAM "."
 #define LAUNCHER_IFACE "com.steampowered.PressureVessel.Launcher1"
 #define LAUNCHER_PATH "/com/steampowered/PressureVessel/Launcher1"
 

@@ -617,6 +617,7 @@ list_servers (FILE *original_stdout,
   for (i = 0; running[i] != NULL; i++)
     {
       if (g_str_has_prefix (running[i], LAUNCHER_INSIDE_APP_PREFIX)
+          || g_str_has_prefix (running[i], LAUNCHER_ALONGSIDE_STEAM_PREFIX)
           || g_str_equal (running[i], LAUNCHER_NAME_ALONGSIDE_STEAM))
         fprintf (original_stdout, "--bus-name=%s\n", running[i]);
     }

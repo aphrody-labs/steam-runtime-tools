@@ -27,6 +27,7 @@ uninstalled_env_vars += {'SRT_BIN_PATH': meson.current_build_dir()}
 srt_bin_programs = [
   { 'name': 'check-requirements' },
   { 'name': 'identify-library-abi' },
+  { 'name': 'input-monitor', 'json-glib': true },
   {
     'name': 'launch-client',
     # Needs pv_include_dirs for flatpak-*.h
@@ -51,27 +52,9 @@ srt_bin_programs = [
   },
   { 'name': 'steam-remote' },
   { 'name': 'supervisor' },
+  { 'name': 'system-info', 'json-glib': true },
   { 'name': 'urlopen' },
 ]
-
-# Programs that need GLib and json-glib
-json_programs = [
-  'input-monitor',
-  'system-info',
-]
-
-foreach bin_name : json_programs
-  srt_bin += executable(
-    'steam-runtime-' + bin_name,
-    bin_name + '.c',
-    c_args : srt_c_args,
-    dependencies : [glib, gobject, gio_unix, json_glib, libglnx_dep, libsteamrt_static_dep],
-    install : true,
-    # Use the adjacent json-glib, ignoring LD_LIBRARY_PATH even if set
-    build_rpath : bin_rpath,
-    install_rpath : bin_rpath,
-  )
-endforeach
 
 # Slightly different: needs threads and codegen, and install in libexecdir
 # with an architecture prefix so we can use it during emulation
@@ -169,7 +152,11 @@ foreach bin_details : srt_bin_programs
   name_prefix = bin_details.get('prefix', 'steam-runtime-')
   sources = bin_details.get('sources', [bin_name + '.c'])
 
-  if bin_details.get('glib', true)
+  if bin_details.get('json-glib', false)
+    dependencies = [glib, gobject, gio_unix, json_glib, libglnx_dep, libsteamrt_static_dep]
+    # Usually use the adjacent json-glib, ignoring LD_LIBRARY_PATH even if set
+    use_rpath = bin_details.get('rpath', true)
+  elif bin_details.get('glib', true)
     dependencies = [glib, gobject, gio_unix, libglnx_dep, libsteamrt_static_dep]
     # Usually use the adjacent GLib, ignoring LD_LIBRARY_PATH even if set
     use_rpath = bin_details.get('rpath', true)
@@ -237,9 +224,7 @@ if build_man_pages
   endforeach
 
   foreach bin_name : (
-    json_programs
-    + sh_scripts
-    + [
+    sh_scripts + [
       'launcher-service',
     ]
   )

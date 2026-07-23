@@ -14,9 +14,181 @@
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/launcher-interface-internal.h"
 #include "steam-runtime-tools/log-internal.h"
+#include "steam-runtime-tools/process-manager-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 static const char this_program_name[] = "srt-client-container";
+
+typedef struct
+{
+  GPtrArray *argv;
+  const char * const *envp;
+  GPid pid;
+  guint child_watch;
+  int original_stdout;
+  int original_stderr;
+  int exit_status;
+} ContainerManager;
+
+#define CONTAINER_MANAGER_EMPTY {\
+  .original_stdout = -1, \
+  .original_stderr = -1, \
+}
+
+static void
+container_manager_clear (ContainerManager *self)
+{
+  g_clear_pointer (&self->argv, g_ptr_array_unref);
+  g_clear_handle_id (&self->child_watch, g_source_remove);
+
+  if (self->pid > 0)
+    {
+      /* We kill the subprocess but don't wait for it */
+      g_info ("Terminating containerized subprocess");
+      kill (self->pid, SIGTERM);
+    }
+}
+
+G_DEFINE_AUTO_CLEANUP_CLEAR_FUNC (ContainerManager,
+                                  container_manager_clear)
+
+static gboolean
+container_manager_init (ContainerManager *self,
+                        const char * const *command,
+                        int command_len,
+                        const char *pv_entry_point,
+                        const char * const *pv_options,
+                        size_t n_pv_options,
+                        int original_stdout,
+                        int original_stderr,
+                        GError **error)
+{
+  g_autoptr(GPtrArray) argv = NULL;
+  g_autoptr(GString) run_script = NULL;
+
+  g_return_val_if_fail (self->pid == 0, FALSE);
+  g_return_val_if_fail (self->child_watch == 0, FALSE);
+
+  if (pv_entry_point != NULL)
+    {
+      run_script = g_string_new (pv_entry_point);
+    }
+  else
+    {
+      const char *prefix;
+
+      prefix = _srt_find_myself (NULL, NULL, error);
+
+      if (prefix == NULL)
+        return FALSE;
+
+      run_script = g_string_new (prefix);
+
+      if (!_srt_string_replace_suffix (run_script, "/pressure-vessel", "/run"))
+        return glnx_throw (error,
+                           "Unable to find steamrt*c runtime above %s",
+                           prefix);
+    }
+
+  argv = g_ptr_array_new_full (4 + command_len + n_pv_options, g_free);
+  g_ptr_array_add (argv, g_strdup (run_script->str));
+  g_ptr_array_add (argv, g_strdup ("--for-steam-client"));
+
+  for (size_t i = 0; i < n_pv_options; i++)
+    g_ptr_array_add (argv, g_strdup (pv_options[i]));
+
+  g_ptr_array_add (argv, g_strdup ("--"));
+
+  for (int i = 0; i < command_len; i++)
+    g_ptr_array_add (argv, g_strdup (command[i]));
+
+  g_ptr_array_add (argv, NULL);
+  self->argv = g_steal_pointer (&argv);
+
+  self->original_stdout = original_stdout;
+  self->original_stderr = original_stderr;
+  return TRUE;
+}
+
+static void
+container_manager_child_setup_cb (void *user_data)
+{
+  ContainerManager *self = user_data;
+
+  if (!_srt_raise_on_parent_death (SIGTERM, NULL))
+    _srt_async_signal_safe_error (this_program_name,
+                                  "Failed to set up parent-death signal",
+                                  LAUNCH_EX_FAILED);
+
+  _srt_child_setup_unblock_signals (NULL);
+
+  if (dup2 (self->original_stdout, STDOUT_FILENO) < 0)
+    _srt_async_signal_safe_error (this_program_name,
+                                  "Failed to restore original stdout",
+                                  LAUNCH_EX_FAILED);
+
+  if (dup2 (self->original_stderr, STDERR_FILENO) < 0)
+    _srt_async_signal_safe_error (this_program_name,
+                                  "Failed to restore original stderr",
+                                  LAUNCH_EX_FAILED);
+}
+
+static void
+container_died_cb (GPid pid,
+                   int wait_status,
+                   void *user_data)
+{
+  ContainerManager *self = user_data;
+
+  g_return_if_fail (pid == self->pid);
+  self->pid = 0;
+  self->child_watch = 0;
+
+  g_info ("Containerized subprocess %u exited, wait status %d",
+          (unsigned int) pid, wait_status);
+  self->exit_status = _srt_wait_status_to_exit_status (wait_status);
+}
+
+static gboolean
+container_manager_start (ContainerManager *self,
+                         GError **error)
+{
+  g_return_val_if_fail (self->argv != NULL, FALSE);
+  g_return_val_if_fail (self->pid == 0, FALSE);
+  g_return_val_if_fail (self->child_watch == 0, FALSE);
+
+  /* We intentionally don't close inherited file descriptors here:
+   * if there are any, then the container manager and the Steam Client
+   * get to inherit them. */
+  if (!g_spawn_async_with_pipes (NULL,
+                                 (char **) self->argv->pdata,
+                                 (char **) self->envp,
+                                 (G_SPAWN_DO_NOT_REAP_CHILD
+                                  | G_SPAWN_CHILD_INHERITS_STDIN
+                                  | G_SPAWN_LEAVE_DESCRIPTORS_OPEN),
+                                 container_manager_child_setup_cb,
+                                 self,
+                                 &self->pid,
+                                 NULL,    /* inherit stdin */
+                                 NULL,    /* inherit stdout */
+                                 NULL,    /* inherit stderr */
+                                 error))
+    return FALSE;
+
+  /* No need for these any more */
+  g_clear_pointer (&self->argv, g_ptr_array_unref);
+
+  /* This is higher-priority than watching s-r-launcher-service:
+   * if they both exit at the same time, we want to exit without
+   * restarting the launcher service. */
+  self->child_watch = g_child_watch_add_full (G_PRIORITY_HIGH,
+                                              self->pid,
+                                              container_died_cb,
+                                              self,
+                                              NULL);
+
+  return TRUE;
+}
 
 static gchar *opt_pv_entry_point = NULL;
 static gchar **opt_pv_options = NULL;
@@ -67,12 +239,16 @@ run (int argc,
      int *exit_status,
      GError **error)
 {
+  g_auto(ContainerManager) container = CONTAINER_MANAGER_EMPTY;
   g_auto(GStrv) envp = NULL;
   g_autoptr(GOptionContext) context = NULL;
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
+  size_t n_pv_options;
 
+  *exit_status = -1;
   setlocale (LC_ALL, "");
+  envp = g_get_environ ();
 
   if (!_srt_util_set_glib_log_handler (this_program_name,
                                        G_LOG_DOMAIN,
@@ -130,13 +306,34 @@ run (int argc,
       return FALSE;
     }
 
+  if (opt_pv_options != NULL)
+    n_pv_options = g_strv_length (opt_pv_options);
+  else
+    n_pv_options = 0;
+
+  if (!container_manager_init (&container,
+                               _srt_const_strv (argv + 1), argc - 1,
+                               opt_pv_entry_point,
+                               _srt_const_strv (opt_pv_options), n_pv_options,
+                               original_stdout,
+                               original_stderr,
+                               error))
+    return FALSE;
+
+  container.envp = _srt_const_strv (envp);
+
   /* TODO: Run steam-runtime-launcher-service sidecar */
   g_critical ("Should run steam-runtime-launcher-service now");
 
-  /* TODO: Run steamrt3c container, containing argv[1...] */
-  g_critical ("Should run \"%s\" now", argv[1]);
+  if (!container_manager_start (&container, error))
+    return FALSE;
 
-  *exit_status = 0;
+  while (container.pid != 0)
+    g_main_context_iteration (NULL, TRUE);
+
+  g_info ("Shutting down");
+  g_return_val_if_fail (container.exit_status >= 0, FALSE);
+  *exit_status = container.exit_status;
   return TRUE;
 }
 

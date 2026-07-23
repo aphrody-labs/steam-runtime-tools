@@ -240,6 +240,8 @@ foreach script : libexec_scripts
 endforeach
 
 if build_man_pages
+  has_man_page = []
+
   foreach bin_name : (
     libc_programs
     + glib_programs
@@ -250,27 +252,22 @@ if build_man_pages
       'launcher-service',
     ]
   )
-    custom_target(
-      'steam-runtime-' + bin_name + '.1',
-      build_by_default : true,
-      command : [
-        pandoc,
-        '-s',
-        '-o', '@OUTPUT@',
-        '-f', pandoc_markdown_nosmart,
-        '-t', 'man',
-        '@INPUT@',
-      ],
-      input : bin_name + '.md',
-      output : 'steam-runtime-' + bin_name + '.1',
-      install : true,
-      install_dir : join_paths(get_option('prefix'), get_option('mandir'), 'man1'),
-    )
+    has_man_page += { 'name': bin_name }
   endforeach
 
-  foreach bin_name : ['logger', 'run-outside-ldlp']
+  foreach bin_name : [
+    'logger',
+    'run-outside-ldlp',
+  ]
+    has_man_page += { 'name': bin_name, 'prefix': 'srt-' }
+  endforeach
+
+  foreach bin_details : has_man_page
+    bin_name = bin_details['name']
+    name_prefix = bin_details.get('prefix', 'steam-runtime-')
+
     custom_target(
-      'srt-' + bin_name + '.1',
+      name_prefix + bin_name + '.1',
       build_by_default : true,
       command : [
         pandoc,
@@ -281,7 +278,7 @@ if build_man_pages
         '@INPUT@',
       ],
       input : bin_name + '.md',
-      output : 'srt-' + bin_name + '.1',
+      output : name_prefix + bin_name + '.1',
       install : true,
       install_dir : join_paths(get_option('prefix'), get_option('mandir'), 'man1'),
     )

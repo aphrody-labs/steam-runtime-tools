@@ -171,4 +171,21 @@ Any value
     (This is the same encoding used by **bash**(1), **bwrap**(1) and
     **env**(1).)
 
+# EXAMPLES
+
+    cd ~/.steam/root
+    steamrt="$(pwd)/steamrt64/pv-runtime/steam-runtime-steamrt"
+    pv="$steamrt/pressure-vessel"
+
+    $pv/libexec/steam-runtime-tools-0/srt-client-container \
+        -- \
+        steam-runtime-launch-client --alongside-steam -- pstree -Tahlp
+
+    $pv/libexec/steam-runtime-tools-0/srt-client-container \
+        --pv-entry-point="$steamrt/run"
+        --pv-option=--devel \
+        --pv-option=--runtime=…/sdk/files \
+        -- \
+        steamrt64/steam
+
 <!-- vim:set sw=4 sts=4 et: -->

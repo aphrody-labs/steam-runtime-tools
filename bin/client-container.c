@@ -18,6 +18,7 @@
 
 static const char this_program_name[] = "srt-client-container";
 
+static gchar *opt_pv_entry_point = NULL;
 static gchar **opt_pv_options = NULL;
 static int opt_verbose = 0;
 static gboolean opt_version = FALSE;
@@ -25,6 +26,7 @@ static gboolean opt_version = FALSE;
 static void
 free_option_globals (void)
 {
+  g_clear_pointer (&opt_pv_entry_point, g_free);
   g_clear_pointer (&opt_pv_options, g_strfreev);
 }
 
@@ -42,6 +44,10 @@ opt_verbose_cb (const char *name,
 
 static GOptionEntry options[] =
 {
+  { "pv-entry-point", '\0',
+    G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME, &opt_pv_entry_point,
+    "Use the given entry point to start the container.",
+    "/path/to/run" },
   { "pv-option", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME_ARRAY, &opt_pv_options,
     "Pass the given OPTION to pressure-vessel. May be repeated.",

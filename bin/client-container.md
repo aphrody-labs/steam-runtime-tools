@@ -15,6 +15,7 @@ srt-client-container - run the Steam Client in a container
 # SYNOPSIS
 
 **srt-client-container**
+[**--pv-entry-point=**_SCRIPT_]
 [**--pv-option=**_OPTION_...]
 [**--verbose** [**--verbose**]]
 [**--**]
@@ -49,6 +50,19 @@ for debugging purposes.
 # OPTIONS
 
 <dl>
+<dt>
+
+**--pv-entry-point=**_SCRIPT_
+
+</dt><dd>
+
+Use the given *SCRIPT* as the entry point for a `steamrt3c` container.
+It must accept the same options as **pressure-vessel-wrap**(1).
+The default is to assume that **srt-client-container** is in the
+`pressure-vessel/` subdirectory of a container runtime,
+and use the adjacent `./run` script.
+
+</dd>
 <dt>
 
 **--pv-option=**_OPTION_

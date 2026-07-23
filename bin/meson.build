@@ -25,6 +25,8 @@ srt_bin = []
 uninstalled_env_vars += {'SRT_BIN_PATH': meson.current_build_dir()}
 
 srt_bin_programs = [
+  { 'name': 'check-requirements' },
+  { 'name': 'identify-library-abi' },
   {
     'name': 'launch-client',
     # Needs pv_include_dirs for flatpak-*.h
@@ -46,6 +48,9 @@ srt_bin_programs = [
     'pkglibexec': true,
     'rpath': false,
   },
+  { 'name': 'steam-remote' },
+  { 'name': 'supervisor' },
+  { 'name': 'urlopen' },
 ]
 
 # Programs that only need glibc
@@ -60,28 +65,6 @@ foreach bin_name : libc_programs
     c_args : srt_c_args,
     dependencies : [libsteamrt_libc_utils_dep],
     install : true,
-  )
-endforeach
-
-# Programs that need GLib
-glib_programs = [
-  'check-requirements',
-  'identify-library-abi',
-  'steam-remote',
-  'supervisor',
-  'urlopen',
-]
-
-foreach bin_name : glib_programs
-  srt_bin += executable(
-    'steam-runtime-' + bin_name,
-    bin_name + '.c',
-    c_args : srt_c_args,
-    dependencies : [glib, gobject, gio_unix, libglnx_dep, libsteamrt_static_dep],
-    install : true,
-    # Use the adjacent GLib, ignoring LD_LIBRARY_PATH even if set
-    build_rpath : bin_rpath,
-    install_rpath : bin_rpath,
   )
 endforeach
 
@@ -263,7 +246,6 @@ if build_man_pages
 
   foreach bin_name : (
     libc_programs
-    + glib_programs
     + json_programs
     + sh_scripts
     + [

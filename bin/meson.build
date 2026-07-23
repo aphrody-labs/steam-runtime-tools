@@ -24,6 +24,30 @@
 srt_bin = []
 uninstalled_env_vars += {'SRT_BIN_PATH': meson.current_build_dir()}
 
+srt_bin_programs = [
+  {
+    'name': 'launch-client',
+    # Needs pv_include_dirs for flatpak-*.h
+    'include_directories': pv_include_dirs,
+    'threads': true,
+  },
+  {
+    'name': 'logger',
+    # Prefixed with srt- so that `pkill steam` will leave
+    # it running for long enough to finish writing its log!
+    'prefix': 'srt-',
+    'sources': ['logger.c', 'logger-mkfifo.c'],
+    'pkglibexec': true,
+  },
+  {
+    'name': 'run-outside-ldlp',
+    # Prefixed with srt- because it's an internal implementation detail
+    'prefix': 'srt-',
+    'pkglibexec': true,
+    'rpath': false,
+  },
+]
+
 # Programs that only need glibc
 libc_programs = [
   'launcher-interface-0',
@@ -80,47 +104,6 @@ foreach bin_name : json_programs
   )
 endforeach
 
-# Slightly different: different prefix (so that `pkill steam` will leave
-# it running for long enough to finish writing its log!),
-# and install in libexecdir
-srt_bin += executable(
-  'srt-logger',
-  sources: [
-    'logger.c',
-    'logger-mkfifo.c',
-  ],
-  c_args : srt_c_args,
-  dependencies : [
-    gio_unix,
-    libglnx_dep,
-    libsteamrt_static_dep,
-  ],
-  install : true,
-  install_dir : pkglibexecdir,
-  build_rpath : pkglibexec_rpath,
-  install_rpath : pkglibexec_rpath,
-)
-
-# Slightly different: needs threads and pv_include_dirs
-srt_bin += executable(
-  'steam-runtime-launch-client',
-  sources: [
-    'launch-client.c',
-  ],
-  c_args : srt_c_args,
-  dependencies : [
-    threads,
-    gio_unix,
-    libglnx_dep,
-    libsteamrt_static_dep,
-  ],
-  # Needs pv_include_dirs for flatpak-*.h
-  include_directories : pv_include_dirs,
-  install : true,
-  build_rpath : bin_rpath,
-  install_rpath : bin_rpath,
-)
-
 # Slightly different: needs threads and codegen, and install in libexecdir
 # with an architecture prefix so we can use it during emulation
 if multiarch != ''
@@ -165,40 +148,13 @@ srt_bin += executable(
   install_rpath : launcher_service_rpath,
 )
 
-# Slightly different: different prefix (so that it's distinguished as an
-# internal tool), and install in libexecdir
-srt_bin += executable(
-  'srt-run-outside-ldlp',
-  'run-outside-ldlp.c',
-  c_args : srt_c_args,
-  dependencies : [glib, gobject, gio_unix, libglnx_dep, libsteamrt_static_dep],
-  install : true,
-  install_dir : pkglibexecdir,
-  build_rpath : pkglibexec_rpath,
-  install_rpath : pkglibexec_rpath,
-)
-
 # Different: needs threads and UI
 if sdl2_dep.found() and sdl2_ttf_dep.found()
-  glib_programs += 'dialog-ui'
-  srt_bin += executable(
-    'steam-runtime-dialog-ui',
-    sources: [
-      'dialog-ui.c',
-    ],
-    c_args : srt_c_args,
-    dependencies : [
-      threads,
-      gio_unix,
-      libglnx_dep,
-      libsteamrt_static_dep,
-      libsteamrt_ui_dep,
-      sdl2_dep,
-      sdl2_ttf_dep,
-      x11_dep,
-    ],
-    install : true,
-  )
+  srt_bin_programs += {
+    'name': 'dialog-ui',
+    'sdl2-ui': true,
+    'threads': true,
+  }
 endif
 
 sh_scripts = [
@@ -239,8 +195,71 @@ foreach script : libexec_scripts
   )
 endforeach
 
+foreach bin_details : srt_bin_programs
+  bin_name = bin_details['name']
+  name_prefix = bin_details.get('prefix', 'steam-runtime-')
+  sources = bin_details.get('sources', [bin_name + '.c'])
+
+  dependencies = [glib, gobject, gio_unix, libglnx_dep, libsteamrt_static_dep]
+  # Usually use the adjacent GLib, ignoring LD_LIBRARY_PATH even if set
+  use_rpath = bin_details.get('rpath', true)
+
+  if bin_details.get('threads', false)
+    dependencies = [threads] + dependencies
+  endif
+
+  if bin_details.get('sdl2-ui', false)
+    dependencies += [
+      libsteamrt_ui_dep,
+      sdl2_dep,
+      sdl2_ttf_dep,
+      x11_dep,
+    ]
+  endif
+
+  pkglibexec = bin_details.get('pkglibexec', false)
+
+  if pkglibexec
+    install_dir = pkglibexecdir
+    rpath = pkglibexec_rpath
+  else
+    install_dir = get_option('bindir')
+    rpath = bin_rpath
+  endif
+
+  if use_rpath
+    srt_bin += executable(
+      name_prefix + bin_name,
+      sources,
+      c_args : srt_c_args,
+      dependencies : dependencies,
+      include_directories : bin_details.get('include_directories', []),
+      install : true,
+      install_dir : install_dir,
+      build_rpath : rpath,
+      install_rpath : rpath,
+    )
+  else
+    srt_bin += executable(
+      name_prefix + bin_name,
+      sources,
+      c_args : srt_c_args,
+      dependencies : dependencies,
+      include_directories : bin_details.get('include_directories', []),
+      install : true,
+      install_dir : install_dir,
+    )
+  endif
+endforeach
+
 if build_man_pages
   has_man_page = []
+
+  foreach bin_details : srt_bin_programs
+    if bin_details.get('manpage', true)
+      has_man_page += bin_details
+    endif
+  endforeach
 
   foreach bin_name : (
     libc_programs
@@ -248,18 +267,10 @@ if build_man_pages
     + json_programs
     + sh_scripts
     + [
-      'launch-client',
       'launcher-service',
     ]
   )
     has_man_page += { 'name': bin_name }
-  endforeach
-
-  foreach bin_name : [
-    'logger',
-    'run-outside-ldlp',
-  ]
-    has_man_page += { 'name': bin_name, 'prefix': 'srt-' }
   endforeach
 
   foreach bin_details : has_man_page

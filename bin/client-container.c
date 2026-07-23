@@ -18,8 +18,15 @@
 
 static const char this_program_name[] = "srt-client-container";
 
+static gchar **opt_pv_options = NULL;
 static int opt_verbose = 0;
 static gboolean opt_version = FALSE;
+
+static void
+free_option_globals (void)
+{
+  g_clear_pointer (&opt_pv_options, g_strfreev);
+}
 
 static gboolean
 opt_verbose_cb (const char *name,
@@ -35,6 +42,10 @@ opt_verbose_cb (const char *name,
 
 static GOptionEntry options[] =
 {
+  { "pv-option", '\0',
+    G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME_ARRAY, &opt_pv_options,
+    "Pass the given OPTION to pressure-vessel. May be repeated.",
+    "OPTION" },
   { "verbose", 'v',
     G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, opt_verbose_cb,
     "Be more verbose. If given twice, log debug messages too.", NULL },
@@ -129,8 +140,13 @@ main (int argc,
 {
   g_autoptr(GError) error = NULL;
   int exit_status = -1;
+  gboolean exit_normally;
 
-  if (run (argc, argv, &exit_status, &error))
+  exit_normally = run (argc, argv, &exit_status, &error);
+
+  free_option_globals ();
+
+  if (exit_normally)
     return exit_status;
 
   if (error == NULL)

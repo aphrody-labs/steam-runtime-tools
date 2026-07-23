@@ -15,6 +15,7 @@ srt-client-container - run the Steam Client in a container
 # SYNOPSIS
 
 **srt-client-container**
+[**--pv-option=**_OPTION_...]
 [**--verbose** [**--verbose**]]
 [**--**]
 [*COMMAND* [*ARGUMENTS...*]]
@@ -48,6 +49,16 @@ for debugging purposes.
 # OPTIONS
 
 <dl>
+<dt>
+
+**--pv-option=**_OPTION_
+
+</dt><dd>
+
+Pass the given *OPTION* to the entry-point script,
+and therefore to **pressure-vessel-wrap**(1).
+
+</dd>
 <dt>
 
 **--verbose**

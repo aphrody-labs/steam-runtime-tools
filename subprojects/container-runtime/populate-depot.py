@@ -1437,6 +1437,26 @@ class Main:
 
         return component_version, subdir
 
+    @property
+    def is_for_steam_client(self) -> bool:
+        runtime = self.runtime
+        assert runtime is not None
+        return self.suite_is_for_steam_client(runtime.suite)
+
+    @staticmethod
+    def suite_is_for_steam_client(suite: str) -> bool:
+        if suite == 'scout':
+            return True
+
+        if (
+            suite.startswith('steamrt')
+            and suite.endswith('c')
+            and suite[len('steamrt'):-1].isdigit()
+        ):
+            return True
+
+        return False
+
     def use_local_pressure_vessel(
         self,
         archive: Path,
@@ -1454,6 +1474,16 @@ class Main:
 
         logger.info('%r', argv)
         subprocess.run(argv, check=True)
+
+        if not self.is_for_steam_client:
+            for client_file in pv_dir.glob(
+                'libexec/steam-runtime-tools-*/srt-client-*',
+            ):
+                logger.info(
+                    'Excluding %r from pressure-vessel',
+                    client_file,
+                )
+                client_file.unlink()
 
     def use_local_runtime(self, runtime: Runtime) -> None:
         assert runtime.path

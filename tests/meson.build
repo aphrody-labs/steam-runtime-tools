@@ -523,6 +523,12 @@ if get_option('bin')
   ]
 endif
 
+if get_option('bin') and get_option('pressure_vessel')
+  test_scripts += [
+    {'name': 'test-client-container.py', 'dbus': true},
+  ]
+endif
+
 if get_option('libcurl_compat')
   test_scripts += [
     {'name': 'libcurl-compat.py'},

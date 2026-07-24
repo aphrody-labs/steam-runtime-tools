@@ -678,8 +678,8 @@ deploy:
                 xz-utils \
                 ${NULL+}
 
-test-populate-depot:debian-12:
+test-populate-depot:debian-13:
     extends: .test-populate-depot
-    image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian:bookworm-slim
+    image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian:trixie-slim
 
 # vim:set sw=4 sts=4 et:

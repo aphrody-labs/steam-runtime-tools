@@ -22,6 +22,9 @@ if [ -n "${CI_COMMIT_TAG-}" ]; then
     set -- "$@" --release
 fi
 
+mkdir -p _build
+deb-git-version-gen "$@" > _build/VERSION.txt
+
 mkdir -p "debian/tmp/artifacts/source"
 set -- "$@" --download "$(pwd)/debian/tmp/artifacts/source"
 

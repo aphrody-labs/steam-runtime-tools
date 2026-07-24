@@ -142,6 +142,7 @@ package:source:
         - ./ci/build-dsc.sh
     artifacts:
         paths:
+            - _build/VERSION.txt
             - debian/tmp/artifacts/source
         when: always
 

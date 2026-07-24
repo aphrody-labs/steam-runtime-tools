@@ -1,10 +1,11 @@
-steam-runtime-tools (0.20260715.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260724.0) UNRELEASED; urgency=medium
 
   [ Simon McVittie ]
   * Packaging:
     - d/control: Set Maintainer to a "role" address
+  * Build system refactoring
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 15 Jul 2026 12:49:57 +0100
+ -- Simon McVittie <smcv@collabora.com>  Fri, 24 Jul 2026 13:36:53 +0100
 
 steam-runtime-tools (0.20260714.0) steamrt; urgency=medium
 

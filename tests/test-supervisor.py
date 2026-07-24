@@ -969,6 +969,19 @@ class TestSupervisor(BaseTest):
             kills_child=False,
         )
 
+    def test_version(self) -> None:
+        proc = subprocess.Popen(
+            self.supervisor + [
+                '--version',
+            ],
+            stdout=subprocess.PIPE,
+            stderr=STDERR_FILENO,
+        )
+        stdout, _ = proc.communicate()
+        self.assertIn(b'\n Package: steam-runtime-tools\n', stdout)
+        self.assertIn(b'\n Version:', stdout)
+        self.assertEqual(proc.returncode, 0)
+
     def test_wrong_options(self) -> None:
         for option in (
             '--an-unknown-option',

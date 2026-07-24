@@ -129,6 +129,7 @@ stages:
     - relocatable-install
     - deploy
     - test
+    - manual
 
 package:source:
     stage: prepare
@@ -655,14 +656,7 @@ deploy:
             --ssh-private-key="$PRESSURE_VESSEL_CI_UPLOAD_SSH_PRIVATE_KEY_FILE" \
             ${NULL+}
 
-.test-populate-depot:
-    stage: test
-    script:
-        - make -C subprojects/container-runtime check
-    artifacts:
-        paths:
-            - subprojects/container-runtime/depots/*.txt
-            - subprojects/container-runtime/depots/*/VERSIONS.txt
+.populate-depot:
     before_script:
         - |
             set -eux
@@ -679,8 +673,56 @@ deploy:
                 xz-utils \
                 ${NULL+}
 
+.test-populate-depot:
+    extends: .populate-depot
+    stage: test
+    script:
+        - make -C subprojects/container-runtime check
+    artifacts:
+        paths:
+            - subprojects/container-runtime/depots/*.txt
+            - subprojects/container-runtime/depots/*/VERSIONS.txt
+
 test-populate-depot:debian-13:
     extends: .test-populate-depot
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian:trixie-slim
+
+.manual-test-depot:
+    extends: .populate-depot
+    stage: manual
+    rules:
+        - when: manual
+    image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian:trixie-slim
+    needs:
+        - package:source
+        - relocatable-install
+    script:
+        tests/pressure-vessel/prepare-manual-test-depots.sh "$SUITE"
+    artifacts:
+        paths:
+            - "*.tar.xz"
+            - "_build/depots/*/*/usr-mtree.txt.gz"
+            - "_build/depots/*/VERSIONS.txt"
+            - "_build/depots/*/mtree.txt.gz"
+
+SteamLinuxRuntime_soldier:
+    extends: .manual-test-depot
+    variables:
+        SUITE: soldier
+
+SteamLinuxRuntime_sniper:
+    extends: .manual-test-depot
+    variables:
+        SUITE: sniper
+
+SteamLinuxRuntime_4:
+    extends: .manual-test-depot
+    variables:
+        SUITE: steamrt4
+
+steam-runtime-steamrt:steamrt3c:
+    extends: .manual-test-depot
+    variables:
+        SUITE: steamrt3c
 
 # vim:set sw=4 sts=4 et:

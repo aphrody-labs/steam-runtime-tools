@@ -24,181 +24,51 @@
 srt_bin = []
 uninstalled_env_vars += {'SRT_BIN_PATH': meson.current_build_dir()}
 
-# Programs that only need glibc
-libc_programs = [
-  'launcher-interface-0',
+srt_bin_programs = [
+  { 'name': 'check-requirements' },
+  { 'name': 'identify-library-abi' },
+  { 'name': 'input-monitor', 'json-glib': true },
+  {
+    'name': 'launch-client',
+    # Needs pv_include_dirs for flatpak-*.h
+    'include_directories': pv_include_dirs,
+    'threads': true,
+  },
+  { 'name': 'launcher-interface-0', 'glib': false },
+  {
+    'name': 'launcher-service',
+    'launcher-codegen': true,
+    'symlink-to-multiarch': true,
+    'threads': true,
+  },
+  {
+    'name': 'logger',
+    # Prefixed with srt- so that `pkill steam` will leave
+    # it running for long enough to finish writing its log!
+    'prefix': 'srt-',
+    'sources': ['logger.c', 'logger-mkfifo.c'],
+    'pkglibexec': true,
+  },
+  {
+    'name': 'run-outside-ldlp',
+    # Prefixed with srt- because it's an internal implementation detail
+    'prefix': 'srt-',
+    'pkglibexec': true,
+    'rpath': false,
+  },
+  { 'name': 'steam-remote' },
+  { 'name': 'supervisor' },
+  { 'name': 'system-info', 'json-glib': true },
+  { 'name': 'urlopen' },
 ]
-
-foreach bin_name : libc_programs
-  srt_bin += executable(
-    'steam-runtime-' + bin_name,
-    bin_name + '.c',
-    c_args : srt_c_args,
-    dependencies : [libsteamrt_libc_utils_dep],
-    install : true,
-  )
-endforeach
-
-# Programs that need GLib
-glib_programs = [
-  'check-requirements',
-  'identify-library-abi',
-  'steam-remote',
-  'supervisor',
-  'urlopen',
-]
-
-foreach bin_name : glib_programs
-  srt_bin += executable(
-    'steam-runtime-' + bin_name,
-    bin_name + '.c',
-    c_args : srt_c_args,
-    dependencies : [glib, gobject, gio_unix, libglnx_dep, libsteamrt_static_dep],
-    install : true,
-    # Use the adjacent GLib, ignoring LD_LIBRARY_PATH even if set
-    build_rpath : bin_rpath,
-    install_rpath : bin_rpath,
-  )
-endforeach
-
-# Programs that need GLib and json-glib
-json_programs = [
-  'input-monitor',
-  'system-info',
-]
-
-foreach bin_name : json_programs
-  srt_bin += executable(
-    'steam-runtime-' + bin_name,
-    bin_name + '.c',
-    c_args : srt_c_args,
-    dependencies : [glib, gobject, gio_unix, json_glib, libglnx_dep, libsteamrt_static_dep],
-    install : true,
-    # Use the adjacent json-glib, ignoring LD_LIBRARY_PATH even if set
-    build_rpath : bin_rpath,
-    install_rpath : bin_rpath,
-  )
-endforeach
-
-# Slightly different: different prefix (so that `pkill steam` will leave
-# it running for long enough to finish writing its log!),
-# and install in libexecdir
-srt_bin += executable(
-  'srt-logger',
-  sources: [
-    'logger.c',
-    'logger-mkfifo.c',
-  ],
-  c_args : srt_c_args,
-  dependencies : [
-    gio_unix,
-    libglnx_dep,
-    libsteamrt_static_dep,
-  ],
-  install : true,
-  install_dir : pkglibexecdir,
-  build_rpath : pkglibexec_rpath,
-  install_rpath : pkglibexec_rpath,
-)
-
-# Slightly different: needs threads and pv_include_dirs
-srt_bin += executable(
-  'steam-runtime-launch-client',
-  sources: [
-    'launch-client.c',
-  ],
-  c_args : srt_c_args,
-  dependencies : [
-    threads,
-    gio_unix,
-    libglnx_dep,
-    libsteamrt_static_dep,
-  ],
-  # Needs pv_include_dirs for flatpak-*.h
-  include_directories : pv_include_dirs,
-  install : true,
-  build_rpath : bin_rpath,
-  install_rpath : bin_rpath,
-)
-
-# Slightly different: needs threads and codegen, and install in libexecdir
-# with an architecture prefix so we can use it during emulation
-if multiarch != ''
-  launcher_service_exe = multiarch + '-srt-launcher-service'
-  launcher_service_dir = pkglibexecdir
-  launcher_service_rpath = pkglibexec_rpath
-
-  # Note that this doesn't work in scout because its meson is too old:
-  # we fix that up in debian/rules
-  if meson.version().version_compare('>=0.61')
-    install_symlink(
-      'steam-runtime-launcher-service',
-      install_dir : get_option('bindir'),
-      # This assumes that bindir is a single path component and
-      # pkglibexecdir is a relative path, but we already make similar
-      # assumptions about RPATHs
-      pointing_to : '..' / pkglibexecdir / launcher_service_exe,
-    )
-  endif
-else
-  launcher_service_exe = 'steam-runtime-launcher-service'
-  launcher_service_dir = get_option('bindir')
-  launcher_service_rpath = bin_rpath
-endif
-
-srt_bin += executable(
-  launcher_service_exe,
-  sources: [
-    'launcher-service.c',
-  ],
-  c_args : srt_c_args,
-  dependencies : [
-    launcher_codegen_dep,
-    threads,
-    gio_unix,
-    libglnx_dep,
-    libsteamrt_static_dep,
-  ],
-  install : true,
-  install_dir: launcher_service_dir,
-  build_rpath : launcher_service_rpath,
-  install_rpath : launcher_service_rpath,
-)
-
-# Slightly different: different prefix (so that it's distinguished as an
-# internal tool), and install in libexecdir
-srt_bin += executable(
-  'srt-run-outside-ldlp',
-  'run-outside-ldlp.c',
-  c_args : srt_c_args,
-  dependencies : [glib, gobject, gio_unix, libglnx_dep, libsteamrt_static_dep],
-  install : true,
-  install_dir : pkglibexecdir,
-  build_rpath : pkglibexec_rpath,
-  install_rpath : pkglibexec_rpath,
-)
 
 # Different: needs threads and UI
 if sdl2_dep.found() and sdl2_ttf_dep.found()
-  glib_programs += 'dialog-ui'
-  srt_bin += executable(
-    'steam-runtime-dialog-ui',
-    sources: [
-      'dialog-ui.c',
-    ],
-    c_args : srt_c_args,
-    dependencies : [
-      threads,
-      gio_unix,
-      libglnx_dep,
-      libsteamrt_static_dep,
-      libsteamrt_ui_dep,
-      sdl2_dep,
-      sdl2_ttf_dep,
-      x11_dep,
-    ],
-    install : true,
-  )
+  srt_bin_programs += {
+    'name': 'dialog-ui',
+    'sdl2-ui': true,
+    'threads': true,
+  }
 endif
 
 sh_scripts = [
@@ -239,38 +109,121 @@ foreach script : libexec_scripts
   )
 endforeach
 
-if build_man_pages
-  foreach bin_name : (
-    libc_programs
-    + glib_programs
-    + json_programs
-    + sh_scripts
-    + [
-      'launch-client',
-      'launcher-service',
+foreach bin_details : srt_bin_programs
+  bin_name = bin_details['name']
+  name_prefix = bin_details.get('prefix', 'steam-runtime-')
+  sources = bin_details.get('sources', [bin_name + '.c'])
+
+  if bin_details.get('json-glib', false)
+    dependencies = [glib, gobject, gio_unix, json_glib, libglnx_dep, libsteamrt_static_dep]
+    # Usually use the adjacent json-glib, ignoring LD_LIBRARY_PATH even if set
+    use_rpath = bin_details.get('rpath', true)
+  elif bin_details.get('glib', true)
+    dependencies = [glib, gobject, gio_unix, libglnx_dep, libsteamrt_static_dep]
+    # Usually use the adjacent GLib, ignoring LD_LIBRARY_PATH even if set
+    use_rpath = bin_details.get('rpath', true)
+  else
+    dependencies = [libsteamrt_libc_utils_dep]
+    # Usually don't use adjacent libraries if we only have glibc dependencies
+    use_rpath = bin_details.get('rpath', false)
+  endif
+
+  if bin_details.get('threads', false)
+    dependencies = [threads] + dependencies
+  endif
+
+  if bin_details.get('launcher-codegen', false)
+    dependencies = [launcher_codegen_dep] + dependencies
+  endif
+
+  if bin_details.get('sdl2-ui', false)
+    dependencies += [
+      libsteamrt_ui_dep,
+      sdl2_dep,
+      sdl2_ttf_dep,
+      x11_dep,
     ]
-  )
-    custom_target(
-      'steam-runtime-' + bin_name + '.1',
-      build_by_default : true,
-      command : [
-        pandoc,
-        '-s',
-        '-o', '@OUTPUT@',
-        '-f', pandoc_markdown_nosmart,
-        '-t', 'man',
-        '@INPUT@',
-      ],
-      input : bin_name + '.md',
-      output : 'steam-runtime-' + bin_name + '.1',
+  endif
+
+  pkglibexec = bin_details.get('pkglibexec', false)
+
+  # s-r-launcher-service gets installed into the ${pkglibexecdir}
+  # with an architecture prefix so we can use it during emulation
+  if bin_details.get('symlink-to-multiarch', false) and multiarch != ''
+    symlink_name_prefix = name_prefix
+    name_prefix = multiarch + '-srt-'
+
+    # We assume the symlink is to be installed in the ${bindir}
+    assert(not pkglibexec)
+    pkglibexec = true
+
+    # Note that this doesn't work in scout because its meson is too old:
+    # we fix that up in debian/rules
+    if meson.version().version_compare('>=0.61')
+      install_symlink(
+        symlink_name_prefix + bin_name,
+        # This assumes that bin_
+        install_dir : get_option('bindir'),
+        # This assumes that bindir is a single path component and
+        # pkglibexecdir is a relative path, but we already make similar
+        # assumptions about RPATHs
+        pointing_to : '..' / pkglibexecdir / name_prefix + bin_name,
+      )
+    endif
+  endif
+
+  if pkglibexec
+    install_dir = pkglibexecdir
+    rpath = pkglibexec_rpath
+  else
+    install_dir = get_option('bindir')
+    rpath = bin_rpath
+  endif
+
+  if use_rpath
+    srt_bin += executable(
+      name_prefix + bin_name,
+      sources,
+      c_args : srt_c_args,
+      dependencies : dependencies,
+      include_directories : bin_details.get('include_directories', []),
       install : true,
-      install_dir : join_paths(get_option('prefix'), get_option('mandir'), 'man1'),
+      install_dir : install_dir,
+      build_rpath : rpath,
+      install_rpath : rpath,
     )
+  else
+    srt_bin += executable(
+      name_prefix + bin_name,
+      sources,
+      c_args : srt_c_args,
+      dependencies : dependencies,
+      include_directories : bin_details.get('include_directories', []),
+      install : true,
+      install_dir : install_dir,
+    )
+  endif
+endforeach
+
+if build_man_pages
+  has_man_page = []
+
+  foreach bin_details : srt_bin_programs
+    if bin_details.get('manpage', true)
+      has_man_page += bin_details
+    endif
   endforeach
 
-  foreach bin_name : ['logger', 'run-outside-ldlp']
+  foreach bin_name : sh_scripts
+    has_man_page += { 'name': bin_name }
+  endforeach
+
+  foreach bin_details : has_man_page
+    bin_name = bin_details['name']
+    name_prefix = bin_details.get('prefix', 'steam-runtime-')
+
     custom_target(
-      'srt-' + bin_name + '.1',
+      name_prefix + bin_name + '.1',
       build_by_default : true,
       command : [
         pandoc,
@@ -281,7 +234,7 @@ if build_man_pages
         '@INPUT@',
       ],
       input : bin_name + '.md',
-      output : 'srt-' + bin_name + '.1',
+      output : name_prefix + bin_name + '.1',
       install : true,
       install_dir : join_paths(get_option('prefix'), get_option('mandir'), 'man1'),
     )

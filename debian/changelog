@@ -1,11 +1,28 @@
-steam-runtime-tools (0.20260724.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260727.0) UNRELEASED; urgency=medium
 
   [ Simon McVittie ]
+  * srt-client-container:
+    - New tool to help to launch the experimental containerized
+      Steam Client with an accompanying s-r-launcher-service.
+      Its exact functionality is subject to change: this is not a stable
+      command-line interface. (steamrt/tasks#1095)
+  * s-r-launch-client:
+    - List all instances of s-r-launcher-service --alongside-steam
+      (steamrt/tasks#1095)
+  * s-r-supervisor:
+    - Write --version output to stdout, not stderr
+  * SteamLinuxRuntime_*:
+    - Don't include srt-client-container in game runtimes, only in steamrt3c
+      (steamrt/tasks#1095)
   * Packaging:
     - d/control: Set Maintainer to a "role" address
   * Build system refactoring
+  * Tests/CI:
+    - Use Debian 13 stable release to test populate-depot.py
+    - Add a manual stage that rebuilds the current beta runtimes with an
+      updated pressure-vessel and scripts
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 24 Jul 2026 13:36:53 +0100
+ -- Simon McVittie <smcv@collabora.com>  Mon, 27 Jul 2026 17:13:45 +0100
 
 steam-runtime-tools (0.20260714.0) steamrt; urgency=medium
 

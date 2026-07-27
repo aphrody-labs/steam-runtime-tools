@@ -1871,6 +1871,31 @@ test_string_read_fd_until_eof (Fixture *f,
     }
 }
 
+static void
+test_string_replace_suffix (Fixture *f,
+                            gconstpointer context)
+{
+  g_autoptr(GString) buf = NULL;
+
+  buf = g_string_new ("/usr/bin/env");
+  g_assert_false (_srt_string_replace_suffix (buf, "/true", "/false"));
+  g_assert_cmpstr (buf->str, ==, "/usr/bin/env");
+  g_assert_cmpuint (buf->len, ==, strlen (buf->str));
+
+  g_assert_true (_srt_string_replace_suffix (buf, "/env", "/python3"));
+  g_assert_cmpstr (buf->str, ==, "/usr/bin/python3");
+  g_assert_cmpuint (buf->len, ==, strlen (buf->str));
+
+  g_assert_true (_srt_string_replace_suffix (buf, "/python3", "/env"));
+  g_assert_cmpstr (buf->str, ==, "/usr/bin/env");
+  g_assert_cmpuint (buf->len, ==, strlen (buf->str));
+
+  g_string_assign (buf, "");
+  g_assert_false (_srt_string_replace_suffix (buf, "/true", "/false"));
+  g_assert_cmpstr (buf->str, ==, "");
+  g_assert_cmpuint (buf->len, ==, strlen (buf->str));
+}
+
 struct
 {
   const char *input;
@@ -2064,6 +2089,8 @@ main (int argc,
               setup, test_string_ends_with, teardown);
   g_test_add ("/utils/string_read_fd_until_eof", Fixture, NULL,
               setup, test_string_read_fd_until_eof, teardown);
+  g_test_add ("/utils/string_replace_suffix", Fixture, NULL,
+              setup, test_string_replace_suffix, teardown);
   g_test_add ("/utils/syslog_level_parse", Fixture, NULL,
               setup, test_syslog_level_parse, teardown);
   g_test_add ("/utils/uevent-field", Fixture, NULL,

@@ -62,6 +62,14 @@ srt_bin_programs = [
   { 'name': 'urlopen' },
 ]
 
+if get_option('pressure_vessel')
+  srt_bin_programs += {
+    'name': 'client-container',
+    'prefix': 'srt-',
+    'pkglibexec': true,
+  }
+endif
+
 # Different: needs threads and UI
 if sdl2_dep.found() and sdl2_ttf_dep.found()
   srt_bin_programs += {

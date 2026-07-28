@@ -127,15 +127,15 @@ if [ -n "$steamrt_n" ] && [ -n "${STEAMRT_CI_APT_PGP_TRUSTED_FILE}" ]; then
         gpg --dearmor \
             < "${STEAMRT_CI_APT_PGP_TRUSTED_FILE}" \
             > /etc/apt/trusted.gpg.d/steamrt-ci.gpg
-    else
-        # STEAMRT4_APT_SOURCES_FILE, etc. are assumed to use
-        # [signed-by=/etc/apt/keyrings/steamrt-ci.gpg]
-        # where necessary
-        mkdir -p /etc/apt/keyrings/
-        gpg --dearmor \
-            < "${STEAMRT_CI_APT_PGP_TRUSTED_FILE}" \
-            > /etc/apt/keyrings/steamrt-ci.gpg
     fi
+
+    # STEAMRT4_APT_SOURCES_FILE, etc. are assumed to use
+    # [signed-by=/etc/apt/keyrings/steamrt-ci.gpg]
+    # where necessary
+    mkdir -p /etc/apt/keyrings/
+    gpg --dearmor \
+        < "${STEAMRT_CI_APT_PGP_TRUSTED_FILE}" \
+        > /etc/apt/keyrings/steamrt-ci.gpg
 fi
 
 apt-get -y update

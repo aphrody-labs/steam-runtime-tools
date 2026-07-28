@@ -1,6 +1,5 @@
-steam-runtime-tools (0.20260727.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260728.0) steamrt; urgency=medium
 
-  [ Simon McVittie ]
   * srt-client-container:
     - New tool to help to launch the experimental containerized
       Steam Client with an accompanying s-r-launcher-service.
@@ -22,7 +21,7 @@ steam-runtime-tools (0.20260727.0) UNRELEASED; urgency=medium
     - Add a manual stage that rebuilds the current beta runtimes with an
       updated pressure-vessel and scripts
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 27 Jul 2026 17:13:45 +0100
+ -- Simon McVittie <smcv@collabora.com>  Tue, 28 Jul 2026 13:32:44 +0100
 
 steam-runtime-tools (0.20260714.0) steamrt; urgency=medium
 

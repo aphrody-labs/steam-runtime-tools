@@ -41,7 +41,7 @@ if [ -e "$STEAMRT_CI_APT_AUTH_CONF" ]; then
 fi
 
 add_beta=yes
-too_old_for_signed_by=
+trust_ci_key_globally=
 
 # shellcheck source=/dev/null
 suite="$(. /usr/lib/os-release; echo "${VERSION_CODENAME-${VERSION}}")"
@@ -53,7 +53,7 @@ case "$suite" in
             cp "${SOLDIER_APT_SOURCES_FILE}" /etc/apt/sources.list
         fi
         steamrt_n=steamrt2
-        too_old_for_signed_by=1
+        trust_ci_key_globally=1
         ;;
 
     (sniper)
@@ -61,14 +61,14 @@ case "$suite" in
             cp "${SNIPER_APT_SOURCES_FILE}" /etc/apt/sources.list
         fi
         steamrt_n=steamrt3
-        too_old_for_signed_by=1
+        trust_ci_key_globally=1
         ;;
 
     (steamrt3c)
         if [ -n "${STEAMRT3C_APT_SOURCES_FILE-}" ]; then
             cp "${STEAMRT3C_APT_SOURCES_FILE}" /etc/apt/sources.list
         fi
-        too_old_for_signed_by=1
+        trust_ci_key_globally=1
         ;;
 
     (steamrt4)
@@ -92,7 +92,7 @@ case "$suite" in
         add_beta=
         steamrt_n=steamrt1
         suite=scout
-        too_old_for_signed_by=1
+        trust_ci_key_globally=1
 
         # Go back to Ubuntu 12.04's default gcc/g++/cpp
         update-alternatives --set g++ /usr/bin/g++-4.6
@@ -122,7 +122,7 @@ if [ -n "$add_beta" ] && [ -n "$steamrt_n" ]; then
 fi
 
 if [ -n "$steamrt_n" ] && [ -n "${STEAMRT_CI_APT_PGP_TRUSTED_FILE}" ]; then
-    if [ -n "$too_old_for_signed_by" ]; then
+    if [ -n "$trust_ci_key_globally" ]; then
         mkdir -p /etc/apt/trusted.gpg.d/
         gpg --dearmor \
             < "${STEAMRT_CI_APT_PGP_TRUSTED_FILE}" \

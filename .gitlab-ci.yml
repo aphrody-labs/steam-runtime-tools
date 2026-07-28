@@ -690,8 +690,7 @@ test-populate-depot:debian-13:
 .manual-test-depot:
     extends: .populate-depot
     stage: manual
-    rules:
-        - when: manual
+    when: manual
     image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/debian:trixie-slim
     needs:
         - package:source

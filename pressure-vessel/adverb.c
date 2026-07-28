@@ -711,6 +711,8 @@ main (int argc,
   g_autoptr(GArray) tuples = NULL;
   g_autoptr(SrtSubprocessRunner) runner = NULL;
   g_autoptr(SrtSystemInfo) info = NULL;
+  SrtLogFlags log_flags = (SRT_LOG_FLAGS_DEBUG_IMPLIES_TIMING
+                           | SRT_LOG_FLAGS_DIVERT_STDOUT);
 
   setlocale (LC_ALL, "");
 
@@ -723,9 +725,7 @@ main (int argc,
   global_ld_so_conf_entries = ld_so_conf_entries;
 
   /* Set up the initial base logging */
-  if (!_srt_util_set_glib_log_handler ("pv-adverb",
-                                       G_LOG_DOMAIN,
-                                       SRT_LOG_FLAGS_DIVERT_STDOUT,
+  if (!_srt_util_set_glib_log_handler ("pv-adverb", G_LOG_DOMAIN, log_flags,
                                        &original_stdout, &original_stderr,
                                        error))
     {
@@ -776,10 +776,12 @@ main (int argc,
       goto out;
     }
 
-  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                       (SRT_LOG_FLAGS_DIVERT_STDOUT |
-                                        SRT_LOG_FLAGS_OPTIONALLY_JOURNAL |
-                                        (opt_verbose ? SRT_LOG_FLAGS_DEBUG : 0)),
+  log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL;
+
+  if (opt_verbose)
+    log_flags |= SRT_LOG_FLAGS_DEBUG;
+
+  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN, log_flags,
                                        NULL, NULL, error))
     {
       ret = 1;

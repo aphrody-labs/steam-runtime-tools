@@ -71,6 +71,11 @@ and use the adjacent `./run` script.
 
 Pass the given *OPTION* to the entry-point script,
 and therefore to **pressure-vessel-wrap**(1).
+Any option that is accepted by **pressure-vessel-wrap**(1) can be used.
+
+Often the syntax with an **=** sign,
+such as **--pv-option=--devel** or **--pv-option=--terminal=xterm**,
+will be the most convenient.
 
 </dd>
 <dt>

@@ -1,6 +1,7 @@
 steam-runtime-tools (0.20260729.0) UNRELEASED; urgency=medium
 
   [ Simon McVittie ]
+  * Avoid some unnecessary log messages when debugging is enabled
   * Tests/CI:
     - Avoid multiarch skew when installing dependencies for multiple
       architectures (steamrt/tasks#1100)

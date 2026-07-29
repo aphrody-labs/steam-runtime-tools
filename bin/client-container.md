@@ -80,11 +80,13 @@ will be the most convenient.
 </dd>
 <dt>
 
-**--verbose**
+**--verbose**, **-v**
 
 </dt><dd>
 
-Be more verbose. If used twice, debug messages are shown.
+Be more verbose.
+If used twice (**-vv**),
+debug messages are shown.
 
 </dd>
 </dl>

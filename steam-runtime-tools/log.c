@@ -380,8 +380,6 @@ log_handler (const gchar *log_domain,
  *  if @SRT_LOG_FLAGS_DIFFABLE is set
  *  (enabled by default if @SRT_LOG_FLAGS_DIFFABLE is not set)
  * @SRT_LOG_FLAGS_TIMING: Emit timings for performance profiling
- *  (enabled by default if @SRT_LOG_FLAGS_DEBUG is set and
- *  @SRT_LOG_FLAGS_DIFFABLE is not)
  * @SRT_LOG_FLAGS_DIVERT_STDOUT: Make standard output a duplicate of
  *  standard error, to avoid unstructured diagnostics like g_debug()
  *  being written to the original standard output
@@ -396,6 +394,9 @@ log_handler (const gchar *log_domain,
  * @SRT_LOG_FLAGS_LEVEL: When emitting diagnostic messages, prepend a
  *  priority marker compatible with `systemd-cat --level-prefix=1` and
  *  `srt-logger --parse-level-prefix`, for example `<4>` for warnings
+ * @SRT_LOG_FLAGS_DEBUG_IMPLIES_TIMING: Automatically
+ *  enable @SRT_LOG_FLAGS_TIMING if @SRT_LOG_FLAGS_DEBUG is set,
+ *  and @SRT_LOG_FLAGS_DIFFABLE is not.
  * @SRT_LOG_FLAGS_NONE: None of the above
  *
  * Flags affecting logging.
@@ -416,6 +417,10 @@ static const GDebugKey log_enable[] =
    * - SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
    * via $SRT_LOG: implementing those flags correctly requires the application
    * to be aware that the original stdout might get altered */
+
+  /* Intentionally no way to set SRT_LOG_FLAGS_PROGRAM_DEBUG_IMPLIES_TIMING
+   * via $SRT_LOG: this flag indicates whether the application relies on
+   * timing/profiling messages to indicate progress while debugging. */
 
   /* Order matters: _srt_util_set_glib_log_handler() relies on this being
    * the last one, so that it can be disabled in the absence of
@@ -720,7 +725,9 @@ _srt_util_set_glib_log_handler (const char *prgname,
 
   if (flags & SRT_LOG_FLAGS_TIMING)
     _srt_profiling_enable (G_LOG_LEVEL_MESSAGE);
-  else if ((flags & SRT_LOG_FLAGS_DEBUG) && !(flags & SRT_LOG_FLAGS_DIFFABLE))
+  else if ((flags & SRT_LOG_FLAGS_DEBUG_IMPLIES_TIMING)
+           && (flags & SRT_LOG_FLAGS_DEBUG)
+           && !(flags & SRT_LOG_FLAGS_DIFFABLE))
     _srt_profiling_enable (G_LOG_LEVEL_DEBUG);
 
   /* We ensure stdin is open first, because otherwise any fd we open is

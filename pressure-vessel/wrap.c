@@ -102,7 +102,7 @@ main (int argc,
   int result;
   PvAppendPreloadFlags append_preload_flags = PV_APPEND_PRELOAD_FLAGS_NONE;
   const SrtKnownArchitecture *host_machine = NULL;
-  SrtLogFlags log_flags;
+  SrtLogFlags log_flags = SRT_LOG_FLAGS_DEBUG_IMPLIES_TIMING;
   PvWrapLogFlags pv_log_flags = PV_WRAP_LOG_FLAGS_NONE;
   SrtSteamCompatFlags compat_flags;
   const GQuark *tuples;
@@ -112,7 +112,7 @@ main (int argc,
 
   /* Set up the initial base logging */
   if (!_srt_util_set_glib_log_handler ("pressure-vessel-wrap",
-                                       G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
+                                       G_LOG_DOMAIN, log_flags,
                                        &original_stdout, &original_stderr, error))
     goto out;
 
@@ -149,7 +149,7 @@ main (int argc,
   if (!pv_wrap_context_parse_argv (self, &argc, &argv, error))
     goto out;
 
-  log_flags = SRT_LOG_FLAGS_DIVERT_STDOUT | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL;
+  log_flags |= SRT_LOG_FLAGS_DIVERT_STDOUT | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL;
 
   if (self->options.deterministic)
     log_flags |= SRT_LOG_FLAGS_DIFFABLE;

@@ -208,9 +208,16 @@ The exit status is similar to **env**(1):
 :   Invalid arguments were given,
     or **srt-client-container** failed to start.
 
-126, 127
-:   The *COMMAND* was not found or could not be launched.
-    These errors are not currently distinguished.
+126
+:   Either the *COMMAND*,
+    the pressure-vessel container entry point,
+    or the **steam-runtime-launcher-service** was found
+    but could not be executed.
+
+127
+:   Either the *COMMAND*,
+    the pressure-vessel container entry point,
+    or the **steam-runtime-launcher-service** was not found.
 
 255
 :   The *COMMAND* was launched, but its exit status could not be

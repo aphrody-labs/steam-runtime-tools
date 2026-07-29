@@ -205,8 +205,8 @@ The exit status is similar to **env**(1):
 :   The *COMMAND* exited successfully with status 0.
 
 125
-:   Invalid arguments were given, or **steam-runtime-supervisor**
-    failed to start.
+:   Invalid arguments were given,
+    or **srt-client-container** failed to start.
 
 126, 127
 :   The *COMMAND* was not found or could not be launched.

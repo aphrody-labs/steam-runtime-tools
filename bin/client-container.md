@@ -174,8 +174,10 @@ the `SRT_LAUNCHER_SERVICE_ALONGSIDE_STEAM` environment variable.
 The standard output from *COMMAND* is printed on standard output.
 
 The standard error from *COMMAND* is printed on standard error.
-Diagnostic messages from **srt-client-container** may also be printed
-on standard error.
+Diagnostic messages from **srt-client-container**,
+**steam-runtime-launcher-service**,
+**pressure-vessel**,
+etc. may also be printed on standard error.
 
 # PROCESS LIFECYCLE
 

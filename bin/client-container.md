@@ -15,8 +15,8 @@ srt-client-container - run the Steam Client in a container
 # SYNOPSIS
 
 **srt-client-container**
-[**--pv-entry-point=**_SCRIPT_]
-[**--pv-option=**_OPTION_...]
+[**--pv-entry-point** *SCRIPT*]
+[**--pv-option** *OPTION*...]
 [**--verbose** [**--verbose**]]
 [**--**]
 [*COMMAND* [*ARGUMENTS...*]]
@@ -52,7 +52,7 @@ for debugging purposes.
 <dl>
 <dt>
 
-**--pv-entry-point=**_SCRIPT_
+**--pv-entry-point** *SCRIPT*
 
 </dt><dd>
 
@@ -65,26 +65,35 @@ and use the adjacent `./run` script.
 </dd>
 <dt>
 
-**--pv-option=**_OPTION_
+**--pv-option** *OPTION*
 
 </dt><dd>
 
 Pass the given *OPTION* to the entry-point script,
 and therefore to **pressure-vessel-wrap**(1).
+Any option that is accepted by **pressure-vessel-wrap**(1) can be used.
+
+Often the syntax with an **=** sign,
+such as **--pv-option=--devel** or **--pv-option=--terminal=xterm**,
+will be the most convenient.
 
 </dd>
 <dt>
 
-**--verbose**
+**--verbose**, **-v**
 
 </dt><dd>
 
-Be more verbose. If used twice, debug messages are shown.
+Be more verbose.
+If used twice (**-vv**),
+debug messages are shown.
 
 </dd>
 </dl>
 
 # ENVIRONMENT
+
+## Read by srt-client-container
 
 <dl>
 <dt>
@@ -107,6 +116,20 @@ If set to 1, same as `SRT_LOG=timestamp`
 </dd>
 <dt>
 
+`SRT_LAUNCHER_SERVICE` (path)
+
+</dt><dd>
+
+If set,
+use this executable instead of automatically selecting a nearby
+`libexec/steam-runtime-tools-0/${architecture}-srt-launcher-service`
+or
+`bin/steam-runtime-launcher-service`
+executable.
+
+</dd>
+<dt>
+
 `SRT_LOG`
 
 </dt><dd>
@@ -117,13 +140,44 @@ affecting how output is recorded. See source code for details.
 </dd>
 </dl>
 
+## Set by srt-client-container
+
+<dl>
+<dt>
+
+`SRT_LAUNCHER_SERVICE_ALONGSIDE_STEAM` (D-Bus name)
+
+</dt><dd>
+
+Set to the bus name of the accompanying **steam-runtime-launcher-service**
+instance,
+in both the Steam Runtime container and the
+**steam-runtime-launcher-service**.
+
+The result is that if the *COMMAND* starts another command using
+`steam-runtime-launcher-service --alongside-steam -- OTHER`,
+or if any command that is a descendant of the
+**steam-runtime-launcher-service** does the same thing,
+then the command *OTHER* will be run by the
+**steam-runtime-launcher-service** that was started by
+**srt-client-container**
+(as opposed to any other instance of
+`steam-runtime-launcher-service --alongside-steam` that might exist),
+as long as none of the descendant processes overwrite
+the `SRT_LAUNCHER_SERVICE_ALONGSIDE_STEAM` environment variable.
+
+</dd>
+</dl>
+
 # OUTPUT
 
 The standard output from *COMMAND* is printed on standard output.
 
 The standard error from *COMMAND* is printed on standard error.
-Diagnostic messages from **srt-client-container** may also be printed
-on standard error.
+Diagnostic messages from **srt-client-container**,
+**steam-runtime-launcher-service**,
+**pressure-vessel**,
+etc. may also be printed on standard error.
 
 # PROCESS LIFECYCLE
 
@@ -151,23 +205,35 @@ The exit status is similar to **env**(1):
 :   The *COMMAND* exited successfully with status 0.
 
 125
-:   Invalid arguments were given, or **steam-runtime-supervisor**
-    failed to start.
+:   Invalid arguments were given,
+    or **srt-client-container** failed to start,
+    or **steam-runtime-launcher-service** failed to start.
 
-126, 127
-:   The *COMMAND* was not found or could not be launched.
-    These errors are not currently distinguished.
+126
+:   Either the *COMMAND*,
+    the pressure-vessel container entry point,
+    or the **steam-runtime-launcher-service** was found
+    but could not be executed.
+
+127
+:   Either the *COMMAND*,
+    the pressure-vessel container entry point,
+    or the **steam-runtime-launcher-service** was not found.
 
 255
-:   The *COMMAND* was launched, but its exit status could not be
-    determined. This happens if the wait-status was neither
-    normal exit nor termination by a signal.
+:   The *COMMAND* or the pressure-vessel container entry point
+    was launched,
+    but its exit status could not be determined.
+    This happens if the wait-status was neither normal exit nor
+    termination by a signal.
 
 Any value
-:   The *COMMAND* exited unsuccessfully with the status indicated.
+:   The *COMMAND* or the pressure-vessel container entry point
+    exited unsuccessfully with the status indicated.
 
 128 + *n*
-:   The *COMMAND* was killed by signal *n*.
+:   The *COMMAND* or the pressure-vessel container entry point
+    was killed by signal *n*.
     (This is the same encoding used by **bash**(1), **bwrap**(1) and
     **env**(1).)
 

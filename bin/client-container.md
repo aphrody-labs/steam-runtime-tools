@@ -93,6 +93,8 @@ debug messages are shown.
 
 # ENVIRONMENT
 
+## Read by srt-client-container
+
 <dl>
 <dt>
 
@@ -114,12 +116,55 @@ If set to 1, same as `SRT_LOG=timestamp`
 </dd>
 <dt>
 
+`SRT_LAUNCHER_SERVICE` (path)
+
+</dt><dd>
+
+If set,
+use this executable instead of automatically selecting a nearby
+`libexec/steam-runtime-tools-0/${architecture}-srt-launcher-service`
+or
+`bin/steam-runtime-launcher-service`
+executable.
+
+</dd>
+<dt>
+
 `SRT_LOG`
 
 </dt><dd>
 
 A sequence of tokens separated by colons, spaces or commas
 affecting how output is recorded. See source code for details.
+
+</dd>
+</dl>
+
+## Set by srt-client-container
+
+<dl>
+<dt>
+
+`SRT_LAUNCHER_SERVICE_ALONGSIDE_STEAM` (D-Bus name)
+
+</dt><dd>
+
+Set to the bus name of the accompanying **steam-runtime-launcher-service**
+instance,
+in both the Steam Runtime container and the
+**steam-runtime-launcher-service**.
+
+The result is that if the *COMMAND* starts another command using
+`steam-runtime-launcher-service --alongside-steam -- OTHER`,
+or if any command that is a descendant of the
+**steam-runtime-launcher-service** does the same thing,
+then the command *OTHER* will be run by the
+**steam-runtime-launcher-service** that was started by
+**srt-client-container**
+(as opposed to any other instance of
+`steam-runtime-launcher-service --alongside-steam` that might exist),
+as long as none of the descendant processes overwrite
+the `SRT_LAUNCHER_SERVICE_ALONGSIDE_STEAM` environment variable.
 
 </dd>
 </dl>

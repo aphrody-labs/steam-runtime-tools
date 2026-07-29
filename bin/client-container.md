@@ -15,8 +15,8 @@ srt-client-container - run the Steam Client in a container
 # SYNOPSIS
 
 **srt-client-container**
-[**--pv-entry-point=**_SCRIPT_]
-[**--pv-option=**_OPTION_...]
+[**--pv-entry-point** *SCRIPT*]
+[**--pv-option** *OPTION*...]
 [**--verbose** [**--verbose**]]
 [**--**]
 [*COMMAND* [*ARGUMENTS...*]]
@@ -52,7 +52,7 @@ for debugging purposes.
 <dl>
 <dt>
 
-**--pv-entry-point=**_SCRIPT_
+**--pv-entry-point** *SCRIPT*
 
 </dt><dd>
 
@@ -65,7 +65,7 @@ and use the adjacent `./run` script.
 </dd>
 <dt>
 
-**--pv-option=**_OPTION_
+**--pv-option** *OPTION*
 
 </dt><dd>
 

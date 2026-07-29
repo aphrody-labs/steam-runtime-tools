@@ -1,3 +1,13 @@
+steam-runtime-tools (0.20260729.0) UNRELEASED; urgency=medium
+
+  [ Simon McVittie ]
+  * Tests/CI:
+    - Avoid multiarch skew when installing dependencies for multiple
+      architectures (steamrt/tasks#1100)
+    - Make manual jobs not block the pipeline
+
+ -- Simon McVittie <smcv@collabora.com>  Wed, 29 Jul 2026 12:06:57 +0100
+
 steam-runtime-tools (0.20260728.0) steamrt; urgency=medium
 
   * srt-client-container:

@@ -206,7 +206,8 @@ The exit status is similar to **env**(1):
 
 125
 :   Invalid arguments were given,
-    or **srt-client-container** failed to start.
+    or **srt-client-container** failed to start,
+    or **steam-runtime-launcher-service** failed to start.
 
 126
 :   Either the *COMMAND*,
@@ -220,15 +221,19 @@ The exit status is similar to **env**(1):
     or the **steam-runtime-launcher-service** was not found.
 
 255
-:   The *COMMAND* was launched, but its exit status could not be
-    determined. This happens if the wait-status was neither
-    normal exit nor termination by a signal.
+:   The *COMMAND* or the pressure-vessel container entry point
+    was launched,
+    but its exit status could not be determined.
+    This happens if the wait-status was neither normal exit nor
+    termination by a signal.
 
 Any value
-:   The *COMMAND* exited unsuccessfully with the status indicated.
+:   The *COMMAND* or the pressure-vessel container entry point
+    exited unsuccessfully with the status indicated.
 
 128 + *n*
-:   The *COMMAND* was killed by signal *n*.
+:   The *COMMAND* or the pressure-vessel container entry point
+    was killed by signal *n*.
     (This is the same encoding used by **bash**(1), **bwrap**(1) and
     **env**(1).)
 

@@ -267,6 +267,176 @@ test_to_shell (Fixture *f,
 }
 
 static void
+test_prepend_append_immediate (Fixture *f,
+                               gconstpointer context)
+{
+  /* Test all possible combinations of "prefix" and "current" for
+   * _srt_env_overlay_prepend */
+
+  /* NULL prefix can't happen */
+  _srt_env_overlay_set (f->container_env, "VAR", "current");
+  g_test_expect_message ("steam-runtime-tools", G_LOG_LEVEL_CRITICAL,
+                         "_srt_env_overlay_prepend: assertion 'prefix != NULL' failed");
+  _srt_env_overlay_prepend (f->container_env, "VAR", NULL, ':');
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "VAR"),
+                   ==, "current");
+
+  /* Test prefix == "" with different current values */
+  _srt_env_overlay_set (f->container_env, "VAR", NULL);
+  _srt_env_overlay_prepend (f->container_env, "VAR", "", ':');
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "VAR"),
+                   ==, "");
+
+  _srt_env_overlay_set (f->container_env, "VAR", "");
+  _srt_env_overlay_prepend (f->container_env, "VAR", "", ':');
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "VAR"),
+                   ==, "");
+
+  _srt_env_overlay_set (f->container_env, "VAR", "current");
+  _srt_env_overlay_prepend (f->container_env, "VAR", "", ':');
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "VAR"),
+                   ==, "current");
+
+  /* Test prefix == "prefix" with different current values */
+  _srt_env_overlay_set (f->container_env, "VAR", NULL);
+  _srt_env_overlay_prepend (f->container_env, "VAR", "prefix", ':');
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "VAR"),
+                   ==, "prefix");
+
+  _srt_env_overlay_set (f->container_env, "VAR", "");
+  _srt_env_overlay_prepend (f->container_env, "VAR", "prefix", ':');
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "VAR"),
+                   ==, "prefix");
+
+  _srt_env_overlay_set (f->container_env, "VAR", "current");
+  _srt_env_overlay_prepend (f->container_env, "VAR", "prefix", ':');
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "VAR"),
+                   ==, "prefix:current");
+
+  /* Test combining immediate prepend and append */
+
+  /* G_MESSAGES_DEBUG is already set to "all" by setup() */
+  _srt_env_overlay_prepend (f->container_env, "G_MESSAGES_DEBUG", "x", ':');
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "G_MESSAGES_DEBUG"),
+                   ==, "x:all");
+
+  _srt_env_overlay_append (f->container_env, "G_MESSAGES_DEBUG", "y", ':');
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "G_MESSAGES_DEBUG"),
+                   ==, "x:all:y");
+
+  /* Immediate edit with a different delimiter, however strange, is allowed. */
+  _srt_env_overlay_append (f->container_env, "G_MESSAGES_DEBUG", "z", ' ');
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "G_MESSAGES_DEBUG"),
+                   ==, "x:all:y z");
+}
+
+static void
+test_prepend_append_deferred (Fixture *f,
+                              gconstpointer context)
+{
+  char out_delimiter = '\0';
+  const char *out_prepend = NULL;
+  const char *out_append = NULL;
+  g_auto(GStrv) envp = NULL;
+
+  /* NOT_IN_ENV not in the env overlay, this tests unresolved pending edits. */
+  _srt_env_overlay_prepend (f->container_env, "NOT_IN_ENV", "a", ':');
+  _srt_env_overlay_append (f->container_env, "NOT_IN_ENV", "x", ':');
+  _srt_env_overlay_prepend (f->container_env, "NOT_IN_ENV", "b", ':');
+  _srt_env_overlay_append (f->container_env, "NOT_IN_ENV", "y", ':');
+
+  /* Deferred edits with a different delimiter happen with the first
+   * specified delimiter. */
+  g_test_expect_message ("steam-runtime-tools", G_LOG_LEVEL_WARNING,
+                         "NOT_IN_ENV is already being edited with ':', delimiter ' ' is going to be discarded.");
+  _srt_env_overlay_prepend (f->container_env, "NOT_IN_ENV", "c", ' ');
+  g_test_expect_message ("steam-runtime-tools", G_LOG_LEVEL_WARNING,
+                         "NOT_IN_ENV is already being edited with ':', delimiter ' ' is going to be discarded.");
+  _srt_env_overlay_append (f->container_env, "NOT_IN_ENV", "z", ' ');
+
+  g_assert_true (_srt_env_overlay_contains (f->container_env, "NOT_IN_ENV"));
+  g_assert_null (_srt_env_overlay_get (f->container_env, "NOT_IN_ENV"));
+
+  g_assert_true (_srt_env_overlay_get_edit (f->container_env, "NOT_IN_ENV",
+                                            &out_delimiter,
+                                            &out_prepend, &out_append));
+  g_assert_cmpint (out_delimiter, ==, ':');
+  g_assert_cmpstr (out_prepend, ==, "c:b:a");
+  g_assert_cmpstr (out_append, ==, "x:y:z");
+}
+
+static void
+test_prepend_append_accumulate (Fixture *f,
+                                gconstpointer context)
+{
+  /* Repeated prepend/append calls on a resolved variable apply immediately.
+   * G_MESSAGES_DEBUG is already set to "all" by setup() */
+
+  /* Each new prepend call is pushed further ahead of the base value. */
+  _srt_env_overlay_prepend (f->container_env, "G_MESSAGES_DEBUG", "a", ':');
+  _srt_env_overlay_prepend (f->container_env, "G_MESSAGES_DEBUG", "b", ':');
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "G_MESSAGES_DEBUG"),
+                   ==, "b:a:all");
+
+  /* Repeated append calls accumulate in call order. */
+  _srt_env_overlay_append (f->container_env, "G_MESSAGES_DEBUG", "x", ':');
+  _srt_env_overlay_append (f->container_env, "G_MESSAGES_DEBUG", "y", ':');
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "G_MESSAGES_DEBUG"),
+                   ==, "b:a:all:x:y");
+}
+
+static void
+test_prepend_append_mutual_exclusivity (Fixture *f,
+                                        gconstpointer context)
+{
+  /* A deferred edit on FLATPAK_ID... */
+  _srt_env_overlay_prepend (f->container_env, "FLATPAK_ID", "pre", ':');
+  g_assert_true (_srt_env_overlay_get_edit (f->container_env, "FLATPAK_ID",
+                                            NULL, NULL, NULL));
+
+  /* ...is cleared by an explicit set()... */
+  _srt_env_overlay_set (f->container_env, "FLATPAK_ID", "explicit");
+  g_assert_false (_srt_env_overlay_get_edit (f->container_env, "FLATPAK_ID",
+                                             NULL, NULL, NULL));
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "FLATPAK_ID"),
+                   ==, "explicit");
+
+  /* ...and also by an explicit inherit(). First reset to inherited state. */
+  _srt_env_overlay_inherit (f->container_env, "FLATPAK_ID");
+  _srt_env_overlay_prepend (f->container_env, "FLATPAK_ID", "pre", ':');
+  g_assert_true (_srt_env_overlay_get_edit (f->container_env, "FLATPAK_ID",
+                                            NULL, NULL, NULL));
+  _srt_env_overlay_inherit (f->container_env, "FLATPAK_ID");
+  g_assert_false (_srt_env_overlay_get_edit (f->container_env, "FLATPAK_ID",
+                                             NULL, NULL, NULL));
+  g_assert_false (_srt_env_overlay_contains (f->container_env, "FLATPAK_ID"));
+}
+
+static void
+test_inherit_matching_pattern_clears_edits (Fixture *f,
+                                            gconstpointer context)
+{
+  /* A deferred edit on FLATPAK_ID... */
+  _srt_env_overlay_prepend (f->container_env, "FLATPAK_ID", "pre", ':');
+  g_assert_true (_srt_env_overlay_get_edit (f->container_env, "FLATPAK_ID",
+                                            NULL, NULL, NULL));
+  g_assert_true (_srt_env_overlay_contains (f->container_env, "FLATPAK_ID"));
+
+  /* ...must be cleared by inherit_matching_pattern() when the name matches. */
+  _srt_env_overlay_inherit_matching_pattern (f->container_env, "FLATPAK_*");
+
+  g_assert_false (_srt_env_overlay_get_edit (f->container_env, "FLATPAK_ID",
+                                             NULL, NULL, NULL));
+  g_assert_false (_srt_env_overlay_contains (f->container_env, "FLATPAK_ID"));
+
+  /* A deferred append on a non-matching variable must be unaffected. */
+  _srt_env_overlay_append (f->container_env, "LD_PRELOAD", "extra", ':');
+  _srt_env_overlay_inherit_matching_pattern (f->container_env, "FLATPAK_*");
+  g_assert_true (_srt_env_overlay_get_edit (f->container_env, "LD_PRELOAD",
+                                            NULL, NULL, NULL));
+}
+
+static void
 test_update (Fixture *f,
              gconstpointer context)
 {
@@ -301,6 +471,16 @@ main (int argc,
               setup, test_to_env0, teardown);
   g_test_add ("/env-overlay/to-shell", Fixture, NULL,
               setup, test_to_shell, teardown);
+  g_test_add ("/env-overlay/prepend-append-immediate", Fixture, NULL,
+              setup, test_prepend_append_immediate, teardown);
+  g_test_add ("/env-overlay/prepend-append-deferred", Fixture, NULL,
+              setup, test_prepend_append_deferred, teardown);
+  g_test_add ("/env-overlay/prepend-append-accumulate", Fixture, NULL,
+              setup, test_prepend_append_accumulate, teardown);
+  g_test_add ("/env-overlay/prepend-append-mutual-exclusivity", Fixture, NULL,
+              setup, test_prepend_append_mutual_exclusivity, teardown);
+  g_test_add ("/env-overlay/inherit-matching-pattern-clears-edits", Fixture, NULL,
+              setup, test_inherit_matching_pattern_clears_edits, teardown);
   g_test_add ("/env-overlay/update", Fixture, NULL,
               setup, test_update, teardown);
 

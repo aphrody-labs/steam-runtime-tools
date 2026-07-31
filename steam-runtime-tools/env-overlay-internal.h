@@ -27,6 +27,22 @@
 #define SRT_TYPE_ENV_OVERLAY (_srt_env_overlay_get_type ())
 GType _srt_env_overlay_get_type (void);
 
+typedef struct _SrtEnvOverlayEdit SrtEnvOverlayEdit;
+
+/*
+ * SrtEnvOverlayEdit:
+ *
+ * A deferred prepends and/or append operation for a single environment
+ * variable whose base value is not yet known (i.e. it would otherwise
+ * be inherited from the execution environment).
+ */
+struct _SrtEnvOverlayEdit
+{
+  char delimiter;
+  gchar *prepend;  /* (nullable) */
+  gchar *append;   /* (nullable) */
+};
+
 typedef struct _SrtEnvOverlay SrtEnvOverlay;
 
 /*
@@ -37,12 +53,14 @@ typedef struct _SrtEnvOverlay SrtEnvOverlay;
  * - Set to a value (empty or non-empty)
  * - Forced to be unset
  * - Inherited from some execution environment that is unknown to us
+ * - Has a pending prepend/append edit (deferred resolution)
  *
  * We represent this as follows:
  *
  * - Set to a value: values[VAR] = VAL
  * - Forced to be unset: values[VAR] = NULL
- * - Inherited from the execution environment: VAR not in `values`
+ * - Inherited from the execution environment: VAR not in `values` and not in `edits`
+ * - Has a deferred edit: edits[VAR] = SrtEnvOverlayEdit (VAR is never in `values`)
  */
 struct _SrtEnvOverlay
 {
@@ -50,6 +68,9 @@ struct _SrtEnvOverlay
 
   /* (element-type filename filename) */
   GHashTable *values;
+
+  /* (element-type filename SrtEnvOverlayEdit) */
+  GHashTable *edits;
 };
 
 SrtEnvOverlay *_srt_env_overlay_new (void);
@@ -66,6 +87,15 @@ void _srt_env_overlay_set (SrtEnvOverlay *self,
 void _srt_env_overlay_take (SrtEnvOverlay *self,
                             gchar *var,
                             gchar *val);
+
+void _srt_env_overlay_prepend (SrtEnvOverlay *self,
+                               const char *var,
+                               const char *prefix,
+                               char delimiter);
+void _srt_env_overlay_append (SrtEnvOverlay *self,
+                              const char *var,
+                              const char *suffix,
+                              char delimiter);
 
 void _srt_env_overlay_inherit (SrtEnvOverlay *self,
                                const char *var);
@@ -90,6 +120,12 @@ gboolean _srt_env_overlay_contains (const SrtEnvOverlay *self,
 const char *_srt_env_overlay_get (const SrtEnvOverlay *self,
                                   const char *var);
 
+gboolean _srt_env_overlay_get_edit (const SrtEnvOverlay *self,
+                                    const char *var,
+                                    char *delimiter_out,
+                                    const char **prepend_out,
+                                    const char **append_out);
+
 void _srt_env_overlay_debug_log (const SrtEnvOverlay *self);
 GStrv _srt_env_overlay_apply (const SrtEnvOverlay *self,
                               GStrv envp);
@@ -99,10 +135,12 @@ gchar *_srt_env_overlay_to_shell (const SrtEnvOverlay *self);
 GOptionGroup *_srt_env_overlay_create_option_group (SrtEnvOverlay *self);
 
 /*
- * Returns: %TRUE if this environment overlay does not set or unset anything.
+ * Returns: %TRUE if this environment overlay does not set or unset anything,
+ *          and has no pending edits.
  */
 static inline gboolean
 _srt_env_overlay_is_empty (const SrtEnvOverlay *self)
 {
-  return (g_hash_table_size (self->values) == 0);
+  return (g_hash_table_size (self->values) == 0 &&
+          g_hash_table_size (self->edits) == 0);
 }

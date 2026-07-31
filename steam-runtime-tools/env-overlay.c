@@ -1083,6 +1083,9 @@ _srt_env_overlay_create_option_group (SrtEnvOverlay *self)
  *
  * For each variable that would be unset by @other,
  * update @self to unset it.
+ *
+ * For each variable with a pending edit in @other,
+ * "apply" the edit to @self.
  */
 void
 _srt_env_overlay_update (SrtEnvOverlay *self,
@@ -1099,5 +1102,21 @@ _srt_env_overlay_update (SrtEnvOverlay *self,
   g_hash_table_iter_init (&iter, other->values);
 
   while (g_hash_table_iter_next (&iter, &k, &v))
-    g_hash_table_replace (self->values, g_strdup (k), g_strdup (v));
+    {
+      g_hash_table_remove (self->edits, k);
+      g_hash_table_replace (self->values, g_strdup (k), g_strdup (v));
+    }
+
+  g_hash_table_iter_init (&iter, other->edits);
+
+  while (g_hash_table_iter_next (&iter, &k, &v))
+    {
+      SrtEnvOverlayEdit *edit = v;
+
+      if (edit->prepend != NULL)
+        _srt_env_overlay_prepend (self, k, edit->prepend, edit->delimiter);
+
+      if (edit->append != NULL)
+        _srt_env_overlay_append (self, k, edit->append, edit->delimiter);
+    }
 }

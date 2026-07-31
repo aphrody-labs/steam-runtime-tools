@@ -458,6 +458,95 @@ test_update (Fixture *f,
                    ==, "all");
 }
 
+static void
+test_update_edits (Fixture *f,
+                   gconstpointer context)
+{
+  g_autoptr(SrtEnvOverlay) self = NULL;
+  g_autoptr(SrtEnvOverlay) other = NULL;
+  g_autoptr(SrtEnvOverlay) self_updated = NULL;
+  char out_delimiter = '\0';
+  const char *out_prepend = NULL;
+  const char *out_append = NULL;
+
+  self = _srt_env_overlay_new();
+  _srt_env_overlay_set (self, "VAR1", "val1_self");
+  _srt_env_overlay_set (self, "VAR2", "val2_self");
+  _srt_env_overlay_set (self, "VAR5", "val5_self");
+  _srt_env_overlay_append (self, "VAR3", "val3_post_self", ':');
+  _srt_env_overlay_prepend (self, "VAR4", "val4_pre_self", ':');
+  _srt_env_overlay_append (self, "VAR4", "val4_post_self", ':');
+  _srt_env_overlay_prepend (self, "VAR7", "val7_pre_self", ':');
+  _srt_env_overlay_append (self, "VAR7", "val7_post_self", ':');
+
+  other = _srt_env_overlay_new();
+  _srt_env_overlay_set (other, "VAR1", "val1_other");
+  _srt_env_overlay_set (other, "VAR3", NULL);
+  _srt_env_overlay_set (other, "VAR6", "val6_other");
+  _srt_env_overlay_prepend (other, "VAR2", "val2_pre_other", ':');
+  _srt_env_overlay_append (other, "VAR2", "val2_post_other", ':');
+  _srt_env_overlay_prepend (other, "VAR4", "val4_pre_other", ':');
+  _srt_env_overlay_prepend (other, "VAR8", "val8_pre_other", ':');
+  _srt_env_overlay_append (other, "VAR8", "val8_post_other", ':');
+
+  self_updated = _srt_env_overlay_copy(self);
+  _srt_env_overlay_update (self_updated, other);
+
+  /* VAR1 is taken from `other->values` */
+  g_assert_cmpstr (_srt_env_overlay_get (self_updated, "VAR1"),
+                   ==, "val1_other");
+  g_assert_false (_srt_env_overlay_get_edit (self_updated, "VAR1",
+                                             NULL, NULL, NULL));
+
+  /* The VAR2 from `other->edits` is applied to `self->values` */
+  g_assert_cmpstr (_srt_env_overlay_get (self_updated, "VAR2"),
+                   ==, "val2_pre_other:val2_self:val2_post_other");
+  g_assert_false (_srt_env_overlay_get_edit (self_updated, "VAR2",
+                                             NULL, NULL, NULL));
+
+  /* VAR3 is unset by `other->values` replacing the one in `self->edits` */
+  g_assert_cmpstr (_srt_env_overlay_get (self_updated, "VAR3"),
+                   ==, NULL);
+  g_assert_false (_srt_env_overlay_get_edit (self_updated, "VAR3",
+                                             NULL, NULL, NULL));
+
+  /* The VAR4 from `other->edits` is applied to `self->edits` */
+  g_assert_true (_srt_env_overlay_get_edit (self_updated, "VAR4",
+                                            &out_delimiter, &out_prepend, &out_append));
+  g_assert_cmpint (out_delimiter, ==, ':');
+  g_assert_cmpstr (out_prepend, ==, "val4_pre_other:val4_pre_self");
+  g_assert_cmpstr (out_append, ==, "val4_post_self");
+  g_assert_null (_srt_env_overlay_get (self_updated, "VAR4"));
+
+  /* VAR5 was only in `self->values` and is kept intact */
+  g_assert_cmpstr (_srt_env_overlay_get (self_updated, "VAR5"),
+                   ==, "val5_self");
+  g_assert_false (_srt_env_overlay_get_edit (self_updated, "VAR5",
+                                             NULL, NULL, NULL));
+
+  /* VAR6 was only in `other->values` and is updated in `self` */
+  g_assert_cmpstr (_srt_env_overlay_get (self_updated, "VAR6"),
+                   ==, "val6_other");
+  g_assert_false (_srt_env_overlay_get_edit (self_updated, "VAR6",
+                                             NULL, NULL, NULL));
+
+  /* VAR7 was only in `self->edits` and is kept intact */
+  g_assert_true (_srt_env_overlay_get_edit (self_updated, "VAR7",
+                                            &out_delimiter, &out_prepend, &out_append));
+  g_assert_cmpint (out_delimiter, ==, ':');
+  g_assert_cmpstr (out_prepend, ==, "val7_pre_self");
+  g_assert_cmpstr (out_append, ==, "val7_post_self");
+  g_assert_null (_srt_env_overlay_get (self_updated, "VAR7"));
+
+  /* VAR8 was only in `other->edits` and is updated in `self` */
+  g_assert_true (_srt_env_overlay_get_edit (self_updated, "VAR8",
+                                            &out_delimiter, &out_prepend, &out_append));
+  g_assert_cmpint (out_delimiter, ==, ':');
+  g_assert_cmpstr (out_prepend, ==, "val8_pre_other");
+  g_assert_cmpstr (out_append, ==, "val8_post_other");
+  g_assert_null (_srt_env_overlay_get (self_updated, "VAR8"));
+}
+
 int
 main (int argc,
       char **argv)
@@ -483,6 +572,8 @@ main (int argc,
               setup, test_inherit_matching_pattern_clears_edits, teardown);
   g_test_add ("/env-overlay/update", Fixture, NULL,
               setup, test_update, teardown);
+  g_test_add ("/env-overlay/update-edits", Fixture, NULL,
+              setup, test_update_edits, teardown);
 
   return g_test_run ();
 }

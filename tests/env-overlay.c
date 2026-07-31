@@ -363,12 +363,58 @@ test_prepend_append_deferred (Fixture *f,
   g_assert_cmpint (out_delimiter, ==, ':');
   g_assert_cmpstr (out_prepend, ==, "c:b:a");
   g_assert_cmpstr (out_append, ==, "x:y:z");
+
+  /* FLATPAK_ID is inherited (not in values) after setup(); a deferred
+   * prepend/append must not be resolved yet. */
+  g_assert_false (_srt_env_overlay_contains (f->container_env, "FLATPAK_ID"));
+  _srt_env_overlay_prepend (f->container_env, "FLATPAK_ID", "pre", ':');
+  _srt_env_overlay_append (f->container_env, "FLATPAK_ID", "post", ':');
+
+  /* _srt_env_overlay_get() still returns NULL,
+   * exactly as if it were inherited: the real value is not known yet. */
+  g_assert_true (_srt_env_overlay_contains (f->container_env, "FLATPAK_ID"));
+  g_assert_null (_srt_env_overlay_get (f->container_env, "FLATPAK_ID"));
+
+  /* But the edit is tracked, _srt_env_overlay_get_edit() sees it */
+  g_assert_true (_srt_env_overlay_get_edit (f->container_env, "FLATPAK_ID",
+                                            &out_delimiter, &out_prepend, &out_append));
+  g_assert_cmpint (out_delimiter, ==, ':');
+  g_assert_cmpstr (out_prepend, ==, "pre");
+  g_assert_cmpstr (out_append, ==, "post");
+
+  /* A variable with no pending edit at all returns FALSE. */
+  g_assert_false (_srt_env_overlay_get_edit (f->container_env, "LD_AUDIT",
+                                             NULL, NULL, NULL));
+
+  /* Resolved against the real envp at apply() time. */
+  envp = _srt_strdupv  (initial_envp);
+  envp = _srt_env_overlay_apply (f->container_env, envp);
+  g_assert_cmpstr (g_environ_getenv (envp, "FLATPAK_ID"), ==,
+                   "pre:com.valvesoftware.Steam:post");
+}
+
+static void
+test_prepend_append_deferred_absent (Fixture *f,
+                                     gconstpointer context)
+{
+  g_auto(GStrv) envp = NULL;
+
+  /* NOT_IN_ENVP is inherited, and does not appear in initial_envp at all. */
+  _srt_env_overlay_prepend (f->container_env, "NOT_IN_ENVP", "pre", ':');
+  _srt_env_overlay_append (f->container_env, "NOT_IN_ENVP", "post", ':');
+
+  envp = _srt_strdupv (initial_envp);
+  envp = _srt_env_overlay_apply (f->container_env, envp);
+  /* No spurious delimiter next to the missing base value. */
+  g_assert_cmpstr (g_environ_getenv (envp, "NOT_IN_ENVP"), ==, "pre:post");
 }
 
 static void
 test_prepend_append_accumulate (Fixture *f,
                                 gconstpointer context)
 {
+  g_auto(GStrv) envp = NULL;
+
   /* Repeated prepend/append calls on a resolved variable apply immediately.
    * G_MESSAGES_DEBUG is already set to "all" by setup() */
 
@@ -383,6 +429,20 @@ test_prepend_append_accumulate (Fixture *f,
   _srt_env_overlay_append (f->container_env, "G_MESSAGES_DEBUG", "y", ':');
   g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "G_MESSAGES_DEBUG"),
                    ==, "b:a:all:x:y");
+
+  /* Repeated prepend calls on a still-deferred variable. */
+
+  /* Each new prepend call is pushed further ahead of the base value. */
+  _srt_env_overlay_prepend (f->container_env, "FLATPAK_ID", "a", ':');
+  _srt_env_overlay_prepend (f->container_env, "FLATPAK_ID", "b", ':');
+  /* Repeated append calls accumulate in call order. */
+  _srt_env_overlay_append (f->container_env, "FLATPAK_ID", "x", ':');
+  _srt_env_overlay_append (f->container_env, "FLATPAK_ID", "y", ':');
+
+  envp = _srt_strdupv (initial_envp);
+  envp = _srt_env_overlay_apply (f->container_env, envp);
+  g_assert_cmpstr (g_environ_getenv (envp, "FLATPAK_ID"), ==,
+                   "b:a:com.valvesoftware.Steam:x:y");
 }
 
 static void
@@ -545,6 +605,22 @@ test_update_edits (Fixture *f,
   g_assert_cmpstr (out_prepend, ==, "val8_pre_other");
   g_assert_cmpstr (out_append, ==, "val8_post_other");
   g_assert_null (_srt_env_overlay_get (self_updated, "VAR8"));
+
+  /* In different terms, check that applying `self_updated` to the env
+   * is equivalent to sequentially applying `self` and `other`. */
+  {
+    g_auto(GStrv) envp1 = NULL;
+    g_auto(GStrv) envp2 = NULL;
+
+    envp1 = _srt_env_overlay_apply (self_updated, envp1);
+
+    envp2 = _srt_env_overlay_apply (self, envp2);
+    envp2 = _srt_env_overlay_apply (other, envp2);
+
+    qsort (envp1, g_strv_length (envp1), sizeof (char *), _srt_indirect_strcmp0);
+    qsort (envp2, g_strv_length (envp2), sizeof (char *), _srt_indirect_strcmp0);
+    g_assert_cmpstrv (envp1, envp2);
+  }
 }
 
 int
@@ -564,6 +640,8 @@ main (int argc,
               setup, test_prepend_append_immediate, teardown);
   g_test_add ("/env-overlay/prepend-append-deferred", Fixture, NULL,
               setup, test_prepend_append_deferred, teardown);
+  g_test_add ("/env-overlay/prepend-append-deferred-absent", Fixture, NULL,
+              setup, test_prepend_append_deferred_absent, teardown);
   g_test_add ("/env-overlay/prepend-append-accumulate", Fixture, NULL,
               setup, test_prepend_append_accumulate, teardown);
   g_test_add ("/env-overlay/prepend-append-mutual-exclusivity", Fixture, NULL,

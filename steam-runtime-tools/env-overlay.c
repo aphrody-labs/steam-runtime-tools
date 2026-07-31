@@ -879,12 +879,36 @@ _srt_env_overlay_apply (const SrtEnvOverlay *self,
 
   for (iter = vars; iter != NULL; iter = iter->next)
     {
-      const char *value = g_hash_table_lookup (self->values, iter->data);
+      const char *var = iter->data;
+      gpointer value = NULL;
 
-      if (value != NULL)
-        envp = g_environ_setenv (envp, iter->data, value, TRUE);
+      if (g_hash_table_lookup_extended (self->values, var, NULL, &value))
+        {
+          if (value != NULL)
+            envp = g_environ_setenv (envp, var, value, TRUE);
+          else
+            envp = g_environ_unsetenv (envp, var);
+        }
       else
-        envp = g_environ_unsetenv (envp, iter->data);
+        {
+          SrtEnvOverlayEdit *edit = g_hash_table_lookup (self->edits, var);
+          const char *old_value = g_environ_getenv (envp, var);
+          g_autofree gchar *combined = NULL;
+
+          /* For the mutual-exclusivity constraint, if var is not in values
+           * then it must be in edits (it was returned by
+           * _srt_env_overlay_get_vars(), which is their union). */
+          g_assert (edit != NULL);
+          combined = _srt_env_overlay_join_with_delimiter (edit->prepend,
+                                                           old_value,
+                                                           edit->append,
+                                                           edit->delimiter);
+
+          if (combined != NULL)
+            envp = g_environ_setenv (envp, var, combined, TRUE);
+          else
+            envp = g_environ_unsetenv (envp, var);
+        }
     }
 
   return g_steal_pointer (&envp);

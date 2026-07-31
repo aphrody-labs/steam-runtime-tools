@@ -35,6 +35,9 @@ typedef struct _SrtEnvOverlayEdit SrtEnvOverlayEdit;
  * A deferred prepends and/or append operation for a single environment
  * variable whose base value is not yet known (i.e. it would otherwise
  * be inherited from the execution environment).
+
+ * The deferred operation will be resolved against the real value
+ * when _srt_env_overlay_apply() gets called.
  */
 struct _SrtEnvOverlayEdit
 {

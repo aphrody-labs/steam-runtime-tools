@@ -932,6 +932,10 @@ byte_array_append_env0 (GByteArray *arr,
  * Return all of the variables set by @self, as a buffer in `env -0` format.
  * Unset and inherited variables are ignored.
  *
+ * It is a programming error to call this function for an overlay
+ * that contains pending prepend/append edits
+ * (_srt_env_overlay_prepend() or _srt_env_overlay_append()).
+ *
  * Returns: (transfer full): `NAME=VALUE\0NAME=VALUE\0...`
  */
 GBytes *
@@ -942,6 +946,7 @@ _srt_env_overlay_to_env0 (const SrtEnvOverlay *self)
   const GList *iter;
 
   g_return_val_if_fail (self != NULL, NULL);
+  g_warn_if_fail (g_hash_table_size (self->edits) == 0);
 
   arr = g_byte_array_new ();
   vars = _srt_env_overlay_get_vars (self);
@@ -975,6 +980,10 @@ _srt_env_overlay_to_env0 (const SrtEnvOverlay *self)
  *
  * Inherited variables are ignored.
  *
+ * It is a programming error to call this function for an overlay
+ * that contains pending prepend/append edits
+ * (_srt_env_overlay_prepend() or _srt_env_overlay_append()).
+ *
  * Returns: (transfer full): a shell script
  */
 gchar *
@@ -985,6 +994,7 @@ _srt_env_overlay_to_shell (const SrtEnvOverlay *self)
   const GList *iter;
 
   g_return_val_if_fail (self != NULL, NULL);
+  g_warn_if_fail (g_hash_table_size (self->edits) == 0);
 
   buf = g_string_new ("");
   vars = _srt_env_overlay_get_vars (self);

@@ -198,13 +198,12 @@ dump_json_graphics_module (void *p)
       if (json->instance_extensions != NULL)
         {
           const GList *iter;
-          size_t i;
 
           g_test_message ("\tinstance extensions:");
 
-          for (iter = json->instance_extensions, i = 0;
+          for (iter = json->instance_extensions;
                iter != NULL;
-               iter = iter->next, i++)
+               iter = iter->next)
             {
               const InstanceExtension *ie = iter->data;
 
@@ -243,13 +242,12 @@ dump_json_graphics_module (void *p)
       if (json->device_extensions != NULL)
         {
           const GList *iter;
-          size_t i;
 
           g_test_message ("\tdevice extensions:");
 
-          for (iter = json->device_extensions, i = 0;
+          for (iter = json->device_extensions;
                iter != NULL;
-               iter = iter->next, i++)
+               iter = iter->next)
             {
               const DeviceExtension *de = iter->data;
 
@@ -3951,8 +3949,7 @@ check_paths_are_relative (const GList *list,
                           SrtGraphicsModule module)
 {
   const gchar *library_path = NULL;
-  gsize i = 0;
-  for (const GList *iter = list; iter != NULL; iter = iter->next, i++)
+  for (const GList *iter = list; iter != NULL; iter = iter->next)
     {
       g_autofree gchar *absolute_path = NULL;
       switch (module)

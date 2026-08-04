@@ -74,7 +74,7 @@ project.
 libcapsule
 ----------
 
-Upstream: <https://gitlab.collabora.com/vivek/libcapsule/>
+Upstream: <https://gitlab.com/fledermaus/libcapsule/>
 
 pressure-vessel uses libcapsule's capsule-capture-libs tool to modify
 its containers to integrate graphics drivers and their dependencies from

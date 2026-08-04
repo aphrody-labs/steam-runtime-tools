@@ -305,7 +305,7 @@ contributed to the Linux kernel.
 [Ubuntu]: https://ubuntu.com/
 [bubblewrap]: https://github.com/containers/bubblewrap
 [ldlp]: ld-library-path-runtime.md
-[libcapsule]: https://gitlab.collabora.com/vivek/libcapsule
+[libcapsule]: https://gitlab.com/fledermaus/libcapsule
 [pressure-vessel]: pressure-vessel.md
 [sniper README]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/sniper/README.md
 [sniper SDK]: https://gitlab.steamos.cloud/steamrt/sniper/sdk/-/blob/steamrt/sniper/README.md

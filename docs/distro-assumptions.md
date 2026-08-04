@@ -684,7 +684,7 @@ container runtime on a new distribution, in particular:
 [container runtime]: container-runtime.md
 [eudev]: https://github.com/eudev-project/eudev
 [ldlp]: ld-library-path-runtime.md
-[libcapsule]: https://gitlab.collabora.com/vivek/libcapsule
+[libcapsule]: https://gitlab.com/fledermaus/libcapsule
 [libudev0-shim]: https://github.com/archlinux/libudev0-shim
 [libudev-compat]: https://gitweb.gentoo.org/repo/gentoo.git/tree/sys-libs/libudev-compat
 [libxcrypt]: https://github.com/besser82/libxcrypt

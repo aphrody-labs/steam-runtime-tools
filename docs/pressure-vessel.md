@@ -268,7 +268,7 @@ would be in Flatpak). It could be, if desired.
 [container runtime]: container-runtime.md
 [ld.so]: https://linux.die.net/man/8/ld.so
 [ldlp]: ld-library-path-runtime.md
-[libcapsule]: https://gitlab.collabora.com/vivek/libcapsule/
+[libcapsule]: https://gitlab.com/fledermaus/libcapsule
 [many-builds]: ../build-aux/many-builds.md
 [naming recommendations from the freedesktop.org Desktop Entry Specification]: https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html#file-naming
 [pressure-vessel source]: https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/tree/main/pressure-vessel

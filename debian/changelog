@@ -1,13 +1,18 @@
-steam-runtime-tools (0.20260729.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260804.0) UNRELEASED; urgency=medium
 
   [ Simon McVittie ]
   * Avoid some unnecessary log messages when debugging is enabled
+  * Documentation fixes
   * Tests/CI:
     - Avoid multiarch skew when installing dependencies for multiple
       architectures (steamrt/tasks#1100)
     - Make manual jobs not block the pipeline
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 29 Jul 2026 12:06:57 +0100
+  [ Antonio Ospite ]
+  * Tests/CI:
+    - Fix some compiler warnings
+
+ -- Simon McVittie <smcv@collabora.com>  Tue, 04 Aug 2026 17:24:47 +0100
 
 steam-runtime-tools (0.20260728.0) steamrt; urgency=medium
 

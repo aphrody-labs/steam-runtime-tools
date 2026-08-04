@@ -308,7 +308,7 @@ if [ -n "${STEAM_COMPAT_MACHINE_ARCHITECTURE-}" ] \
     # If not, the extra process wrapper has negligible performance impact.
     if [ -x "${pv}/libexec/steam-runtime-tools-0/${STEAM_COMPAT_MACHINE_ARCHITECTURE}-exec" ]; then
         export PRESSURE_VESSEL_PREFIX="$pv"
-        exec "${pv}/libexec/steam-runtime-tools-0/${STEAM_COMPAT_MACHINE_ARCHITECTURE}-exec" "${here}/${run}" "$@"
+        exec "${pv}/libexec/steam-runtime-tools-0/${STEAM_COMPAT_MACHINE_ARCHITECTURE}-exec" -- "${here}/${run}" "$@"
     fi
 fi
 

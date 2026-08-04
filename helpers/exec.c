@@ -70,7 +70,7 @@ main (int argc,
 {
   int opt;
 
-  while ((opt = getopt_long (argc, argv, "", long_options, NULL)) != -1)
+  while ((opt = getopt_long (argc, argv, "+", long_options, NULL)) != -1)
     {
       switch (opt)
         {

@@ -100,6 +100,16 @@ class TestHelpers(BaseTest):
         proc.communicate()
         self.assertEqual(proc.returncode, LAUNCH_EX_CANNOT_INVOKE)
 
+    def test_exec_stop_parsing(self) -> None:
+        proc = subprocess.Popen(
+            [str(self.exec_exe), 'sh', '-euc', 'echo Yes'],
+            stdout=subprocess.PIPE,
+            stderr=STDERR_FILENO,
+        )
+        stdout, _ = proc.communicate()
+        self.assertIn(b'Yes', stdout)
+        self.assertEqual(proc.returncode, 0)
+
     def test_exec_version(self) -> None:
         proc = subprocess.Popen(
             [str(self.exec_exe), '--version'],

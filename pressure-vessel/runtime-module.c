@@ -485,11 +485,10 @@ icd_details_fill_array_single_arch (GPtrArray *details_arr,
                                     const SrtKnownArchitecture *known)
 {
   const GList *icd_iter;
-  gsize j;
 
   g_return_if_fail (tuple != SRT_ARCHITECTURE_QUARK_NONE);
 
-  for (icd_iter = drivers, j = 0; icd_iter != NULL; icd_iter = icd_iter->next, j++)
+  for (icd_iter = drivers; icd_iter != NULL; icd_iter = icd_iter->next)
     {
       SrtBaseGraphicsModule *module = icd_iter->data;
       g_autoptr(IcdDetails) details = icd_details_new (provider, module);

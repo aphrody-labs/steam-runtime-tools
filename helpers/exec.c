@@ -96,7 +96,7 @@ main (int argc,
     }
 
   if (argc < optind + 1)
-    usage (1);
+    usage (LAUNCH_EX_USAGE);
 
   execvp (argv[optind], &argv[optind]);
 

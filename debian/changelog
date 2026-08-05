@@ -1,6 +1,10 @@
-steam-runtime-tools (0.20260804.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260805.0) UNRELEASED; urgency=medium
 
   [ Simon McVittie ]
+  * SteamLinuxRuntime_*:
+    - When running under x86 emulation on arm64, fix failure to launch
+      native Linux titles that have command-line arguments starting with -,
+      such as Team Fortress 2 (steamrt/tasks#1109)
   * Avoid some unnecessary log messages when debugging is enabled
   * Documentation fixes
   * Tests/CI:
@@ -9,10 +13,10 @@ steam-runtime-tools (0.20260804.0) UNRELEASED; urgency=medium
     - Make manual jobs not block the pipeline
 
   [ Antonio Ospite ]
-  * Tests/CI:
-    - Fix some compiler warnings
+  * Internal changes:
+    - Fix new compiler warnings with gcc-16
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 04 Aug 2026 17:24:47 +0100
+ -- Simon McVittie <smcv@collabora.com>  Wed, 05 Aug 2026 12:44:02 +0100
 
 steam-runtime-tools (0.20260728.0) steamrt; urgency=medium
 

@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260805.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260805.0) steamrt; urgency=medium
 
   [ Simon McVittie ]
   * SteamLinuxRuntime_*:
@@ -16,7 +16,7 @@ steam-runtime-tools (0.20260805.0) UNRELEASED; urgency=medium
   * Internal changes:
     - Fix new compiler warnings with gcc-16
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 05 Aug 2026 12:44:02 +0100
+ -- Simon McVittie <smcv@collabora.com>  Wed, 05 Aug 2026 14:11:12 +0100
 
 steam-runtime-tools (0.20260728.0) steamrt; urgency=medium
 

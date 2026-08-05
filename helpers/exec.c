@@ -70,7 +70,7 @@ main (int argc,
 {
   int opt;
 
-  while ((opt = getopt_long (argc, argv, "", long_options, NULL)) != -1)
+  while ((opt = getopt_long (argc, argv, "+", long_options, NULL)) != -1)
     {
       switch (opt)
         {
@@ -96,7 +96,7 @@ main (int argc,
     }
 
   if (argc < optind + 1)
-    usage (1);
+    usage (LAUNCH_EX_USAGE);
 
   execvp (argv[optind], &argv[optind]);
 

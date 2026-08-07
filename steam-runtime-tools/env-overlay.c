@@ -935,6 +935,48 @@ _srt_env_overlay_env_fd_cli (SrtEnvOverlay *self,
   return TRUE;
 }
 
+static gboolean
+_srt_env_overlay_edit_env_fd_cli (SrtEnvOverlay *self,
+                                  const char *option_name,
+                                  const char *value,
+                                  GError **error)
+{
+  g_autofree gchar *contents = NULL;
+  gsize remaining = 0;
+  const char *p;
+
+  g_assert (self != NULL);
+
+  if (!_srt_env_overlay_read_env0_fd (value, &contents, &remaining, error))
+    return FALSE;
+
+  g_assert (contents[remaining] == '\0');
+
+  p = contents;
+
+  while (remaining > 0)
+    {
+      size_t len = strlen (p);
+
+      g_assert (len <= remaining);
+
+      if (!_srt_env_overlay_parse_edit_record (self, p, error))
+        return FALSE;
+
+      p += len;
+      remaining -= len;
+
+      if (remaining > 0)
+        {
+          g_assert (*p == '\0');
+          p += 1;
+          remaining -= 1;
+        }
+    }
+
+  return TRUE;
+}
+
 static gchar *
 _srt_env_overlay_edit_to_string (const char *var, SrtEnvOverlayEdit *edit)
 {
@@ -1215,6 +1257,15 @@ opt_env_fd_cb (const char *option_name,
 }
 
 static gboolean
+opt_edit_env_fd_cb (const char *option_name,
+                    const gchar *value,
+                    gpointer data,
+                    GError **error)
+{
+  return _srt_env_overlay_edit_env_fd_cli (data, option_name, value, error);
+}
+
+static gboolean
 opt_inherit_env_cb (const char *option_name,
                     const gchar *value,
                     gpointer data,
@@ -1250,6 +1301,9 @@ static const GOptionEntry options[] =
   { "env-fd", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, opt_env_fd_cb,
     "Read environment variables in env -0 format from FD", "FD" },
+  { "edit-env-fd", '\0',
+    G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, opt_edit_env_fd_cb,
+    "Read set/unset/prepend/append environment edits from FD", "FD" },
   { "inherit-env", '\0',
     G_OPTION_FLAG_FILENAME, G_OPTION_ARG_CALLBACK, opt_inherit_env_cb,
     "Undo a previous --env, --unset-env, --pass-env, etc.", "VAR" },

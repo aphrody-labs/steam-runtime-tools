@@ -201,6 +201,93 @@ class TestSupervisor(BaseTest):
             proc.wait()
             self.assertEqual(proc.returncode, 0)
 
+    def test_edit_env_fd(self) -> None:
+        '''Exercise --clear-env, --edit-env-fd, -vv'''
+        proc = subprocess.Popen(
+            [
+                'env',
+                'PV_TEST_VAR_TWO=wrong',
+                'PV_TEST_VAR_THREE=inherited',
+            ] + self.supervisor + [
+                '--clear-env',
+                '--inherit-env=PV_TEST_VAR_THREE',
+                '--edit-env-fd=%d' % STDIN_FILENO,
+                '-v',
+                '-v',
+                '--',
+                '/bin/sh', '-euc',
+                '''
+                echo PV_TEST_VAR_ONE="${PV_TEST_VAR_ONE-unset}"
+                echo PV_TEST_VAR_TWO="${PV_TEST_VAR_TWO-unset}"
+                echo PV_TEST_VAR_THREE="${PV_TEST_VAR_THREE-unset}"
+                ''',
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=STDERR_FILENO,
+        )
+
+        try:
+            stdin = proc.stdin
+            assert stdin is not None
+
+            with stdin:
+                stdin.write(b'set=PV_TEST_VAR_ONE=one\0')
+                stdin.write(b'unset=PV_TEST_VAR_TWO\0')
+                stdin.write(b'prepend=PV_TEST_VAR_THREE=before\0')
+                # The last \0 is optional: here we do add it,
+                # but in test-launcher.py we do not, so both ways are tested
+                stdin.write(b'append=PV_TEST_VAR_THREE=after\0')
+
+            stdout = proc.stdout
+            assert stdout is not None
+
+            with stdout:
+                self.assertEqual(
+                    stdout.read().decode('utf-8'),
+                    'PV_TEST_VAR_ONE=one\n'
+                    'PV_TEST_VAR_TWO=unset\n'
+                    # --clear-env makes --inherit-env effectively equivalent to
+                    # --unset-env, so the inherited PV_TEST_VAR_THREE value is
+                    # unavailable to the prepend/append edit and does not
+                    # appear in the result.
+                    'PV_TEST_VAR_THREE=before:after\n'
+                )
+        finally:
+            proc.wait()
+            self.assertEqual(proc.returncode, 0)
+
+    def test_edit_env_fd_bad_record(self) -> None:
+        '''--edit-env-fd with a malformed record fails cleanly'''
+        proc = subprocess.Popen(
+            self.supervisor + [
+                '--edit-env-fd=%d' % STDIN_FILENO,
+                '--',
+                '/bin/sh', '-euc', 'exit 42',
+            ],
+            stdin=subprocess.PIPE,
+            stdout=STDERR_FILENO,
+            stderr=subprocess.PIPE,
+        )
+
+        try:
+            stdin = proc.stdin
+            assert stdin is not None
+
+            with stdin:
+                stdin.write(b'bogus=FOO=BAR')
+
+            stderr = proc.stderr
+            assert stderr is not None
+
+            with stderr:
+                stderr_text = stderr.read().decode('utf-8')
+        finally:
+            proc.wait()
+            self.assertEqual(proc.returncode, LAUNCH_EX_FAILED)
+
+        self.assertIn('Unknown edit command', stderr_text)
+
     def test_fd_assign(self) -> None:
         for target in (STDOUT_FILENO, 9):
             read_end, write_end = os.pipe2(os.O_CLOEXEC)
@@ -989,6 +1076,8 @@ class TestSupervisor(BaseTest):
             '--env==bar',
             '--env-fd=-1',
             '--env-fd=23',
+            '--edit-env-fd=-1',
+            '--edit-env-fd=23',
             '--lock-fd=-1',
             '--lock-fd=23',
             '--lock-fd=nope',

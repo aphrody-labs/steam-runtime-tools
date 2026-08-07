@@ -952,6 +952,23 @@ main (int argc,
        * (if different). For this reason we convert them to `--setenv`. */
       g_assert (self->flatpak_subsandbox != NULL);
 
+      /* In principle we should be passing edits unresolved to the subsandbox
+       * and apply them on the "other side",
+       * e.g. by adding a `pv_bwrap_container_env_to_edit_env_fd` and calling
+       * that in `pv_bwrap_container_env_to_subsandbox_argv`.
+       * However, we can't do that, because the o.fd.Portal interface
+       * doesn't have a way to receive arbitrary append/prepend edits,
+       * only set and unset instructions.*
+       *
+       * But we know that all Flatpak subsandboxes are quite similar to each
+       * other, because they're set up that way by Flatpak - so our
+       * self->original_environ is going to be a pretty good approximation of
+       * what the environment looks like in the new subsandbox.
+       *
+       * At least in the short term, we can resolve edits "over here". */
+      _srt_env_overlay_resolve_edits (container_env,
+                                      _srt_const_strv (self->original_environ));
+
       if (!pv_bwrap_container_env_to_subsandbox_argv (self->flatpak_subsandbox,
                                                       container_env,
                                                       error))

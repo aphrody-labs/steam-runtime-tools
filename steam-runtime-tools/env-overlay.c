@@ -840,20 +840,22 @@ _srt_env_overlay_pass_matching_pattern_cli (SrtEnvOverlay *self,
   return TRUE;
 }
 
+/* On success, `*contents_out` is set to an array of `*len_out + 1` bytes:
+ * what was read from the fd, plus an additional `\0`. */
 static gboolean
-_srt_env_overlay_env_fd_cli (SrtEnvOverlay *self,
-                             const char *option_name,
-                             const char *value,
-                             GError **error)
+_srt_env_overlay_read_env0_fd (const char *value,
+                               gchar **contents_out,
+                               gsize *len_out,
+                               GError **error)
 {
   g_autofree gchar *proc_filename = NULL;
-  g_autofree gchar *env_block = NULL;
-  gsize remaining;
-  const char *p;
   guint64 fd;
   gchar *endptr;
 
-  g_assert (self != NULL);
+  g_return_val_if_fail (value != NULL, FALSE);
+  g_return_val_if_fail (contents_out != NULL, FALSE);
+  g_return_val_if_fail (len_out != NULL, FALSE);
+  g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
   fd = g_ascii_strtoull (value, &endptr, 10);
 
@@ -866,8 +868,31 @@ _srt_env_overlay_env_fd_cli (SrtEnvOverlay *self,
 
   proc_filename = g_strdup_printf ("/proc/self/fd/%d", (int) fd);
 
-  if (!g_file_get_contents (proc_filename, &env_block, &remaining, error))
+  if (!g_file_get_contents (proc_filename, contents_out, len_out, error))
     return FALSE;
+
+  if (fd >= 3)
+    close (fd);
+
+  return TRUE;
+}
+
+static gboolean
+_srt_env_overlay_env_fd_cli (SrtEnvOverlay *self,
+                             const char *option_name,
+                             const char *value,
+                             GError **error)
+{
+  g_autofree gchar *env_block = NULL;
+  gsize remaining = 0;
+  const char *p;
+
+  g_assert (self != NULL);
+
+  if (!_srt_env_overlay_read_env0_fd (value, &env_block, &remaining, error))
+    return FALSE;
+
+  g_assert (env_block[remaining] == '\0');
 
   p = env_block;
 
@@ -875,7 +900,7 @@ _srt_env_overlay_env_fd_cli (SrtEnvOverlay *self,
     {
       g_autofree gchar *var = NULL;
       g_autofree gchar *val = NULL;
-      size_t len = strnlen (p, remaining);
+      size_t len = strlen (p);
       const char *equals;
 
       g_assert (len <= remaining);
@@ -906,9 +931,6 @@ _srt_env_overlay_env_fd_cli (SrtEnvOverlay *self,
           remaining -= 1;
         }
     }
-
-  if (fd >= 3)
-    close (fd);
 
   return TRUE;
 }

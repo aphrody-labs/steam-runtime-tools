@@ -857,6 +857,49 @@ _srt_env_overlay_debug_log (const SrtEnvOverlay *self)
 }
 
 /*
+ * _srt_env_overlay_resolve_edits:
+ * @self: An overlay
+ * @envp: An environment block
+ *
+ * Resolve all pending edit operations in @self, replacing them
+ * by setting the variable to its value from @envp with the
+ * appropriate new items prepended and/or appended.
+ */
+void
+_srt_env_overlay_resolve_edits (SrtEnvOverlay *self,
+                                const char * const *envp)
+{
+  GHashTableIter iter;
+  void *k, *v;
+
+  g_return_if_fail (self != NULL);
+  g_return_if_fail (self->refcount > 0);
+
+  g_hash_table_iter_init (&iter, self->edits);
+
+  while (g_hash_table_iter_next (&iter, &k, &v))
+    {
+      const char *envp_value = _srt_environ_getenv (envp, k);
+      SrtEnvOverlayEdit *edit = v;
+      g_autofree gchar *resolved = _srt_env_overlay_join_with_delimiter (edit->prepend,
+                                                                         envp_value,
+                                                                         edit->append,
+                                                                         edit->delimiter);
+
+      /* Insert into self->values before removing from self->edits
+       * as g_hash_table_iter_remove() below will free k and make it unusable. */
+      g_hash_table_replace (self->values,
+                            g_strdup (k),
+                            g_steal_pointer (&resolved));
+
+      /* Use g_hash_table_iter_remove() instead of g_hash_table_remove(),
+       * because removing from self->edits by key while iterating over it
+       * would invalidate the iterator. */
+      g_hash_table_iter_remove (&iter);
+    }
+}
+
+/*
  * _srt_env_overlay_apply:
  * @self: Variables to set and unset
  * @envp: (transfer full): An environment block
@@ -935,6 +978,9 @@ byte_array_append_env0 (GByteArray *arr,
  * It is a programming error to call this function for an overlay
  * that contains pending prepend/append edits
  * (_srt_env_overlay_prepend() or _srt_env_overlay_append()).
+ * If the previous values of the variables are available,
+ * call `_srt_env_overlay_resolve_edits()` to convert edits into
+ * setting concrete values first.
  *
  * Returns: (transfer full): `NAME=VALUE\0NAME=VALUE\0...`
  */

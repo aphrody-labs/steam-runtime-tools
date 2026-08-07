@@ -130,6 +130,8 @@ gboolean _srt_env_overlay_get_edit (const SrtEnvOverlay *self,
                                     const char **append_out);
 
 void _srt_env_overlay_debug_log (const SrtEnvOverlay *self);
+void _srt_env_overlay_resolve_edits (SrtEnvOverlay *self,
+                                     const char * const *envp);
 GStrv _srt_env_overlay_apply (const SrtEnvOverlay *self,
                               GStrv envp);
 GBytes *_srt_env_overlay_to_env0 (const SrtEnvOverlay *self);

@@ -473,6 +473,29 @@ test_prepend_append_mutual_exclusivity (Fixture *f,
 }
 
 static void
+test_resolve_edits (Fixture *f,
+                    gconstpointer context)
+{
+  g_auto(GStrv) envp = NULL;
+
+  /* LD_PRELOAD is inherited, and appears in initial_envp. */
+  _srt_env_overlay_prepend (f->container_env, "LD_PRELOAD", "pre", ':');
+  _srt_env_overlay_append (f->container_env, "LD_PRELOAD", "post", ':');
+
+  /* NOT_IN_ENVP is inherited, and does not appear in initial_envp at all. */
+  _srt_env_overlay_prepend (f->container_env, "NOT_IN_ENVP", "pre", ':');
+  _srt_env_overlay_append (f->container_env, "NOT_IN_ENVP", "post", ':');
+
+  _srt_env_overlay_resolve_edits (f->container_env, initial_envp);
+
+  /* Edits have been resolved. */
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "LD_PRELOAD"), ==, "pre:libfakeroot.so:post");
+  g_assert_false (_srt_env_overlay_get_edit (f->container_env, "LD_PRELOAD", NULL, NULL, NULL));
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "NOT_IN_ENVP"), ==, "pre:post");
+  g_assert_false (_srt_env_overlay_get_edit (f->container_env, "NOT_IN_ENVP", NULL, NULL, NULL));
+}
+
+static void
 test_inherit_matching_pattern_clears_edits (Fixture *f,
                                             gconstpointer context)
 {
@@ -648,6 +671,8 @@ main (int argc,
               setup, test_prepend_append_mutual_exclusivity, teardown);
   g_test_add ("/env-overlay/inherit-matching-pattern-clears-edits", Fixture, NULL,
               setup, test_inherit_matching_pattern_clears_edits, teardown);
+  g_test_add ("/env-overlay/resolve-edits", Fixture, NULL,
+              setup, test_resolve_edits, teardown);
   g_test_add ("/env-overlay/update", Fixture, NULL,
               setup, test_update, teardown);
   g_test_add ("/env-overlay/update-edits", Fixture, NULL,

@@ -100,6 +100,10 @@ void _srt_env_overlay_append (SrtEnvOverlay *self,
                               const char *suffix,
                               char delimiter);
 
+gboolean _srt_env_overlay_parse_edit_record (SrtEnvOverlay *self,
+                                             const char *record,
+                                             GError **error);
+
 void _srt_env_overlay_inherit (SrtEnvOverlay *self,
                                const char *var);
 

@@ -598,6 +598,108 @@ _srt_env_overlay_append (SrtEnvOverlay *self,
 }
 
 /*
+ * _srt_env_overlay_parse_edit_record:
+ * @self: Environment variables to edit
+ * @record: (type filename): A single edit record in the form
+ *  "command=VAR" or "command=VAR=VALUE"
+ * @error: Set on failure
+ *
+ * Parse @record and apply it to @self.
+ * A @record is a string representing a
+ * set/unset/prepend/append operation
+ * and can be in any of the following forms
+ *  - set=VAR=VALUE
+ *  - unset=VAR
+ *  - prepend=VAR=VALUE
+ *  - append=VAR=VALUE
+ *
+ * Returns: %TRUE on success
+ */
+gboolean
+_srt_env_overlay_parse_edit_record (SrtEnvOverlay *self,
+                                    const char *record,
+                                    GError **error)
+{
+  size_t len = strlen (record);
+  const char *equals;
+  const char *command_end;
+  const char *rest;
+  size_t rest_len;
+  g_autofree gchar *command = NULL;
+
+  g_return_val_if_fail (self != NULL, FALSE);
+  g_return_val_if_fail (record != NULL, FALSE);
+  g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+
+  equals = memchr (record, '=', len);
+
+  if (equals == NULL || equals == record)
+    {
+      g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE,
+                   "Edit record must be given in the form command=VAR "
+                   "or command=VAR=VALUE, not \"%s\"", record);
+      return FALSE;
+    }
+
+  command_end = equals;
+  command = g_strndup (record, command_end - record);
+  rest = equals + 1;
+  rest_len = len - (command_end - record) - 1;
+  g_assert (rest_len == strlen (rest));
+
+  if (g_strcmp0 (command, "set") == 0 ||
+      g_strcmp0 (command, "prepend") == 0 ||
+      g_strcmp0 (command, "append") == 0)
+    {
+      const char *inner_equals;
+      g_autofree gchar *var = NULL;
+      const char *val = NULL;
+
+      inner_equals = strchr (rest, '=');
+
+      if (inner_equals == NULL || inner_equals == rest)
+        {
+          g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE,
+                       "\"%s\" record must be given in the form "
+                       "%s=VAR=VALUE, not \"%s\"",
+                       command, command, record);
+          return FALSE;
+        }
+
+      var = g_strndup (rest, inner_equals - rest);
+      val = inner_equals + 1;
+
+      if (g_strcmp0 (command, "set") == 0)
+        _srt_env_overlay_set (self, var, val);
+      else if (g_strcmp0 (command, "prepend") == 0)
+        _srt_env_overlay_prepend (self, var, val, ':');
+      else /* must be "append" as per the outer conditional */
+        _srt_env_overlay_append (self, var, val, ':');
+    }
+  else if (g_strcmp0 (command, "unset") == 0)
+    {
+      if (rest_len == 0 || strchr (rest, '=') != NULL)
+        {
+          g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE,
+                       "\"unset\" record must be given in the form "
+                       "unset=VAR, not \"%s\"", record);
+          return FALSE;
+        }
+
+      _srt_env_overlay_set (self, rest, NULL);
+    }
+  else
+    {
+      g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE,
+                   "Unknown edit command \"%s\": must be one of "
+                   "set, unset, prepend, append", command);
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+/*
  * _srt_env_overlay_inherit_matching_pattern:
  * @self: Environment variables to set or unset
  * @pattern: (type filename): A glob pattern for environment variable names

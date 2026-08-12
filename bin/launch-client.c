@@ -973,6 +973,8 @@ main (int argc,
   g_autoptr(GDBusConnection) peer_connection = NULL;
   g_auto(GVariantBuilder) fd_builder = {};
   g_auto(GVariantBuilder) env_builder = {};
+  g_auto(GVariantBuilder) edit_env_builder = {};
+  g_autoptr(GVariant) env_edits = NULL;
   g_auto(GVariantBuilder) options_builder = {};
   g_autoptr(AutoUnixFDList) fd_list = NULL;
   g_autoptr(GHashTable) pty_bridges = NULL;
@@ -1362,19 +1364,41 @@ main (int argc,
       g_variant_builder_add (&fd_builder, "{uh}", fd, handle);
     }
 
-  /* Cross-process propagation of unresolved prepend/append edits has not
-   * been implemented yet; warn instead of silently dropping pending edits.
-   */
-  g_warn_if_fail (g_hash_table_size (env_overlay->edits) == 0);
+  /* Pending prepend/append edits against inherited variables can only be
+   * propagated to our own launcher-service.
+   *
+   * host_api/subsandbox_api are external Flatpak portal interfaces that
+   * currently do not support the new option, so we still have no way
+   * to send edits there.
+   *
+   * Still warn in those cases if there are pending edits. */
+  if (api != &launcher_api)
+    g_warn_if_fail (g_hash_table_size (env_overlay->edits) == 0);
+
+  g_variant_builder_init (&edit_env_builder, G_VARIANT_TYPE ("aay"));
 
   g_hash_table_iter_init (&iter, env_overlay->values);
 
   while (g_hash_table_iter_next (&iter, &key, &value))
     {
       if (value != NULL)
-        g_variant_builder_add (&env_builder, "{ss}", key, value);
+        {
+          if (g_utf8_validate (key, -1, NULL) &&
+              g_utf8_validate (value, -1, NULL))
+            {
+              g_variant_builder_add (&env_builder, "{ss}", key, value);
+            }
+          else
+            {
+              g_autofree gchar *record = g_strdup_printf ("set=%s=%s", (char *)key, (char *)value);
+
+              g_variant_builder_add (&edit_env_builder, "^ay", record);
+            }
+        }
       else
-        unsetenv = TRUE;
+        {
+          unsetenv = TRUE;
+        }
     }
 
   spawn_flags = 0;
@@ -1464,7 +1488,18 @@ main (int argc,
           while (g_hash_table_iter_next (&iter, &key, &value))
             {
               if (value == NULL)
-                g_variant_builder_add (&strv_builder, "s", key);
+                {
+                  if (g_utf8_validate (key, -1, NULL))
+                    {
+                      g_variant_builder_add (&strv_builder, "s", key);
+                    }
+                  else
+                    {
+                      g_autofree gchar *record = g_strdup_printf ("unset=%s", (char *)key);
+
+                      g_variant_builder_add (&edit_env_builder, "^ay", record);
+                    }
+                }
             }
 
           g_variant_builder_add (&options_builder, "{s@v}", "unset-env",
@@ -1498,6 +1533,44 @@ main (int argc,
 
           g_ptr_array_add (replacement_command_and_args, NULL);
           command_and_args = (char **) replacement_command_and_args->pdata;
+        }
+    }
+
+  if (g_hash_table_size (env_overlay->edits) > 0)
+    {
+      g_hash_table_iter_init (&iter, env_overlay->edits);
+
+      while (g_hash_table_iter_next (&iter, &key, &value))
+        {
+          const char *var = key;
+          SrtEnvOverlayEdit *edit = value;
+
+          if (edit->prepend != NULL)
+            {
+              g_autofree gchar *record = g_strdup_printf ("prepend=%s=%s", var, edit->prepend);
+
+              g_variant_builder_add (&edit_env_builder, "^ay", record);
+            }
+
+          if (edit->append != NULL)
+            {
+              g_autofree gchar *record = g_strdup_printf ("append=%s=%s", var, edit->append);
+
+              g_variant_builder_add (&edit_env_builder, "^ay", record);
+            }
+        }
+    }
+
+  env_edits = g_variant_ref_sink (g_variant_new_variant (g_variant_builder_end (&edit_env_builder)));
+  if (g_variant_n_children (env_edits) > 0)
+    {
+      if (api == &launcher_api)
+        {
+          g_variant_builder_add (&options_builder, "{s@v}", "edit-env", env_edits);
+        }
+      else
+        {
+          g_warning ("Some environment variable edits cannot be represented when communicating with Flatpak");
         }
     }
 

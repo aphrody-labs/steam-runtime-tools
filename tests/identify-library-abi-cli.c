@@ -419,7 +419,7 @@ test_library_identification (Fixture *f,
     {
       g_autofree gchar *glib_dirname = NULL;
       g_autofree gchar *expected_out_line = NULL;
-      const gchar *out_line;
+      gchar *out_line;
       gchar *end_of_line;  /* not owned */
 
       if (!g_file_test (glib_info[i].path, G_FILE_TEST_EXISTS))

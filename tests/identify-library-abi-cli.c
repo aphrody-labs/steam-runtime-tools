@@ -394,10 +394,10 @@ test_library_identification (Fixture *f,
   for (i = 0; i < G_N_ELEMENTS (glib_info); i++)
     {
       g_autofree gchar *expected_out_line = NULL;
-      gchar *out_line = strstr (child_stdout, glib_info[i].path);
+      char *out_line = strstr (child_stdout, glib_info[i].path);
       if (out_line != NULL)
         {
-          gchar *end_of_line = strstr (out_line, "\n");
+          char *end_of_line = strstr (out_line, "\n");
           g_assert_nonnull (end_of_line);
           end_of_line[0] = '\0';
           expected_out_line = g_strdup_printf ("%s=%s", glib_info[i].path, glib_info[i].abi);
@@ -419,8 +419,8 @@ test_library_identification (Fixture *f,
     {
       g_autofree gchar *glib_dirname = NULL;
       g_autofree gchar *expected_out_line = NULL;
-      const gchar *out_line;
-      gchar *end_of_line;  /* not owned */
+      char *out_line;  /* not owned, points into child_stdout */
+      char *end_of_line;  /* likewise */
 
       if (!g_file_test (glib_info[i].path, G_FILE_TEST_EXISTS))
         {

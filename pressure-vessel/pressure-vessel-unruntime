@@ -34,6 +34,15 @@ here="${me%/*}"
 me="${me##*/}"
 
 undo_steamrt () {
+    # Undo the Steam Runtime environment, but only if it's already in use.
+    case "${STEAM_RUNTIME-}" in
+        (/*)
+            ;;
+        (*)
+            return
+            ;;
+    esac
+
     unset LD_LIBRARY_PATH
 
     PATH="/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games"

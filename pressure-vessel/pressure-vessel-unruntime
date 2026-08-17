@@ -2,7 +2,7 @@
 
 # pressure-vessel-unruntime — undo the Steam Runtime's environment
 #
-# Copyright © 2017-2022 Collabora Ltd.
+# Copyright © 2017-2026 Collabora Ltd.
 #
 # SPDX-License-Identifier: MIT
 #
@@ -33,7 +33,27 @@ me="$(readlink -f "$0")"
 here="${me%/*}"
 me="${me##*/}"
 
-default_path="/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games"
+undo_steamrt () {
+    unset LD_LIBRARY_PATH
+
+    PATH="/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games"
+
+    unset STEAM_RUNTIME
+
+    if [ -n "${SYSTEM_LD_LIBRARY_PATH+set}" ]; then
+        export LD_LIBRARY_PATH="$SYSTEM_LD_LIBRARY_PATH"
+    fi
+
+    if [ -n "${SYSTEM_PATH+set}" ]; then
+        export PATH="$SYSTEM_PATH"
+    fi
+
+    # STEAM_ZENITY="" explicitly disables use of zenity, and should be kept.
+    # Any other value can be unset.
+    if [ -n "${STEAM_ZENITY-}" ]; then
+        unset STEAM_ZENITY
+    fi
+}
 
 # Undo any weird environment before we start running external
 # executables. We put it back before running the actual app/game.
@@ -65,18 +85,10 @@ if [ -n "${STEAM_RUNTIME-}" ]; then
 fi
 
 unset LD_AUDIT
-unset LD_LIBRARY_PATH
 unset LD_PRELOAD
-PATH="$default_path"
-unset STEAM_RUNTIME
 
 if [ -n "${SYSTEM_LD_LIBRARY_PATH+set}" ]; then
     set -- "--env-if-host=SYSTEM_LD_LIBRARY_PATH=$SYSTEM_LD_LIBRARY_PATH" "$@"
-    # This has been superseeded by the new $PRESSURE_VESSEL_APP_LD_LIBRARY_PATH
-    # environment variable. When we are sure that we are always using the new
-    # _v2-entry-point with $PRESSURE_VESSEL_APP_LD_LIBRARY_PATH support, the
-    # following export can be removed
-    export LD_LIBRARY_PATH="$SYSTEM_LD_LIBRARY_PATH"
 fi
 
 if [ -n "${STEAM_RUNTIME_LIBRARY_PATH+set}" ]; then
@@ -85,14 +97,9 @@ fi
 
 if [ -n "${SYSTEM_PATH+set}" ]; then
     set -- "--env-if-host=SYSTEM_PATH=$SYSTEM_PATH" "$@"
-    export PATH="$SYSTEM_PATH"
 fi
 
-# STEAM_ZENITY="" explicitly disables use of zenity, and should be kept.
-# Any other value can be unset.
-if [ -n "${STEAM_ZENITY-}" ]; then
-    unset STEAM_ZENITY
-fi
+undo_steamrt
 
 unset SYSTEM_LD_LIBRARY_PATH
 unset SYSTEM_PATH

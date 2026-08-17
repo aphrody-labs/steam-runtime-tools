@@ -108,7 +108,7 @@ test_apply (Fixture *f,
   };
   g_auto(GStrv) envp = NULL;
 
-  envp = g_strdupv ((gchar **) initial_envp);
+  envp = _srt_strdupv (initial_envp);
   envp = _srt_env_overlay_apply (f->container_env, envp);
   qsort (envp, g_strv_length (envp), sizeof (char *), _srt_indirect_strcmp0);
   dump_envp (_srt_const_strv (envp));

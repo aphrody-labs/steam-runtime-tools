@@ -212,6 +212,8 @@ if [ "$#" -eq 0 ] || [ "$1" = -- ]; then
     usage 125
 fi
 
+# begin-remove-after: steamrt/tasks#727
+#
 # At this point $LD_LIBRARY_PATH might
 # 1. be equal to $STEAM_RUNTIME_LIBRARY_PATH (e.g. a game without
 #    any special launch options).
@@ -227,6 +229,10 @@ fi
 # $STEAM_RUNTIME paths. In this way we should end up with a list of paths
 # that are from the system $LD_LIBRARY_PATH, the system "ldconfig" and the
 # manually set $LD_LIBRARY_PATH paths from the game launch options.
+#
+# TODO: When Steam stops invoking compatibility tools in the
+# legacy Steam Runtime LDLP environment, we can drop this, and instead
+# let a user-set LD_LIBRARY_PATH pass through as-is.
 case "${STEAM_RUNTIME-}" in
     (/*)
         oldIFS="$IFS"
@@ -257,6 +263,8 @@ esac
 
 unset LD_LIBRARY_PATH
 unset STEAM_RUNTIME
+
+# end-remove-after: steamrt/tasks#727
 
 if [ -z "${suite}" ]; then
     run=run

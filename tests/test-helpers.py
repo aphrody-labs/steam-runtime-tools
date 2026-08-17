@@ -32,12 +32,12 @@ STDERR_FILENO = 2
 class TestHelpers(BaseTest):
     def run_subprocess(
         self,
-        args,           # type: typing.Union[typing.List[str], str]
-        check=False,
-        input=None,     # type: typing.Optional[bytes]
-        timeout=None,   # type: typing.Optional[int]
-        **kwargs        # type: typing.Any
-    ):
+        args: typing.Union[typing.List[str], str],
+        check: bool = False,
+        input: typing.Optional[bytes] = None,
+        timeout: typing.Optional[int] = None,
+        **kwargs: typing.Any
+    ) -> None:
         logger.info('Running: %r', args)
         return run_subprocess(
             args, check=check, input=input, timeout=timeout, **kwargs

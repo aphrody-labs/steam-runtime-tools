@@ -45,7 +45,12 @@ undo_steamrt () {
 
     unset LD_LIBRARY_PATH
 
-    PATH="/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games"
+    # Try not to fall back to the default_path if we don't have to
+    case ":$PATH:" in
+        (*:$STEAM_RUNTIME*)
+            export PATH="/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games"
+            ;;
+    esac
 
     unset STEAM_RUNTIME
 

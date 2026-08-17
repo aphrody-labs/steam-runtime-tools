@@ -5,11 +5,8 @@
 import logging
 import os
 import shlex
-import signal
 import subprocess
 import sys
-import tempfile
-import time
 import typing
 from pathlib import Path
 

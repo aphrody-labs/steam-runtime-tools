@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260818.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260818.0) steamrt; urgency=medium
 
   [ Simon McVittie ]
   * pressure-vessel:
@@ -18,7 +18,7 @@ steam-runtime-tools (0.20260818.0) UNRELEASED; urgency=medium
   * Tests/CI:
     - Fix more compiler warnings
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 18 Aug 2026 14:43:41 +0100
+ -- Simon McVittie <smcv@collabora.com>  Tue, 18 Aug 2026 14:50:02 +0100
 
 steam-runtime-tools (0.20260805.0) steamrt; urgency=medium
 

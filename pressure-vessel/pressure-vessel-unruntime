@@ -2,7 +2,7 @@
 
 # pressure-vessel-unruntime — undo the Steam Runtime's environment
 #
-# Copyright © 2017-2022 Collabora Ltd.
+# Copyright © 2017-2026 Collabora Ltd.
 #
 # SPDX-License-Identifier: MIT
 #
@@ -33,10 +33,57 @@ me="$(readlink -f "$0")"
 here="${me%/*}"
 me="${me##*/}"
 
-default_path="/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games"
+# begin-remove-after: steamrt/tasks#727
+# TODO: When Steam stops invoking compatibility tools in the
+# legacy Steam Runtime LDLP environment, we can drop this.
+undo_steamrt () {
+    # Undo the Steam Runtime environment, but only if it's already in use.
+    case "${STEAM_RUNTIME-}" in
+        (/*)
+            ;;
+        (*)
+            return
+            ;;
+    esac
+
+    unset LD_LIBRARY_PATH
+
+    # Try not to fall back to the default_path if we don't have to
+    case ":$PATH:" in
+        (*:$STEAM_RUNTIME*)
+            export PATH="/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games"
+            ;;
+    esac
+
+    case "$STEAM_ZENITY" in
+        ($STEAM_RUNTIME/*)
+            unset STEAM_ZENITY
+            ;;
+    esac
+
+    unset STEAM_RUNTIME
+
+    if [ -n "${SYSTEM_LD_LIBRARY_PATH+set}" ]; then
+        export LD_LIBRARY_PATH="$SYSTEM_LD_LIBRARY_PATH"
+    fi
+
+    if [ -n "${SYSTEM_PATH+set}" ]; then
+        export PATH="$SYSTEM_PATH"
+    fi
+
+    # Removing the Steam Runtime from the PATH might have eliminated our
+    # ability to run zenity via PATH search, if the host system doesn't
+    # have it
+    if [ "${STEAM_ZENITY-}" = zenity ] && ! command -v zenity >/dev/null; then
+        unset STEAM_ZENITY
+    fi
+}
+# end-remove-after: steamrt/tasks#727
 
 # Undo any weird environment before we start running external
-# executables. We put it back before running the actual app/game.
+# executables. We put it back before running the actual app/game,
+# if appropriate.
+#
 # We prepend options to "$@" because that's the only array available
 # in generic POSIX /bin/sh, and bash is not always practical to use.
 
@@ -58,25 +105,20 @@ if [ -n "${PATH-}" ]; then
     set -- "--env-if-host=PATH=$PATH" "$@"
 fi
 
+# begin-remove-after: steamrt/tasks#727
 # Intentionally not STEAM_RUNTIME_SCOUT: we want the LDLP runtime
 # that we were previously running in, if any
 if [ -n "${STEAM_RUNTIME-}" ]; then
     set -- "--env-if-host=STEAM_RUNTIME=$STEAM_RUNTIME" "$@"
 fi
+# end-remove-after: steamrt/tasks#727
 
 unset LD_AUDIT
-unset LD_LIBRARY_PATH
 unset LD_PRELOAD
-PATH="$default_path"
-unset STEAM_RUNTIME
 
+# begin-remove-after: steamrt/tasks#727
 if [ -n "${SYSTEM_LD_LIBRARY_PATH+set}" ]; then
     set -- "--env-if-host=SYSTEM_LD_LIBRARY_PATH=$SYSTEM_LD_LIBRARY_PATH" "$@"
-    # This has been superseeded by the new $PRESSURE_VESSEL_APP_LD_LIBRARY_PATH
-    # environment variable. When we are sure that we are always using the new
-    # _v2-entry-point with $PRESSURE_VESSEL_APP_LD_LIBRARY_PATH support, the
-    # following export can be removed
-    export LD_LIBRARY_PATH="$SYSTEM_LD_LIBRARY_PATH"
 fi
 
 if [ -n "${STEAM_RUNTIME_LIBRARY_PATH+set}" ]; then
@@ -85,25 +127,36 @@ fi
 
 if [ -n "${SYSTEM_PATH+set}" ]; then
     set -- "--env-if-host=SYSTEM_PATH=$SYSTEM_PATH" "$@"
-    export PATH="$SYSTEM_PATH"
 fi
 
-# STEAM_ZENITY="" explicitly disables use of zenity, and should be kept.
-# Any other value can be unset.
-if [ -n "${STEAM_ZENITY-}" ]; then
-    unset STEAM_ZENITY
-fi
+undo_steamrt
+# end-remove-after: steamrt/tasks#727
 
+# If we're about to go into a container, system paths no longer make sense
 unset SYSTEM_LD_LIBRARY_PATH
 unset SYSTEM_PATH
 unset SYSTEM_ZENITY
 
+# begin-remove-after: steamrt/tasks#727
+#
+# If we've been invoked from _v2-entry-point.sh, it sets this variable
+# to the LD_LIBRARY_PATH with which it was invoked, after filtering out
+# any components of the form $STEAM_RUNTIME/anything.
+# This allows user-specified Steam Launch Options like
+#   LD_LIBRARY_PATH=$HOME/workarounds:${LD_LIBRARY_PATH:+":$LD_LIBRARY_PATH"} %command%
+# to preserve the $HOME/workarounds part, while discarding any
+# LDLP Steam Runtime components that are no longer appropriate.
+#
+# TODO: When Steam stops invoking compatibility tools in the
+# legacy Steam Runtime LDLP environment, we can drop this, and instead
+# let a user-set LD_LIBRARY_PATH pass through as-is.
 if [ -n "${PRESSURE_VESSEL_APP_LD_LIBRARY_PATH+set}" ]; then
     set -- "--env-if-host=PRESSURE_VESSEL_APP_LD_LIBRARY_PATH=$PRESSURE_VESSEL_APP_LD_LIBRARY_PATH" "$@"
     export LD_LIBRARY_PATH="$PRESSURE_VESSEL_APP_LD_LIBRARY_PATH"
 fi
 
 unset PRESSURE_VESSEL_APP_LD_LIBRARY_PATH
+# end-remove-after: steamrt/tasks#727
 
 exec "$here/pressure-vessel-wrap" "$@"
 

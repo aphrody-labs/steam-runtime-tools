@@ -1,3 +1,25 @@
+steam-runtime-tools (0.20260818.0) UNRELEASED; urgency=medium
+
+  [ Simon McVittie ]
+  * pressure-vessel:
+    - Don't try to "escape" from the LD_LIBRARY_PATH-based Steam Runtime if
+      we are not already running in that runtime.
+      This fixes a regression when running the experimental containerized
+      Steam Client in a Snap app, especially when using the Nvidia
+      proprietary driver, and might also be helpful on host OSs that
+      rely on preserving non-standard $LD_LIBRARY_PATH or $PATH entries.
+      (steamrt/tasks#1053)
+    - Be more resilient against various possible values of $STEAM_ZENITY
+      (steamrt/tasks#1053)
+  * Tests/CI:
+    - Fix lint warnings
+
+  [ Antonio Ospite ]
+  * Tests/CI:
+    - Fix more compiler warnings
+
+ -- Simon McVittie <smcv@collabora.com>  Tue, 18 Aug 2026 14:43:41 +0100
+
 steam-runtime-tools (0.20260805.0) steamrt; urgency=medium
 
   [ Simon McVittie ]

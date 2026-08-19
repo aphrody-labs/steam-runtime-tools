@@ -208,7 +208,7 @@ test_from_container_env (Fixture *f,
   gboolean ok;
   gsize i;
 
-  pv_bwrap_container_env_to_envp (bwrap_envp, f->container_env);
+  bwrap_envp->envp = _srt_env_overlay_apply (f->container_env, bwrap_envp->envp);
   dump_bwrap (bwrap_envp, "Environment for final command");
   ok = pv_bwrap_container_env_to_env_fd (adverb_argv,
                                          f->container_env,

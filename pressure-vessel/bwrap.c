@@ -736,19 +736,6 @@ pv_bwrap_container_env_to_subsandbox_argv (FlatpakBwrap *flatpak_subsandbox,
 }
 
 /*
- * Populate @bwrap with environment variables from @container_env.
- */
-void
-pv_bwrap_container_env_to_envp (FlatpakBwrap *bwrap,
-                                SrtEnvOverlay *container_env)
-{
-  g_return_if_fail (bwrap != NULL);
-  g_return_if_fail (container_env != NULL);
-
-  bwrap->envp = _srt_env_overlay_apply (container_env, bwrap->envp);
-}
-
-/*
  * pv_bwrap_container_env_to_env_fd:
  * @argv: Arguments for s-r-launch-client, pv-adverb, or anything else
  *  that takes an `--env-fd` argument compatible with those

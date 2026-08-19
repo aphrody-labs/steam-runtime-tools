@@ -966,7 +966,7 @@ main (int argc,
    * the final_argv->envp will be ignored anyway, other than as a way to
    * invoke s-r-launch-client (for which original_environ is appropriate). */
   if (!self->is_flatpak_env)
-    pv_bwrap_container_env_to_envp (final_argv, container_env);
+    final_argv->envp = _srt_env_overlay_apply (container_env, final_argv->envp);
 
   /* Now that we've populated final_argv->envp, it's too late to change
    * any environment variables. Make sure that under normal circumstances

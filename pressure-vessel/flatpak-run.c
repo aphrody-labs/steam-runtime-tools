@@ -942,20 +942,20 @@ systemd_unit_name_escape (const gchar *in)
 
 /*
  * Modified from Flatpak's version. For simplicity we assume that @owner
- * and @prefix are in a form that don't need escaping to be a valid systemd
- * scope name.
+ * is in a form that doesn't need escaping to be a valid systemd scope name.
  */
 gboolean
-flatpak_run_in_transient_unit (const char *owner,
-                               const char *prefix,
-                               const char *app_id,
-                               GError **error)
+flatpak_run_in_transient_unit (const char  *owner,
+                               const char  *app_id,
+                               const char  *instance_id,
+                               GError     **error)
 {
   g_autoptr(GDBusConnection) conn = NULL;
   g_autofree char *path = NULL;
   g_autofree char *address = NULL;
   g_autofree char *name = NULL;
   g_autofree char *app_id_escaped = NULL;
+  g_autofree char *instance_id_escaped = NULL;
   g_autofree char *job = NULL;
   SystemdManager *manager = NULL;
   GVariantBuilder builder;
@@ -968,6 +968,7 @@ flatpak_run_in_transient_unit (const char *owner,
   g_autoptr(GMainContextPopDefault) main_context = NULL;
 
   g_return_val_if_fail (app_id != NULL, FALSE);
+  g_return_val_if_fail (instance_id != NULL, FALSE);
 
   path = g_strdup_printf ("/run/user/%d/systemd/private", getuid ());
 
@@ -996,10 +997,11 @@ flatpak_run_in_transient_unit (const char *owner,
     goto out;
 
   app_id_escaped = systemd_unit_name_escape (app_id);
-  name = g_strdup_printf ("app-%s-%s%s-%d.scope",
-                          owner, prefix,
+  instance_id_escaped = systemd_unit_name_escape (instance_id);
+  name = g_strdup_printf ("app-%s-%s-%s.scope",
+                          owner,
                           app_id_escaped,
-                          getpid ());
+                          instance_id_escaped);
 
   g_variant_builder_init (&builder, G_VARIANT_TYPE ("a(sv)"));
 

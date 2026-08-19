@@ -517,6 +517,8 @@ void
 pv_wrap_move_into_scope (const char *steam_app_id)
 {
   g_autoptr(GError) local_error = NULL;
+  g_autofree gchar *app_id = NULL;
+  g_autofree gchar *instance_id = NULL;
 
   if (steam_app_id != NULL)
     {
@@ -526,10 +528,15 @@ pv_wrap_move_into_scope (const char *steam_app_id)
         steam_app_id = NULL;
     }
 
+  /* We use the process ID as an instance ID, as Flatpak used to do */
+  instance_id = g_strdup_printf ("%d", getpid ());
+
   if (steam_app_id != NULL)
-    flatpak_run_in_transient_unit ("steam", "app", steam_app_id, &local_error);
+    app_id = g_strdup_printf ("app%s", steam_app_id);
   else
-    flatpak_run_in_transient_unit ("steam", "", "unknown", &local_error);
+    app_id = g_strdup ("unknown");
+
+  flatpak_run_in_transient_unit ("steam", app_id, instance_id, &local_error);
 
   if (local_error != NULL)
     g_debug ("Cannot move into a systemd scope: %s", local_error->message);

@@ -596,6 +596,8 @@ gboolean _srt_environ_get_boolean (const char * const *envp,
                                    gboolean *result,
                                    GError **error);
 
+GBytes *_srt_environ_to_env0 (const char * const *envp) G_GNUC_WARN_UNUSED_RESULT;
+
 gchar *_srt_describe_fd (int fd) G_GNUC_MALLOC G_GNUC_WARN_UNUSED_RESULT;
 
 /*

@@ -601,6 +601,40 @@ test_environ_get_boolean (Fixture *f,
     }
 }
 
+static void
+test_environ_to_env0 (Fixture *f,
+                      gconstpointer context)
+{
+  static const char * const envp[] =
+  {
+    "EMPTY=",
+    "ONE=1",
+    "FOO=hello, world!",
+    NULL
+  };
+  g_autoptr(GBytes) bytes = NULL;
+  const void *data;
+  size_t len = 0;
+  g_autofree gchar *copy = NULL;
+
+  bytes = _srt_environ_to_env0 (envp);
+  data = g_bytes_get_data (bytes, &len);
+
+  /* Make a copy and replace all the \0 with '|',
+   * so that we can assert about it more easily.
+   * (Any character not found in our test data would work.) */
+  copy = g_malloc0 (len + 1);
+  memcpy (copy, data, len);
+
+  for (size_t i = 0; i < len; i++)
+    {
+      if (copy[i] == '\0')
+        copy[i] = '|';
+    }
+
+  g_assert_cmpstr (copy, ==, "EMPTY=|ONE=1|FOO=hello, world!|");
+}
+
 typedef struct
 {
   const char *name;
@@ -2053,6 +2087,8 @@ main (int argc,
               setup, test_escape_steam_runtime, teardown);
   g_test_add ("/utils/environ_get_boolean", Fixture, NULL,
               setup, test_environ_get_boolean, teardown);
+  g_test_add ("/utils/environ_to_env0", Fixture, NULL,
+              setup, test_environ_to_env0, teardown);
   g_test_add ("/utils/evdev-bits", Fixture, NULL,
               setup, test_evdev_bits, teardown);
   g_test_add ("/utils/test-file-in-sysroot", Fixture, NULL,

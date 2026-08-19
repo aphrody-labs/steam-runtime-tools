@@ -1380,6 +1380,31 @@ _srt_boolean_environment (const gchar *name,
 }
 
 /*
+ * _srt_environ_to_env0:
+ * @envp: Environment variables
+ *
+ * Return all of the variables set in @envp, as a buffer in `env -0` format.
+ *
+ * Returns: (transfer full): `NAME=VALUE\0NAME=VALUE\0...`
+ */
+GBytes *
+_srt_environ_to_env0 (const char * const *envp)
+{
+  GByteArray *arr = NULL;
+
+  arr = g_byte_array_new ();
+
+  if (envp != NULL)
+    {
+      /* This appends VAR=VALUE plus \0 */
+      for (size_t i = 0; envp[i] != NULL; i++)
+        g_byte_array_append (arr, (const guint8 *) envp[i], strlen (envp[i]) + 1);
+    }
+
+  return g_byte_array_free_to_bytes (arr);
+}
+
+/*
  * _srt_async_signal_safe_error:
  * @prgname: The program name, like g_get_prgname()
  * @message: A human-readable message

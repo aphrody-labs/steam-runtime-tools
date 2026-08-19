@@ -1,7 +1,7 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  *
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.0
+ * Last updated: Flatpak 1.18.1
  *
  * Copyright © 2014-2018 Red Hat, Inc
  * Copyright © 2024 GNOME Foundation, Inc.
@@ -305,7 +305,7 @@ flatpak_permission_to_args (FlatpakPermission *permission,
     {
       /* Completely disallowed */
 
-      g_ptr_array_add (args, g_strdup_printf ("--no%s=%s", argname, name));
+      g_ptr_array_add (args, g_strdup_printf ("--%s=%s", noargname, name));
     }
 }
 

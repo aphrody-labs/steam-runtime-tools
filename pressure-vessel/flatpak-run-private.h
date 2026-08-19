@@ -1,6 +1,6 @@
 /*
  * Cut-down version of common/flatpak-run-private.h from Flatpak
- * Last updated: Flatpak 1.18.0
+ * Last updated: Flatpak 1.18.1
  *
  * Copyright © 2017-2024 Collabora Ltd.
  * Copyright © 2014-2024 Red Hat, Inc
@@ -35,6 +35,11 @@
 #include "flatpak-utils-private.h"
 #include "flatpak-exports-private.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
+
+#define FLATPAK_RUN_APP_DEPLOY_APP_ORIGINAL (-2)
+#define FLATPAK_RUN_APP_DEPLOY_APP_EMPTY (-3)
+
+#define FLATPAK_RUN_APP_DEPLOY_USR_ORIGINAL (-2)
 
 /* modified for pressure-vessel */
 gboolean flatpak_run_in_transient_unit (const char *owner,

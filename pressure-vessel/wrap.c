@@ -969,12 +969,9 @@ main (int argc,
     final_argv->envp = _srt_env_overlay_apply (container_env, final_argv->envp);
 
   /* Now that we've populated final_argv->envp, it's too late to change
-   * any environment variables. Make sure that under normal circumstances
-   * we get an assertion failure if we try.
-   * However, if we're working around a setuid bwrap, we need to keep this
-   * around a little bit longer. */
-  if (!(self->workarounds & PV_WORKAROUND_FLAGS_BWRAP_SETUID))
-    g_clear_pointer (&container_env, _srt_env_overlay_unref);
+   * any environment variables.
+   * Make sure we get an assertion failure if we try. */
+  g_clear_pointer (&container_env, _srt_env_overlay_unref);
 
   if (bwrap != NULL)
     {
@@ -1049,9 +1046,11 @@ main (int argc,
            * We used to do this for only the environment variables that
            * a setuid executable would filter out, but now that we're using
            * --env-fd, it's just as easy to serialize all of them. */
-          if (!pv_bwrap_container_env_to_env_fd (adverb_argv,
-                                                 container_env,
-                                                 error))
+          g_autoptr(GBytes) env0 = NULL;
+
+          env0 = _srt_environ_to_env0 (_srt_const_strv (final_argv->envp));
+
+          if (!pv_bwrap_env0_to_env_fd (adverb_argv, env0, error))
             goto out;
         }
 

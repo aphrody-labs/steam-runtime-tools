@@ -736,32 +736,29 @@ pv_bwrap_container_env_to_subsandbox_argv (FlatpakBwrap *flatpak_subsandbox,
 }
 
 /*
- * pv_bwrap_container_env_to_env_fd:
+ * pv_bwrap_env0_to_env_fd:
  * @argv: Arguments for s-r-launch-client, pv-adverb, or anything else
  *  that takes an `--env-fd` argument compatible with those
- * @container_env: The environment variables to set
+ * @env0: The environment variables to set, in `env -0` format
  * @error: You know how this works
  *
- * Add the variables that are set by @container_env to the
- * arguments in @argv as an `--env-fd`.
+ * Add the variables in @env0 to the arguments in @argv as an `--env-fd`.
  *
  * Returns: %TRUE on success
  */
 gboolean
-pv_bwrap_container_env_to_env_fd (FlatpakBwrap *argv,
-                                  SrtEnvOverlay *container_env,
-                                  GError **error)
+pv_bwrap_env0_to_env_fd (FlatpakBwrap *argv,
+                         GBytes *env0,
+                         GError **error)
 {
   g_auto(GLnxTmpfile) tmpf  = { 0, };
-  g_autoptr(GBytes) bytes = NULL;
   const void *content = NULL;
   size_t content_size = 0;
 
   g_return_val_if_fail (argv != NULL, FALSE);
-  g_return_val_if_fail (container_env != NULL, FALSE);
+  g_return_val_if_fail (env0 != NULL, FALSE);
 
-  bytes = _srt_env_overlay_to_env0 (container_env);
-  content = g_bytes_get_data (bytes, &content_size);
+  content = g_bytes_get_data (env0, &content_size);
   g_return_val_if_fail (content_size < G_MAXSSIZE, FALSE);
 
   if (content_size != 0)
@@ -776,4 +773,27 @@ pv_bwrap_container_env_to_env_fd (FlatpakBwrap *argv,
     }
 
   return TRUE;
+}
+
+/*
+ * pv_bwrap_container_env_to_env_fd:
+ * @argv: Arguments for s-r-launch-client, pv-adverb, or anything else
+ *  that takes an `--env-fd` argument compatible with those
+ * @container_env: The environment variables to set
+ * @error: You know how this works
+ *
+ * Add the variables that are set by @container_env to the
+ * arguments in @argv as an `--env-fd`.
+ * Variables that are unset are ignored.
+ *
+ * Returns: %TRUE on success
+ */
+gboolean
+pv_bwrap_container_env_to_env_fd (FlatpakBwrap *argv,
+                                  SrtEnvOverlay *container_env,
+                                  GError **error)
+{
+  g_autoptr(GBytes) bytes = _srt_env_overlay_to_env0 (container_env);
+
+  return pv_bwrap_env0_to_env_fd (argv, bytes, error);
 }

@@ -709,14 +709,16 @@ pv_bwrap_container_env_to_subsandbox_argv (FlatpakBwrap *flatpak_subsandbox,
                                            SrtEnvOverlay *container_env,
                                            GError **error)
 {
+  g_autoptr(GBytes) env0 = NULL;
   g_autoptr(GList) vars = NULL;
   const GList *iter;
 
   g_return_val_if_fail (flatpak_subsandbox != NULL, FALSE);
   g_return_val_if_fail (container_env != NULL, FALSE);
 
-  if (!pv_bwrap_container_env_to_env_fd (flatpak_subsandbox, container_env,
-                                         error))
+  env0 = _srt_env_overlay_to_env0 (container_env);
+
+  if (!pv_bwrap_env0_to_env_fd (flatpak_subsandbox, env0, error))
     return FALSE;
 
   vars = _srt_env_overlay_get_vars (container_env);
@@ -773,27 +775,4 @@ pv_bwrap_env0_to_env_fd (FlatpakBwrap *argv,
     }
 
   return TRUE;
-}
-
-/*
- * pv_bwrap_container_env_to_env_fd:
- * @argv: Arguments for s-r-launch-client, pv-adverb, or anything else
- *  that takes an `--env-fd` argument compatible with those
- * @container_env: The environment variables to set
- * @error: You know how this works
- *
- * Add the variables that are set by @container_env to the
- * arguments in @argv as an `--env-fd`.
- * Variables that are unset are ignored.
- *
- * Returns: %TRUE on success
- */
-gboolean
-pv_bwrap_container_env_to_env_fd (FlatpakBwrap *argv,
-                                  SrtEnvOverlay *container_env,
-                                  GError **error)
-{
-  g_autoptr(GBytes) bytes = _srt_env_overlay_to_env0 (container_env);
-
-  return pv_bwrap_env0_to_env_fd (argv, bytes, error);
 }

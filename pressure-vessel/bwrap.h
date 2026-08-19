@@ -79,6 +79,3 @@ gboolean pv_bwrap_container_env_to_subsandbox_argv (FlatpakBwrap *flatpak_subsan
 gboolean pv_bwrap_env0_to_env_fd (FlatpakBwrap *argv,
                                   GBytes *env0,
                                   GError **error);
-gboolean pv_bwrap_container_env_to_env_fd (FlatpakBwrap *argv,
-                                           SrtEnvOverlay *container_env,
-                                           GError **error);

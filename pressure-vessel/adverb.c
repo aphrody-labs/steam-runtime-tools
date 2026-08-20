@@ -56,7 +56,6 @@
 
 #define DEFAULT_TERMINATE_TIMEOUT 2.0
 
-static const char * const *global_envp = NULL;
 static GPtrArray *global_ld_so_conf_entries = NULL;
 static SrtProcessManagerOptions *global_options = NULL;
 static gboolean opt_clear_env = FALSE;
@@ -719,7 +718,6 @@ main (int argc,
   global_options = &process_manager_options;
 
   envp = g_get_environ ();
-  global_envp = (const char * const *) envp;
 
   ld_so_conf_entries = g_ptr_array_new_with_free_func (g_free);
   global_ld_so_conf_entries = ld_so_conf_entries;
@@ -856,7 +854,7 @@ main (int argc,
    * for starting its associated server already */
   runner = _srt_subprocess_runner_new_full (opt_emulator,
                                             NULL,   /* server assumed ready */
-                                            global_envp,
+                                            _srt_const_strv (envp),
                                             bindir,
                                             pkglibexecdir,
                                             NULL,   /* no sysroot */
@@ -1013,7 +1011,6 @@ out:
   if (local_error != NULL)
     _srt_log_failure ("%s", local_error->message);
 
-  global_envp = NULL;
   g_debug ("Exiting with status %d", ret);
   return ret;
 }

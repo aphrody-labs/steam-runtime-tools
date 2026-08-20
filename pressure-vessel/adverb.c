@@ -712,6 +712,7 @@ main (int argc,
   g_autoptr(SrtSystemInfo) info = NULL;
   SrtLogFlags log_flags = (SRT_LOG_FLAGS_DEBUG_IMPLIES_TIMING
                            | SRT_LOG_FLAGS_DIVERT_STDOUT);
+  const char *ldlp;
 
   setlocale (LC_ALL, "");
 
@@ -850,6 +851,21 @@ main (int argc,
                                         NULL);
     }
 
+  ldlp = g_environ_getenv (envp, "LD_LIBRARY_PATH");
+  g_debug ("Inherited LD_LIBRARY_PATH: \"%s\"",
+           ldlp ?: "(unset)");
+
+  /* If we were given a LD_LIBRARY_PATH via --env-fd, it might be
+   * functionally necessary for running ldconfig, pv-locale-gen,
+   * the emulator, s-r-system-info helpers, and so on.
+   * Normally we would also inherit this, but we can't count on that
+   * happening if the environment was scrubbed by a setuid bwrap. */
+  envp = _srt_env_overlay_apply (env_overlay, envp);
+
+  ldlp = g_environ_getenv (envp, "LD_LIBRARY_PATH");
+  g_debug ("LD_LIBRARY_PATH after applying environment options: \"%s\"",
+           ldlp ?: "(unset)");
+
   /* If we were given an emulator, we assume that pv-wrap was responsible
    * for starting its associated server already */
   runner = _srt_subprocess_runner_new_full (opt_emulator,
@@ -860,8 +876,6 @@ main (int argc,
                                             NULL,   /* no sysroot */
                                             SRT_TEST_FLAGS_NONE,
                                             NULL);  /* cwd */
-
-  envp = _srt_env_overlay_apply (env_overlay, envp);
 
   if (opt_clear_env)
     {

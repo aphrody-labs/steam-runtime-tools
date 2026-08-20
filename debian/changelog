@@ -1,8 +1,15 @@
-steam-runtime-tools (0.20260818.1) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260820.0) UNRELEASED; urgency=medium
 
+  * pressure-vessel:
+    - When using a setuid system copy of bubblewrap
+      (this is a discouraged/legacy configuration):
+      + Fix a regression in handling of LD_LIBRARY_PATH (steamrt/tasks#1121)
+      + Preserve all environment variables, not just the ones we modify
+    - Update Flatpak-derived code from 1.18.1
+    - Refactoring (steamrt/tasks#1093)
   * Update libglnx subproject to 2026-08-18 (steamrt/tasks#1096)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 19 Aug 2026 15:26:43 +0100
+ -- Simon McVittie <smcv@collabora.com>  Thu, 20 Aug 2026 16:28:25 +0100
 
 steam-runtime-tools (0.20260818.0) steamrt; urgency=medium
 

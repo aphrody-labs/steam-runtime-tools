@@ -1,6 +1,6 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.0
+ * Last updated: Flatpak 1.18.1
  * Copyright © 2014-2019 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -75,7 +75,7 @@ const char * const *flatpak_abs_usrmerged_dirs = abs_usrmerged_dirs;
    (so we can't create mountpoints there) and don't match what's on the host anyway.
    flatpak_abs_usrmerged_dirs get the same treatment without having to be listed
    here. */
-static const char *dont_export_in[] = {
+const char *dont_export_in[] = {
   "/.flatpak-info",
   "/app",
   "/dev",

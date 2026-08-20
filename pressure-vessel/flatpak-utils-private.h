@@ -1,6 +1,6 @@
 /*
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.0
+ * Last updated: Flatpak 1.18.1
  *
  * Copyright © 2014 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
@@ -165,7 +165,8 @@ flatpak_auto_lock_helper (GMutex *mutex)
   return mutex;
 }
 
-gboolean flatpak_switch_symlink_and_remove (const char *symlink_path,
+gboolean flatpak_switch_symlink_and_remove (int         dir_fd,
+                                            const char *symlink_name,
                                             const char *target,
                                             GError    **error);
 
@@ -206,14 +207,14 @@ typedef enum {
   FLATPAK_CP_FLAGS_NONE = 0,
   FLATPAK_CP_FLAGS_MERGE = 1 << 0,
   FLATPAK_CP_FLAGS_NO_CHOWN = 1 << 1,
-  FLATPAK_CP_FLAGS_MOVE = 1 << 2,
 } FlatpakCpFlags;
 
-gboolean   flatpak_cp_a (GFile         *src,
-                         GFile         *dest,
-                         FlatpakCpFlags flags,
-                         GCancellable  *cancellable,
-                         GError       **error);
+gboolean   flatpak_cp_a_at (int            src_dfd,
+                            int            dest_parent_dfd,
+                            const char    *dest_name,
+                            FlatpakCpFlags flags,
+                            GCancellable  *cancellable,
+                            GError       **error);
 
 gboolean flatpak_mkdir_p (GFile        *dir,
                           GCancellable *cancellable,

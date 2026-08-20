@@ -197,25 +197,32 @@ test_from_container_env (Fixture *f,
                          gconstpointer context)
 {
   static const char expected_env[] = (
+    "FLATPAK_ID=com.valvesoftware.Steam\0"
     "G_MESSAGES_DEBUG=all\0"
     "LD_AUDIT=audit.so\0"
+    "LD_PRELOAD=libfakeroot.so\0"
     /* ... plus an implicit \0 */
   );
   g_autoptr(GError) local_error = NULL;
   g_autoptr(FlatpakBwrap) adverb_argv = flatpak_bwrap_new ((char **) initial_envp);
   g_autoptr(FlatpakBwrap) bwrap_envp = flatpak_bwrap_new ((char **) initial_envp);
   g_auto(GStrv) envp = NULL;
+  g_autoptr(GBytes) env0 = NULL;
   gboolean ok;
   gsize i;
+  const void *env0_data;
+  size_t env0_len = 0;
 
-  pv_bwrap_container_env_to_envp (bwrap_envp, f->container_env);
+  bwrap_envp->envp = _srt_env_overlay_apply (f->container_env, bwrap_envp->envp);
   dump_bwrap (bwrap_envp, "Environment for final command");
-  ok = pv_bwrap_container_env_to_env_fd (adverb_argv,
-                                         f->container_env,
-                                         &local_error);
+
+  /* In the real pv-wrap code we only do this if bwrap is setuid */
+  env0 = _srt_environ_to_env0 (_srt_const_strv (bwrap_envp->envp));
+  ok = pv_bwrap_env0_to_env_fd (adverb_argv, env0, &local_error);
   g_assert_no_error (local_error);
   g_assert_true (ok);
   dump_bwrap (adverb_argv, "Arguments to add to pv-adverb");
+
   /*
    * Set variable => set variable in envp, and also add --setenv if it's one
    *  that glibc would otherwise filter out in a setuid bwrap
@@ -233,6 +240,10 @@ test_from_container_env (Fixture *f,
   assert_1_item (_srt_const_strv (envp), i++, "LD_AUDIT=audit.so");
   assert_1_item (_srt_const_strv (envp), i++, "LD_PRELOAD=libfakeroot.so");
   assert_1_item (_srt_const_strv (envp), i++, NULL);
+
+  env0_data = g_bytes_get_data (env0, &env0_len);
+  g_assert_cmpmem (expected_env, sizeof (expected_env) - 1,
+                   env0_data, env0_len);
 
   g_assert_cmpstrv (adverb_argv->envp, initial_envp);
   i = 0;

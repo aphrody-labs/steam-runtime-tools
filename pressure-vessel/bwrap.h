@@ -76,8 +76,6 @@ gboolean pv_bwrap_append_adjusted_exports (FlatpakBwrap *to,
 gboolean pv_bwrap_container_env_to_subsandbox_argv (FlatpakBwrap *flatpak_subsandbox,
                                                     SrtEnvOverlay *container_env,
                                                     GError **error);
-void pv_bwrap_container_env_to_envp (FlatpakBwrap *bwrap,
-                                     SrtEnvOverlay *container_env);
-gboolean pv_bwrap_container_env_to_env_fd (FlatpakBwrap *argv,
-                                           SrtEnvOverlay *container_env,
-                                           GError **error);
+gboolean pv_bwrap_env0_to_env_fd (FlatpakBwrap *argv,
+                                  GBytes *env0,
+                                  GError **error);

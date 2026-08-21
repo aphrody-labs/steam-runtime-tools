@@ -278,7 +278,10 @@ class TestLauncher(BaseTest):
                 read_end, write_end = os.pipe2(os.O_CLOEXEC)
 
                 with open(write_end, 'wb') as writer:
-                    writer.write(b'PV_TEST_VAR_ONE=one\n\0PV_TEST_VAR_TWO=two')
+                    writer.write(
+                        # Note that this is not valid UTF-8.
+                        b'PV_TEST_VAR_ONE=one\n\0PV_TEST_VAR_TWO=\xff\xff'
+                    )
 
                 completed = run_subprocess(
                     self.clean_up_env + self.launch + [
@@ -298,7 +301,7 @@ class TestLauncher(BaseTest):
                     stdout=subprocess.PIPE,
                     stderr=2,
                 )
-                self.assertEqual(completed.stdout, b'>>one\n<<>>two<<')
+                self.assertEqual(completed.stdout, b'>>one\n<<>>\xff\xff<<')
 
                 logger.debug('Checking --edit-env-fd')
                 read_end, write_end = os.pipe2(os.O_CLOEXEC)
@@ -403,22 +406,24 @@ class TestLauncher(BaseTest):
 
                 logger.debug('Checking --env precedence')
                 completed = run_subprocess(
-                    self.clean_up_env + [
-                        'PV_TEST_VAR=not-inherited',
-                    ] + self.launch + [
-                        '--pass-env=PV_TEST_VAR',
-                        '--env=PV_TEST_VAR=nope',
-                        '--env=PV_TEST_VAR=overridden',
-                        '--socket', socket,
-                        '--',
-                        'sh', '-euc', 'printf \'%s\' "$PV_TEST_VAR"',
+                    self.clean_up_env_as_bytes + [
+                        b'PV_TEST_VAR=not-inherited',
+                    ] + self.launch_as_bytes + [
+                        b'--pass-env=PV_TEST_VAR',
+                        b'--env=PV_TEST_VAR=nope',
+                        # Note that this is not valid UTF-8,
+                        # but we want it to work anyway.
+                        b'--env=PV_TEST_VAR=\xffoverridden\xff',
+                        b'--socket', socket.encode('utf-8'),
+                        b'--',
+                        b'sh', b'-euc', b'printf \'%s\' "$PV_TEST_VAR"',
                     ],
                     check=True,
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.PIPE,
                     stderr=2,
                 )
-                self.assertEqual(completed.stdout, b'overridden')
+                self.assertEqual(completed.stdout, b'\xffoverridden\xff')
 
                 logger.debug('Checking --inherit-env')
                 completed = run_subprocess(

@@ -938,7 +938,7 @@ static const GOptionEntry options[] =
     "Requires '--bus-name=org.freedesktop.portal.Flatpak'.",
     "DIR" },
   { "socket", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_STRING, &opt_socket,
+    G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME, &opt_socket,
     "Connect to a Launcher server listening on this AF_UNIX socket.",
     "ABSPATH|@ABSTRACT" },
   { "terminate", '\0',

@@ -1804,10 +1804,10 @@ main (int argc,
   server->exit_status = EX_UNAVAILABLE;
 
   if (opt_socket != NULL)
-    g_warning ("The --socket option is deprecated. Prefer to use --session or --bus-name.");
+    _srt_log_warning ("The --socket option is deprecated. Prefer to use --session or --bus-name.");
 
   if (opt_socket_directory != NULL)
-    g_warning ("The --socket-directory option is deprecated. Prefer to use --session or --bus-name.");
+    _srt_log_warning ("The --socket-directory option is deprecated. Prefer to use --session or --bus-name.");
 
   /* This emits SrtPortalListener::ready if we were not asked to listen
    * on any bus names but are now successfully listening on a socket.
@@ -1874,7 +1874,7 @@ out:
       };
       int saved_errno;
 
-      g_warning ("Failed to start IPC server, running wrapped command instead");
+      _srt_log_warning ("Failed to start IPC server, running wrapped command instead");
 
       /* Make sure we don't leak the info file descriptor down into the
        * child process, but instead just close it */

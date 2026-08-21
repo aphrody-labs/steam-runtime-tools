@@ -1,5 +1,6 @@
 steam-runtime-tools (0.20260820.0) UNRELEASED; urgency=medium
 
+  [ Simon McVittie ]
   * pressure-vessel:
     - When using a setuid system copy of bubblewrap
       (this is a discouraged/legacy configuration):
@@ -9,7 +10,10 @@ steam-runtime-tools (0.20260820.0) UNRELEASED; urgency=medium
     - Refactoring (steamrt/tasks#1093)
   * Update libglnx subproject to 2026-08-18 (steamrt/tasks#1096)
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 20 Aug 2026 16:28:25 +0100
+  [ Antonio Ospite ]
+  * Refactoring (steamrt/tasks#1093)
+
+ -- Simon McVittie <smcv@collabora.com>  Fri, 21 Aug 2026 15:37:58 +0100
 
 steam-runtime-tools (0.20260818.0) steamrt; urgency=medium
 

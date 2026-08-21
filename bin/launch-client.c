@@ -1362,6 +1362,11 @@ main (int argc,
       g_variant_builder_add (&fd_builder, "{uh}", fd, handle);
     }
 
+  /* Cross-process propagation of unresolved prepend/append edits has not
+   * been implemented yet; warn instead of silently dropping pending edits.
+   */
+  g_warn_if_fail (g_hash_table_size (env_overlay->edits) == 0);
+
   g_hash_table_iter_init (&iter, env_overlay->values);
 
   while (g_hash_table_iter_next (&iter, &key, &value))

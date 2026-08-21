@@ -269,6 +269,7 @@ test_from_container_env_subsandbox (Fixture *f,
   gboolean ok;
   gsize i;
 
+  _srt_env_overlay_resolve_edits (f->container_env, initial_envp);
   ok = pv_bwrap_container_env_to_subsandbox_argv (flatpak_subsandbox,
                                                   f->container_env,
                                                   &local_error);

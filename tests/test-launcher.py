@@ -303,6 +303,30 @@ class TestLauncher(BaseTest):
                 )
                 self.assertEqual(completed.stdout, b'>>one\n<<>>\xff\xff<<')
 
+                logger.debug('Checking arbitrary environment variable name')
+                read_end, write_end = os.pipe2(os.O_CLOEXEC)
+
+                with open(write_end, 'wb') as writer:
+                    writer.write(b' \xff\n=argh')
+
+                completed = run_subprocess(
+                    self.clean_up_env + self.launch + [
+                        '--env-fd=%d' % read_end,
+                        '--socket', socket,
+                        '--',
+                        sys.executable,
+                        '-c',
+                        'import os; '
+                        + r'print(os.environb[b" \xff\n"].decode("ascii"))',
+                    ],
+                    check=True,
+                    pass_fds=[read_end],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=2,
+                )
+                self.assertEqual(completed.stdout, b'argh\n')
+
                 logger.debug('Checking --edit-env-fd')
                 read_end, write_end = os.pipe2(os.O_CLOEXEC)
 

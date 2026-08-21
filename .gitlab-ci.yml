@@ -248,7 +248,8 @@ build:devel:
                 _build/devel
             ninja -C _build/devel
             ninja -C _build/devel install
-            G_MESSAGES_DEBUG=all meson test -C _build/devel
+            G_DEBUG=fatal-criticals G_MESSAGES_DEBUG=all \
+                meson test -C _build/devel
 
             build-aux/scout-layered.sh
 
@@ -291,7 +292,8 @@ build:coverage:
                 _build/coverage
             ninja -C _build/coverage
             ninja -C _build/coverage install
-            G_MESSAGES_DEBUG=all meson test -C _build/coverage
+            G_DEBUG=fatal-criticals G_MESSAGES_DEBUG=all \
+                meson test -C _build/coverage
             ninja -C _build/coverage -j1 coverage-{html,xml}
 
     coverage: '/^\s*lines:\s+([\d.]+%)/'
@@ -340,7 +342,8 @@ build:aarch64:
                 _build/aarch64
             ninja -C _build/aarch64
             ninja -C _build/aarch64 install
-            G_MESSAGES_DEBUG=all meson test -C _build/aarch64
+            G_DEBUG=fatal-criticals G_MESSAGES_DEBUG=all \
+                meson test -C _build/aarch64
 
     artifacts:
         paths:
@@ -372,7 +375,8 @@ build:clang:
                 _build/clang-asan
             ninja -C _build/clang-asan
             ninja -C _build/clang-asan install
-            G_MESSAGES_DEBUG=all meson test -C _build/clang-asan
+            G_DEBUG=fatal-criticals G_MESSAGES_DEBUG=all \
+                meson test -C _build/clang-asan
 
     artifacts:
         paths:

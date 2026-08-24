@@ -1,5 +1,33 @@
 steam-runtime-tools (0.20260820.0) UNRELEASED; urgency=medium
 
+  [ Antonio Ospite ]
+  * s-r-supervisor:
+    - Add --edit-env-fd option.
+      This allows appending and prepending colon-delimited items to
+      environment variables without needing to know their current values.
+      It can also set environment variables like --env/--env-fd,
+      or unset them like --unset-env.
+      (steamrt/tasks#1093)
+  * s-r-launcher-service:
+    - Add edit-env option to append, prepend, set or unset arbitrary
+      environment variables, even if they are not valid UTF-8
+      (steamrt/tasks#1093)
+  * s-r-launch-client:
+    - Add --edit-env-fd option, similar to s-r-supervisor.
+      append= and prepend= edits currently only work when communicating
+      with a matching version of s-r-launcher-service, and will be ignored
+      with a warning if communicating with flatpak-portal or
+      flatpak-session-helper.
+      (steamrt/tasks#1093)
+    - When setting or unsetting an environment variable, if its name or
+      value is not valid UTF-8 and we are communicating with
+      s-r-launcher-service, transfer it via edit-env
+      (steamrt/tasks#1007)
+  * pressure-vessel:
+    - pv-wrap: Add --edit-env-fd, similar to s-r-supervisor
+      (steamrt/tasks#1093)
+  * Refactoring (steamrt/tasks#1093)
+
   [ Simon McVittie ]
   * pressure-vessel:
     - When using a setuid system copy of bubblewrap
@@ -7,13 +35,12 @@ steam-runtime-tools (0.20260820.0) UNRELEASED; urgency=medium
       + Fix a regression in handling of LD_LIBRARY_PATH (steamrt/tasks#1121)
       + Preserve all environment variables, not just the ones we modify
     - Update Flatpak-derived code from 1.18.1
-    - Refactoring (steamrt/tasks#1093)
+  * s-r-launch-client, s-r-launcher-service:
+    - Fix ability to pass non-ASCII paths to --socket
   * Update libglnx subproject to 2026-08-18 (steamrt/tasks#1096)
-
-  [ Antonio Ospite ]
   * Refactoring (steamrt/tasks#1093)
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 21 Aug 2026 15:37:58 +0100
+ -- Simon McVittie <smcv@collabora.com>  Mon, 24 Aug 2026 11:27:34 +0100
 
 steam-runtime-tools (0.20260818.0) steamrt; urgency=medium
 

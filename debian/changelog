@@ -37,10 +37,15 @@ steam-runtime-tools (0.20260820.0) UNRELEASED; urgency=medium
     - Update Flatpak-derived code from 1.18.1
   * s-r-launch-client, s-r-launcher-service:
     - Fix ability to pass non-ASCII paths to --socket
+    - Avoid test failures under G_DEBUG=fatal-warnings
   * Update libglnx subproject to 2026-08-18 (steamrt/tasks#1096)
   * Refactoring (steamrt/tasks#1093)
+  * Documentation fixes
+  * Tests/CI:
+    - Improve coverage (steamrt/tasks#1007)
+    - Improve strictness by using G_DEBUG=fatal-criticals
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 24 Aug 2026 11:27:34 +0100
+ -- Simon McVittie <smcv@collabora.com>  Mon, 24 Aug 2026 12:02:45 +0100
 
 steam-runtime-tools (0.20260818.0) steamrt; urgency=medium
 

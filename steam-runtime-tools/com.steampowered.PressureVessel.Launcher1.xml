@@ -102,6 +102,23 @@
               environment of the new process.
             </para></listitem>
           </varlistentry>
+          <varlistentry>
+            <term>edit-env aay</term>
+            <listitem>
+              <para>
+                If present, each element is a record in the form
+                "set=VAR=VALUE", "unset=VAR", "prepend=VAR=VALUE",
+                or "append=VAR=VALUE" followed by a zero byte, describing
+                an edit operation to apply to the
+                corresponding environment variable of the new process,
+                resolved against its current value in the launcher's own
+                environment (after "envs" and "unset-env" have already been
+                applied).
+              </para>
+              <para>
+                The delimiter used to prepend/append values is always ':'.
+            </para></listitem>
+          </varlistentry>
         </variablelist>
 
         This method returns as soon as the process ID of the new process

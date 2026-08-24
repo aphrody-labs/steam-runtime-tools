@@ -542,6 +542,87 @@ test_update (Fixture *f,
 }
 
 static void
+test_parse_edit_record (Fixture *f,
+                        gconstpointer context)
+{
+  g_autoptr(GError) error = NULL;
+  static const char * const valid_edits[] =
+  {
+    "set=NEW_VAR=value",
+    "set=FOO=bar",
+    "unset=FOO",
+    "prepend=LD_PRELOAD=pre",
+    "append=LD_PRELOAD=post",
+    "set=IMMEDIATE_EDIT=value",
+    "prepend=IMMEDIATE_EDIT=prefix",
+    "append=DEFERRED_EDIT=suffix",
+    NULL
+  };
+
+  static const char * const invalid_edits[] =
+  {
+    "prependFOO", /* not a command */
+    "bogus=FOO=BAR", /* invalid command */
+    "=FOO=BAR", /* should have non-empty command */
+    "unset=", /* variable name needs to be non-empty */
+    "unset=FOO=BAR", /* variable name should not have = */
+    "set=FOO", /* set needs = and a value */
+    "prepend=FOO", /* prepend needs = and a value */
+    "append=FOO", /* append needs = and a value */
+    "set==BAR", /* variable name needs to be non-empty */
+    NULL
+  };
+
+  gboolean ok;
+  char out_delimiter = '\0';
+  const char *out_prepend = NULL;
+  const char *out_append = NULL;
+  gsize i;
+
+  for (i = 0; valid_edits[i] != NULL; i++)
+    {
+      ok = _srt_env_overlay_parse_edit_record (f->container_env, valid_edits[i],
+                                               &error);
+      g_assert_no_error (error);
+      g_assert_true (ok);
+    }
+
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "NEW_VAR"),
+                   ==, "value");
+
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "FOO"),
+                   ==, NULL);
+
+  g_assert_true (_srt_env_overlay_get_edit (f->container_env, "LD_PRELOAD",
+                                            &out_delimiter,
+                                            &out_prepend, &out_append));
+  g_assert_cmpint (out_delimiter, ==, ':');
+  g_assert_cmpstr (out_prepend, ==, "pre");
+  g_assert_cmpstr (out_append, ==, "post");
+
+  g_assert_cmpstr (_srt_env_overlay_get (f->container_env, "IMMEDIATE_EDIT"),
+                   ==, "prefix:value");
+
+  g_assert_true (_srt_env_overlay_get_edit (f->container_env, "DEFERRED_EDIT",
+                                            &out_delimiter,
+                                            &out_prepend, &out_append));
+  g_assert_cmpint (out_delimiter, ==, ':');
+  g_assert_cmpstr (out_prepend, ==, NULL);
+  g_assert_cmpstr (out_append, ==, "suffix");
+
+  /* test malformed record */
+  for (i = 0; invalid_edits[i] != NULL; i++)
+    {
+      ok = _srt_env_overlay_parse_edit_record (f->container_env, invalid_edits[i],
+                                               &error);
+      g_assert_false (ok);
+      g_assert_error (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE);
+      g_test_message ("Parsing invalid record \"%s\" -> error as expected: \"%s\"", invalid_edits[i], error->message);
+      g_clear_error (&error);
+    }
+}
+
+static void
 test_update_edits (Fixture *f,
                    gconstpointer context)
 {
@@ -677,6 +758,8 @@ main (int argc,
               setup, test_update, teardown);
   g_test_add ("/env-overlay/update-edits", Fixture, NULL,
               setup, test_update_edits, teardown);
+  g_test_add ("/env-overlay/parse-edit-record", Fixture, NULL,
+              setup, test_parse_edit_record, teardown);
 
   return g_test_run ();
 }

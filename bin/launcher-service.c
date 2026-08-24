@@ -40,6 +40,7 @@
 #include <gio/gio.h>
 #include <gio/gunixfdlist.h>
 
+#include "steam-runtime-tools/env-overlay-internal.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/launcher-internal.h"
 #include "steam-runtime-tools/log-internal.h"
@@ -584,6 +585,7 @@ handle_launch (PvLauncher1           *object,
       if (g_strcmp0 (var, "PWD") == 0)
         continue;
 
+      g_debug ("Setting the environment variable %s to %s...", var, val);
       env = g_environ_setenv (env, var, val, TRUE);
     }
 
@@ -598,6 +600,37 @@ handle_launch (PvLauncher1           *object,
       g_debug ("Unsetting the environment variable %s...", unset_env[i]);
       env = g_environ_unsetenv (env, unset_env[i]);
     }
+
+  {
+    g_autofree const char **edit_env = NULL;
+
+    g_variant_lookup (arg_options, "edit-env", "^a&ay", &edit_env);
+
+    if (edit_env != NULL && edit_env[0] != NULL)
+      {
+        g_autoptr(SrtEnvOverlay) edit_overlay = _srt_env_overlay_new ();
+
+        for (i = 0; edit_env[i] != NULL; i++)
+          {
+            g_debug ("Editing the environment with \"%s\"...", edit_env[i]);
+            if (!_srt_env_overlay_parse_edit_record (edit_overlay, edit_env[i],
+                                                     &error))
+              {
+                g_dbus_method_invocation_return_error (invocation, G_DBUS_ERROR,
+                                                       G_DBUS_ERROR_INVALID_ARGS,
+                                                       "Invalid edit-env option: %s",
+                                                       error->message);
+                return G_DBUS_METHOD_INVOCATION_HANDLED;
+              }
+          }
+
+        /* _srt_env_overlay_apply() resolves each pending edit against
+         * whatever value @env already has for that variable -- which by
+         * this point already reflects "envs" and "unset-env" -- so no
+         * separate "inherit" step is needed here. */
+        env = _srt_env_overlay_apply (edit_overlay, env);
+      }
+  }
 
   if (arg_cwd_path == NULL)
     env = g_environ_setenv (env, "PWD", self->original_cwd_l,

@@ -20,6 +20,7 @@ steam-runtime-supervisor - run and supervise a subprocess
 [**--[no-]-close-fds**]
 [**--env** _VAR_**=**_VALUE_]
 [**--env-fd** *FD*]
+[**--edit-env-fd** *FD*]
 [**--[no-]exit-with-parent**]
 [**--inherit-env** *VAR*]
 [**--inherit-env-matching** *WILDCARD*]
@@ -106,6 +107,31 @@ Parse zero-terminated environment variables from _FD_, and set each
 one as if via **--env**.
 The format of _FD_ is the same as the output of `$(env -0)` or the
 pseudo-file `/proc/PID/environ`.
+
+</dd>
+<dt>
+
+**--edit-env-fd** _FD_
+
+</dt><dd>
+
+Parse zero-terminated environment edit records from _FD_, and apply
+each one to the environment.
+Each record has the form:
+
+* `set=VAR=VALUE`: as **--env** _VAR=VALUE_
+* `unset=VAR`: as **--unset-env** _VAR_
+* `prepend=VAR=PREFIX`: If *VAR* has a non-empty value,
+  add *PREFIX* before the current value,
+  separated by a `:` delimiter.
+  If *VAR* is empty or unset, instead set it to *PREFIX*,
+  without adding the delimiter.
+  For example,
+  `prepend=LD_LIBRARY_PATH=/app/lib:/app/lib64`
+  adds library search path entries.
+* `append=VAR=SUFFIX`: similar to `prepend`, but add *SUFFIX* after the current value if any
+
+Records are processed in the order they appear in _FD_.
 
 </dd>
 <dt>

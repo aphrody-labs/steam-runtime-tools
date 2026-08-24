@@ -132,6 +132,8 @@ class TestLauncher(BaseTest):
             proc = subprocess.Popen(
                 self.clean_up_env + [
                     'PV_TEST_VAR=from-launcher',
+                    'PV_TEST_VAR_THREE=inherited',
+                    'PV_TEST_VAR_FOUR=inherited',
                 ] + self.launcher + [
                     '--socket-directory', temp,
                 ],
@@ -297,6 +299,44 @@ class TestLauncher(BaseTest):
                     stderr=2,
                 )
                 self.assertEqual(completed.stdout, b'>>one\n<<>>two<<')
+
+                logger.debug('Checking --edit-env-fd')
+                read_end, write_end = os.pipe2(os.O_CLOEXEC)
+
+                with open(write_end, 'wb') as writer:
+                    writer.write(b'set=PV_TEST_VAR_ONE=one\0')
+                    writer.write(b'unset=PV_TEST_VAR_TWO\0')
+                    writer.write(b'set=PV_TEST_VAR_THREE=env\0')
+                    writer.write(b'prepend=PV_TEST_VAR_THREE=before\0')
+                    writer.write(b'append=PV_TEST_VAR_THREE=after\0')
+                    # The last \0 is optional: here we do not add it,
+                    # but in test-supervisor.py we do, so both ways are tested
+                    writer.write(b'append=PV_TEST_VAR_FOUR=after')
+
+                completed = run_subprocess(
+                    self.clean_up_env + self.launch + [
+                        '--edit-env-fd=%d' % read_end,
+                        '--socket', socket,
+                        '--',
+                        'sh', '-euc',
+                        'printf \'%s\' '
+                        '"'
+                        '>>${PV_TEST_VAR_ONE-unset}<<'
+                        '>>${PV_TEST_VAR_TWO-unset}<<'
+                        '>>${PV_TEST_VAR_THREE-unset}<<'
+                        '>>${PV_TEST_VAR_FOUR-unset}<<'
+                        '"',
+                    ],
+                    check=True,
+                    pass_fds=[read_end],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=2,
+                )
+                self.assertEqual(
+                    completed.stdout,
+                    b'>>one<<>>unset<<>>before:env:after<<>>inherited:after<<',
+                )
 
                 logger.debug('Checking precedence of environment options')
                 completed = run_subprocess(
@@ -1603,6 +1643,124 @@ class TestLauncher(BaseTest):
                 stack.enter_context(ensure_terminated(proc))
                 proc.communicate(input='', timeout=10)
                 self.assertEqual(proc.returncode, code)
+
+    def test_edit_env_fd_malformed(self) -> None:
+        """Test that malformed --edit-env-fd records fail
+        with a clear error."""
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(
+                self.show_location('test_edit_env_fd_malformed')
+            )
+
+            read_end, write_end = os.pipe2(os.O_CLOEXEC)
+
+            # We only test with an unknown command here -
+            # other malformed edit records are unit-tested in env-overlay.c
+            # so this doesn't need to be an exhaustive test.
+            with open(write_end, 'wb') as writer:
+                writer.write(b'bogus=FOO=BAR\0')
+
+            proc = subprocess.Popen(
+                self.clean_up_env + self.launch + [
+                    '--edit-env-fd=%d' % read_end,
+                    '--',
+                    'true',
+                ],
+                pass_fds=[read_end],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            stack.enter_context(ensure_terminated(proc))
+            stdout, stderr = proc.communicate(input=b'', timeout=10)
+
+            # Should exit with non-zero
+            self.assertNotEqual(proc.returncode, 0)
+            # Should contain the error message
+            self.assertIn(b'Unknown edit command', stderr)
+
+    def test_edit_env_fd_dbus_malformed(self) -> None:
+        """Test that a malformed edit-env record received directly over
+        D-Bus causes Launch() to fail cleanly."""
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(
+                self.show_location('test_edit_env_fd_dbus_malformed')
+            )
+            try:
+                from gi.repository import GLib, Gio
+            except ImportError as e:
+                self.skipTest(str(e))
+
+            temp = stack.enter_context(
+                tempfile.TemporaryDirectory(prefix='test-'),
+            )
+
+            logger.debug('Starting launcher with socket directory')
+            proc = subprocess.Popen(
+                self.clean_up_env + self.launcher + [
+                    '--socket-directory', temp,
+                ],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=2,
+                universal_newlines=True,
+            )
+            stack.enter_context(ensure_terminated(proc))
+
+            dbus_address = ''
+            stdout = proc.stdout
+            assert stdout is not None
+            for line in stdout:
+                line = line.rstrip('\n')
+                logger.debug('%s', line)
+
+                if line.startswith('dbus_address='):
+                    dbus_address = line[len('dbus_address='):]
+
+            self.assertTrue(dbus_address)
+
+            conn = Gio.DBusConnection.new_for_address_sync(
+                dbus_address,
+                Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT,
+                None,
+                None,
+            )
+
+            with self.assertRaises(Exception) as catcher:
+                conn.call_with_unix_fd_list_sync(
+                    None,
+                    LAUNCHER_PATH,
+                    LAUNCHER_IFACE,
+                    'Launch',
+                    GLib.Variant(
+                        '(ayaaya{uh}a{ss}ua{sv})',
+                        (
+                            os.getcwdb() + b'\0',
+                            [b'true\0'],
+                            {},     # no fds
+                            {},     # environment
+                            0,      # no flags
+                            {
+                                'edit-env': GLib.Variant(
+                                    'aay', [b'bogus=FOO=BAR\0'],
+                                ),
+                            },
+                        ),
+                    ),
+                    GLib.VariantType.new('(u)'),
+                    Gio.DBusCallFlags.NONE,
+                    -1,
+                    None,   # GUnixFDList is not bound
+                    None,
+                )
+
+            logger.debug(
+                'When sending a malformed edit-env record: %s',
+                catcher.exception,
+            )
+            self.assertIn(
+                'Invalid edit-env option', str(catcher.exception),
+            )
 
     def test_version(self) -> None:
         with contextlib.ExitStack() as stack:

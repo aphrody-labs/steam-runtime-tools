@@ -1507,7 +1507,7 @@ static GOptionEntry options[] =
     "name on the D-Bus session bus.",
     NULL },
   { "socket", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_STRING, &opt_socket,
+    G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME, &opt_socket,
     "Listen on this AF_UNIX socket.",
     "ABSPATH|@ABSTRACT" },
   { "stop-on-exit", '\0',

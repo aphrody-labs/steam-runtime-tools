@@ -66,8 +66,9 @@
  *
  * This is functionally equivalent to %G_LOG_LEVEL_MESSAGE, but
  * the handler set up by _srt_util_set_glib_log_handler() prints it
- * as though it was a warning. Use to log a warning that should not
- * cause program termination, even during unit testing.
+ * as though it was a warning.
+ * Use to log a warning that should not cause program termination,
+ * even during unit testing or under `G_DEBUG=fatal-warnings`.
  */
 
 /*
@@ -78,8 +79,10 @@
  * Only use this in programs that have called
  * _srt_util_set_glib_log_handler().
  *
- * This is functionally equivalent to g_message(), but with a different
- * log level.
+ * This is functionally equivalent to g_message(),
+ * but with a different log level so that it is logged like a fatal error.
+ * Use it in command-line utilities to log a GError that will cause
+ * graceful program termination.
  */
 
 typedef void *AutoLibraryHandle;

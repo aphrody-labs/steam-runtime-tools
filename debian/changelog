@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260820.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260824.0) steamrt; urgency=medium
 
   [ Antonio Ospite ]
   * s-r-supervisor:
@@ -45,7 +45,7 @@ steam-runtime-tools (0.20260820.0) UNRELEASED; urgency=medium
     - Improve coverage (steamrt/tasks#1007)
     - Improve strictness by using G_DEBUG=fatal-criticals
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 24 Aug 2026 12:02:45 +0100
+ -- Simon McVittie <smcv@collabora.com>  Mon, 24 Aug 2026 17:38:32 +0100
 
 steam-runtime-tools (0.20260818.0) steamrt; urgency=medium
 

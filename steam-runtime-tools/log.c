@@ -85,6 +85,20 @@
  * graceful program termination.
  */
 
+/*
+ * _srt_log_warning:
+ * @...: format string and arguments, as for g_message()
+ *
+ * Convenience macro to log at level %SRT_LOG_LEVEL_WARNING.
+ * Only use this in programs that have called
+ * _srt_util_set_glib_log_handler().
+ *
+ * This is functionally equivalent to g_message(),
+ * but with a different log level so that it is logged like a g_warning().
+ * Use to log a warning that should not cause program termination,
+ * even during unit testing or under `G_DEBUG=fatal-warnings`.
+ */
+
 typedef void *AutoLibraryHandle;
 G_DEFINE_AUTO_CLEANUP_FREE_FUNC (AutoLibraryHandle, dlclose, NULL);
 

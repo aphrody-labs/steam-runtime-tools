@@ -252,6 +252,7 @@ endif
 bubblewrap_subproject = subproject(
   'bubblewrap',
   default_options : [
+    'assume_kernel=3.8.0',
     'bash_completion=disabled',
     'build_rpath=' + pkglibexec_rpath,
     'bwrapdir=' + pkglibexecdir,

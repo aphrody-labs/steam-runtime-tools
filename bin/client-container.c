@@ -503,7 +503,7 @@ run (int argc,
       g_print ("%s:\n"
                " Package: steam-runtime-tools\n"
                " Version: %s\n",
-               argv[0], VERSION);
+               g_get_prgname (), VERSION);
       *exit_status = 0;
       return TRUE;
     }

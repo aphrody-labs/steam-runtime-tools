@@ -284,7 +284,7 @@ run (int argc,
           "%s:\n"
           " Package: steam-runtime-tools\n"
           " Version: %s\n",
-          THIS_PROGRAM, VERSION);
+          g_get_prgname (), VERSION);
       return TRUE;
     }
 

@@ -340,7 +340,7 @@ main (int argc,
       g_print ("%s:\n"
                " Package: steam-runtime-tools\n"
                " Version: %s\n",
-               argv[0], VERSION);
+               g_get_prgname (), VERSION);
       ret = 0;
       goto out;
     }

@@ -1223,7 +1223,7 @@ main (int argc,
                 "%s:\n"
                 " Package: steam-runtime-tools\n"
                 " Version: %s\n",
-                argv[0], VERSION);
+                g_get_prgname (), VERSION);
             return 0;
 
           case OPTION_IGNORE_EXTRA_DRIVERS:

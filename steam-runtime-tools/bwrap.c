@@ -11,7 +11,6 @@
 #include "steam-runtime-tools/bwrap-internal.h"
 
 #include "steam-runtime-tools/architecture-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 /*
@@ -288,10 +287,10 @@ check_bwrap (SrtSubprocessRunner *runner,
  * @skip_testing: If true, do not test the bwrap executable, but instead
  *  assume that it will work
  * @flags_out: (out): Properties of the returned executable
+ * @error: Set on failure
  *
  * Attempt to find a working bwrap executable in the environment,
- * `${pkglibexecdir}` or a system location. Log messages via _srt_log_failure()
- * if none can be found.
+ * `${pkglibexecdir}` or a system location.
  *
  * Returns: (transfer full): Path to bwrap(1), or %NULL if not found
  */

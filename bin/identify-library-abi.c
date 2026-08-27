@@ -72,6 +72,7 @@ static const GOptionEntry option_entries[] =
     &opt_skip_unversioned, "Skip the libraries that have a filename that end with "
     "just \".so\"", NULL },
 
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
   SRT_CLI_OPTION_ENTRY_VERSION,
   G_OPTION_ENTRY_NULL
 };

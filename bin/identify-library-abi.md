@@ -34,6 +34,9 @@ steam-runtime-identify-library-abi - Identify the ABI of the libraries stored in
 :   If a library filename ends with just `.so`, its ABI will not be identified
     and will not be printed in output.
 
+**--verbose**
+:   Be more verbose. If used twice, debug messages are shown.
+
 **--version**
 :   Instead of performing the libraries identification, write in output the
     version number as YAML.

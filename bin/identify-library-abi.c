@@ -212,20 +212,13 @@ run_ldconfig (const char *ldconfig,
 }
 
 static gboolean
-run (int argc,
+run (FILE *original_stdout,
+     int argc,
      char **argv,
      GError **error)
 {
-  g_autoptr(FILE) original_stdout = NULL;
   gsize i;
   char separator = '\n';
-
-  /* stdout is reserved for machine-readable output, so avoid having
-   * things like g_debug() pollute it. */
-  original_stdout = _srt_divert_stdout_to_stderr (error);
-
-  if (original_stdout == NULL)
-    return FALSE;
 
   _srt_unblock_signals ();
 
@@ -287,16 +280,26 @@ int
 main (int argc,
       char **argv)
 {
+  g_autoptr(FILE) original_stdout = NULL;
   g_autoptr(GOptionContext) option_context = NULL;
   g_autoptr(GError) error = NULL;
+  glnx_autofd int original_stdout_fd = -1;
   int status = EXIT_SUCCESS;
 
   _srt_setenv_disable_gio_modules ();
 
+  if (!_srt_cli_init ("steam-runtime-identify-library-abi", G_LOG_DOMAIN,
+                      SRT_LOG_FLAGS_DIVERT_STDOUT,
+                      &original_stdout_fd, NULL, &error))
+    {
+      status = EX_OSERR;
+      goto out;
+    }
+
   option_context = g_option_context_new ("");
   g_option_context_add_main_entries (option_context, option_entries, NULL);
 
-  if (!_srt_cli_option_context_parse (option_context, -1,
+  if (!_srt_cli_option_context_parse (option_context, original_stdout_fd,
                                       &argc, &argv, &error))
     {
       status = EX_USAGE;
@@ -327,7 +330,13 @@ main (int argc,
         }
     }
 
-  if (!run (argc, argv, &error))
+  if (!_srt_fdopen_take (&original_stdout_fd, "w", &original_stdout, &error))
+    {
+      status = EX_OSERR;
+      goto out;
+    }
+
+  if (!run (original_stdout, argc, argv, &error))
     status = EXIT_FAILURE;
 
 out:

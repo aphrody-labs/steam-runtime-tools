@@ -27,7 +27,7 @@ steam-runtime-launch-client - launch processes across a container boundary
 [**--pass-env-matching** *WILDCARD*]
 [**--unset-env** *VAR*]
 [**--terminate**]
-[**--verbose**]
+[**--verbose** [**--verbose**]]
 {**--bus-name** *NAME*|**--dbus-address** *ADDRESS*|**--socket** *SOCKET*|**--host**|**--inside-app** *ID*|**--alongside-steam**}
 [**--**]
 [*COMMAND* [*ARGUMENTS...*]]
@@ -39,7 +39,7 @@ steam-runtime-launch-client - launch processes across a container boundary
 [*$0* *ARGUMENTS...*]
 
 **steam-runtime-launch-client**
-[**--verbose**]
+[**--verbose** [**--verbose**]]
 **--list**
 
 # DESCRIPTION
@@ -398,11 +398,11 @@ Flatpak 1.12 or later.
 </dd>
 <dt>
 
-**--verbose**
+**--verbose**, **-v**
 
 </dt><dd>
 
-Be more verbose.
+Be more verbose. If used twice, debug messages are shown.
 
 </dd>
 </dl>

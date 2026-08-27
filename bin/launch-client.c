@@ -767,7 +767,6 @@ static gchar *opt_socket = NULL;
 static gboolean opt_share_pids = FALSE;
 static gboolean opt_terminate = FALSE;
 static gchar *opt_usr_path = NULL;
-static gboolean opt_verbose = FALSE;
 
 static gboolean
 opt_pass_env_cb (const char *option_name,
@@ -944,10 +943,8 @@ static const GOptionEntry options[] =
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_terminate,
     "Terminate the Launcher server after the COMMAND (if any) has run.",
     NULL },
-  { "verbose", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
-    "Be more verbose.", NULL },
 
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
   SRT_CLI_OPTION_ENTRY_VERSION,
   G_OPTION_ENTRY_NULL
 };
@@ -1035,7 +1032,9 @@ main (int argc,
   /* Guess we might need up to 4 names + NULL, which is enough for
    * "--alongside-steam --host" without reallocation */
   opt_bus_names = g_ptr_array_new_full (5, g_free);
-  opt_verbose = _srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE", FALSE);
+
+  if (_srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE", FALSE))
+    _srt_cli_increase_verbosity (SRT_LOG_FLAGS_DEBUG);
 
   for (i = 0; i <= 2; i++)
     {
@@ -1052,12 +1051,6 @@ main (int argc,
     goto out;
 
   if (!_srt_fdopen_take (&original_stdout_fd, "w", &original_stdout, error))
-    {
-      launch_exit_status = LAUNCH_EX_FAILED;
-      goto out;
-    }
-
-  if (!_srt_cli_update_log_flags ((opt_verbose ? SRT_LOG_FLAGS_DEBUG : 0), error))
     {
       launch_exit_status = LAUNCH_EX_FAILED;
       goto out;

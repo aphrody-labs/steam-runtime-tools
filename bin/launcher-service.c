@@ -1584,9 +1584,9 @@ main (int argc,
   setlocale (LC_ALL, "");
 
   /* Set up the initial base logging */
-  if (!_srt_cli_set_glib_log_handler ("steam-runtime-launcher-service",
-                                      G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
-                                      NULL, NULL, error))
+  if (!_srt_cli_init ("steam-runtime-launcher-service", G_LOG_DOMAIN,
+                      SRT_LOG_FLAGS_NONE,
+                      NULL, NULL, error))
     {
       server->exit_status = EX_UNAVAILABLE;
       goto out;
@@ -1623,9 +1623,7 @@ main (int argc,
 
   if (opt_verbose)
     {
-      if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                          SRT_LOG_FLAGS_DEBUG,
-                                          NULL, NULL, error))
+      if (!_srt_cli_update_log_flags (SRT_LOG_FLAGS_DEBUG, error))
         goto out;
     }
 

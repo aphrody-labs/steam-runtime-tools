@@ -721,10 +721,8 @@ main (int argc,
   ld_so_conf_entries = g_ptr_array_new_with_free_func (g_free);
   global_ld_so_conf_entries = ld_so_conf_entries;
 
-  /* Set up the initial base logging */
-  if (!_srt_cli_set_glib_log_handler ("pv-adverb", G_LOG_DOMAIN, log_flags,
-                                      &original_stdout, &original_stderr,
-                                      error))
+  if (!_srt_cli_init ("pv-adverb", G_LOG_DOMAIN, log_flags,
+                      &original_stdout, &original_stderr, error))
     {
       ret = EX_UNAVAILABLE;
       goto out;
@@ -769,8 +767,7 @@ main (int argc,
   if (opt_verbose)
     log_flags |= SRT_LOG_FLAGS_DEBUG;
 
-  if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN, log_flags,
-                                      NULL, NULL, error))
+  if (!_srt_cli_update_log_flags (log_flags, error))
     {
       ret = 1;
       goto out;

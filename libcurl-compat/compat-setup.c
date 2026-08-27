@@ -450,11 +450,12 @@ main (int argc,
   g_autoptr(GOptionContext) option_context = NULL;
   g_autoptr(GError) error = NULL;
   int status = EXIT_SUCCESS;
+  SrtLogFlags log_flags = SRT_LOG_FLAGS_NONE;
 
   setlocale (LC_ALL, "");
-  if (!_srt_cli_set_glib_log_handler ("steam-runtime-libcurl-compat-setup",
-                                      G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
-                                      NULL, NULL, &error))
+  if (!_srt_cli_init ("steam-runtime-libcurl-compat-setup", G_LOG_DOMAIN,
+                      log_flags,
+                      NULL, NULL, &error))
     {
       status = EX_UNAVAILABLE;
       goto out;
@@ -469,10 +470,12 @@ main (int argc,
       goto out;
     }
 
-  if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                      (SRT_LOG_FLAGS_DIVERT_STDOUT |
-                                       (opt_verbose ? SRT_LOG_FLAGS_DEBUG : 0)),
-                                      NULL, NULL, &error))
+  log_flags |= SRT_LOG_FLAGS_DIVERT_STDOUT;
+
+  if (opt_verbose)
+    log_flags |= SRT_LOG_FLAGS_DEBUG;
+
+  if (!_srt_cli_update_log_flags (log_flags, &error))
     {
       status = EX_UNAVAILABLE;
       goto out;

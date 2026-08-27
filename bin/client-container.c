@@ -468,17 +468,16 @@ run (int argc,
   g_autoptr(GOptionContext) context = NULL;
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
+  SrtLogFlags log_flags = SRT_LOG_FLAGS_DIVERT_STDOUT;
   size_t n_pv_options;
 
   *exit_status = -1;
   setlocale (LC_ALL, "");
   envp = g_get_environ ();
 
-  if (!_srt_cli_set_glib_log_handler (this_program_name,
-                                      G_LOG_DOMAIN,
-                                      SRT_LOG_FLAGS_DIVERT_STDOUT,
-                                      &original_stdout, &original_stderr,
-                                      error))
+  if (!_srt_cli_init (this_program_name, G_LOG_DOMAIN, log_flags,
+                      &original_stdout, &original_stderr,
+                      error))
     return FALSE;
 
   context = g_option_context_new (
@@ -494,12 +493,15 @@ run (int argc,
 
   g_clear_pointer (&context, g_option_context_free);
 
-  if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                      (SRT_LOG_FLAGS_DIVERT_STDOUT
-                                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
-                                       | (opt_verbose >= 2 ? SRT_LOG_FLAGS_DEBUG : 0)
-                                       | (opt_verbose ? SRT_LOG_FLAGS_INFO : 0)),
-                                      NULL, NULL, error))
+  log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL;
+
+  if (opt_verbose >= 2)
+    log_flags |= SRT_LOG_FLAGS_DEBUG;
+
+  if (opt_verbose >= 1)
+    log_flags |= SRT_LOG_FLAGS_INFO;
+
+  if (!_srt_cli_update_log_flags (log_flags, error))
     return FALSE;
 
   _srt_setenv_disable_gio_modules ();

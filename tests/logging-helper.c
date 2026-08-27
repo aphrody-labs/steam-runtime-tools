@@ -54,17 +54,14 @@ main (int argc,
   if (opt_divert_stdout)
     flags |= SRT_LOG_FLAGS_DIVERT_STDOUT;
 
-  if (opt_keep_prgname)
-    prgname = NULL;
-
-  if (!_srt_cli_set_glib_log_handler (prgname, G_LOG_DOMAIN, flags,
-                                      &original_stdout, &original_stderr, &error))
+  if (!_srt_cli_init (prgname, G_LOG_DOMAIN, flags,
+                      &original_stdout, &original_stderr, &error))
     {
       g_warning ("%s: %s\n", g_get_prgname (), error->message);
       return 1;
     }
 
-  /* _srt_cli_set_glib_log_handler() ensures the three standard fds are
+  /* _srt_cli_init() ensures the three standard fds are
    * open, even if only pointing to /dev/null */
   g_assert_no_errno (fcntl (STDIN_FILENO, F_GETFL, 0));
   g_assert_no_errno (fcntl (STDOUT_FILENO, F_GETFL, 0));
@@ -84,8 +81,8 @@ main (int argc,
   if (_srt_boolean_environment ("PRESSURE_VESSEL_LOG_WITH_TIMESTAMP", FALSE))
     g_message ("P_V_LOG_WITH_TIMESTAMP is true");
 
-  g_message ("flags: allow_journal=%d divert_stdout=%d keep_prgname=%d",
-             opt_allow_journal, opt_divert_stdout, opt_keep_prgname);
+  g_message ("flags: allow_journal=%d divert_stdout=%d",
+             opt_allow_journal, opt_divert_stdout);
 
   g_print ("stdout while running\n");
   g_printerr ("stderr while running\n");

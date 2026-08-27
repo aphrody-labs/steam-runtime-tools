@@ -214,10 +214,9 @@ main (int argc,
   subproc_environ = g_get_environ ();
   _srt_setenv_disable_gio_modules ();
 
-  if (!_srt_cli_set_glib_log_handler ("steam-runtime-check-requirements",
-                                      G_LOG_DOMAIN,
-                                      log_flags,
-                                      &original_stdout_fd, NULL, &error))
+  if (!_srt_cli_init ("steam-runtime-check-requirements", G_LOG_DOMAIN,
+                      log_flags,
+                      &original_stdout_fd, NULL, &error))
     {
       g_warning ("%s", error->message);
       g_clear_error (&error);
@@ -261,9 +260,7 @@ main (int argc,
 
   log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL | SRT_LOG_FLAGS_DIVERT_STDOUT;
 
-  if (!_srt_cli_set_glib_log_handler (NULL,
-                                      G_LOG_DOMAIN, log_flags,
-                                      NULL, NULL, &error))
+  if (!_srt_cli_update_log_flags (log_flags, &error))
     {
       g_warning ("%s", error->message);
       g_clear_error (&error);

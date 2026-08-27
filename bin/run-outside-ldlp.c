@@ -54,11 +54,10 @@ run (int argc,
   const char *search_path = NULL;
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
+  SrtLogFlags log_flags = SRT_LOG_FLAGS_NONE;
 
-  if (!_srt_cli_set_glib_log_handler (THIS_PROGRAM,
-                                      G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
-                                      &original_stdout, &original_stderr,
-                                      error))
+  if (!_srt_cli_init (THIS_PROGRAM, G_LOG_DOMAIN, log_flags,
+                      &original_stdout, &original_stderr, error))
     return FALSE;
 
   exe_name = glnx_basename (argv[0]);
@@ -91,12 +90,15 @@ run (int argc,
       invocation_argv = argv + 1;
     }
 
-  if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                      (SRT_LOG_FLAGS_DIVERT_STDOUT
-                                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
-                                       | (opt_verbose >= 2 ? SRT_LOG_FLAGS_DEBUG : 0)
-                                       | (opt_verbose ? SRT_LOG_FLAGS_INFO : 0)),
-                                      NULL, NULL, error))
+  log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL | SRT_LOG_FLAGS_DIVERT_STDOUT;
+
+  if (opt_verbose >= 2)
+    log_flags |= SRT_LOG_FLAGS_DEBUG;
+
+  if (opt_verbose >= 1)
+    log_flags |= SRT_LOG_FLAGS_INFO;
+
+  if (!_srt_cli_update_log_flags (log_flags, error))
     return FALSE;
 
   if (strchr (exe_name, '/') != NULL)

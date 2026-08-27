@@ -60,14 +60,13 @@ run (int argc,
   glnx_autofd int top_fd = -1;
   glnx_autofd int original_stdout = -1;
   PvMtreeApplyFlags flags = PV_MTREE_APPLY_FLAGS_GZIP;
+  SrtLogFlags log_flags = SRT_LOG_FLAGS_OPTIONALLY_JOURNAL;
 
   setlocale (LC_ALL, "");
 
-  if (!_srt_cli_set_glib_log_handler ("pv-verify",
-                                      G_LOG_DOMAIN,
-                                      (SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
-                                       | SRT_LOG_FLAGS_DIVERT_STDOUT),
-                                      &original_stdout, NULL, error))
+  if (!_srt_cli_init ("pv-verify", G_LOG_DOMAIN,
+                      log_flags | SRT_LOG_FLAGS_DIVERT_STDOUT,
+                      &original_stdout, NULL, error))
     return FALSE;
 
   context = g_option_context_new ("DIRECTORY\n"
@@ -78,10 +77,10 @@ run (int argc,
                                       &argc, &argv, error))
     return FALSE;
 
-  if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                      (SRT_LOG_FLAGS_OPTIONALLY_JOURNAL |
-                                       (opt_verbose ? SRT_LOG_FLAGS_DEBUG : 0)),
-                                      NULL, NULL, error))
+  if (opt_verbose)
+    log_flags |= SRT_LOG_FLAGS_DEBUG;
+
+  if (!_srt_cli_update_log_flags (log_flags, error))
     return FALSE;
 
   if (opt_quiet)

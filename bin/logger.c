@@ -248,16 +248,15 @@ run (int argc,
   g_autoptr(GOptionContext) option_context = NULL;
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
+  SrtLogFlags log_flags = SRT_LOG_FLAGS_NONE;
   gboolean consume_stdin;
 
   setlocale (LC_ALL, "");
   subproc_environ = g_get_environ ();
   _srt_setenv_disable_gio_modules ();
 
-  if (!_srt_cli_set_glib_log_handler (THIS_PROGRAM,
-                                      G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
-                                      &original_stdout, &original_stderr,
-                                      error))
+  if (!_srt_cli_init (THIS_PROGRAM, G_LOG_DOMAIN, log_flags,
+                      &original_stdout, &original_stderr, error))
     return FALSE;
 
   if (!_srt_check_not_setuid ())
@@ -278,12 +277,15 @@ run (int argc,
   if (!_srt_boolean_environment ("SRT_LOG_ROTATION", TRUE))
     opt_max_bytes = 0;
 
-  if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                      (SRT_LOG_FLAGS_DIVERT_STDOUT
-                                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
-                                       | (opt_verbose >= 2 ? SRT_LOG_FLAGS_DEBUG : 0)
-                                       | (opt_verbose ? SRT_LOG_FLAGS_INFO : 0)),
-                                      NULL, NULL, error))
+  log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL | SRT_LOG_FLAGS_DIVERT_STDOUT;
+
+  if (opt_verbose >= 2)
+    log_flags |= SRT_LOG_FLAGS_DEBUG;
+
+  if (opt_verbose >= 1)
+    log_flags |= SRT_LOG_FLAGS_INFO;
+
+  if (!_srt_cli_update_log_flags (log_flags, error))
     return FALSE;
 
   _srt_unblock_signals ();

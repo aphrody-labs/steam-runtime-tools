@@ -45,10 +45,10 @@
  * open a file that does not exist.
  *
  * Only use this in programs that have called
- * _srt_cli_set_glib_log_handler().
+ * _srt_cli_init().
  *
  * This is functionally equivalent to %G_LOG_LEVEL_MESSAGE, but
- * the handler set up by _srt_cli_set_glib_log_handler() prints it
+ * the handler set up by _srt_cli_init() prints it
  * as though it was a fatal error. Use it in command-line utilities
  * to log a GError that will cause program termination.
  *
@@ -63,10 +63,10 @@
  * error.
  *
  * Only use this in programs that have called
- * _srt_cli_set_glib_log_handler().
+ * _srt_cli_init().
  *
  * This is functionally equivalent to %G_LOG_LEVEL_MESSAGE, but
- * the handler set up by _srt_cli_set_glib_log_handler() prints it
+ * the handler set up by _srt_cli_init() prints it
  * as though it was a warning.
  * Use to log a warning that should not cause program termination,
  * even during unit testing or under `G_DEBUG=fatal-warnings`.
@@ -77,8 +77,7 @@
  * @...: format string and arguments, as for g_message()
  *
  * Convenience macro to log at level %SRT_LOG_LEVEL_FAILURE.
- * Only use this in programs that have called
- * _srt_cli_set_glib_log_handler().
+ * Only use this in programs that have called _srt_cli_init().
  *
  * This is functionally equivalent to g_message(),
  * but with a different log level so that it is logged like a fatal error.
@@ -91,8 +90,7 @@
  * @...: format string and arguments, as for g_message()
  *
  * Convenience macro to log at level %SRT_LOG_LEVEL_WARNING.
- * Only use this in programs that have called
- * _srt_cli_set_glib_log_handler().
+ * Only use this in programs that have called _srt_cli_init().
  *
  * This is functionally equivalent to g_message(),
  * but with a different log level so that it is logged like a g_warning().
@@ -241,8 +239,10 @@ static struct
   type_of_sd_journal_send journal_send;
   /* \r\n or \n */
   const char *newline;
+  GQuark app_log_domain;
 } log_settings =
 {
+  .app_log_domain = 0,
   .pid = -1,
   .newline = "\n",
 };
@@ -402,7 +402,7 @@ log_handler (const gchar *log_domain,
  *  standard error, to avoid unstructured diagnostics like g_debug()
  *  being written to the original standard output
  *  (use this in conjunction with the @original_stdout_out parameter of
- *  _srt_cli_set_glib_log_handler())
+ *  _srt_cli_init())
  * @SRT_LOG_FLAGS_OPTIONALLY_JOURNAL: If standard output or standard error
  *  is /dev/null or an invalid file descriptor, or if the user requests
  *  logging to the Journal via environment variables, automatically
@@ -643,32 +643,8 @@ _srt_cli_restore_saved_fd (int saved_fd,
   return TRUE;
 }
 
-/*
- * _srt_cli_set_glib_log_handler:
- * @prgname: (nullable): Passed to g_set_prgname() if not %NULL
- * @extra_log_domain: (nullable): A log domain, usually %G_LOG_DOMAIN
- * @flags: Flags affecting logging
- *
- * Configure GLib to log to stderr with a message format suitable for
- * command-line programs, for example
- *
- * ```
- * my-program[123]: W: Resonance cascade scenario occurred
- * ```
- *
- * The chosen message format is used for @extra_log_domain, and also
- * for the `steam-runtime-tools` log domain used by the
- * steam-runtime-tools library.
- *
- * Logging can be configured by the `SRT_LOG` environment variable,
- * which is a sequence of tokens separated by colons, spaces or commas
- * matching the nicknames of #SrtLogFlags members. See
- * g_parse_debug_string().
- */
-gboolean
-_srt_cli_set_glib_log_handler (const char *prgname,
-                               const char *extra_log_domain,
-                               SrtLogFlags flags,
+static gboolean
+_srt_cli_set_glib_log_handler (SrtLogFlags flags,
                                int *original_stdout_out,
                                int *original_stderr_out,
                                GError **error)
@@ -682,8 +658,8 @@ _srt_cli_set_glib_log_handler (const char *prgname,
   const char *log_env = g_getenv ("SRT_LOG");
   gsize log_env_n_keys = G_N_ELEMENTS (log_enable);
 
-  if (prgname != NULL)
-    g_set_prgname (prgname);
+  /* _srt_cli_init() should have been called first */
+  g_return_val_if_fail (log_settings.prgname != NULL, FALSE);
 
   if (flags & SRT_LOG_FLAGS_OPTIONALLY_JOURNAL)
     {
@@ -718,7 +694,6 @@ _srt_cli_set_glib_log_handler (const char *prgname,
     flags |= SRT_LOG_FLAGS_INFO;
 
   log_settings.flags = flags;
-  log_settings.prgname = g_get_prgname ();
 
   if ((flags & SRT_LOG_FLAGS_PID)
       || !(flags & SRT_LOG_FLAGS_DIFFABLE))
@@ -732,7 +707,8 @@ _srt_cli_set_glib_log_handler (const char *prgname,
   if (flags & SRT_LOG_FLAGS_DEBUG)
     log_levels |= G_LOG_LEVEL_DEBUG | G_LOG_LEVEL_INFO;
 
-  g_log_set_handler (extra_log_domain, log_levels, log_handler, NULL);
+  g_log_set_handler (g_quark_to_string (log_settings.app_log_domain),
+                     log_levels, log_handler, NULL);
   g_log_set_handler (G_LOG_DOMAIN, log_levels, log_handler, NULL);
 
   if (flags & SRT_LOG_FLAGS_TIMING)
@@ -767,6 +743,59 @@ _srt_cli_set_glib_log_handler (const char *prgname,
     }
 
   return TRUE;
+}
+
+/*
+ * _srt_cli_init:
+ * @prgname: Passed to g_set_prgname()
+ * @app_log_domain: (nullable): A log domain, usually %G_LOG_DOMAIN
+ * @flags: Flags affecting logging
+ *
+ * Configure GLib to log to stderr with a message format suitable for
+ * command-line programs, for example
+ *
+ * ```
+ * my-program[123]: W: Resonance cascade scenario occurred
+ * ```
+ *
+ * The chosen message format is used for @extra_log_domain, and also
+ * for the `steam-runtime-tools` log domain used by the
+ * steam-runtime-tools library.
+ *
+ * Logging can be configured by the `SRT_LOG` environment variable,
+ * which is a sequence of tokens separated by colons, spaces or commas
+ * matching the nicknames of #SrtLogFlags members. See
+ * g_parse_debug_string().
+ */
+gboolean
+_srt_cli_init (const char *prgname,
+               const char *app_log_domain,
+               SrtLogFlags flags,
+               int *original_stdout_out,
+               int *original_stderr_out,
+               GError **error)
+{
+  g_return_val_if_fail (prgname != NULL, FALSE);
+  /* Can only be called once */
+  g_return_val_if_fail (log_settings.prgname == NULL, FALSE);
+
+  g_set_prgname (prgname);
+  log_settings.prgname = g_get_prgname ();
+  g_assert (log_settings.prgname != NULL);
+
+  log_settings.app_log_domain = g_quark_from_string (app_log_domain);
+
+  return _srt_cli_set_glib_log_handler (flags,
+                                        original_stdout_out,
+                                        original_stderr_out,
+                                        error);
+}
+
+gboolean
+_srt_cli_update_log_flags (SrtLogFlags flags,
+                           GError **error)
+{
+  return _srt_cli_set_glib_log_handler (flags, NULL, NULL, error);
 }
 
 gboolean

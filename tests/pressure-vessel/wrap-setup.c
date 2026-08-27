@@ -2656,7 +2656,9 @@ test_payload_command (Fixture *f,
 
       arg = g_ptr_array_index (argv_in_container->argv, offset);
 
-      if (g_str_equal (arg, "--verbose"))
+      while (g_str_equal (arg, "--verbose")
+             || g_str_equal (arg, "-v")
+             || g_str_equal (arg, "-vv"))
         offset++;
     }
 
@@ -2722,7 +2724,9 @@ test_payload_command (Fixture *f,
 
       arg = g_ptr_array_index (argv_in_container->argv, offset);
 
-      if (g_str_equal (arg, "--verbose"))
+      while (g_str_equal (arg, "--verbose")
+             || g_str_equal (arg, "-v")
+             || g_str_equal (arg, "-vv"))
         offset++;
 
       for (size_t j = 0; j < G_N_ELEMENTS (expected_options); j++)

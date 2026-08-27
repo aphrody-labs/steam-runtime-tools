@@ -1850,7 +1850,9 @@ pv_wrap_context_maybe_wrap_in_launcher (PvWrapContext *self,
                                 helper_tuple);
 
   if (_srt_cli_is_debugging ())
-    flatpak_bwrap_add_arg (payload_command, "--verbose");
+    flatpak_bwrap_add_arg (payload_command, "-vv");
+  else if (_srt_cli_is_verbose ())
+    flatpak_bwrap_add_arg (payload_command, "-v");
 
   flatpak_bwrap_append_argsv (payload_command, (char **) options, (int) n_options);
   flatpak_bwrap_add_arg (payload_command, "--");
@@ -1943,7 +1945,9 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
       flatpak_bwrap_add_arg (launcher_argv, launcher_service);
 
       if (_srt_cli_is_debugging ())
-        flatpak_bwrap_add_arg (launcher_argv, "--verbose");
+        flatpak_bwrap_add_arg (launcher_argv, "-vv");
+      else if (_srt_cli_is_verbose ())
+        flatpak_bwrap_add_arg (launcher_argv, "-v");
 
       /* In --launcher mode, arguments after the "--" separator are
        * passed to the launcher */

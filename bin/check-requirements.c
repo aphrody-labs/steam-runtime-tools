@@ -207,13 +207,22 @@ main (int argc,
   const char *pkglibexecdir = NULL;
   int opt;
   int exit_code = EXIT_SUCCESS;
-  SrtLogFlags log_flags;
+  SrtLogFlags log_flags = SRT_LOG_FLAGS_NONE;
   SrtBwrapIssues bwrap_issues;
   SrtFlatpakIssues flatpak_issues;
 
   subproc_environ = g_get_environ ();
   _srt_setenv_disable_gio_modules ();
-  log_flags = SRT_LOG_FLAGS_OPTIONALLY_JOURNAL | SRT_LOG_FLAGS_DIVERT_STDOUT;
+
+  if (!_srt_cli_set_glib_log_handler ("steam-runtime-check-requirements",
+                                      G_LOG_DOMAIN,
+                                      log_flags,
+                                      &original_stdout_fd, NULL, &error))
+    {
+      g_warning ("%s", error->message);
+      g_clear_error (&error);
+      return EXIT_FAILURE;
+    }
 
   while ((opt = getopt_long (argc, argv, "v", long_options, NULL)) != -1)
     {
@@ -250,9 +259,11 @@ main (int argc,
   if (optind != argc)
     usage (EX_USAGE);
 
-  if (!_srt_cli_set_glib_log_handler ("steam-runtime-check-requirements",
+  log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL | SRT_LOG_FLAGS_DIVERT_STDOUT;
+
+  if (!_srt_cli_set_glib_log_handler (NULL,
                                       G_LOG_DOMAIN, log_flags,
-                                      &original_stdout_fd, NULL, &error))
+                                      NULL, NULL, &error))
     {
       g_warning ("%s", error->message);
       g_clear_error (&error);

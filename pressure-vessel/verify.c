@@ -21,7 +21,7 @@
 static gboolean opt_minimized_runtime = FALSE;
 static gchar *opt_mtree = NULL;
 static gboolean opt_quiet = FALSE;
-static gboolean opt_verbose = FALSE;
+
 static GOptionEntry options[] =
 {
   { "minimized-runtime", '\0',
@@ -33,10 +33,8 @@ static GOptionEntry options[] =
   { "quiet", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_quiet,
     "Be less verbose.", NULL },
-  { "verbose", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
-    "Be more verbose.", NULL },
 
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
   SRT_CLI_OPTION_ENTRY_VERSION,
   G_OPTION_ENTRY_NULL
 };
@@ -60,12 +58,12 @@ run (int argc,
   glnx_autofd int top_fd = -1;
   glnx_autofd int original_stdout = -1;
   PvMtreeApplyFlags flags = PV_MTREE_APPLY_FLAGS_GZIP;
-  SrtLogFlags log_flags = SRT_LOG_FLAGS_OPTIONALLY_JOURNAL;
 
   setlocale (LC_ALL, "");
 
   if (!_srt_cli_init ("pv-verify", G_LOG_DOMAIN,
-                      log_flags | SRT_LOG_FLAGS_DIVERT_STDOUT,
+                      (SRT_LOG_FLAGS_DIVERT_STDOUT
+                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL),
                       &original_stdout, NULL, error))
     return FALSE;
 
@@ -75,12 +73,6 @@ run (int argc,
 
   if (!_srt_cli_option_context_parse (context, original_stdout,
                                       &argc, &argv, error))
-    return FALSE;
-
-  if (opt_verbose)
-    log_flags |= SRT_LOG_FLAGS_DEBUG;
-
-  if (!_srt_cli_update_log_flags (log_flags, error))
     return FALSE;
 
   if (opt_quiet)

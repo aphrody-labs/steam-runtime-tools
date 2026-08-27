@@ -68,11 +68,11 @@ just exit with status 0.
 </dd>
 <dt>
 
-**--verbose**
+**--verbose**, **-v**
 
 </dt><dd>
 
-Be more verbose.
+Be more verbose. If used twice, debug messages are shown.
 
 </dd>
 <dt>

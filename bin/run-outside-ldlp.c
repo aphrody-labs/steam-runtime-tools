@@ -57,7 +57,8 @@ run (int argc,
 
   if (!_srt_cli_set_glib_log_handler (THIS_PROGRAM,
                                       G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
-                                      NULL, NULL, error))
+                                      &original_stdout, &original_stderr,
+                                      error))
     return FALSE;
 
   exe_name = glnx_basename (argv[0]);
@@ -95,8 +96,7 @@ run (int argc,
                                        | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
                                        | (opt_verbose >= 2 ? SRT_LOG_FLAGS_DEBUG : 0)
                                        | (opt_verbose ? SRT_LOG_FLAGS_INFO : 0)),
-                                      &original_stdout, &original_stderr,
-                                      error))
+                                      NULL, NULL, error))
     return FALSE;
 
   if (strchr (exe_name, '/') != NULL)

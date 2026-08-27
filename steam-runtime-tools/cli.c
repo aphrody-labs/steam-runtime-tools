@@ -643,18 +643,22 @@ _srt_cli_restore_saved_fd (int saved_fd,
   return TRUE;
 }
 
-static gboolean
-_srt_cli_set_glib_log_handler (SrtLogFlags flags,
-                               int *original_stdout_out,
-                               int *original_stderr_out,
-                               GError **error)
+static void
+apply_glib_log_handler (GLogLevelFlags log_levels)
 {
-  GLogLevelFlags log_levels = (G_LOG_LEVEL_ERROR
-                               | G_LOG_LEVEL_CRITICAL
-                               | SRT_LOG_LEVEL_FAILURE
-                               | SRT_LOG_LEVEL_WARNING
-                               | G_LOG_LEVEL_WARNING
-                               | G_LOG_LEVEL_MESSAGE);
+  if (log_levels != 0)
+    {
+      g_log_set_handler (g_quark_to_string (log_settings.app_log_domain),
+                         log_levels, log_handler, NULL);
+      g_log_set_handler (G_LOG_DOMAIN, log_levels, log_handler, NULL);
+    }
+}
+
+static gboolean
+configure_logging (SrtLogFlags flags,
+                   GError **error)
+{
+  GLogLevelFlags log_levels = 0;
   const char *log_env = g_getenv ("SRT_LOG");
   gsize log_env_n_keys = G_N_ELEMENTS (log_enable);
 
@@ -701,15 +705,15 @@ _srt_cli_set_glib_log_handler (SrtLogFlags flags,
   else
     log_settings.pid = 0;
 
-  if (flags & SRT_LOG_FLAGS_INFO)
+  /* This function only covers the configurable log levels: info and debug.
+   * Higher log levels are done in _srt_cli_init() */
+  if (flags & (SRT_LOG_FLAGS_INFO | SRT_LOG_FLAGS_DEBUG))
     log_levels |= G_LOG_LEVEL_INFO;
 
   if (flags & SRT_LOG_FLAGS_DEBUG)
     log_levels |= G_LOG_LEVEL_DEBUG | G_LOG_LEVEL_INFO;
 
-  g_log_set_handler (g_quark_to_string (log_settings.app_log_domain),
-                     log_levels, log_handler, NULL);
-  g_log_set_handler (G_LOG_DOMAIN, log_levels, log_handler, NULL);
+  apply_glib_log_handler (log_levels);
 
   if (flags & SRT_LOG_FLAGS_TIMING)
     _srt_profiling_enable (G_LOG_LEVEL_MESSAGE);
@@ -717,13 +721,6 @@ _srt_cli_set_glib_log_handler (SrtLogFlags flags,
            && (flags & SRT_LOG_FLAGS_DEBUG)
            && !(flags & SRT_LOG_FLAGS_DIFFABLE))
     _srt_profiling_enable (G_LOG_LEVEL_DEBUG);
-
-  /* We ensure stdin is open first, because otherwise any fd we open is
-   * likely to become unintentionally the new stdin. */
-  if (!initialize_stdio_fd (STDIN_FILENO, NULL, error)
-      || !initialize_stdio_fd (STDOUT_FILENO, original_stdout_out, error)
-      || !initialize_stdio_fd (STDERR_FILENO, original_stderr_out, error))
-    return FALSE;
 
   set_up_output (STDOUT_FILENO);
   set_up_output (STDERR_FILENO);
@@ -785,17 +782,32 @@ _srt_cli_init (const char *prgname,
 
   log_settings.app_log_domain = g_quark_from_string (app_log_domain);
 
-  return _srt_cli_set_glib_log_handler (flags,
-                                        original_stdout_out,
-                                        original_stderr_out,
-                                        error);
+  /* Set these up as early as we reasonably can,
+   * so that any errors after this point come out in the expected format.
+   * These are only the non-optional log levels:
+   * configure_logging() handles the optional ones (info and debug). */
+  apply_glib_log_handler (G_LOG_LEVEL_ERROR
+                          | G_LOG_LEVEL_CRITICAL
+                          | SRT_LOG_LEVEL_FAILURE
+                          | SRT_LOG_LEVEL_WARNING
+                          | G_LOG_LEVEL_WARNING
+                          | G_LOG_LEVEL_MESSAGE);
+
+  /* We ensure stdin is open first, because otherwise any fd we open is
+   * likely to become unintentionally the new stdin. */
+  if (!initialize_stdio_fd (STDIN_FILENO, NULL, error)
+      || !initialize_stdio_fd (STDOUT_FILENO, original_stdout_out, error)
+      || !initialize_stdio_fd (STDERR_FILENO, original_stderr_out, error))
+    return FALSE;
+
+  return configure_logging (flags, error);
 }
 
 gboolean
 _srt_cli_update_log_flags (SrtLogFlags flags,
                            GError **error)
 {
-  return _srt_cli_set_glib_log_handler (flags, NULL, NULL, error);
+  return configure_logging (flags, error);
 }
 
 gboolean

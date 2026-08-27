@@ -1064,7 +1064,7 @@ main (int argc,
     {
       fprintf (original_stdout,
                "%s:\n"
-               " Package: pressure-vessel\n"
+               " Package: steam-runtime-tools\n"
                " Version: %s\n",
                g_get_prgname (), VERSION);
       launch_exit_status = 0;

@@ -1626,7 +1626,7 @@ main (int argc,
   if (opt_version)
     {
       g_print ("%s:\n"
-               " Package: pressure-vessel\n"
+               " Package: steam-runtime-tools\n"
                " Version: %s\n",
                g_get_prgname (), VERSION);
       server->exit_status = 0;

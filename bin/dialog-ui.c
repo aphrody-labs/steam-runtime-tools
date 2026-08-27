@@ -1001,7 +1001,7 @@ main (int argc,
             case OPTION_VERSION:
                 printf("%s:\n", THIS_PROGRAM);
                 printf(" Package: steam-runtime-tools\n");
-                printf(" VERSION: %s\n", VERSION);
+                printf(" Version: %s\n", VERSION);
                 ret = EXIT_SUCCESS;
                 goto out;
 

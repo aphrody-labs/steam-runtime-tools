@@ -70,7 +70,6 @@ static gchar *opt_set_ld_library_path = NULL;
 static double opt_terminate_idle_timeout = 0.0;
 static double opt_terminate_timeout = DEFAULT_TERMINATE_TIMEOUT;
 static gboolean opt_terminate_with_main = FALSE;
-static gboolean opt_verbose = FALSE;
 static gboolean opt_wait = FALSE;
 static gboolean opt_write = FALSE;
 
@@ -676,10 +675,7 @@ static GOptionEntry options[] =
     "[Default: " G_STRINGIFY (DEFAULT_TERMINATE_TIMEOUT) "]",
     "SECONDS" },
 
-  { "verbose", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
-    "Be more verbose.", NULL },
-
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
   SRT_CLI_OPTION_ENTRY_VERSION,
   G_OPTION_ENTRY_NULL
 };
@@ -745,7 +741,8 @@ main (int argc,
   g_option_context_add_group (context,
                               _srt_env_overlay_create_option_group (env_overlay));
 
-  opt_verbose = _srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE", FALSE);
+  if (_srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE", FALSE))
+    _srt_cli_increase_verbosity (SRT_LOG_FLAGS_DEBUG);
 
   if (!_srt_cli_option_context_parse (context, original_stdout,
                                       &argc, &argv, error))
@@ -763,9 +760,6 @@ main (int argc,
   g_clear_pointer (&context, g_option_context_free);
 
   log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL;
-
-  if (opt_verbose)
-    log_flags |= SRT_LOG_FLAGS_DEBUG;
 
   if (!_srt_cli_update_log_flags (log_flags, error))
     {

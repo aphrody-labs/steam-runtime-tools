@@ -37,7 +37,7 @@ pv-adverb - wrap processes in various ways
 [**--[no-]wait**]
 [**--[no-]write**]
 **--lock-file** *FILENAME*...]
-[**--verbose**]
+[**--verbose** [**--verbose**]]
 [**--**]
 *COMMAND* [*ARGUMENTS...*]
 
@@ -384,11 +384,11 @@ as the command.
 </dd>
 <dt>
 
-**--verbose**
+**--verbose**, **-v**
 
 </dt><dd>
 
-Be more verbose.
+Be more verbose. If used twice, debug messages are shown.
 
 </dd>
 <dt>

@@ -1110,7 +1110,9 @@ main (int argc,
       flatpak_bwrap_append_args (adverb_argv, adverb_preload_argv);
 
       if (_srt_cli_is_debugging ())
-        flatpak_bwrap_add_arg (adverb_argv, "--verbose");
+        flatpak_bwrap_add_arg (adverb_argv, "-vv");
+      else if (_srt_cli_is_verbose ())
+        flatpak_bwrap_add_arg (adverb_argv, "-v");
 
       flatpak_bwrap_add_arg (adverb_argv, "--");
 

@@ -61,6 +61,7 @@ run (int argc,
   g_autofree gchar *mtree = NULL;
   g_autofree gchar *top = NULL;
   glnx_autofd int top_fd = -1;
+  glnx_autofd int original_stdout = -1;
   PvMtreeApplyFlags flags = PV_MTREE_APPLY_FLAGS_GZIP;
 
   setlocale (LC_ALL, "");
@@ -69,7 +70,7 @@ run (int argc,
                                        G_LOG_DOMAIN,
                                        (SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
                                         | SRT_LOG_FLAGS_DIVERT_STDOUT),
-                                       NULL, NULL, error))
+                                       &original_stdout, NULL, error))
     return FALSE;
 
   context = g_option_context_new ("DIRECTORY\n"
@@ -81,6 +82,9 @@ run (int argc,
 
   if (opt_version)
     {
+      if (!_srt_util_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
+        return FALSE;
+
       g_print ("%s:\n"
                " Package: steam-runtime-tools\n"
                " Version: %s\n",

@@ -1024,19 +1024,10 @@ main (int argc,
       goto out;
     }
 
-  original_stdout = fdopen (original_stdout_fd, "w");
-
-  if (original_stdout == NULL)
+  if (!_srt_fdopen_take (&original_stdout_fd, "w", &original_stdout, error))
     {
-      glnx_throw_errno_prefix (error,
-                               "Unable to create a stdio wrapper for fd %d",
-                               original_stdout_fd);
       launch_exit_status = LAUNCH_EX_FAILED;
       goto out;
-    }
-  else
-    {
-      original_stdout_fd = -1;    /* ownership taken, do not close */
     }
 
   context = g_option_context_new ("COMMAND [ARG...]");

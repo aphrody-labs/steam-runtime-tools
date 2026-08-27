@@ -723,16 +723,34 @@ _srt_divert_stdout_to_stderr (GError **error)
                                          "Unable to make fd %d a copy of fd %d",
                                          STDOUT_FILENO, STDERR_FILENO);
 
-  original_stdout = fdopen (original_stdout_fd, "w");
-
-  if (original_stdout == NULL)
-    return glnx_null_throw_errno_prefix (error,
-                                         "Unable to create a stdio wrapper for fd %d",
-                                         original_stdout_fd);
-  else
-    original_stdout_fd = -1;    /* ownership taken, do not close */
+  if (!_srt_fdopen_take (&original_stdout_fd, "w", &original_stdout, error))
+    return NULL;
 
   return g_steal_pointer (&original_stdout);
+}
+
+G_GNUC_INTERNAL gboolean
+_srt_fdopen_take (int *take_fd,
+                  const char *mode,
+                  FILE **fh_out,
+                  GError **error)
+{
+  g_return_val_if_fail (take_fd != NULL, FALSE);
+  g_return_val_if_fail (*take_fd >= 0, FALSE);
+  g_return_val_if_fail (mode != NULL, FALSE);
+  g_return_val_if_fail (fh_out != NULL, FALSE);
+  g_return_val_if_fail (*fh_out == NULL, FALSE);
+  g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+
+  *fh_out = fdopen (*take_fd, mode);
+
+  if (*fh_out == NULL)
+    return glnx_throw_errno_prefix (error,
+                                    "Unable to create a stdio wrapper for fd %d",
+                                    *take_fd);
+
+  *take_fd = -1;    /* ownership taken, do not close */
+  return TRUE;
 }
 
 /*

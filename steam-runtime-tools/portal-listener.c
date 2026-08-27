@@ -117,12 +117,8 @@ _srt_portal_listener_set_up_info_fd (SrtPortalListener *self,
     }
   else if (fd > 0)
     {
-      self->info_fh = fdopen (fd, "w");
-
-      if (self->info_fh == NULL)
-        return glnx_throw_errno_prefix (error,
-                                        "Unable to create a stdio wrapper for fd %d",
-                                        fd);
+      if (!_srt_fdopen_take (&fd, "w", &self->info_fh, error))
+        return FALSE;
     }
 
   return TRUE;

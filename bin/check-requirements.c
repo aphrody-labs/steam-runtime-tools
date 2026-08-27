@@ -259,17 +259,10 @@ main (int argc,
       return EXIT_FAILURE;
     }
 
-  original_stdout = fdopen (original_stdout_fd, "w");
-
-  if (original_stdout == NULL)
+  if (!_srt_fdopen_take (&original_stdout_fd, "w", &original_stdout, &error))
     {
-      g_warning ("Unable to create a stdio wrapper for fd %d: %s",
-                 original_stdout_fd, g_strerror (errno));
+      _srt_log_failure ("%s", error->message);
       return EXIT_FAILURE;
-    }
-  else
-    {
-      original_stdout_fd = -1;    /* ownership taken, do not close */
     }
 
   _srt_unblock_signals ();

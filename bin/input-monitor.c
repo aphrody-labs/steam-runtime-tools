@@ -886,6 +886,9 @@ static const GOptionEntry option_entries[] =
     NULL },
   { "udev", 0, G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, opt_udev_cb,
     "Find devices using udev", NULL },
+  /* Intentionally not SRT_CLI_OPTION_ENTRY_VERBOSE:
+   * this option affects the JSON output on stdout,
+   * not just the diagnostic messages on stderr. */
   { "verbose", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
     "Be more verbose", NULL },
 
@@ -900,14 +903,20 @@ run (int argc,
 {
   g_autoptr(GOptionContext) option_context = NULL;
   g_autoptr(SrtInputDeviceMonitor) monitor = NULL;
+  glnx_autofd int original_stdout_fd = -1;
   guint int_handler;
 
   _srt_setenv_disable_gio_modules ();
 
+  if (!_srt_cli_init ("steam-runtime-input-monitor", G_LOG_DOMAIN,
+                      SRT_LOG_FLAGS_DIVERT_STDOUT,
+                      &original_stdout_fd, NULL, error))
+    return FALSE;
+
   option_context = g_option_context_new ("");
   g_option_context_add_main_entries (option_context, option_entries, NULL);
 
-  if (!_srt_cli_option_context_parse (option_context, -1,
+  if (!_srt_cli_option_context_parse (option_context, original_stdout_fd,
                                       &argc, &argv, error))
     return FALSE;
 
@@ -919,11 +928,7 @@ run (int argc,
       return FALSE;
     }
 
-  /* stdout is reserved for machine-readable output, so avoid having
-   * things like g_debug() pollute it. */
-  original_stdout = _srt_divert_stdout_to_stderr (error);
-
-  if (original_stdout == NULL)
+  if (!_srt_fdopen_take (&original_stdout_fd, "w", &original_stdout, error))
     return FALSE;
 
   _srt_unblock_signals ();

@@ -1201,8 +1201,19 @@ main (int argc,
   SrtDriverFlags extra_driver_flags = SRT_DRIVER_FLAGS_INCLUDE_ALL;
   gboolean check_graphics = TRUE;
   gboolean check_libraries = TRUE;
+  SrtLogFlags log_flags = SRT_LOG_FLAGS_NONE;
 
   _srt_setenv_disable_gio_modules ();
+
+  if (!_srt_cli_set_glib_log_handler ("steam-runtime-system-info",
+                                      G_LOG_DOMAIN,
+                                      log_flags,
+                                      &original_stdout_fd, NULL, &error))
+    {
+      g_warning ("%s", error->message);
+      g_clear_error (&error);
+      return 1;
+    }
 
   while ((opt = getopt_long (argc, argv, "", long_options, NULL)) != -1)
     {
@@ -1252,11 +1263,12 @@ main (int argc,
   if (optind != argc)
     usage (1);
 
-  if (!_srt_cli_set_glib_log_handler ("steam-runtime-system-info",
+  log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL | SRT_LOG_FLAGS_DIVERT_STDOUT;
+
+  if (!_srt_cli_set_glib_log_handler (NULL,
                                       G_LOG_DOMAIN,
-                                      (SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
-                                       | SRT_LOG_FLAGS_DIVERT_STDOUT),
-                                      &original_stdout_fd, NULL, &error))
+                                      log_flags,
+                                      NULL, NULL, &error))
     {
       g_warning ("%s", error->message);
       return 1;

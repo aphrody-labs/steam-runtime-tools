@@ -7,9 +7,9 @@
 #include "pressure-vessel/wrap-context.h"
 
 #include "steam-runtime-tools/architecture-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/launcher-interface-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 #include "pressure-vessel/bwrap.h"
@@ -1850,7 +1850,7 @@ pv_wrap_context_maybe_wrap_in_launcher (PvWrapContext *self,
                                 pv_wrap_context_get_helpers_dir_in_container (self),
                                 helper_tuple);
 
-  if (_srt_util_is_debugging ())
+  if (_srt_cli_is_debugging ())
     flatpak_bwrap_add_arg (payload_command, "--verbose");
 
   flatpak_bwrap_append_argsv (payload_command, (char **) options, (int) n_options);
@@ -1943,7 +1943,7 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
       g_debug ("Adding steam-runtime-launcher-service '%s'...", launcher_service);
       flatpak_bwrap_add_arg (launcher_argv, launcher_service);
 
-      if (_srt_util_is_debugging ())
+      if (_srt_cli_is_debugging ())
         flatpak_bwrap_add_arg (launcher_argv, "--verbose");
 
       /* In --launcher mode, arguments after the "--" separator are

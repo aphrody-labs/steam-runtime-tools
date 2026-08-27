@@ -42,9 +42,9 @@
 #include <json-glib/json-glib.h>
 
 #include <steam-runtime-tools/architecture-internal.h>
+#include <steam-runtime-tools/cli-internal.h>
 #include <steam-runtime-tools/json-glib-backports-internal.h>
 #include <steam-runtime-tools/json-utils-internal.h>
-#include <steam-runtime-tools/log-internal.h>
 #include <steam-runtime-tools/os-internal.h>
 #include <steam-runtime-tools/system-info-internal.h>
 #include <steam-runtime-tools/utils-internal.h>
@@ -1252,11 +1252,11 @@ main (int argc,
   if (optind != argc)
     usage (1);
 
-  if (!_srt_util_set_glib_log_handler ("steam-runtime-system-info",
-                                       G_LOG_DOMAIN,
-                                       (SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
-                                        | SRT_LOG_FLAGS_DIVERT_STDOUT),
-                                       &original_stdout_fd, NULL, &error))
+  if (!_srt_cli_set_glib_log_handler ("steam-runtime-system-info",
+                                      G_LOG_DOMAIN,
+                                      (SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
+                                       | SRT_LOG_FLAGS_DIVERT_STDOUT),
+                                      &original_stdout_fd, NULL, &error))
     {
       g_warning ("%s", error->message);
       return 1;

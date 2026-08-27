@@ -14,11 +14,11 @@
 #include <gio/gio.h>
 #include "libglnx.h"
 
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/env-overlay-internal.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/file-lock-internal.h"
 #include "steam-runtime-tools/launcher-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/process-manager-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
@@ -310,11 +310,11 @@ main (int argc,
   envp = g_get_environ ();
 
   /* Set up the initial base logging */
-  if (!_srt_util_set_glib_log_handler ("steam-runtime-supervisor",
-                                       G_LOG_DOMAIN,
-                                       SRT_LOG_FLAGS_DIVERT_STDOUT,
-                                       &original_stdout, &original_stderr,
-                                       error))
+  if (!_srt_cli_set_glib_log_handler ("steam-runtime-supervisor",
+                                      G_LOG_DOMAIN,
+                                      SRT_LOG_FLAGS_DIVERT_STDOUT,
+                                      &original_stdout, &original_stderr,
+                                      error))
     goto out;
 
   context = g_option_context_new (
@@ -334,7 +334,7 @@ main (int argc,
 
   if (opt_version)
     {
-      if (!_srt_util_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
+      if (!_srt_cli_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
         goto out;
 
       g_print ("%s:\n"
@@ -345,12 +345,12 @@ main (int argc,
       goto out;
     }
 
-  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                       (SRT_LOG_FLAGS_DIVERT_STDOUT
-                                        | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
-                                        | (opt_verbose >= 2 ? SRT_LOG_FLAGS_DEBUG : 0)
-                                        | (opt_verbose ? SRT_LOG_FLAGS_INFO : 0)),
-                                       NULL, NULL, error))
+  if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
+                                      (SRT_LOG_FLAGS_DIVERT_STDOUT
+                                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
+                                       | (opt_verbose >= 2 ? SRT_LOG_FLAGS_DEBUG : 0)
+                                       | (opt_verbose ? SRT_LOG_FLAGS_INFO : 0)),
+                                      NULL, NULL, error))
     goto out;
 
   /* Must be called before we start any threads, but after we set up
@@ -441,7 +441,7 @@ main (int argc,
     }
 
 
-  if (_srt_util_is_debugging ())
+  if (_srt_cli_is_debugging ())
     _srt_env_overlay_debug_log (env_overlay);
 
   envp = _srt_env_overlay_apply (env_overlay, envp);

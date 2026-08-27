@@ -8,8 +8,8 @@
 #include "steam-runtime-tools/glib-backports-internal.h"
 
 #include <steam-runtime-tools/steam-runtime-tools.h>
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/launcher-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/logger-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
@@ -256,9 +256,9 @@ run (int argc,
   subproc_environ = g_get_environ ();
   _srt_setenv_disable_gio_modules ();
 
-  if (!_srt_util_set_glib_log_handler (THIS_PROGRAM,
-                                       G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
-                                       NULL, NULL, error))
+  if (!_srt_cli_set_glib_log_handler (THIS_PROGRAM,
+                                      G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
+                                      NULL, NULL, error))
     return FALSE;
 
   if (!_srt_check_not_setuid ())
@@ -288,13 +288,13 @@ run (int argc,
       return TRUE;
     }
 
-  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                       (SRT_LOG_FLAGS_DIVERT_STDOUT
-                                        | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
-                                        | (opt_verbose >= 2 ? SRT_LOG_FLAGS_DEBUG : 0)
-                                        | (opt_verbose ? SRT_LOG_FLAGS_INFO : 0)),
-                                       &original_stdout, &original_stderr,
-                                       error))
+  if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
+                                      (SRT_LOG_FLAGS_DIVERT_STDOUT
+                                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
+                                       | (opt_verbose >= 2 ? SRT_LOG_FLAGS_DEBUG : 0)
+                                       | (opt_verbose ? SRT_LOG_FLAGS_INFO : 0)),
+                                      &original_stdout, &original_stderr,
+                                      error))
     return FALSE;
 
   _srt_unblock_signals ();

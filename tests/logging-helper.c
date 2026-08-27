@@ -7,7 +7,7 @@
 
 #include <steam-runtime-tools/steam-runtime-tools.h>
 
-#include "steam-runtime-tools/log-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 static gboolean opt_allow_journal = FALSE;
@@ -55,14 +55,14 @@ main (int argc,
   if (opt_keep_prgname)
     prgname = NULL;
 
-  if (!_srt_util_set_glib_log_handler (prgname, G_LOG_DOMAIN, flags,
-                                       &original_stdout, &original_stderr, &error))
+  if (!_srt_cli_set_glib_log_handler (prgname, G_LOG_DOMAIN, flags,
+                                      &original_stdout, &original_stderr, &error))
     {
       g_warning ("%s: %s\n", g_get_prgname (), error->message);
       return 1;
     }
 
-  /* _srt_util_set_glib_log_handler() ensures the three standard fds are
+  /* _srt_cli_set_glib_log_handler() ensures the three standard fds are
    * open, even if only pointing to /dev/null */
   g_assert_no_errno (fcntl (STDIN_FILENO, F_GETFL, 0));
   g_assert_no_errno (fcntl (STDOUT_FILENO, F_GETFL, 0));
@@ -92,9 +92,9 @@ main (int argc,
   g_message ("notice message");
 
   if ((original_stdout >= 0
-       && !_srt_util_restore_saved_fd (original_stdout, STDOUT_FILENO, &error))
+       && !_srt_cli_restore_saved_fd (original_stdout, STDOUT_FILENO, &error))
       || (original_stderr >= 0
-          && !_srt_util_restore_saved_fd (original_stderr, STDERR_FILENO, &error)))
+          && !_srt_cli_restore_saved_fd (original_stderr, STDERR_FILENO, &error)))
     {
       g_warning ("%s: %s\n", prgname, error->message);
       return 1;

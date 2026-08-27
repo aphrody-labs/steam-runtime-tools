@@ -39,10 +39,10 @@
 #include <gio/gio.h>
 #include <gio/gunixfdlist.h>
 
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/env-overlay-internal.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/launcher-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/pty-bridge-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 #include "libglnx.h"
@@ -1015,10 +1015,10 @@ main (int argc,
   global_original_environ = (const char * const *) original_environ;
 
   /* Set up the initial base logging */
-  if (!_srt_util_set_glib_log_handler ("steam-runtime-launch-client",
-                                       G_LOG_DOMAIN,
-                                       SRT_LOG_FLAGS_DIVERT_STDOUT,
-                                       &original_stdout_fd, NULL, error))
+  if (!_srt_cli_set_glib_log_handler ("steam-runtime-launch-client",
+                                      G_LOG_DOMAIN,
+                                      SRT_LOG_FLAGS_DIVERT_STDOUT,
+                                      &original_stdout_fd, NULL, error))
     {
       launch_exit_status = LAUNCH_EX_FAILED;
       goto out;
@@ -1071,9 +1071,9 @@ main (int argc,
       goto out;
     }
 
-  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                       (opt_verbose ? SRT_LOG_FLAGS_DEBUG : 0),
-                                       NULL, NULL, error))
+  if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
+                                      (opt_verbose ? SRT_LOG_FLAGS_DEBUG : 0),
+                                      NULL, NULL, error))
     {
       launch_exit_status = LAUNCH_EX_FAILED;
       goto out;

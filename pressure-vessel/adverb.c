@@ -34,11 +34,11 @@
 #include <glib/gstdio.h>
 #include <gio/gio.h>
 
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/env-overlay-internal.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/file-lock-internal.h"
 #include "steam-runtime-tools/launcher-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/process-manager-internal.h"
 #include "steam-runtime-tools/profiling-internal.h"
 #include "steam-runtime-tools/steam-runtime-tools.h"
@@ -372,7 +372,7 @@ regenerate_ld_so_cache (SrtSubprocessRunner *runner,
   g_ptr_array_add (argv, new_path);
   g_ptr_array_add (argv, (char *) "-X");    /* Don't update symlinks */
 
-  if (_srt_util_is_debugging ())
+  if (_srt_cli_is_debugging ())
     g_ptr_array_add (argv, (char *) "-v");
 
   g_ptr_array_add (argv, NULL);
@@ -412,7 +412,7 @@ regenerate_ld_so_cache (SrtSubprocessRunner *runner,
     return glnx_prefix_error (error, "Cannot move %s to %s",
                               new_path, replace_path);
 
-  if (_srt_util_is_debugging ())
+  if (_srt_cli_is_debugging ())
     {
       const char * const read_back_argv[] =
       {
@@ -724,9 +724,9 @@ main (int argc,
   global_ld_so_conf_entries = ld_so_conf_entries;
 
   /* Set up the initial base logging */
-  if (!_srt_util_set_glib_log_handler ("pv-adverb", G_LOG_DOMAIN, log_flags,
-                                       &original_stdout, &original_stderr,
-                                       error))
+  if (!_srt_cli_set_glib_log_handler ("pv-adverb", G_LOG_DOMAIN, log_flags,
+                                      &original_stdout, &original_stderr,
+                                      error))
     {
       ret = EX_UNAVAILABLE;
       goto out;
@@ -767,7 +767,7 @@ main (int argc,
 
   if (opt_version)
     {
-      if (!_srt_util_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
+      if (!_srt_cli_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
         {
           ret = EX_OSERR;
           goto out;
@@ -786,8 +786,8 @@ main (int argc,
   if (opt_verbose)
     log_flags |= SRT_LOG_FLAGS_DEBUG;
 
-  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN, log_flags,
-                                       NULL, NULL, error))
+  if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN, log_flags,
+                                      NULL, NULL, error))
     {
       ret = 1;
       goto out;

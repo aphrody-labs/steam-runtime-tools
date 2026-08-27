@@ -45,9 +45,9 @@
 #include <glib-object.h>
 
 #include <steam-runtime-tools/bwrap-internal.h>
+#include <steam-runtime-tools/cli-internal.h>
 #include <steam-runtime-tools/container-internal.h>
 #include <steam-runtime-tools/cpu-feature-internal.h>
-#include <steam-runtime-tools/log-internal.h>
 #include <steam-runtime-tools/resolve-in-sysroot-internal.h>
 #include <steam-runtime-tools/runtime-internal.h>
 #include <steam-runtime-tools/steam-internal.h>
@@ -250,9 +250,9 @@ main (int argc,
   if (optind != argc)
     usage (EX_USAGE);
 
-  if (!_srt_util_set_glib_log_handler ("steam-runtime-check-requirements",
-                                       G_LOG_DOMAIN, log_flags,
-                                       &original_stdout_fd, NULL, &error))
+  if (!_srt_cli_set_glib_log_handler ("steam-runtime-check-requirements",
+                                      G_LOG_DOMAIN, log_flags,
+                                      &original_stdout_fd, NULL, &error))
     {
       g_warning ("%s", error->message);
       g_clear_error (&error);

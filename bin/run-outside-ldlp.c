@@ -10,8 +10,8 @@
 #include <glib-unix.h>
 #include <gio/gio.h>
 
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/launcher-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/runtime-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
@@ -55,9 +55,9 @@ run (int argc,
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
 
-  if (!_srt_util_set_glib_log_handler (THIS_PROGRAM,
-                                       G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
-                                       NULL, NULL, error))
+  if (!_srt_cli_set_glib_log_handler (THIS_PROGRAM,
+                                      G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
+                                      NULL, NULL, error))
     return FALSE;
 
   exe_name = glnx_basename (argv[0]);
@@ -89,13 +89,13 @@ run (int argc,
       invocation_argv = argv + 1;
     }
 
-  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                       (SRT_LOG_FLAGS_DIVERT_STDOUT
-                                        | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
-                                        | (opt_verbose >= 2 ? SRT_LOG_FLAGS_DEBUG : 0)
-                                        | (opt_verbose ? SRT_LOG_FLAGS_INFO : 0)),
-                                       &original_stdout, &original_stderr,
-                                       error))
+  if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
+                                      (SRT_LOG_FLAGS_DIVERT_STDOUT
+                                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
+                                       | (opt_verbose >= 2 ? SRT_LOG_FLAGS_DEBUG : 0)
+                                       | (opt_verbose ? SRT_LOG_FLAGS_INFO : 0)),
+                                      &original_stdout, &original_stderr,
+                                      error))
     return FALSE;
 
   if (strchr (exe_name, '/') != NULL)
@@ -130,9 +130,9 @@ run (int argc,
     return FALSE;
 
   if ((original_stdout >= 0
-       && !_srt_util_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
+       && !_srt_cli_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
       || (original_stderr >= 0
-          && !_srt_util_restore_saved_fd (original_stderr, STDERR_FILENO, error)))
+          && !_srt_cli_restore_saved_fd (original_stderr, STDERR_FILENO, error)))
     return FALSE;
 
   execve (invocation_target, invocation_argv, env);

@@ -37,8 +37,8 @@
 #include <gio/gunixfdlist.h>
 
 #include <stdlib.h>
+#include <steam-runtime-tools/cli-internal.h>
 #include <steam-runtime-tools/container-internal.h>
-#include <steam-runtime-tools/log-internal.h>
 #include <steam-runtime-tools/runtime-internal.h>
 #include <steam-runtime-tools/utils-internal.h>
 #include <sys/wait.h>
@@ -228,10 +228,10 @@ main (int argc,
   g_autoptr(GError) error = NULL;
   gboolean prefer_steam;
 
-  _srt_util_set_glib_log_handler (THIS_PROGRAM,
-                                  G_LOG_DOMAIN,
-                                  SRT_LOG_FLAGS_OPTIONALLY_JOURNAL,
-                                  NULL, NULL, NULL);
+  _srt_cli_set_glib_log_handler (THIS_PROGRAM,
+                                 G_LOG_DOMAIN,
+                                 SRT_LOG_FLAGS_OPTIONALLY_JOURNAL,
+                                 NULL, NULL, NULL);
 
   option_context = g_option_context_new ("{ file | URL }");
   g_option_context_add_main_entries (option_context, option_entries, NULL);

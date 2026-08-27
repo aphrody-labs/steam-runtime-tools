@@ -24,7 +24,7 @@
 #include "wrap-setup.h"
 
 #include "steam-runtime-tools/glib-backports-internal.h"
-#include "steam-runtime-tools/log-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/subprocess-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 #include "steam-runtime-tools/virtualization-internal.h"

@@ -30,9 +30,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/env-overlay-internal.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/profiling-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 #include "libglnx.h"
@@ -111,9 +111,9 @@ main (int argc,
   setlocale (LC_ALL, "");
 
   /* Set up the initial base logging */
-  if (!_srt_util_set_glib_log_handler ("pressure-vessel-wrap",
-                                       G_LOG_DOMAIN, log_flags,
-                                       &original_stdout, &original_stderr, error))
+  if (!_srt_cli_set_glib_log_handler ("pressure-vessel-wrap",
+                                      G_LOG_DOMAIN, log_flags,
+                                      &original_stdout, &original_stderr, error))
     goto out;
 
   g_info ("pressure-vessel version %s", VERSION);
@@ -165,8 +165,8 @@ main (int argc,
                                            G_N_ELEMENTS (pv_debug_keys));
     }
 
-  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN, log_flags,
-                                       NULL, NULL, error))
+  if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN, log_flags,
+                                      NULL, NULL, error))
     goto out;
 
   pv_wrap_detect_virtualization (&interpreter_root, &host_machine);
@@ -187,7 +187,7 @@ main (int argc,
   if (self->options.version_only || self->options.version)
     {
       if (original_stdout >= 0
-          && !_srt_util_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
+          && !_srt_cli_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
         goto out;
 
       if (self->options.version_only)
@@ -310,7 +310,7 @@ main (int argc,
   compat_flags = _srt_steam_get_compat_flags (_srt_const_strv (self->original_environ));
   _srt_get_current_dirs (&cwd_p, &cwd_l);
 
-  if (_srt_util_is_debugging ())
+  if (_srt_cli_is_debugging ())
     {
       g_auto(GStrv) env = g_strdupv (self->original_environ);
 
@@ -393,7 +393,7 @@ main (int argc,
       g_assert (self->exports != NULL);
       g_assert (bwrap_filesystem_arguments != NULL);
 
-      if ((_srt_util_get_log_flags () & SRT_LOG_FLAGS_LEVEL)
+      if ((_srt_cli_get_log_flags () & SRT_LOG_FLAGS_LEVEL)
           && (self->bwrap_flags & SRT_BWRAP_FLAGS_HAS_LEVEL_PREFIX))
         flatpak_bwrap_add_arg (bwrap, "--level-prefix");
 
@@ -484,7 +484,7 @@ main (int argc,
       if (self->options.generate_locales)
         flags |= PV_RUNTIME_FLAGS_GENERATE_LOCALES;
 
-      if (_srt_util_is_debugging ())
+      if (_srt_cli_is_debugging ())
         flags |= PV_RUNTIME_FLAGS_VERBOSE;
 
       if (self->options.import_ca_certs)
@@ -1008,7 +1008,7 @@ main (int argc,
         goto out;
 
 
-      if (_srt_util_is_debugging ())
+      if (_srt_cli_is_debugging ())
         {
           g_debug ("%s options before bundling:", self->bwrap_executable);
 
@@ -1129,7 +1129,7 @@ main (int argc,
 
       flatpak_bwrap_append_args (adverb_argv, adverb_preload_argv);
 
-      if (_srt_util_is_debugging ())
+      if (_srt_cli_is_debugging ())
         flatpak_bwrap_add_arg (adverb_argv, "--verbose");
 
       flatpak_bwrap_add_arg (adverb_argv, "--");
@@ -1176,7 +1176,7 @@ main (int argc,
    * to make debugging a bit easier. */
   flatpak_bwrap_sort_envp (final_argv);
 
-  if (_srt_util_is_debugging ())
+  if (_srt_cli_is_debugging ())
     {
       if (self->runtime != NULL && (pv_log_flags & PV_WRAP_LOG_FLAGS_OVERRIDES))
         pv_runtime_log_overrides (self->runtime);

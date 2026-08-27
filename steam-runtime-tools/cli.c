@@ -23,7 +23,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "steam-runtime-tools/log-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 
 #include <dlfcn.h>
 #include <sys/stat.h>
@@ -44,10 +44,10 @@
  * open a file that does not exist.
  *
  * Only use this in programs that have called
- * _srt_util_set_glib_log_handler().
+ * _srt_cli_set_glib_log_handler().
  *
  * This is functionally equivalent to %G_LOG_LEVEL_MESSAGE, but
- * the handler set up by _srt_util_set_glib_log_handler() prints it
+ * the handler set up by _srt_cli_set_glib_log_handler() prints it
  * as though it was a fatal error. Use it in command-line utilities
  * to log a GError that will cause program termination.
  *
@@ -62,10 +62,10 @@
  * error.
  *
  * Only use this in programs that have called
- * _srt_util_set_glib_log_handler().
+ * _srt_cli_set_glib_log_handler().
  *
  * This is functionally equivalent to %G_LOG_LEVEL_MESSAGE, but
- * the handler set up by _srt_util_set_glib_log_handler() prints it
+ * the handler set up by _srt_cli_set_glib_log_handler() prints it
  * as though it was a warning.
  * Use to log a warning that should not cause program termination,
  * even during unit testing or under `G_DEBUG=fatal-warnings`.
@@ -77,7 +77,7 @@
  *
  * Convenience macro to log at level %SRT_LOG_LEVEL_FAILURE.
  * Only use this in programs that have called
- * _srt_util_set_glib_log_handler().
+ * _srt_cli_set_glib_log_handler().
  *
  * This is functionally equivalent to g_message(),
  * but with a different log level so that it is logged like a fatal error.
@@ -91,7 +91,7 @@
  *
  * Convenience macro to log at level %SRT_LOG_LEVEL_WARNING.
  * Only use this in programs that have called
- * _srt_util_set_glib_log_handler().
+ * _srt_cli_set_glib_log_handler().
  *
  * This is functionally equivalent to g_message(),
  * but with a different log level so that it is logged like a g_warning().
@@ -401,7 +401,7 @@ log_handler (const gchar *log_domain,
  *  standard error, to avoid unstructured diagnostics like g_debug()
  *  being written to the original standard output
  *  (use this in conjunction with the @original_stdout_out parameter of
- *  _srt_util_set_glib_log_handler())
+ *  _srt_cli_set_glib_log_handler())
  * @SRT_LOG_FLAGS_OPTIONALLY_JOURNAL: If standard output or standard error
  *  is /dev/null or an invalid file descriptor, or if the user requests
  *  logging to the Journal via environment variables, automatically
@@ -439,7 +439,7 @@ static const GDebugKey log_enable[] =
    * via $SRT_LOG: this flag indicates whether the application relies on
    * timing/profiling messages to indicate progress while debugging. */
 
-  /* Order matters: _srt_util_set_glib_log_handler() relies on this being
+  /* Order matters: _srt_cli_set_glib_log_handler() relies on this being
    * the last one, so that it can be disabled in the absence of
    * SRT_LOG_FLAGS_OPTIONALLY_JOURNAL */
   { "journal", SRT_LOG_FLAGS_JOURNAL },
@@ -619,9 +619,9 @@ set_up_output (int fd,
 }
 
 gboolean
-_srt_util_restore_saved_fd (int saved_fd,
-                            int target_fd,
-                            GError **error)
+_srt_cli_restore_saved_fd (int saved_fd,
+                           int target_fd,
+                           GError **error)
 {
   g_return_val_if_fail (saved_fd >= 0, FALSE);
 
@@ -649,7 +649,7 @@ _srt_util_restore_saved_fd (int saved_fd,
 }
 
 /*
- * _srt_util_set_glib_log_handler:
+ * _srt_cli_set_glib_log_handler:
  * @prgname: (nullable): Passed to g_set_prgname() if not %NULL
  * @extra_log_domain: (nullable): A log domain, usually %G_LOG_DOMAIN
  * @flags: Flags affecting logging
@@ -671,12 +671,12 @@ _srt_util_restore_saved_fd (int saved_fd,
  * g_parse_debug_string().
  */
 gboolean
-_srt_util_set_glib_log_handler (const char *prgname,
-                                const char *extra_log_domain,
-                                SrtLogFlags flags,
-                                int *original_stdout_out,
-                                int *original_stderr_out,
-                                GError **error)
+_srt_cli_set_glib_log_handler (const char *prgname,
+                               const char *extra_log_domain,
+                               SrtLogFlags flags,
+                               int *original_stdout_out,
+                               int *original_stderr_out,
+                               GError **error)
 {
   GLogLevelFlags log_levels = (G_LOG_LEVEL_ERROR
                                | G_LOG_LEVEL_CRITICAL
@@ -772,19 +772,19 @@ _srt_util_set_glib_log_handler (const char *prgname,
 }
 
 gboolean
-_srt_util_is_verbose (void)
+_srt_cli_is_verbose (void)
 {
   return !!(log_settings.flags & (SRT_LOG_FLAGS_INFO | SRT_LOG_FLAGS_DEBUG));
 }
 
 gboolean
-_srt_util_is_debugging (void)
+_srt_cli_is_debugging (void)
 {
   return !!(log_settings.flags & SRT_LOG_FLAGS_DEBUG);
 }
 
 SrtLogFlags
-_srt_util_get_log_flags (void)
+_srt_cli_get_log_flags (void)
 {
   return log_settings.flags;
 }

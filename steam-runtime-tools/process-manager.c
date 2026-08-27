@@ -16,8 +16,8 @@
 #include "libglnx.h"
 
 #include "steam-runtime-tools/glib-backports-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/launcher-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/missing-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
@@ -1407,7 +1407,7 @@ _srt_process_manager_run (SrtProcessManager *self,
       self->n_pass_fds = 0;
     }
 
-  if (self->opts.dump_parameters && _srt_util_is_debugging ())
+  if (self->opts.dump_parameters && _srt_cli_is_debugging ())
     _srt_process_manager_dump_parameters (self, argv, envp);
 
   if (self->opts.forward_signals)

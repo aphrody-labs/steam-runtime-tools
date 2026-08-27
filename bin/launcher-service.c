@@ -40,10 +40,10 @@
 #include <gio/gio.h>
 #include <gio/gunixfdlist.h>
 
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/env-overlay-internal.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/launcher-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/portal-listener-internal.h"
 #include "steam-runtime-tools/runtime-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
@@ -1586,9 +1586,9 @@ main (int argc,
   setlocale (LC_ALL, "");
 
   /* Set up the initial base logging */
-  if (!_srt_util_set_glib_log_handler ("steam-runtime-launcher-service",
-                                       G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
-                                       NULL, NULL, error))
+  if (!_srt_cli_set_glib_log_handler ("steam-runtime-launcher-service",
+                                      G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
+                                      NULL, NULL, error))
     {
       server->exit_status = EX_UNAVAILABLE;
       goto out;
@@ -1635,9 +1635,9 @@ main (int argc,
 
   if (opt_verbose)
     {
-      if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                           SRT_LOG_FLAGS_DEBUG,
-                                           NULL, NULL, error))
+      if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
+                                          SRT_LOG_FLAGS_DEBUG,
+                                          NULL, NULL, error))
         goto out;
     }
 
@@ -1647,7 +1647,7 @@ main (int argc,
 
   server->purpose = opt_purpose;
 
-  if (_srt_util_is_debugging () || opt_hint)
+  if (_srt_cli_is_debugging () || opt_hint)
     server->flags |= PV_LAUNCHER_SERVER_FLAGS_HINT;
 
   if (opt_stop_on_exit)

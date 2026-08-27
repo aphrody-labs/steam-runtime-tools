@@ -13,7 +13,7 @@
 #include "libglnx.h"
 
 #include "steam-runtime-tools/glib-backports-internal.h"
-#include "steam-runtime-tools/log-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 #include "mtree.h"
@@ -66,11 +66,11 @@ run (int argc,
 
   setlocale (LC_ALL, "");
 
-  if (!_srt_util_set_glib_log_handler ("pv-verify",
-                                       G_LOG_DOMAIN,
-                                       (SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
-                                        | SRT_LOG_FLAGS_DIVERT_STDOUT),
-                                       &original_stdout, NULL, error))
+  if (!_srt_cli_set_glib_log_handler ("pv-verify",
+                                      G_LOG_DOMAIN,
+                                      (SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
+                                       | SRT_LOG_FLAGS_DIVERT_STDOUT),
+                                      &original_stdout, NULL, error))
     return FALSE;
 
   context = g_option_context_new ("DIRECTORY\n"
@@ -82,7 +82,7 @@ run (int argc,
 
   if (opt_version)
     {
-      if (!_srt_util_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
+      if (!_srt_cli_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
         return FALSE;
 
       g_print ("%s:\n"
@@ -92,10 +92,10 @@ run (int argc,
       return TRUE;
     }
 
-  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                       (SRT_LOG_FLAGS_OPTIONALLY_JOURNAL |
-                                        (opt_verbose ? SRT_LOG_FLAGS_DEBUG : 0)),
-                                       NULL, NULL, error))
+  if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
+                                      (SRT_LOG_FLAGS_OPTIONALLY_JOURNAL |
+                                       (opt_verbose ? SRT_LOG_FLAGS_DEBUG : 0)),
+                                      NULL, NULL, error))
     return FALSE;
 
   if (opt_quiet)

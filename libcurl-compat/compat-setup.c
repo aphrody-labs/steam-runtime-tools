@@ -16,7 +16,7 @@
 #include <gio/gio.h>
 #include <steam-runtime-tools/steam-runtime-tools.h>
 #include "steam-runtime-tools/glib-backports-internal.h"
-#include "steam-runtime-tools/log-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 static void
@@ -453,9 +453,9 @@ main (int argc,
   int status = EXIT_SUCCESS;
 
   setlocale (LC_ALL, "");
-  if (!_srt_util_set_glib_log_handler ("steam-runtime-libcurl-compat-setup",
-                                       G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
-                                       NULL, NULL, &error))
+  if (!_srt_cli_set_glib_log_handler ("steam-runtime-libcurl-compat-setup",
+                                      G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
+                                      NULL, NULL, &error))
     {
       status = EX_UNAVAILABLE;
       goto out;
@@ -479,10 +479,10 @@ main (int argc,
       goto out;
     }
 
-  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                       (SRT_LOG_FLAGS_DIVERT_STDOUT |
-                                        (opt_verbose ? SRT_LOG_FLAGS_DEBUG : 0)),
-                                       NULL, NULL, &error))
+  if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
+                                      (SRT_LOG_FLAGS_DIVERT_STDOUT |
+                                       (opt_verbose ? SRT_LOG_FLAGS_DEBUG : 0)),
+                                      NULL, NULL, &error))
     {
       status = EX_UNAVAILABLE;
       goto out;

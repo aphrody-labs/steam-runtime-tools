@@ -59,15 +59,15 @@ int _srt_journal_stream_fd (const char *identifier,
                             gboolean enable_level_prefixes,
                             GError **error);
 
-gboolean _srt_util_set_glib_log_handler (const char *prgname,
-                                         const char *extra_log_domain,
-                                         SrtLogFlags flags,
-                                         int *original_stdout_out,
-                                         int *original_stderr_out,
-                                         GError **error);
-gboolean _srt_util_restore_saved_fd (int saved_fd,
-                                     int target_fd,
-                                     GError **error);
-gboolean _srt_util_is_verbose (void);
-gboolean _srt_util_is_debugging (void);
-SrtLogFlags _srt_util_get_log_flags (void);
+gboolean _srt_cli_set_glib_log_handler (const char *prgname,
+                                        const char *extra_log_domain,
+                                        SrtLogFlags flags,
+                                        int *original_stdout_out,
+                                        int *original_stderr_out,
+                                        GError **error);
+gboolean _srt_cli_restore_saved_fd (int saved_fd,
+                                    int target_fd,
+                                    GError **error);
+gboolean _srt_cli_is_verbose (void);
+gboolean _srt_cli_is_debugging (void);
+SrtLogFlags _srt_cli_get_log_flags (void);

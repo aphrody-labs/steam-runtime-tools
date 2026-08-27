@@ -5,7 +5,7 @@
 
 #include "passwd.h"
 
-#include "steam-runtime-tools/log-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 
 /* Append @field to @buffer, replacing colons or newlines with '_'
  * to avoid possibly corrupting the passwd(5)/group(5) syntax. */

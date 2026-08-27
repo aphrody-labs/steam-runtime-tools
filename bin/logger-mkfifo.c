@@ -9,7 +9,7 @@
 
 #include <libglnx.h>
 
-#include <steam-runtime-tools/log-internal.h>
+#include <steam-runtime-tools/cli-internal.h>
 
 #include "logger-mkfifo.h"
 

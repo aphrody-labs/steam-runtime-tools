@@ -562,17 +562,25 @@ handle_launch (PvLauncher1           *object,
     {
       char *empty[] = { NULL };
 
+      g_debug ("Starting with blank environment");
       env = g_strdupv (empty);
     }
   else
     {
+      g_debug ("Starting with inherited environment");
       env = g_strdupv (self->child_environ);
     }
 
   if (self->main_pid_str != NULL)
-    env = g_environ_setenv (env, "MAINPID", self->main_pid_str, TRUE);
+    {
+      g_debug ("Setting MAINPID=%s", self->main_pid_str);
+      env = g_environ_setenv (env, "MAINPID", self->main_pid_str, TRUE);
+    }
   else
-    env = g_environ_unsetenv (env, "MAINPID");
+    {
+      g_debug ("Unsetting MAINPID");
+      env = g_environ_unsetenv (env, "MAINPID");
+    }
 
   n_envs = g_variant_n_children (arg_envs);
   for (i = 0; i < n_envs; i++)
@@ -633,10 +641,16 @@ handle_launch (PvLauncher1           *object,
   }
 
   if (arg_cwd_path == NULL)
-    env = g_environ_setenv (env, "PWD", self->original_cwd_l,
-                            TRUE);
+    {
+      g_debug ("Setting PWD to inherited working directory %s", self->original_cwd_l);
+      env = g_environ_setenv (env, "PWD", self->original_cwd_l,
+                              TRUE);
+    }
   else
-    env = g_environ_setenv (env, "PWD", arg_cwd_path, TRUE);
+    {
+      g_debug ("Setting PWD to requested working directory %s", arg_cwd_path);
+      env = g_environ_setenv (env, "PWD", arg_cwd_path, TRUE);
+    }
 
   /* We use LEAVE_DESCRIPTORS_OPEN and set CLOEXEC in the child_setup,
    * to work around a deadlock in GLib < 2.60 */

@@ -428,7 +428,6 @@ run (gboolean runtime_optional,
 }
 
 static gboolean opt_runtime_optional = FALSE;
-static gboolean opt_verbose = FALSE;
 
 static const GOptionEntry option_entries[] =
 {
@@ -436,9 +435,8 @@ static const GOptionEntry option_entries[] =
     &opt_runtime_optional,
     "Set up compatibility shim in a separate directory so it can be "
     "enabled or disabled by run.sh", NULL },
-  { "verbose", '\0', G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
-    "Be more verbose", NULL },
 
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
   SRT_CLI_OPTION_ENTRY_VERSION,
   G_OPTION_ENTRY_NULL
 };
@@ -471,9 +469,6 @@ main (int argc,
     }
 
   log_flags |= SRT_LOG_FLAGS_DIVERT_STDOUT;
-
-  if (opt_verbose)
-    log_flags |= SRT_LOG_FLAGS_DEBUG;
 
   if (!_srt_cli_update_log_flags (log_flags, &error))
     {

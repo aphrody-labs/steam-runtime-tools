@@ -447,18 +447,32 @@ static const GDebugKey log_enable[] =
 };
 
 /*
- * ensure_fd_not_cloexec:
+ * initialize_stdio_fd:
+ * @fd: `STDIN_FILENO`, `STDOUT_FILENO` or `STDERR_FILENO`
+ * @save_original: (out): If not %NULL, duplicate the original fd here
  *
  * Ensure that @fd is open and not marked for close-on-execute, to avoid
  * weird side-effects if opening an unrelated file descriptor ends up as
  * one of the three standard fds, either in this process or a subprocess.
  */
 static gboolean
-ensure_fd_not_cloexec (int fd,
-                       GError **error)
+initialize_stdio_fd (int fd,
+                     int *save_original,
+                     GError **error)
 {
   int flags;
   int errsv;
+
+  if (save_original != NULL)
+    {
+      *save_original = TEMP_FAILURE_RETRY (fcntl (fd, F_DUPFD_CLOEXEC, 3));
+
+      /* Ignore EBADF because there's no guarantee that the standard fds
+       * are open yet */
+      if (*save_original < 0 && errno != EBADF)
+        return glnx_throw_errno_prefix (error,
+                                        "Unable to duplicate fd %d", fd);
+    }
 
   flags = fcntl (fd, F_GETFD, 0);
 
@@ -513,30 +527,12 @@ ensure_fd_not_cloexec (int fd,
 /*
  * set_up_output:
  * @fd: `STDOUT_FILENO` or `STDERR_FILENO`
- * @save_original: (out): If not %NULL, duplicate the original stdout/stderr
- *  here
  */
-static gboolean
-set_up_output (int fd,
-               int *save_original,
-               GError **error)
+static void
+set_up_output (int fd)
 {
   SrtLogFlags required_flags;
   gboolean use_journal = FALSE;
-
-  if (save_original != NULL)
-    {
-      *save_original = TEMP_FAILURE_RETRY (fcntl (fd, F_DUPFD_CLOEXEC, 3));
-
-      /* Ignore EBADF because there's no guarantee that the standard fds
-       * are open yet */
-      if (*save_original < 0 && errno != EBADF)
-        return glnx_throw_errno_prefix (error,
-                                        "Unable to duplicate fd %d", fd);
-    }
-
-  if (!ensure_fd_not_cloexec (fd, error))
-    return FALSE;
 
   if (fd == STDOUT_FILENO)
     required_flags = SRT_LOG_FLAGS_JOURNAL | SRT_LOG_FLAGS_DIVERT_STDOUT;
@@ -615,8 +611,6 @@ set_up_output (int fd,
           g_clear_error (&local_error);
         }
     }
-
-  return TRUE;
 }
 
 gboolean
@@ -750,10 +744,13 @@ _srt_cli_set_glib_log_handler (const char *prgname,
 
   /* We ensure stdin is open first, because otherwise any fd we open is
    * likely to become unintentionally the new stdin. */
-  if (!ensure_fd_not_cloexec (STDIN_FILENO, error)
-      || !set_up_output (STDOUT_FILENO, original_stdout_out, error)
-      || !set_up_output (STDERR_FILENO, original_stderr_out, error))
+  if (!initialize_stdio_fd (STDIN_FILENO, NULL, error)
+      || !initialize_stdio_fd (STDOUT_FILENO, original_stdout_out, error)
+      || !initialize_stdio_fd (STDERR_FILENO, original_stderr_out, error))
     return FALSE;
+
+  set_up_output (STDOUT_FILENO);
+  set_up_output (STDERR_FILENO);
 
   /* Avoid "stairstep" effect when using SrtPtyBridge, by sending CRLF
    * at the end of diagnostic messages */

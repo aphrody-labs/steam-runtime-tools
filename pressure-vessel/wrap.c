@@ -194,7 +194,7 @@ main (int argc,
         g_print ("%s\n", VERSION);
       else
         g_print ("%s:\n"
-                 " Package: pressure-vessel\n"
+                 " Package: steam-runtime-tools\n"
                  " Version: %s\n",
                  g_get_prgname (), VERSION);
 

@@ -355,9 +355,8 @@ main (int argc,
 
   if (argc < 2)
     {
-      g_printerr ("%s: Usage: %s [OPTIONS] COMMAND [ARG...]\n",
-                  g_get_prgname (),
-                  g_get_prgname ());
+      _srt_log_failure ("Usage: %s [OPTIONS] COMMAND [ARG...]",
+                        g_get_prgname ());
       goto out;
     }
 

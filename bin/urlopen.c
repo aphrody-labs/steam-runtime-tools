@@ -237,7 +237,7 @@ main (int argc,
 
   if (!_srt_cli_option_context_parse (option_context, -1, &argc, &argv, &error))
     {
-      g_printerr ("%s: %s\n", g_get_prgname (), error->message);
+      _srt_log_failure ("%s", error->message);
       return 1;
     }
 

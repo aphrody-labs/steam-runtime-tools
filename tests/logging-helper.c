@@ -57,7 +57,7 @@ main (int argc,
   if (!_srt_cli_init (prgname, G_LOG_DOMAIN, flags,
                       &original_stdout, &original_stderr, &error))
     {
-      g_warning ("%s: %s\n", g_get_prgname (), error->message);
+      _srt_log_failure ("%s", error->message);
       return 1;
     }
 
@@ -95,7 +95,7 @@ main (int argc,
       || (original_stderr >= 0
           && !_srt_cli_restore_saved_fd (original_stderr, STDERR_FILENO, &error)))
     {
-      g_warning ("%s: %s\n", prgname, error->message);
+      _srt_log_failure ("%s", error->message);
       return 1;
     }
 

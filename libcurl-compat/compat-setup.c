@@ -494,7 +494,7 @@ main (int argc,
 
 out:
   if (status != EXIT_SUCCESS)
-    g_printerr ("%s: %s\n", g_get_prgname (), error->message);
+    _srt_log_failure ("%s", error->message);
 
   g_clear_error (&error);
   g_clear_pointer (&option_context, g_option_context_free);

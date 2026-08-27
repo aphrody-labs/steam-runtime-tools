@@ -60,7 +60,7 @@ main (int argc,
 
   if (!_srt_steam_command_via_pipe (argv + 1, argc - 1, &error))
     {
-      g_printerr ("steam-runtime-steam-remote: %s\n", error->message);
+      _srt_log_failure ("%s", error->message);
       return EXIT_FAILURE;
     }
 

@@ -1208,8 +1208,7 @@ main (int argc,
   if (!_srt_cli_init ("steam-runtime-system-info", G_LOG_DOMAIN, log_flags,
                       &original_stdout_fd, NULL, &error))
     {
-      g_warning ("%s", error->message);
-      g_clear_error (&error);
+      _srt_log_failure ("%s", error->message);
       return 1;
     }
 
@@ -1265,7 +1264,7 @@ main (int argc,
 
   if (!_srt_cli_update_log_flags (log_flags, &error))
     {
-      g_warning ("%s", error->message);
+      _srt_log_failure ("%s", error->message);
       return 1;
     }
 
@@ -1285,7 +1284,7 @@ main (int argc,
       info = srt_system_info_new_from_json (test_json_path, &error);
       if (info == NULL)
         {
-          g_warning ("%s", error->message);
+          _srt_log_failure ("%s", error->message);
           return 1;
         }
     }

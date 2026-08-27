@@ -218,8 +218,7 @@ main (int argc,
                       log_flags,
                       &original_stdout_fd, NULL, &error))
     {
-      g_warning ("%s", error->message);
-      g_clear_error (&error);
+      _srt_log_failure ("%s", error->message);
       return EXIT_FAILURE;
     }
 
@@ -262,8 +261,7 @@ main (int argc,
 
   if (!_srt_cli_update_log_flags (log_flags, &error))
     {
-      g_warning ("%s", error->message);
-      g_clear_error (&error);
+      _srt_log_failure ("%s", error->message);
       return EXIT_FAILURE;
     }
 

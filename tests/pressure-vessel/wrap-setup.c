@@ -2648,8 +2648,9 @@ test_payload_command (Fixture *f,
        * are currently mutually exclusive */
       g_assert_false (test->emulated);
 
-      g_assert_cmpuint (argv_in_container->argv->len, >=, 2);
-      arg = g_ptr_array_index (argv_in_container->argv, 0);
+      g_assert_cmpuint (offset, ==, 0);
+      g_assert_cmpuint (argv_in_container->argv->len, >=, offset + 2);
+      arg = g_ptr_array_index (argv_in_container->argv, offset);
 #ifdef _SRT_MULTIARCH
       g_assert_true (g_str_has_suffix (arg, "/" _SRT_MULTIARCH "-srt-launcher-service"));
 #else
@@ -2657,7 +2658,7 @@ test_payload_command (Fixture *f,
 #endif
       offset++;
 
-      arg = g_ptr_array_index (argv_in_container->argv, 1);
+      arg = g_ptr_array_index (argv_in_container->argv, offset);
 
       if (g_str_equal (arg, "--verbose"))
         offset++;
@@ -2669,8 +2670,9 @@ test_payload_command (Fixture *f,
 
       g_assert_false (test->launcher_instead);
 
-      g_assert_cmpuint (argv_in_container->argv->len, >=, 3);
-      arg = g_ptr_array_index (argv_in_container->argv, 0);
+      g_assert_cmpuint (offset, ==, 0);
+      g_assert_cmpuint (argv_in_container->argv->len, >=, offset + 3);
+      arg = g_ptr_array_index (argv_in_container->argv, offset);
       g_assert_cmpstr (arg, ==, expected_emulator);
       offset++;
 

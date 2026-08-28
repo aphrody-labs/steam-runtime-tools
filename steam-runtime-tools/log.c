@@ -435,7 +435,7 @@ static const GDebugKey log_enable[] =
    * via $SRT_LOG: implementing those flags correctly requires the application
    * to be aware that the original stdout might get altered */
 
-  /* Intentionally no way to set SRT_LOG_FLAGS_PROGRAM_DEBUG_IMPLIES_TIMING
+  /* Intentionally no way to set SRT_LOG_FLAGS_DEBUG_IMPLIES_TIMING
    * via $SRT_LOG: this flag indicates whether the application relies on
    * timing/profiling messages to indicate progress while debugging. */
 

@@ -335,7 +335,7 @@ main (int argc,
   if (opt_version)
     {
       if (!_srt_util_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
-        return FALSE;
+        goto out;
 
       g_print ("%s:\n"
                " Package: steam-runtime-tools\n"

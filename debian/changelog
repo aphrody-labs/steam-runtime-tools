@@ -1,11 +1,23 @@
-steam-runtime-tools (0.20260826.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260828.0) UNRELEASED; urgency=medium
 
+  * s-r-launcher-service:
+    - When debug logging is enabled, log MAINPID and PWD environment
+      variable changes (steamrt/tasks#1078)
+  * s-r-supervisor:
+    - Fix error reporting for an unlikely error scenario
   * Update bubblewrap subproject to v0.12.0.
     This includes the fix for security vulnerability GHSA-pxhw-h44j-8pfx,
     but is not a security-sensitive change for steam-runtime-tools
     because we do not use bubblewrap as a security boundary.
+  * Documentation fixes (steamrt/tasks#1079)
+  * Tests/CI:
+    - Improve code clarity (steamrt/tasks#1079)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 26 Aug 2026 15:12:28 +0100
+  [ Antonio Ospite ]
+  * Convert REUSE licensing information to TOML format
+    (steamrt/tasks#1069)
+
+ -- Simon McVittie <smcv@collabora.com>  Fri, 28 Aug 2026 13:12:15 +0100
 
 steam-runtime-tools (0.20260824.0) steamrt; urgency=medium
 

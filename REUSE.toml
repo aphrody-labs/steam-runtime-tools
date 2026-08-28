@@ -1,0 +1,34 @@
+version = 1
+SPDX-PackageName = "steam-runtime-tools"
+SPDX-PackageDownloadLocation = "https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/"
+
+[[annotations]]
+path = "debian/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2013-2026 Collabora Ltd."
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = [
+  "build-aux/many-builds.md",
+  "ci/*.sources.list",
+  "docs/reference/version.xml.in",
+  "helpers/shader.*",
+  "libcurl-compat/README.md",
+  "tests/template.test.in",
+  "tests/*.json",
+  "tests/**/*.json",
+  "tests/**/*.symbols",
+  "tests/pressure-vessel/mock-emulators/*.json",
+  ".gitlab/issue_templates/*",
+  ".gitlab/merge_request_templates/*",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2019-2025 Collabora Ltd."
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "build-aux/git-version-gen"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2007-2017 Free Software Foundation, Inc."
+SPDX-License-Identifier = "GPL-3.0-or-later"

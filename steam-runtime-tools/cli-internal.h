@@ -46,6 +46,8 @@ typedef enum
   SRT_LOG_FLAGS_NONE = 0
 } SrtLogFlags;
 
+#define SRT_LOG_FLAGS_VERBOSITY_MASK (SRT_LOG_FLAGS_DEBUG | SRT_LOG_FLAGS_INFO)
+
 #define SRT_LOG_LEVEL_FAILURE (1 << G_LOG_LEVEL_USER_SHIFT)
 #define SRT_LOG_LEVEL_WARNING (1 << (G_LOG_LEVEL_USER_SHIFT + 1))
 
@@ -73,6 +75,7 @@ gboolean _srt_cli_restore_saved_fd (int saved_fd,
 gboolean _srt_cli_is_verbose (void);
 gboolean _srt_cli_is_debugging (void);
 SrtLogFlags _srt_cli_get_log_flags (void);
+void _srt_cli_increase_verbosity (SrtLogFlags flags);
 
 gboolean _srt_cli_option_context_parse (GOptionContext *context,
                                         int original_stdout_fd,

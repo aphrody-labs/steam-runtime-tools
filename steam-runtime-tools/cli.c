@@ -870,6 +870,15 @@ _srt_cli_option_context_parse (GOptionContext *context,
   return ret;
 }
 
+void
+_srt_cli_increase_verbosity (SrtLogFlags flags)
+{
+  g_return_if_fail (log_settings.prgname != NULL);
+  g_return_if_fail (flags == (flags & SRT_LOG_FLAGS_VERBOSITY_MASK));
+  log_settings.flags |= flags;
+  update_verbose_log_handlers ();
+}
+
 /*
  * SRT_CLI_OPTION_ENTRY_VERBOSE:
  *

@@ -788,3 +788,38 @@ _srt_cli_get_log_flags (void)
 {
   return log_settings.flags;
 }
+
+static int original_stdout_during_option_parsing = -1;
+
+static void
+print_to_original_stdout (const char *string)
+{
+  int fd = original_stdout_during_option_parsing;
+
+  if (fd < 0)
+    fd = STDOUT_FILENO;
+
+  glnx_loop_write (fd, string, strlen (string));
+}
+
+gboolean
+_srt_cli_option_context_parse (GOptionContext *context,
+                               int original_stdout_fd,
+                               int *argc,
+                               char ***argv,
+                               GError **error)
+{
+  GPrintFunc previous_print_handler;
+  gboolean ret;
+
+  original_stdout_during_option_parsing = original_stdout_fd;
+  previous_print_handler = g_set_print_handler (print_to_original_stdout);
+
+  ret = g_option_context_parse (context, argc, argv, error);
+
+  previous_print_handler = g_set_print_handler (previous_print_handler);
+  g_assert (previous_print_handler == print_to_original_stdout);
+  original_stdout_during_option_parsing = -1;
+
+  return ret;
+}

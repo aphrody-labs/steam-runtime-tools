@@ -40,6 +40,8 @@ main (int argc,
   option_context = g_option_context_new ("MESSAGE");
   g_option_context_add_main_entries (option_context, option_entries, NULL);
 
+  /* Intentionally not _srt_cli_option_context_parse() because we're
+   * running this before _srt_cli_init() */
   if (!g_option_context_parse (option_context, &argc, &argv, &error))
     {
       g_warning ("%s: %s\n", prgname, error->message);

@@ -751,7 +751,8 @@ main (int argc,
 
   opt_verbose = _srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE", FALSE);
 
-  if (!g_option_context_parse (context, &argc, &argv, error))
+  if (!_srt_cli_option_context_parse (context, original_stdout,
+                                      &argc, &argv, error))
     {
       if (g_error_matches (local_error, G_IO_ERROR, G_IO_ERROR_BUSY))
         ret = EX_TEMPFAIL;

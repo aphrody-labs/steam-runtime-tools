@@ -327,7 +327,8 @@ main (int argc,
   g_option_context_add_group (context,
                               _srt_env_overlay_create_option_group (env_overlay));
 
-  if (!g_option_context_parse (context, &argc, &argv, error))
+  if (!_srt_cli_option_context_parse (context, original_stdout,
+                                      &argc, &argv, error))
     goto out;
 
   g_clear_pointer (&context, g_option_context_free);

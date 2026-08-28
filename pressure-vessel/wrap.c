@@ -146,7 +146,7 @@ main (int argc,
   if (!pv_wrap_options_parse_environment (&self->options, error))
     goto out;
 
-  if (!pv_wrap_context_parse_argv (self, &argc, &argv, error))
+  if (!pv_wrap_context_parse_argv (self, original_stdout, &argc, &argv, error))
     goto out;
 
   log_flags |= SRT_LOG_FLAGS_DIVERT_STDOUT | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL;

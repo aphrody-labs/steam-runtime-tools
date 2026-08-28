@@ -236,7 +236,7 @@ main (int argc,
   option_context = g_option_context_new ("{ file | URL }");
   g_option_context_add_main_entries (option_context, option_entries, NULL);
 
-  if (!g_option_context_parse (option_context, &argc, &argv, &error))
+  if (!_srt_cli_option_context_parse (option_context, -1, &argc, &argv, &error))
     {
       g_printerr ("%s: %s\n", g_get_prgname (), error->message);
       return 1;

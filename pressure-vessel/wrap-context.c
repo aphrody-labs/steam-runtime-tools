@@ -905,6 +905,7 @@ pv_wrap_options_parse_environment (PvWrapOptions *self,
 
 gboolean
 pv_wrap_options_parse_argv (PvWrapOptions *self,
+                            int original_stdout,
                             int *argcp,
                             char ***argvp,
                             GError **error)
@@ -1229,7 +1230,8 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
   g_option_group_add_entries (main_group, options);
   g_option_context_set_main_group (context, g_steal_pointer (&main_group));
 
-  if (!g_option_context_parse (context, argcp, argvp, error))
+  if (!_srt_cli_option_context_parse (context, original_stdout,
+                                      argcp, argvp, error))
     return FALSE;
 
   return TRUE;
@@ -1237,6 +1239,7 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
 
 gboolean
 pv_wrap_context_parse_argv (PvWrapContext *self,
+                            int original_stdout,
                             int *argcp,
                             char ***argvp,
                             GError **error)
@@ -1252,7 +1255,8 @@ pv_wrap_context_parse_argv (PvWrapContext *self,
   for (i = 0; i < argc; i++)
     self->original_argv[i] = g_strdup (argv[i]);
 
-  return pv_wrap_options_parse_argv (&self->options, argcp, argvp, error);
+  return pv_wrap_options_parse_argv (&self->options, original_stdout,
+                                     argcp, argvp, error);
 }
 
 gboolean

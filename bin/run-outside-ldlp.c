@@ -66,7 +66,8 @@ run (int argc,
       option_context = g_option_context_new ("COMMAND [ARGUMENTS...]");
       g_option_context_add_main_entries (option_context, option_entries, NULL);
 
-      if (!g_option_context_parse (option_context, &argc, &argv, error))
+      if (!_srt_cli_option_context_parse (option_context, original_stdout,
+                                          &argc, &argv, error))
         return FALSE;
 
       if (argc >= 2 && strcmp (argv[1], "--") == 0)

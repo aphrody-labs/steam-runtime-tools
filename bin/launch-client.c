@@ -1051,7 +1051,7 @@ main (int argc,
         }
     }
 
-  if (!g_option_context_parse (context, &argc, &argv, error))
+  if (!_srt_cli_option_context_parse (context, original_stdout_fd, &argc, &argv, error))
     goto out;
 
   if (!_srt_fdopen_take (&original_stdout_fd, "w", &original_stdout, error))

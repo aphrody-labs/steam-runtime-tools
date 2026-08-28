@@ -1608,7 +1608,7 @@ main (int argc,
   g_return_val_if_fail (argc >= 1, EX_USAGE);
   g_return_val_if_fail (argv[argc] == NULL, EX_USAGE);
 
-  if (!g_option_context_parse (context, &argc, &argv, error))
+  if (!_srt_cli_option_context_parse (context, -1, &argc, &argv, error))
     {
       server->exit_status = EX_USAGE;
       goto out;

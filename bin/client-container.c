@@ -490,7 +490,8 @@ run (int argc,
 
   g_option_context_add_main_entries (context, options, NULL);
 
-  if (!g_option_context_parse (context, &argc, &argv, error))
+  if (!_srt_cli_option_context_parse (context, original_stdout,
+                                      &argc, &argv, error))
     return FALSE;
 
   g_clear_pointer (&context, g_option_context_free);

@@ -28,6 +28,7 @@
 #include <steam-runtime-tools/steam-runtime-tools.h>
 
 #include "steam-runtime-tools/glib-backports-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/input-device-internal.h"
 #include "steam-runtime-tools/json-glib-backports-internal.h"
 #include "steam-runtime-tools/json-utils-internal.h"
@@ -907,7 +908,8 @@ run (int argc,
   option_context = g_option_context_new ("");
   g_option_context_add_main_entries (option_context, option_entries, NULL);
 
-  if (!g_option_context_parse (option_context, &argc, &argv, error))
+  if (!_srt_cli_option_context_parse (option_context, -1,
+                                      &argc, &argv, error))
     return FALSE;
 
   if (ignoring_initial_devices

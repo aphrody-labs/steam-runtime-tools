@@ -1370,7 +1370,8 @@ test_options_defaults (Fixture *f,
       g_assert_cmpint (options->version, ==, FALSE);
       g_assert_cmpint (options->version_only, ==, FALSE);
 
-      ok = pv_wrap_context_parse_argv (f->context, &argc, &argv, &local_error);
+      ok = pv_wrap_context_parse_argv (f->context, STDERR_FILENO,
+                                       &argc, &argv, &local_error);
       g_assert_no_error (local_error);
       g_assert_true (ok);
 
@@ -1441,7 +1442,8 @@ test_options_false (Fixture *f,
   const char *steam_app_id = NULL;
   gboolean ok;
 
-  ok = pv_wrap_context_parse_argv (f->context, &argc, &argv, &local_error);
+  ok = pv_wrap_context_parse_argv (f->context, STDERR_FILENO,
+                                   &argc, &argv, &local_error);
   g_assert_no_error (local_error);
   g_assert_true (ok);
 
@@ -1563,7 +1565,7 @@ test_options_invalid (Fixture *f,
       modifiable_argv = g_memdup2 (argv->pdata, argv->len * sizeof (char *));
 
       fixture_recreate_context (f);
-      ok = pv_wrap_context_parse_argv (f->context,
+      ok = pv_wrap_context_parse_argv (f->context, STDERR_FILENO,
                                        &argc, &modifiable_argv,
                                        &local_error);
 
@@ -1618,7 +1620,8 @@ test_options_steam_client (Fixture *f,
   gboolean ok;
   guint n;
 
-  ok = pv_wrap_context_parse_argv (f->context, &argc, &modifiable_argv,
+  ok = pv_wrap_context_parse_argv (f->context, STDERR_FILENO,
+                                   &argc, &modifiable_argv,
                                    &local_error);
   g_assert_no_error (local_error);
   g_assert_true (ok);
@@ -1762,7 +1765,8 @@ test_options_true (Fixture *f,
   gboolean ok;
   guint n;
 
-  ok = pv_wrap_context_parse_argv (f->context, &argc, &argv, &local_error);
+  ok = pv_wrap_context_parse_argv (f->context, STDERR_FILENO,
+                                   &argc, &argv, &local_error);
   g_assert_no_error (local_error);
   g_assert_true (ok);
 

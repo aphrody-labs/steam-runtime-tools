@@ -77,7 +77,8 @@ run (int argc,
                                   "DIRECTORY is SteamLinuxRuntime_sniper or similar.\n");
   g_option_context_add_main_entries (context, options, NULL);
 
-  if (!g_option_context_parse (context, &argc, &argv, error))
+  if (!_srt_cli_option_context_parse (context, original_stdout,
+                                      &argc, &argv, error))
     return FALSE;
 
   if (opt_version)

@@ -36,6 +36,7 @@
 
 #include <steam-runtime-tools/architecture.h>
 #include <steam-runtime-tools/architecture-internal.h>
+#include <steam-runtime-tools/cli-internal.h>
 #include <steam-runtime-tools/glib-backports-internal.h>
 #include <steam-runtime-tools/utils-internal.h>
 
@@ -296,7 +297,8 @@ main (int argc,
   option_context = g_option_context_new ("");
   g_option_context_add_main_entries (option_context, option_entries, NULL);
 
-  if (!g_option_context_parse (option_context, &argc, &argv, &error))
+  if (!_srt_cli_option_context_parse (option_context, -1,
+                                      &argc, &argv, &error))
     {
       status = EX_USAGE;
       goto out;

@@ -80,6 +80,16 @@ gboolean _srt_cli_option_context_parse (GOptionContext *context,
                                         char ***argv,
                                         GError **error);
 
+gboolean _srt_cli_option_arg_func_verbose (const char *name,
+                                           const char *value,
+                                           void *data,
+                                           GError **error);
+
+#define SRT_CLI_OPTION_ENTRY_VERBOSE \
+{ "verbose", 'v', \
+  G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, _srt_cli_option_arg_func_verbose, \
+  "Be more verbose. If given twice, log debug messages too.", NULL }
+
 gboolean _srt_cli_option_arg_func_version (const char *name,
                                            const char *value,
                                            void *data,

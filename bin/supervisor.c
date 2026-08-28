@@ -46,7 +46,6 @@ static double opt_terminate_idle_timeout = 0.0;
 /* Note that this is not DEFAULT_TERMINATE_TIMEOUT,
  * to give us a way to distinguish between specified and unspecified */
 static double opt_terminate_timeout = -1.0;
-static unsigned opt_verbose = 0;
 
 static gboolean
 opt_assign_fd_cb (const char *name,
@@ -78,18 +77,6 @@ opt_terminate_with_main_cb (const char *name,
     opt_terminate_with_main = TRISTATE_YES;
   else
     opt_terminate_with_main = TRISTATE_NO;
-
-  return TRUE;
-}
-
-static gboolean
-opt_verbose_cb (const char *name,
-                const char *value,
-                gpointer data,
-                GError **error)
-{
-  if (opt_verbose < 2)
-    opt_verbose++;
 
   return TRUE;
 }
@@ -279,10 +266,7 @@ static GOptionEntry options[] =
     "--terminate-with- options were used]",
     "SECONDS" },
 
-  { "verbose", 'v',
-    G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, opt_verbose_cb,
-    "Be more verbose. If given twice, log debug messages too.", NULL },
-
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
   SRT_CLI_OPTION_ENTRY_VERSION,
   G_OPTION_ENTRY_NULL
 };
@@ -330,12 +314,6 @@ main (int argc,
   g_clear_pointer (&context, g_option_context_free);
 
   log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL;
-
-  if (opt_verbose >= 2)
-    log_flags |= SRT_LOG_FLAGS_DEBUG;
-
-  if (opt_verbose >= 1)
-    log_flags |= SRT_LOG_FLAGS_INFO;
 
   if (!_srt_cli_update_log_flags (log_flags, error))
     goto out;

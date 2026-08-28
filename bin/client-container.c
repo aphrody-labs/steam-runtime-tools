@@ -417,25 +417,12 @@ launcher_service_manager_start (LauncherServiceManager *self,
 
 static gchar *opt_pv_entry_point = NULL;
 static gchar **opt_pv_options = NULL;
-static int opt_verbose = 0;
 
 static void
 free_option_globals (void)
 {
   g_clear_pointer (&opt_pv_entry_point, g_free);
   g_clear_pointer (&opt_pv_options, g_strfreev);
-}
-
-static gboolean
-opt_verbose_cb (const char *name,
-                const char *value,
-                gpointer data,
-                GError **error)
-{
-  if (opt_verbose < 2)
-    opt_verbose++;
-
-  return TRUE;
 }
 
 static GOptionEntry options[] =
@@ -448,10 +435,8 @@ static GOptionEntry options[] =
     G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME_ARRAY, &opt_pv_options,
     "Pass the given OPTION to pressure-vessel. May be repeated.",
     "OPTION" },
-  { "verbose", 'v',
-    G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, opt_verbose_cb,
-    "Be more verbose. If given twice, log debug messages too.", NULL },
 
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
   SRT_CLI_OPTION_ENTRY_VERSION,
   G_OPTION_ENTRY_NULL
 };
@@ -494,12 +479,6 @@ run (int argc,
   g_clear_pointer (&context, g_option_context_free);
 
   log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL;
-
-  if (opt_verbose >= 2)
-    log_flags |= SRT_LOG_FLAGS_DEBUG;
-
-  if (opt_verbose >= 1)
-    log_flags |= SRT_LOG_FLAGS_INFO;
 
   if (!_srt_cli_update_log_flags (log_flags, error))
     return FALSE;

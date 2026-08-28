@@ -38,24 +38,11 @@ static int opt_file_level = SRT_SYSLOG_LEVEL_DEFAULT_FILE;
 static int opt_journal_level = SRT_SYSLOG_LEVEL_DEFAULT_JOURNAL;
 static int opt_terminal_level = SRT_SYSLOG_LEVEL_DEFAULT_TERMINAL;
 static int opt_default_line_level = SRT_SYSLOG_LEVEL_DEFAULT_LINE;
-static unsigned opt_verbose = 0;
 
 const char opt_file_level_name[] = "file-level";
 const char opt_journal_level_name[] = "journal-level";
 const char opt_terminal_level_name[] = "terminal-level";
 const char opt_default_line_level_name[] = "default-level";
-
-static gboolean
-opt_verbose_cb (const char *name,
-                const char *value,
-                gpointer data,
-                GError **error)
-{
-  if (opt_verbose < 2)
-    opt_verbose++;
-
-  return TRUE;
-}
 
 static gboolean
 opt_rotate_cb (const char *name,
@@ -198,10 +185,8 @@ static const GOptionEntry option_entries[] =
     G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, &opt_level_cb,
     "Only log lines with at least the given importance to the terminal",
     "LEVEL" },
-  { "verbose", 'v',
-    G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, &opt_verbose_cb,
-    "Be more verbose. If given twice, log debug messages too.", NULL },
 
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
   SRT_CLI_OPTION_ENTRY_VERSION,
   G_OPTION_ENTRY_NULL
 };
@@ -278,12 +263,6 @@ run (int argc,
     opt_max_bytes = 0;
 
   log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL | SRT_LOG_FLAGS_DIVERT_STDOUT;
-
-  if (opt_verbose >= 2)
-    log_flags |= SRT_LOG_FLAGS_DEBUG;
-
-  if (opt_verbose >= 1)
-    log_flags |= SRT_LOG_FLAGS_INFO;
 
   if (!_srt_cli_update_log_flags (log_flags, error))
     return FALSE;

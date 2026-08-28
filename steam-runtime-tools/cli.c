@@ -654,11 +654,26 @@ apply_glib_log_handler (GLogLevelFlags log_levels)
     }
 }
 
+static void
+update_verbose_log_handlers (void)
+{
+  GLogLevelFlags log_levels = 0;
+
+  /* This function only covers the configurable log levels: info and debug.
+   * Higher log levels are done in _srt_cli_init() */
+  if (log_settings.flags & (SRT_LOG_FLAGS_INFO | SRT_LOG_FLAGS_DEBUG))
+    log_levels |= G_LOG_LEVEL_INFO;
+
+  if (log_settings.flags & SRT_LOG_FLAGS_DEBUG)
+    log_levels |= G_LOG_LEVEL_DEBUG | G_LOG_LEVEL_INFO;
+
+  apply_glib_log_handler (log_levels);
+}
+
 static gboolean
 configure_logging (SrtLogFlags flags,
                    GError **error)
 {
-  GLogLevelFlags log_levels = 0;
   const char *log_env = g_getenv ("SRT_LOG");
   gsize log_env_n_keys = G_N_ELEMENTS (log_enable);
 
@@ -705,15 +720,7 @@ configure_logging (SrtLogFlags flags,
   else
     log_settings.pid = 0;
 
-  /* This function only covers the configurable log levels: info and debug.
-   * Higher log levels are done in _srt_cli_init() */
-  if (flags & (SRT_LOG_FLAGS_INFO | SRT_LOG_FLAGS_DEBUG))
-    log_levels |= G_LOG_LEVEL_INFO;
-
-  if (flags & SRT_LOG_FLAGS_DEBUG)
-    log_levels |= G_LOG_LEVEL_DEBUG | G_LOG_LEVEL_INFO;
-
-  apply_glib_log_handler (log_levels);
+  update_verbose_log_handlers ();
 
   if (flags & SRT_LOG_FLAGS_TIMING)
     _srt_profiling_enable (G_LOG_LEVEL_MESSAGE);
@@ -861,6 +868,47 @@ _srt_cli_option_context_parse (GOptionContext *context,
   original_stdout_during_option_parsing = -1;
 
   return ret;
+}
+
+/*
+ * SRT_CLI_OPTION_ENTRY_VERBOSE:
+ *
+ * A #GOptionEntry that configures `--verbose`, `-v` to provide 2-level
+ * verbosity similar to Flatpak:
+ * `-v` enables INFO-level logging,
+ * `-vv` enables INFO- and DEBUG-level logging.
+ *
+ * This assumes that _srt_cli_init() has been called before parsing
+ * command-line options.
+ */
+
+/*
+ * _srt_cli_option_arg_func_verbose:
+ *
+ * Implementation of `--verbose`, `-v`:
+ * enable INFO-level logging, or if INFO-level logging was already enabled,
+ * enable DEBUG-level logging as well.
+ * This is a #GOptionArgFunc.
+ *
+ * Returns: %TRUE
+ */
+gboolean
+_srt_cli_option_arg_func_verbose (G_GNUC_UNUSED const char *name,
+                                  G_GNUC_UNUSED const char *value,
+                                  G_GNUC_UNUSED void *data,
+                                  G_GNUC_UNUSED GError **error)
+{
+  SrtLogFlags old = log_settings.flags;
+
+  g_return_val_if_fail (log_settings.prgname != NULL, FALSE);
+
+  if (old & SRT_LOG_FLAGS_INFO)
+    log_settings.flags |= SRT_LOG_FLAGS_DEBUG;
+  else
+    log_settings.flags |= SRT_LOG_FLAGS_INFO;
+
+  update_verbose_log_handlers ();
+  return TRUE;
 }
 
 /*

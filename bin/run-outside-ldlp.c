@@ -19,26 +19,10 @@
 
 #define THIS_PROGRAM "srt-run-outside-ldlp"
 
-static unsigned opt_verbose = 0;
-
-static gboolean
-opt_verbose_cb (const char *name,
-                const char *value,
-                gpointer data,
-                GError **error)
-{
-  if (opt_verbose < 2)
-    opt_verbose++;
-
-  return TRUE;
-}
-
 static const GOptionEntry option_entries[] =
 {
-  { "verbose", 'v',
-    G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, &opt_verbose_cb,
-    "Be more verbose. If given twice, log debug messages too.", NULL },
-  { NULL }
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
+  G_OPTION_ENTRY_NULL
 };
 
 static gboolean
@@ -91,12 +75,6 @@ run (int argc,
     }
 
   log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL | SRT_LOG_FLAGS_DIVERT_STDOUT;
-
-  if (opt_verbose >= 2)
-    log_flags |= SRT_LOG_FLAGS_DEBUG;
-
-  if (opt_verbose >= 1)
-    log_flags |= SRT_LOG_FLAGS_INFO;
 
   if (!_srt_cli_update_log_flags (log_flags, error))
     return FALSE;

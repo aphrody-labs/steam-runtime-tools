@@ -125,7 +125,6 @@ class TestHelpers(BaseTest):
                 if tool in (
                     'pv-try-setlocale',
                     'steam-runtime-dialog-ui',
-                    'steam-runtime-system-info',
                 ):
                     # TODO: Ideally we'd be more consistent with formatting
                     help_mentions_help = False

@@ -49,49 +49,6 @@
 #include <steam-runtime-tools/system-info-internal.h>
 #include <steam-runtime-tools/utils-internal.h>
 
-enum
-{
-  OPTION_HELP = 1,
-  OPTION_EXPECTATION,
-  OPTION_IGNORE_EXTRA_DRIVERS,
-  OPTION_NO_GRAPHICS_TESTS,
-  OPTION_NO_LIBRARIES,
-  OPTION_VERBOSE,
-  OPTION_VERSION,
-};
-
-struct option long_options[] =
-{
-    { "expectations", required_argument, NULL, OPTION_EXPECTATION },
-    { "ignore-extra-drivers", no_argument, NULL, OPTION_IGNORE_EXTRA_DRIVERS },
-    { "no-graphics-tests", no_argument, NULL, OPTION_NO_GRAPHICS_TESTS },
-    { "no-libraries", no_argument, NULL, OPTION_NO_LIBRARIES },
-    { "verbose", no_argument, NULL, OPTION_VERBOSE },
-    { "version", no_argument, NULL, OPTION_VERSION },
-    { "help", no_argument, NULL, OPTION_HELP },
-    { NULL, 0, NULL, 0 }
-};
-
-static void usage (int code) __attribute__((__noreturn__));
-
-/*
- * Print usage information and exit with status @code.
- */
-static void
-usage (int code)
-{
-  FILE *fp;
-
-  if (code == 0)
-    fp = stdout;
-  else
-    fp = stderr;
-
-  fprintf (fp, "Usage: %s [OPTIONS]\n",
-           program_invocation_short_name);
-  exit (code);
-}
-
 static void
 jsonify_flags (JsonBuilder *builder,
                GType flags_type,
@@ -1179,7 +1136,7 @@ main (int argc,
   g_autoptr(SrtObjectList) implicit_layers = NULL;
   g_autoptr(SrtOpenXr1Runtime) openxr_1_rt_fallback = NULL;
   g_auto(GStrv) driver_environment = NULL;
-  char *expectations = NULL;
+  g_autofree gchar *expectations = NULL;
   gboolean verbose = FALSE;
   g_autoptr(JsonBuilder) builder = NULL;
   gboolean can_run = FALSE;
@@ -1192,7 +1149,6 @@ main (int argc,
   g_autofree gchar *data_path = NULL;
   g_autofree gchar *bin32_path = NULL;
   g_autofree gchar *rt_path = NULL;
-  int opt;
   const GQuark *multiarch_tuples;
   gsize n_multiarch_tuples;
   GList *icds;
@@ -1201,71 +1157,64 @@ main (int argc,
   SrtDriverFlags extra_driver_flags = SRT_DRIVER_FLAGS_INCLUDE_ALL;
   gboolean check_graphics = TRUE;
   gboolean check_libraries = TRUE;
-  SrtLogFlags log_flags = SRT_LOG_FLAGS_NONE;
 
   _srt_setenv_disable_gio_modules ();
 
-  if (!_srt_cli_init ("steam-runtime-system-info", G_LOG_DOMAIN, log_flags,
+  if (!_srt_cli_init ("steam-runtime-system-info", G_LOG_DOMAIN,
+                      (SRT_LOG_FLAGS_DIVERT_STDOUT
+                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL),
                       &original_stdout_fd, NULL, &error))
     {
       _srt_log_failure ("%s", error->message);
       return 1;
     }
 
-  while ((opt = getopt_long (argc, argv, "", long_options, NULL)) != -1)
     {
-      switch (opt)
+      g_autoptr(GOptionContext) context = NULL;
+      gboolean opt_extra_drivers = TRUE;
+      const GOptionEntry options[] =
+      {
+        { "expectations", '\0',
+          G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME, &expectations,
+          "Directory containing details of expected libraries"
+          " [default: $STEAM_RUNTIME/usr/lib/steamrt or /usr/lib/steamrt]",
+          "PATH" },
+        { "ignore-extra-drivers", '\0',
+          G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &opt_extra_drivers,
+          "Ignore drivers that are not expected to be loaded by applications",
+          NULL },
+        { "no-graphics-tests", '\0',
+          G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &check_graphics,
+          "Don't check whether graphics drivers work",
+          NULL },
+        { "no-libraries", '\0',
+          G_OPTION_FLAG_REVERSE, G_OPTION_ARG_NONE, &check_libraries,
+          "Don't check shared libraries against expectations",
+          NULL },
+        /* Intentionally not SRT_CLI_OPTION_ENTRY_VERBOSE:
+         * this option affects the JSON output on stdout,
+         * not just the diagnostic messages on stderr. */
+        { "verbose", '\0',
+          G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &verbose,
+          "Be more verbose", NULL },
+
+        SRT_CLI_OPTION_ENTRY_VERSION,
+        G_OPTION_ENTRY_NULL
+      };
+
+      context = g_option_context_new ("");
+      g_option_context_add_main_entries (context, options, NULL);
+
+      if (!_srt_cli_option_context_parse (context, original_stdout_fd,
+                                          &argc, &argv, &error)
+          || !_srt_cli_check_no_positional_parameters (argc, argv, &error))
         {
-          case OPTION_EXPECTATION:
-            expectations = optarg;
-            break;
-
-          case OPTION_VERBOSE:
-            verbose = TRUE;
-            break;
-
-          case OPTION_VERSION:
-            /* Output version number as YAML for machine-readability,
-             * inspired by `ostree --version` and `docker version` */
-            printf (
-                "%s:\n"
-                " Package: steam-runtime-tools\n"
-                " Version: %s\n",
-                g_get_prgname (), VERSION);
-            return 0;
-
-          case OPTION_IGNORE_EXTRA_DRIVERS:
-            extra_driver_flags = SRT_DRIVER_FLAGS_NONE;
-            break;
-
-          case OPTION_NO_GRAPHICS_TESTS:
-            check_graphics = FALSE;
-            break;
-
-          case OPTION_NO_LIBRARIES:
-            check_libraries = FALSE;
-            break;
-
-          case OPTION_HELP:
-            usage (0);
-            break;
-
-          case '?':
-          default:
-            usage (1);
-            break;  /* not reached */
+          _srt_log_failure ("%s", error->message);
+          return 1;
         }
-    }
 
-  if (optind != argc)
-    usage (1);
-
-  log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL | SRT_LOG_FLAGS_DIVERT_STDOUT;
-
-  if (!_srt_cli_update_log_flags (log_flags, &error))
-    {
-      _srt_log_failure ("%s", error->message);
-      return 1;
+      if (!opt_extra_drivers)
+        extra_driver_flags = SRT_DRIVER_FLAGS_NONE;
     }
 
   if (!_srt_fdopen_take (&original_stdout_fd, "w", &original_stdout, &error))

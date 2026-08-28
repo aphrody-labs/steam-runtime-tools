@@ -240,7 +240,7 @@ test_help_and_version (Fixture *f,
   g_assert_true (g_utf8_validate (output, -1, NULL));
   g_assert_nonnull (diagnostics);
 
-  g_assert_nonnull (strstr (output, "OPTIONS"));
+  g_assert_nonnull (strstr (output, "--help"));
 
   g_free (output);
   g_free (diagnostics);

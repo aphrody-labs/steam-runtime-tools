@@ -57,41 +57,6 @@
                                | SRT_X86_FEATURE_CMPXCHG16B \
                                | SRT_X86_FEATURE_SSE3)
 
-enum
-{
-  OPTION_HELP = 1,
-  OPTION_VERSION,
-  OPTION_VERBOSE = 'v',
-};
-
-struct option long_options[] =
-{
-    { "verbose", no_argument, NULL, OPTION_VERBOSE },
-    { "version", no_argument, NULL, OPTION_VERSION },
-    { "help", no_argument, NULL, OPTION_HELP },
-    { NULL, 0, NULL, 0 }
-};
-
-static void usage (int code) __attribute__((__noreturn__));
-
-/*
- * Print usage information and exit with status @code.
- */
-static void
-usage (int code)
-{
-  FILE *fp;
-
-  if (code == 0)
-    fp = stdout;
-  else
-    fp = stderr;
-
-  fprintf (fp, "Usage: %s [OPTIONS]\n",
-           program_invocation_short_name);
-  exit (code);
-}
-
 static gboolean
 check_x86_features (SrtX86FeatureFlags features)
 {
@@ -205,9 +170,7 @@ main (int argc,
   const gchar *output = NULL;
   const char *prefix = NULL;
   const char *pkglibexecdir = NULL;
-  int opt;
   int exit_code = EXIT_SUCCESS;
-  SrtLogFlags log_flags = SRT_LOG_FLAGS_NONE;
   SrtBwrapIssues bwrap_issues;
   SrtFlatpakIssues flatpak_issues;
 
@@ -215,54 +178,33 @@ main (int argc,
   _srt_setenv_disable_gio_modules ();
 
   if (!_srt_cli_init ("steam-runtime-check-requirements", G_LOG_DOMAIN,
-                      log_flags,
+                      (SRT_LOG_FLAGS_DIVERT_STDOUT
+                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL),
                       &original_stdout_fd, NULL, &error))
     {
       _srt_log_failure ("%s", error->message);
       return EXIT_FAILURE;
     }
 
-  while ((opt = getopt_long (argc, argv, "v", long_options, NULL)) != -1)
     {
-      switch (opt)
+      g_autoptr(GOptionContext) context = NULL;
+      static const GOptionEntry options[] =
+      {
+        SRT_CLI_OPTION_ENTRY_VERBOSE,
+        SRT_CLI_OPTION_ENTRY_VERSION,
+        G_OPTION_ENTRY_NULL
+      };
+
+      context = g_option_context_new ("");
+      g_option_context_add_main_entries (context, options, NULL);
+
+      if (!_srt_cli_option_context_parse (context, original_stdout_fd,
+                                          &argc, &argv, &error)
+          || !_srt_cli_check_no_positional_parameters (argc, argv, &error))
         {
-          case OPTION_VERBOSE:
-            if (log_flags & SRT_LOG_FLAGS_INFO)
-              log_flags |= SRT_LOG_FLAGS_DEBUG;
-            else
-              log_flags |= SRT_LOG_FLAGS_INFO;
-            break;
-
-          case OPTION_VERSION:
-            /* Output version number as YAML for machine-readability,
-             * inspired by `ostree --version` and `docker version` */
-            printf (
-                "%s:\n"
-                " Package: steam-runtime-tools\n"
-                " Version: %s\n",
-                g_get_prgname (), VERSION);
-            return EXIT_SUCCESS;
-
-          case OPTION_HELP:
-            usage (0);
-            break;
-
-          case '?':
-          default:
-            usage (EX_USAGE);
-            break;  /* not reached */
+          _srt_log_failure ("%s", error->message);
+          return EX_USAGE;
         }
-    }
-
-  if (optind != argc)
-    usage (EX_USAGE);
-
-  log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL | SRT_LOG_FLAGS_DIVERT_STDOUT;
-
-  if (!_srt_cli_update_log_flags (log_flags, &error))
-    {
-      _srt_log_failure ("%s", error->message);
-      return EXIT_FAILURE;
     }
 
   if (!_srt_fdopen_take (&original_stdout_fd, "w", &original_stdout, &error))

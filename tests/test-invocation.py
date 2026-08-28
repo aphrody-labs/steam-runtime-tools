@@ -124,7 +124,6 @@ class TestHelpers(BaseTest):
 
                 if tool in (
                     'pv-try-setlocale',
-                    'steam-runtime-check-requirements',
                     'steam-runtime-dialog-ui',
                     'steam-runtime-system-info',
                 ):

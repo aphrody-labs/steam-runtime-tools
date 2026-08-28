@@ -140,8 +140,6 @@ typedef struct
   gboolean systemd_scope;
   gboolean test;
   gboolean verbose;
-  gboolean version;
-  gboolean version_only;
 } PvWrapOptions;
 
 struct _PvWrapContext

@@ -835,7 +835,6 @@ static SrtInputDeviceMonitorFlags opt_mode = SRT_INPUT_DEVICE_MONITOR_FLAGS_NONE
 static SrtInputDeviceMonitorFlags opt_flags = SRT_INPUT_DEVICE_MONITOR_FLAGS_NONE;
 static gboolean opt_evdev = FALSE;
 static gboolean opt_hidraw = FALSE;
-static gboolean opt_print_version = FALSE;
 
 static gboolean
 opt_once_cb (const gchar *option_name,
@@ -889,9 +888,9 @@ static const GOptionEntry option_entries[] =
     "Find devices using udev", NULL },
   { "verbose", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
     "Be more verbose", NULL },
-  { "version", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_print_version,
-    "Print version number and exit", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 static gboolean
@@ -918,18 +917,6 @@ run (int argc,
       g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,
                    "Combining --only-new with --once is not useful");
       return FALSE;
-    }
-
-  if (opt_print_version)
-    {
-      /* Output version number as YAML for machine-readability,
-       * inspired by `ostree --version` and `docker version` */
-      g_print (
-          "%s:\n"
-          " Package: steam-runtime-tools\n"
-          " Version: %s\n",
-          g_get_prgname (), VERSION);
-      return TRUE;
     }
 
   /* stdout is reserved for machine-readable output, so avoid having

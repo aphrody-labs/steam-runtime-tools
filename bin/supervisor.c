@@ -47,7 +47,6 @@ static double opt_terminate_idle_timeout = 0.0;
  * to give us a way to distinguish between specified and unspecified */
 static double opt_terminate_timeout = -1.0;
 static unsigned opt_verbose = 0;
-static gboolean opt_version = FALSE;
 
 static gboolean
 opt_assign_fd_cb (const char *name,
@@ -283,10 +282,9 @@ static GOptionEntry options[] =
   { "verbose", 'v',
     G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, opt_verbose_cb,
     "Be more verbose. If given twice, log debug messages too.", NULL },
-  { "version", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_version,
-    "Print version number and exit.", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 int
@@ -332,19 +330,6 @@ main (int argc,
     goto out;
 
   g_clear_pointer (&context, g_option_context_free);
-
-  if (opt_version)
-    {
-      if (!_srt_cli_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
-        goto out;
-
-      g_print ("%s:\n"
-               " Package: steam-runtime-tools\n"
-               " Version: %s\n",
-               g_get_prgname (), VERSION);
-      ret = 0;
-      goto out;
-    }
 
   if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
                                       (SRT_LOG_FLAGS_DIVERT_STDOUT

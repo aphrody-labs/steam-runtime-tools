@@ -50,18 +50,18 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(AutoUnixFDList, g_object_unref)
 
 static gchar **uris = NULL;
 static gboolean opt_print_help = FALSE;
-static gboolean opt_print_version = FALSE;
 
 static const GOptionEntry option_entries[] =
 {
   /* Imitate the allowed options of the real 'xdg-open' */
   { "manual", 0, G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_NONE, &opt_print_help,
     NULL, NULL },
-  { "version", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_print_version,
-    "Print version number and exit", NULL },
   { G_OPTION_REMAINING, 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME_ARRAY,
     &uris, NULL, NULL },
-  { NULL }
+
+  /* Simply print the version number, similarly to the real xdg-open */
+  SRT_CLI_OPTION_ENTRY_VERSION_IS_VERSION_ONLY,
+  G_OPTION_ENTRY_NULL
 };
 
 static gboolean
@@ -244,13 +244,6 @@ main (int argc,
 
   _srt_setenv_disable_gio_modules ();
   _srt_unblock_signals ();
-
-  if (opt_print_version)
-    {
-      /* Simply print the version number, similarly to the real xdg-open */
-      g_print ("%s\n", VERSION);
-      return EXIT_SUCCESS;
-    }
 
   if (uris == NULL || g_strv_length (uris) > 1)
     {

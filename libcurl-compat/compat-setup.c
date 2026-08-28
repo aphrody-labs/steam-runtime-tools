@@ -427,7 +427,6 @@ run (gboolean runtime_optional,
   return TRUE;
 }
 
-static gboolean opt_print_version = FALSE;
 static gboolean opt_runtime_optional = FALSE;
 static gboolean opt_verbose = FALSE;
 
@@ -439,9 +438,9 @@ static const GOptionEntry option_entries[] =
     "enabled or disabled by run.sh", NULL },
   { "verbose", '\0', G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
     "Be more verbose", NULL },
-  { "version", '\0', G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_print_version,
-    "Print version number and exit", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 int
@@ -467,15 +466,6 @@ main (int argc,
   if (!_srt_cli_option_context_parse (option_context, -1, &argc, &argv, &error))
     {
       status = EX_USAGE;
-      goto out;
-    }
-
-  if (opt_print_version)
-    {
-      g_print ("%s:\n"
-               " Package: steam-runtime-tools\n"
-               " Version: %s\n",
-               g_get_prgname (), VERSION);
       goto out;
     }
 

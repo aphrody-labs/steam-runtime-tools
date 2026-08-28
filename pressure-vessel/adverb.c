@@ -71,7 +71,6 @@ static double opt_terminate_idle_timeout = 0.0;
 static double opt_terminate_timeout = DEFAULT_TERMINATE_TIMEOUT;
 static gboolean opt_terminate_with_main = FALSE;
 static gboolean opt_verbose = FALSE;
-static gboolean opt_version = FALSE;
 static gboolean opt_wait = FALSE;
 static gboolean opt_write = FALSE;
 
@@ -680,10 +679,9 @@ static GOptionEntry options[] =
   { "verbose", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
     "Be more verbose.", NULL },
-  { "version", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_version,
-    "Print version number and exit.", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 int
@@ -765,22 +763,6 @@ main (int argc,
     }
 
   g_clear_pointer (&context, g_option_context_free);
-
-  if (opt_version)
-    {
-      if (!_srt_cli_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
-        {
-          ret = EX_OSERR;
-          goto out;
-        }
-
-      g_print ("%s:\n"
-               " Package: steam-runtime-tools\n"
-               " Version: %s\n",
-               g_get_prgname (), VERSION);
-      ret = 0;
-      goto out;
-    }
 
   log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL;
 

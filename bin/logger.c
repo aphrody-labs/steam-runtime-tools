@@ -39,7 +39,6 @@ static int opt_journal_level = SRT_SYSLOG_LEVEL_DEFAULT_JOURNAL;
 static int opt_terminal_level = SRT_SYSLOG_LEVEL_DEFAULT_TERMINAL;
 static int opt_default_line_level = SRT_SYSLOG_LEVEL_DEFAULT_LINE;
 static unsigned opt_verbose = 0;
-static gboolean opt_version = FALSE;
 
 const char opt_file_level_name[] = "file-level";
 const char opt_journal_level_name[] = "journal-level";
@@ -202,10 +201,9 @@ static const GOptionEntry option_entries[] =
   { "verbose", 'v',
     G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, &opt_verbose_cb,
     "Be more verbose. If given twice, log debug messages too.", NULL },
-  { "version", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_version,
-    "Print version number and exit.", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 static GSpawnError
@@ -278,16 +276,6 @@ run (int argc,
 
   if (!_srt_boolean_environment ("SRT_LOG_ROTATION", TRUE))
     opt_max_bytes = 0;
-
-  if (opt_version)
-    {
-      g_print (
-          "%s:\n"
-          " Package: steam-runtime-tools\n"
-          " Version: %s\n",
-          g_get_prgname (), VERSION);
-      return TRUE;
-    }
 
   if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
                                       (SRT_LOG_FLAGS_DIVERT_STDOUT

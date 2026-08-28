@@ -184,24 +184,6 @@ main (int argc,
   for (i = 0; i < n_tuples; i++)
     g_info ("Architecture: %s", g_quark_to_string (tuples[i]));
 
-  if (self->options.version_only || self->options.version)
-    {
-      if (original_stdout >= 0
-          && !_srt_cli_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
-        goto out;
-
-      if (self->options.version_only)
-        g_print ("%s\n", VERSION);
-      else
-        g_print ("%s:\n"
-                 " Package: steam-runtime-tools\n"
-                 " Version: %s\n",
-                 g_get_prgname (), VERSION);
-
-      ret = 0;
-      goto out;
-    }
-
   _srt_unblock_signals ();
   _srt_setenv_disable_gio_modules ();
 

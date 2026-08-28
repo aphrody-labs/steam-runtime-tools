@@ -768,7 +768,6 @@ static gboolean opt_share_pids = FALSE;
 static gboolean opt_terminate = FALSE;
 static gchar *opt_usr_path = NULL;
 static gboolean opt_verbose = FALSE;
-static gboolean opt_version = FALSE;
 
 static gboolean
 opt_pass_env_cb (const char *option_name,
@@ -948,10 +947,9 @@ static const GOptionEntry options[] =
   { "verbose", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
     "Be more verbose.", NULL },
-  { "version", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_version,
-    "Print version number and exit.", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 int
@@ -1057,17 +1055,6 @@ main (int argc,
   if (!_srt_fdopen_take (&original_stdout_fd, "w", &original_stdout, error))
     {
       launch_exit_status = LAUNCH_EX_FAILED;
-      goto out;
-    }
-
-  if (opt_version)
-    {
-      fprintf (original_stdout,
-               "%s:\n"
-               " Package: steam-runtime-tools\n"
-               " Version: %s\n",
-               g_get_prgname (), VERSION);
-      launch_exit_status = 0;
       goto out;
     }
 

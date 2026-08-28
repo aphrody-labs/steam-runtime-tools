@@ -85,8 +85,6 @@ pv_wrap_options_init (PvWrapOptions *self)
   self->test = FALSE;
   self->variable_dir = NULL;
   self->verbose = FALSE;
-  self->version = FALSE;
-  self->version_only = FALSE;
   self->write_final_argv = NULL;
 }
 
@@ -1192,12 +1190,6 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
     { "verbose", '\0',
       G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &self->verbose,
       "Be more verbose.", NULL },
-    { "version", '\0',
-      G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &self->version,
-      "Print version number and exit.", NULL },
-    { "version-only", '\0',
-      G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_NONE, &self->version_only,
-      "Print version number (no other information) and exit.", NULL },
     { "with-host-graphics", '\0',
       G_OPTION_FLAG_NO_ARG | G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_CALLBACK,
       opt_with_host_graphics_cb,
@@ -1217,7 +1209,10 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
     { "only-prepare", '\0',
       G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &self->only_prepare,
       "Prepare runtime, but do not actually run anything.", NULL },
-    { NULL }
+
+    SRT_CLI_OPTION_ENTRY_VERSION,
+    SRT_CLI_OPTION_ENTRY_VERSION_ONLY,
+    G_OPTION_ENTRY_NULL
   };
 
   context = g_option_context_new ("[--] COMMAND [ARGS]\n"

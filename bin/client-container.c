@@ -418,7 +418,6 @@ launcher_service_manager_start (LauncherServiceManager *self,
 static gchar *opt_pv_entry_point = NULL;
 static gchar **opt_pv_options = NULL;
 static int opt_verbose = 0;
-static gboolean opt_version = FALSE;
 
 static void
 free_option_globals (void)
@@ -452,10 +451,9 @@ static GOptionEntry options[] =
   { "verbose", 'v',
     G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, opt_verbose_cb,
     "Be more verbose. If given twice, log debug messages too.", NULL },
-  { "version", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_version,
-    "Print version number and exit.", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 static gboolean
@@ -495,19 +493,6 @@ run (int argc,
     return FALSE;
 
   g_clear_pointer (&context, g_option_context_free);
-
-  if (opt_version)
-    {
-      if (!_srt_cli_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
-        return FALSE;
-
-      g_print ("%s:\n"
-               " Package: steam-runtime-tools\n"
-               " Version: %s\n",
-               g_get_prgname (), VERSION);
-      *exit_status = 0;
-      return TRUE;
-    }
 
   if (!_srt_cli_set_glib_log_handler (NULL, G_LOG_DOMAIN,
                                       (SRT_LOG_FLAGS_DIVERT_STDOUT

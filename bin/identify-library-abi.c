@@ -49,7 +49,6 @@ static gboolean opt_ldconfig = FALSE;
 static gboolean opt_ldconfig_paths = FALSE;
 static gboolean opt_one_line = FALSE;
 static gboolean opt_print0 = FALSE;
-static gboolean opt_print_version = FALSE;
 static gboolean opt_quiet = FALSE;
 static gboolean opt_skip_unversioned = FALSE;
 
@@ -72,9 +71,9 @@ static const GOptionEntry option_entries[] =
   { "skip-unversioned", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE,
     &opt_skip_unversioned, "Skip the libraries that have a filename that end with "
     "just \".so\"", NULL },
-  { "version", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_print_version,
-    "Print version number and exit", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 static gint
@@ -301,17 +300,6 @@ main (int argc,
                                       &argc, &argv, &error))
     {
       status = EX_USAGE;
-      goto out;
-    }
-
-  if (opt_print_version)
-    {
-      /* Output version number as YAML for machine-readability,
-       * inspired by `ostree --version` and `docker version` */
-      g_print ("%s:\n"
-               " Package: steam-runtime-tools\n"
-               " Version: %s\n",
-               g_get_prgname (), VERSION);
       goto out;
     }
 

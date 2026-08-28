@@ -29,6 +29,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <syslog.h>
+#include <sysexits.h>
 #include <unistd.h>
 
 #include <libglnx.h>
@@ -822,4 +823,70 @@ _srt_cli_option_context_parse (GOptionContext *context,
   original_stdout_during_option_parsing = -1;
 
   return ret;
+}
+
+/*
+ * SRT_CLI_OPTION_ENTRY_VERSION:
+ *
+ * A #GOptionEntry that configures `--version` to print version details
+ * and exit with status 0.
+ *
+ * This assumes that if g_set_prgname() will be called,
+ * then it has been called before parsing command-line options.
+ */
+
+/*
+ * _srt_cli_option_arg_func_version:
+ *
+ * Implementation of `--version`.
+ * This is a #GOptionArgFunc.
+ *
+ * Returns: %TRUE
+ */
+gboolean
+_srt_cli_option_arg_func_version (const char *name,
+                                  const char *value,
+                                  void *data,
+                                  GError **error)
+{
+  /* Output version number as YAML for machine-readability,
+   * inspired by `ostree --version` and `docker version` */
+  g_print ("%s:\n"
+           " Package: steam-runtime-tools\n"
+           " Version: %s\n",
+           g_get_prgname (),
+           VERSION);
+  exit (EXIT_SUCCESS);
+}
+
+/*
+ * SRT_CLI_OPTION_ENTRY_VERSION_ONLY:
+ *
+ * A #GOptionEntry that configures `--version-only` to print the
+ * version number (only) and exit with status 0.
+ */
+
+/*
+ * SRT_CLI_OPTION_ENTRY_VERSION_IS_VERSION_ONLY:
+ *
+ * A #GOptionEntry that configures `--version` to print the
+ * version number (only) and exit with status 0.
+ */
+
+/*
+ * _srt_cli_option_arg_func_version_only:
+ *
+ * Implementation of `--version` or `--version-only`.
+ * This is a #GOptionArgFunc.
+ *
+ * Returns: %TRUE
+ */
+gboolean
+_srt_cli_option_arg_func_version_only (const char *name,
+                                       const char *value,
+                                       void *data,
+                                       GError **error)
+{
+  g_print ("%s\n", VERSION);
+  exit (EXIT_SUCCESS);
 }

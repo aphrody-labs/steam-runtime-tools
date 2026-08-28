@@ -77,3 +77,30 @@ gboolean _srt_cli_option_context_parse (GOptionContext *context,
                                         int *argc,
                                         char ***argv,
                                         GError **error);
+
+gboolean _srt_cli_option_arg_func_version (const char *name,
+                                           const char *value,
+                                           void *data,
+                                           GError **error) G_GNUC_NORETURN;
+
+gboolean _srt_cli_option_arg_func_version_only (const char *name,
+                                                const char *value,
+                                                void *data,
+                                                GError **error) G_GNUC_NORETURN;
+
+#define SRT_CLI_OPTION_ENTRY_VERSION \
+{ "version", '\0', \
+  G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, _srt_cli_option_arg_func_version, \
+  "Print version number and exit", NULL }
+
+#define SRT_CLI_OPTION_ENTRY_VERSION_IS_VERSION_ONLY \
+{ "version", '\0', \
+  G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, \
+  _srt_cli_option_arg_func_version_only, \
+  "Print version number and exit", NULL }
+
+#define SRT_CLI_OPTION_ENTRY_VERSION_ONLY \
+{ "version-only", '\0', \
+  G_OPTION_FLAG_NO_ARG | G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_CALLBACK, \
+  _srt_cli_option_arg_func_version_only, \
+  "Print version number and exit", NULL }

@@ -1367,8 +1367,6 @@ test_options_defaults (Fixture *f,
       g_assert_cmpint (options->systemd_scope, ==, FALSE);
       g_assert_cmpint (options->test, ==, FALSE);
       g_assert_cmpint (options->verbose, ==, FALSE);
-      g_assert_cmpint (options->version, ==, FALSE);
-      g_assert_cmpint (options->version_only, ==, FALSE);
 
       ok = pv_wrap_context_parse_argv (f->context, STDERR_FILENO,
                                        &argc, &argv, &local_error);
@@ -1502,8 +1500,6 @@ test_options_false (Fixture *f,
   g_assert_cmpint (options->systemd_scope, ==, FALSE);
   g_assert_cmpint (options->test, ==, FALSE);
   g_assert_cmpint (options->verbose, ==, FALSE);
-  g_assert_cmpint (options->version, ==, FALSE);
-  g_assert_cmpint (options->version_only, ==, FALSE);
 }
 
 /*
@@ -1718,8 +1714,6 @@ test_options_true (Fixture *f,
     "--test",
     "--variable-dir=/runtimes/var",
     "--verbose",
-    "--version",
-    "--version-only",
     "--write-final-argv=/dev/null",
     NULL
   };
@@ -1849,8 +1843,6 @@ test_options_true (Fixture *f,
   g_assert_cmpint (options->systemd_scope, ==, TRUE);
   g_assert_cmpint (options->test, ==, TRUE);
   g_assert_cmpint (options->verbose, ==, TRUE);
-  g_assert_cmpint (options->version, ==, TRUE);
-  g_assert_cmpint (options->version_only, ==, TRUE);
 
   i = 0;
 

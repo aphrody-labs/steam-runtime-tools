@@ -1399,7 +1399,6 @@ static gboolean opt_stop_on_exit = TRUE;
 static gboolean opt_stop_on_name_loss = TRUE;
 static gboolean opt_stop_on_parent_exit = TRUE;
 static gboolean opt_verbose = FALSE;
-static gboolean opt_version = FALSE;
 
 static gboolean
 opt_session_cb (const gchar *option_name G_GNUC_UNUSED,
@@ -1558,10 +1557,9 @@ static GOptionEntry options[] =
   { "verbose", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
     "Be more verbose.", NULL },
-  { "version", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_version,
-    "Print version number and exit.", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 int
@@ -1622,16 +1620,6 @@ main (int argc,
 
   if (argc > 1)
     wrapped_command = server->wrapped_command = &argv[1];
-
-  if (opt_version)
-    {
-      g_print ("%s:\n"
-               " Package: steam-runtime-tools\n"
-               " Version: %s\n",
-               g_get_prgname (), VERSION);
-      server->exit_status = 0;
-      goto out;
-    }
 
   if (opt_verbose)
     {

@@ -108,7 +108,6 @@ class TestHelpers(BaseTest):
                     continue
 
                 help_mentions_help = True
-                help_uses_stdout = True
                 has_version = True
                 has_version_only = False
                 yaml_version = True
@@ -124,19 +123,7 @@ class TestHelpers(BaseTest):
                     has_version_only = True
 
                 if tool in (
-                    'pv-adverb',
                     'pv-try-setlocale',
-                    'pv-verify',
-                    'srt-client-container',
-                    'steam-runtime-launch-client',
-                    'steam-runtime-supervisor',
-                ):
-                    # TODO: Ideally we would restore the original stdout before
-                    # showing help messages, but GOptionContext doesn't know
-                    # how to do that
-                    help_uses_stdout = False
-
-                if tool in (
                     'steam-runtime-check-requirements',
                     'steam-runtime-dialog-ui',
                     'steam-runtime-system-info',
@@ -152,11 +139,10 @@ class TestHelpers(BaseTest):
                 stack.enter_context(ensure_terminated(proc))
                 stdout, _ = proc.communicate(input=b'', timeout=10)
 
-                if help_uses_stdout:
-                    if help_mentions_help:
-                        self.assertIn(b'--help', stdout)
-                    else:
-                        self.assertIn(b'Usage:', stdout)
+                if help_mentions_help:
+                    self.assertIn(b'--help', stdout)
+                else:
+                    self.assertIn(b'Usage:', stdout)
 
                 self.assertEqual(proc.returncode, 0)
 

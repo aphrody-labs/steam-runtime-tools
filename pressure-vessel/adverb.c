@@ -704,8 +704,6 @@ main (int argc,
   g_autoptr(GArray) tuples = NULL;
   g_autoptr(SrtSubprocessRunner) runner = NULL;
   g_autoptr(SrtSystemInfo) info = NULL;
-  SrtLogFlags log_flags = (SRT_LOG_FLAGS_DEBUG_IMPLIES_TIMING
-                           | SRT_LOG_FLAGS_DIVERT_STDOUT);
   const char *ldlp;
 
   setlocale (LC_ALL, "");
@@ -717,7 +715,10 @@ main (int argc,
   ld_so_conf_entries = g_ptr_array_new_with_free_func (g_free);
   global_ld_so_conf_entries = ld_so_conf_entries;
 
-  if (!_srt_cli_init ("pv-adverb", G_LOG_DOMAIN, log_flags,
+  if (!_srt_cli_init ("pv-adverb", G_LOG_DOMAIN,
+                      (SRT_LOG_FLAGS_DEBUG_IMPLIES_TIMING
+                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
+                       | SRT_LOG_FLAGS_DIVERT_STDOUT),
                       &original_stdout, &original_stderr, error))
     {
       ret = EX_UNAVAILABLE;
@@ -758,14 +759,6 @@ main (int argc,
     }
 
   g_clear_pointer (&context, g_option_context_free);
-
-  log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL;
-
-  if (!_srt_cli_update_log_flags (log_flags, error))
-    {
-      ret = 1;
-      goto out;
-    }
 
   /* Must be called before we start any threads, but after we set up
    * logging */

@@ -38,9 +38,10 @@ run (int argc,
   const char *search_path = NULL;
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
-  SrtLogFlags log_flags = SRT_LOG_FLAGS_NONE;
 
-  if (!_srt_cli_init (THIS_PROGRAM, G_LOG_DOMAIN, log_flags,
+  if (!_srt_cli_init (THIS_PROGRAM, G_LOG_DOMAIN,
+                      (SRT_LOG_FLAGS_DIVERT_STDOUT
+                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL),
                       &original_stdout, &original_stderr, error))
     return FALSE;
 
@@ -73,11 +74,6 @@ run (int argc,
       exe_name = argv[1];
       invocation_argv = argv + 1;
     }
-
-  log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL | SRT_LOG_FLAGS_DIVERT_STDOUT;
-
-  if (!_srt_cli_update_log_flags (log_flags, error))
-    return FALSE;
 
   if (strchr (exe_name, '/') != NULL)
     return glnx_throw (error,

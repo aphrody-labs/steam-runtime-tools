@@ -284,7 +284,6 @@ main (int argc,
   GError **error = &local_error;
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
-  SrtLogFlags log_flags = SRT_LOG_FLAGS_DIVERT_STDOUT;
   int ret = LAUNCH_EX_FAILED;
 
   setlocale (LC_ALL, "");
@@ -292,7 +291,9 @@ main (int argc,
   global_options = &process_manager_options;
   envp = g_get_environ ();
 
-  if (!_srt_cli_init ("steam-runtime-supervisor", G_LOG_DOMAIN, log_flags,
+  if (!_srt_cli_init ("steam-runtime-supervisor", G_LOG_DOMAIN,
+                      (SRT_LOG_FLAGS_DIVERT_STDOUT
+                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL),
                       &original_stdout, &original_stderr,
                       error))
     goto out;
@@ -312,11 +313,6 @@ main (int argc,
     goto out;
 
   g_clear_pointer (&context, g_option_context_free);
-
-  log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL;
-
-  if (!_srt_cli_update_log_flags (log_flags, error))
-    goto out;
 
   /* Must be called before we start any threads, but after we set up
    * logging */

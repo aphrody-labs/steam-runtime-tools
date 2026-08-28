@@ -233,14 +233,15 @@ run (int argc,
   g_autoptr(GOptionContext) option_context = NULL;
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
-  SrtLogFlags log_flags = SRT_LOG_FLAGS_NONE;
   gboolean consume_stdin;
 
   setlocale (LC_ALL, "");
   subproc_environ = g_get_environ ();
   _srt_setenv_disable_gio_modules ();
 
-  if (!_srt_cli_init (THIS_PROGRAM, G_LOG_DOMAIN, log_flags,
+  if (!_srt_cli_init (THIS_PROGRAM, G_LOG_DOMAIN,
+                      (SRT_LOG_FLAGS_DIVERT_STDOUT
+                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL),
                       &original_stdout, &original_stderr, error))
     return FALSE;
 
@@ -261,11 +262,6 @@ run (int argc,
 
   if (!_srt_boolean_environment ("SRT_LOG_ROTATION", TRUE))
     opt_max_bytes = 0;
-
-  log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL | SRT_LOG_FLAGS_DIVERT_STDOUT;
-
-  if (!_srt_cli_update_log_flags (log_flags, error))
-    return FALSE;
 
   _srt_unblock_signals ();
 

@@ -76,6 +76,7 @@ gboolean _srt_cli_is_verbose (void);
 gboolean _srt_cli_is_debugging (void);
 SrtLogFlags _srt_cli_get_log_flags (void);
 void _srt_cli_increase_verbosity (SrtLogFlags flags);
+void _srt_cli_set_diffable (void);
 
 gboolean _srt_cli_option_context_parse (GOptionContext *context,
                                         int original_stdout_fd,

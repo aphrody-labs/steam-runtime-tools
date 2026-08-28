@@ -879,6 +879,17 @@ _srt_cli_increase_verbosity (SrtLogFlags flags)
   update_verbose_log_handlers ();
 }
 
+void
+_srt_cli_set_diffable (void)
+{
+  g_return_if_fail (log_settings.prgname != NULL);
+  log_settings.flags |= SRT_LOG_FLAGS_DIFFABLE;
+
+  /* PID is documented to override DIFFABLE */
+  if (!(log_settings.flags & SRT_LOG_FLAGS_PID))
+    log_settings.pid = 0;
+}
+
 /*
  * SRT_CLI_OPTION_ENTRY_VERBOSE:
  *

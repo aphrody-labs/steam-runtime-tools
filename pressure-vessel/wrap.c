@@ -102,7 +102,6 @@ main (int argc,
   int result;
   PvAppendPreloadFlags append_preload_flags = PV_APPEND_PRELOAD_FLAGS_NONE;
   const SrtKnownArchitecture *host_machine = NULL;
-  SrtLogFlags log_flags = SRT_LOG_FLAGS_DEBUG_IMPLIES_TIMING;
   PvWrapLogFlags pv_log_flags = PV_WRAP_LOG_FLAGS_NONE;
   SrtSteamCompatFlags compat_flags;
   const GQuark *tuples;
@@ -111,7 +110,10 @@ main (int argc,
   setlocale (LC_ALL, "");
 
   /* Set up the initial base logging */
-  if (!_srt_cli_init ("pressure-vessel-wrap", G_LOG_DOMAIN, log_flags,
+  if (!_srt_cli_init ("pressure-vessel-wrap", G_LOG_DOMAIN,
+                      (SRT_LOG_FLAGS_DEBUG_IMPLIES_TIMING
+                       | SRT_LOG_FLAGS_DIVERT_STDOUT
+                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL),
                       &original_stdout, &original_stderr, error))
     goto out;
 
@@ -148,19 +150,14 @@ main (int argc,
   if (!pv_wrap_context_parse_argv (self, original_stdout, &argc, &argv, error))
     goto out;
 
-  log_flags |= SRT_LOG_FLAGS_DIVERT_STDOUT | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL;
-
   if (self->options.deterministic)
-    log_flags |= SRT_LOG_FLAGS_DIFFABLE;
+    _srt_cli_set_diffable ();
 
   /* We share the same environment variable as the rest of s-r-t, but look
    * for additional flags in it */
   pv_log_flags = g_parse_debug_string (g_getenv ("SRT_LOG"),
                                        pv_debug_keys,
                                        G_N_ELEMENTS (pv_debug_keys));
-
-  if (!_srt_cli_update_log_flags (log_flags, error))
-    goto out;
 
   pv_wrap_detect_virtualization (&interpreter_root, &host_machine);
 

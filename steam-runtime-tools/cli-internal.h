@@ -84,6 +84,43 @@ gboolean _srt_cli_option_context_parse (GOptionContext *context,
                                         char ***argv,
                                         GError **error);
 
+/*
+ * _srt_cli_check_no_positional_parameters:
+ * @argc: Argument count after _srt_cli_option_context_parse()
+ * @argv: Remaining arguments after _srt_cli_option_context_parse()
+ * @error: Set to a #GOptionError on failure
+ *
+ * Convenience function for tools that do not accept positional parameters.
+ *
+ * Returns: %TRUE if no positional parameters were given,
+ *  except possibly `--`
+ */
+/*
+ * This is implemented as inline because it doesn't have any private state,
+ * not all programs will call it at all, and those that do will call it
+ * exactly once.
+ */
+static inline gboolean
+_srt_cli_check_no_positional_parameters (int argc,
+                                         char **argv,
+                                         GError **error)
+{
+  if (argc >= 2 && strcmp (argv[1], "--") == 0)
+    {
+      argv++;
+      argc--;
+    }
+
+  if (argc > 1)
+    {
+      g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,
+                   "This program does not have positional parameters");
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
 gboolean _srt_cli_option_arg_func_verbose (const char *name,
                                            const char *value,
                                            void *data,

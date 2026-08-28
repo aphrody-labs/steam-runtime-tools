@@ -153,16 +153,11 @@ main (int argc,
   if (self->options.deterministic)
     log_flags |= SRT_LOG_FLAGS_DIFFABLE;
 
-  if (self->options.verbose)
-    {
-      log_flags |= SRT_LOG_FLAGS_DEBUG;
-
-      /* We share the same environment variable as the rest of s-r-t, but look
-       * for additional flags in it */
-      pv_log_flags = g_parse_debug_string (g_getenv ("SRT_LOG"),
-                                           pv_debug_keys,
-                                           G_N_ELEMENTS (pv_debug_keys));
-    }
+  /* We share the same environment variable as the rest of s-r-t, but look
+   * for additional flags in it */
+  pv_log_flags = g_parse_debug_string (g_getenv ("SRT_LOG"),
+                                       pv_debug_keys,
+                                       G_N_ELEMENTS (pv_debug_keys));
 
   if (!_srt_cli_update_log_flags (log_flags, error))
     goto out;

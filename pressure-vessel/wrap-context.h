@@ -139,7 +139,6 @@ typedef struct
   gboolean single_thread;
   gboolean systemd_scope;
   gboolean test;
-  gboolean verbose;
 } PvWrapOptions;
 
 struct _PvWrapContext

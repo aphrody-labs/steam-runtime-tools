@@ -84,7 +84,6 @@ pv_wrap_options_init (PvWrapOptions *self)
   self->terminate_timeout = -1.0;
   self->test = FALSE;
   self->variable_dir = NULL;
-  self->verbose = FALSE;
   self->write_final_argv = NULL;
 }
 
@@ -887,8 +886,9 @@ pv_wrap_options_parse_environment (PvWrapOptions *self,
                                               self->share_pid);
   self->single_thread = _srt_boolean_environment ("PRESSURE_VESSEL_SINGLE_THREAD",
                                                 self->single_thread);
-  self->verbose = _srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE",
-                                            self->verbose);
+
+  if (_srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE", FALSE))
+    _srt_cli_increase_verbosity (SRT_LOG_FLAGS_DEBUG);
 
   if (!opt_shell_cb ("$PRESSURE_VESSEL_SHELL",
                      g_getenv ("PRESSURE_VESSEL_SHELL"), self, error))
@@ -1187,9 +1187,6 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
       G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME, &self->variable_dir,
       "If a runtime needs to be unpacked or copied, put it in DIR.",
       "DIR" },
-    { "verbose", '\0',
-      G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &self->verbose,
-      "Be more verbose.", NULL },
     { "with-host-graphics", '\0',
       G_OPTION_FLAG_NO_ARG | G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_CALLBACK,
       opt_with_host_graphics_cb,
@@ -1210,6 +1207,7 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
       G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &self->only_prepare,
       "Prepare runtime, but do not actually run anything.", NULL },
 
+    SRT_CLI_OPTION_ENTRY_VERBOSE,
     SRT_CLI_OPTION_ENTRY_VERSION,
     SRT_CLI_OPTION_ENTRY_VERSION_ONLY,
     G_OPTION_ENTRY_NULL

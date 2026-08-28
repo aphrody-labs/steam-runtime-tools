@@ -1024,12 +1024,6 @@ main (int argc,
       goto out;
     }
 
-  if (!_srt_fdopen_take (&original_stdout_fd, "w", &original_stdout, error))
-    {
-      launch_exit_status = LAUNCH_EX_FAILED;
-      goto out;
-    }
-
   context = g_option_context_new ("COMMAND [ARG...]");
   g_option_context_set_summary (context,
                                 "Send IPC requests to create child "
@@ -1059,6 +1053,12 @@ main (int argc,
 
   if (!g_option_context_parse (context, &argc, &argv, error))
     goto out;
+
+  if (!_srt_fdopen_take (&original_stdout_fd, "w", &original_stdout, error))
+    {
+      launch_exit_status = LAUNCH_EX_FAILED;
+      goto out;
+    }
 
   if (opt_version)
     {

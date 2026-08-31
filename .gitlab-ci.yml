@@ -249,9 +249,15 @@ build:devel:
             ninja -C _build/devel
             ninja -C _build/devel install
             G_DEBUG=fatal-criticals G_MESSAGES_DEBUG=all \
-                meson test -C _build/devel
+                meson test --no-suite lint -C _build/devel
 
             build-aux/scout-layered.sh
+
+            LINT_WARNINGS_ARE_ERRORS=1 \
+                meson test --suite lint -C _build/devel -v || exit 77
+
+    allow_failure:
+        exit_codes: 77
 
     artifacts:
         paths:

@@ -12,12 +12,15 @@ steam-runtime-tools (0.20260828.0) UNRELEASED; urgency=medium
   * Documentation fixes (steamrt/tasks#1079)
   * Tests/CI:
     - Improve code clarity (steamrt/tasks#1079)
+    - Fix CI failure with GLib 2.89.x and clang (steamrt/tasks#1069)
 
   [ Antonio Ospite ]
   * Convert REUSE licensing information to TOML format
     (steamrt/tasks#1069)
+  * Tests/CI:
+    - Report lint warnings as allowed failures (steamrt/tasks#1069)
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 28 Aug 2026 13:12:15 +0100
+ -- Simon McVittie <smcv@collabora.com>  Tue, 01 Sep 2026 13:11:34 +0100
 
 steam-runtime-tools (0.20260824.0) steamrt; urgency=medium
 

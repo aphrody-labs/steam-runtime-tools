@@ -160,6 +160,7 @@ no_warning_flags = [
     'pedantic',
     'redundant-decls',
     'sign-compare',
+    'typedef-redefinition',
     'unused-local-typedefs',
     'unused-parameter',
     'variadic-macros',

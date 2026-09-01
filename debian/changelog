@@ -1,15 +1,28 @@
-steam-runtime-tools (0.20260828.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260901.0) UNRELEASED; urgency=medium
 
   * s-r-launcher-service:
     - When debug logging is enabled, log MAINPID and PWD environment
       variable changes (steamrt/tasks#1078)
   * s-r-supervisor:
     - Fix error reporting for an unlikely error scenario
+      (steamrt/tasks#1079)
+  * srt-client-container:
+    - If run with no arguments, report the error correctly
+      (steamrt/tasks#1079)
+  * Various command-line tools:
+    - In most tools, --verbose or -v enables INFO messages
+      (steamrt/tasks#1079)
+    - In most tools, repeating --verbose or -v also enables DEBUG messages
+      (steamrt/tasks#1079)
+    - Always output --help and --version on original standard output
+      (steamrt/tasks#1079)
+    - Make --version output more consistent (steamrt/tasks#1079)
   * Update bubblewrap subproject to v0.12.0.
     This includes the fix for security vulnerability GHSA-pxhw-h44j-8pfx,
     but is not a security-sensitive change for steam-runtime-tools
     because we do not use bubblewrap as a security boundary.
   * Documentation fixes (steamrt/tasks#1079)
+  * Refactoring (steamrt/tasks#1079)
   * Tests/CI:
     - Improve code clarity (steamrt/tasks#1079)
     - Fix CI failure with GLib 2.89.x and clang (steamrt/tasks#1069)
@@ -20,7 +33,7 @@ steam-runtime-tools (0.20260828.0) UNRELEASED; urgency=medium
   * Tests/CI:
     - Report lint warnings as allowed failures (steamrt/tasks#1069)
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 01 Sep 2026 13:11:34 +0100
+ -- Simon McVittie <smcv@collabora.com>  Tue, 01 Sep 2026 18:52:31 +0100
 
 steam-runtime-tools (0.20260824.0) steamrt; urgency=medium
 

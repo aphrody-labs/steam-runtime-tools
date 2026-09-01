@@ -1,6 +1,6 @@
 /*
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.1
+ * Last updated: Flatpak 1.18.2
  *
  * Copyright © 2014 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
@@ -364,6 +364,8 @@ char * flatpak_escape_string (const char        *s,
 
 gboolean flatpak_validate_path_characters (const char *path,
                                            GError    **error);
+
+char *flatpak_describe_invalid_first_char (const char *s);
 
 gboolean running_under_sudo_root (void);
 

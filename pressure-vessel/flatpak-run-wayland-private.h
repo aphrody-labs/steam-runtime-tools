@@ -1,6 +1,6 @@
 /*
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.1
+ * Last updated: Flatpak 1.18.2
  * Copyright © 2014 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -33,7 +33,7 @@ G_BEGIN_DECLS
 
 gboolean
 flatpak_run_add_wayland_args (FlatpakBwrap *bwrap,
-#if 0
+#if 0 /* pressure-vessel-specific: no app or instance ID */
                               const char   *app_id,
                               const char   *instance_id,
 #endif

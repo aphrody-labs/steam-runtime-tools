@@ -1,6 +1,6 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.1
+ * Last updated: Flatpak 1.18.2
  * Copyright © 2014-2019 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -310,9 +310,15 @@ flatpak_run_add_pulseaudio_args (FlatpakBwrap         *bwrap,
     }
   else if (pulseaudio_socket && g_file_test (pulseaudio_socket, G_FILE_TEST_EXISTS))
     {
+#if 0 /* pressure-vessel-specific: different /run subdirectory */
+      static const char sandbox_socket_path[] = "/run/flatpak/pulse/native";
+      static const char pulse_server[] = "unix:/run/flatpak/pulse/native";
+      static const char config_path[] = "/run/flatpak/pulse/config";
+#else
       static const char sandbox_socket_path[] = "/run/pressure-vessel/pulse/native";
       static const char pulse_server[] = "unix:/run/pressure-vessel/pulse/native";
       static const char config_path[] = "/run/pressure-vessel/pulse/config";
+#endif
       gboolean share_shm = FALSE; /* TODO: When do we add this? */
       g_autofree char *client_config = g_strdup_printf ("enable-shm=%s\n", share_shm ? "yes" : "no");
 

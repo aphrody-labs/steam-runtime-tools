@@ -1,6 +1,6 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.1
+ * Last updated: Flatpak 1.18.2
  *
  * Copyright © 2014-2018 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
@@ -506,7 +506,11 @@ flatpak_bwrap_populate_runtime_dir (FlatpakBwrap *bwrap,
       for (i = 0; i < bwrap->runtime_dir_members->len; i++)
         {
           const char *member = g_ptr_array_index (bwrap->runtime_dir_members, i);
+#if 0 /* pressure-vessel-specific: we use a different subdirectory of /run */
+          g_autofree char *target = g_strdup_printf ("../../flatpak/%s", member);
+#else
           g_autofree char *target = g_strdup_printf ("../../pressure-vessel/%s", member);
+#endif
 
           if (shared_xdg_runtime_dir != NULL)
             {

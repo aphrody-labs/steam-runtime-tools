@@ -1,6 +1,6 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.1
+ * Last updated: Flatpak 1.18.2
  * Copyright © 2014-2019 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -407,8 +407,13 @@ flatpak_run_add_system_dbus_args (FlatpakBwrap   *app_bwrap)
 gboolean
 flatpak_run_add_a11y_dbus_args (FlatpakBwrap *app_bwrap)
 {
+#if 0 /* pressure-vessel-specific: different /run subdirectory */
+  static const char sandbox_socket_path[] = "/run/flatpak/at-spi-bus";
+  static const char sandbox_dbus_address[] = "unix:path=/run/flatpak/at-spi-bus";
+#else
   static const char sandbox_socket_path[] = "/run/pressure-vessel/at-spi-bus";
   static const char sandbox_dbus_address[] = "unix:path=/run/pressure-vessel/at-spi-bus";
+#endif
   g_autoptr(GDBusConnection) session_bus = NULL;
   g_autofree char *a11y_address = NULL;
   g_autoptr(GError) local_error = NULL;

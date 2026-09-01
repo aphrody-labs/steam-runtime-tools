@@ -7,7 +7,7 @@
 
 #include <steam-runtime-tools/steam-runtime-tools.h>
 
-#include "steam-runtime-tools/log-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 static gboolean opt_allow_journal = FALSE;
@@ -40,6 +40,8 @@ main (int argc,
   option_context = g_option_context_new ("MESSAGE");
   g_option_context_add_main_entries (option_context, option_entries, NULL);
 
+  /* Intentionally not _srt_cli_option_context_parse() because we're
+   * running this before _srt_cli_init() */
   if (!g_option_context_parse (option_context, &argc, &argv, &error))
     {
       g_warning ("%s: %s\n", prgname, error->message);
@@ -52,17 +54,14 @@ main (int argc,
   if (opt_divert_stdout)
     flags |= SRT_LOG_FLAGS_DIVERT_STDOUT;
 
-  if (opt_keep_prgname)
-    prgname = NULL;
-
-  if (!_srt_util_set_glib_log_handler (prgname, G_LOG_DOMAIN, flags,
-                                       &original_stdout, &original_stderr, &error))
+  if (!_srt_cli_init (prgname, G_LOG_DOMAIN, flags,
+                      &original_stdout, &original_stderr, &error))
     {
-      g_warning ("%s: %s\n", g_get_prgname (), error->message);
+      _srt_log_failure ("%s", error->message);
       return 1;
     }
 
-  /* _srt_util_set_glib_log_handler() ensures the three standard fds are
+  /* _srt_cli_init() ensures the three standard fds are
    * open, even if only pointing to /dev/null */
   g_assert_no_errno (fcntl (STDIN_FILENO, F_GETFL, 0));
   g_assert_no_errno (fcntl (STDOUT_FILENO, F_GETFL, 0));
@@ -82,8 +81,8 @@ main (int argc,
   if (_srt_boolean_environment ("PRESSURE_VESSEL_LOG_WITH_TIMESTAMP", FALSE))
     g_message ("P_V_LOG_WITH_TIMESTAMP is true");
 
-  g_message ("flags: allow_journal=%d divert_stdout=%d keep_prgname=%d",
-             opt_allow_journal, opt_divert_stdout, opt_keep_prgname);
+  g_message ("flags: allow_journal=%d divert_stdout=%d",
+             opt_allow_journal, opt_divert_stdout);
 
   g_print ("stdout while running\n");
   g_printerr ("stderr while running\n");
@@ -92,11 +91,11 @@ main (int argc,
   g_message ("notice message");
 
   if ((original_stdout >= 0
-       && !_srt_util_restore_saved_fd (original_stdout, STDOUT_FILENO, &error))
+       && !_srt_cli_restore_saved_fd (original_stdout, STDOUT_FILENO, &error))
       || (original_stderr >= 0
-          && !_srt_util_restore_saved_fd (original_stderr, STDERR_FILENO, &error)))
+          && !_srt_cli_restore_saved_fd (original_stderr, STDERR_FILENO, &error)))
     {
-      g_warning ("%s: %s\n", prgname, error->message);
+      _srt_log_failure ("%s", error->message);
       return 1;
     }
 

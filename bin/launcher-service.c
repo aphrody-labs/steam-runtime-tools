@@ -40,10 +40,10 @@
 #include <gio/gio.h>
 #include <gio/gunixfdlist.h>
 
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/env-overlay-internal.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/launcher-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/portal-listener-internal.h"
 #include "steam-runtime-tools/runtime-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
@@ -1398,8 +1398,6 @@ static gchar *opt_socket_directory = NULL;
 static gboolean opt_stop_on_exit = TRUE;
 static gboolean opt_stop_on_name_loss = TRUE;
 static gboolean opt_stop_on_parent_exit = TRUE;
-static gboolean opt_verbose = FALSE;
-static gboolean opt_version = FALSE;
 
 static gboolean
 opt_session_cb (const gchar *option_name G_GNUC_UNUSED,
@@ -1555,13 +1553,10 @@ static GOptionEntry options[] =
     "D-Bus address (dbus_address=unix:...) and possibly other "
     "fields on stdout, one per line.",
     "PATH" },
-  { "verbose", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
-    "Be more verbose.", NULL },
-  { "version", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_version,
-    "Print version number and exit.", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 int
@@ -1586,9 +1581,9 @@ main (int argc,
   setlocale (LC_ALL, "");
 
   /* Set up the initial base logging */
-  if (!_srt_util_set_glib_log_handler ("steam-runtime-launcher-service",
-                                       G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
-                                       NULL, NULL, error))
+  if (!_srt_cli_init ("steam-runtime-launcher-service", G_LOG_DOMAIN,
+                      SRT_LOG_FLAGS_NONE,
+                      NULL, NULL, error))
     {
       server->exit_status = EX_UNAVAILABLE;
       goto out;
@@ -1603,12 +1598,14 @@ main (int argc,
   opt_hint = _srt_boolean_environment ("SRT_LAUNCHER_SERVICE_HINT", FALSE);
   opt_stop_on_exit = _srt_boolean_environment ("SRT_LAUNCHER_SERVICE_STOP_ON_EXIT", TRUE);
   opt_stop_on_name_loss = _srt_boolean_environment ("SRT_LAUNCHER_SERVICE_STOP_ON_NAME_LOSS", TRUE);
-  opt_verbose = _srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE", FALSE);
+
+  if (_srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE", FALSE))
+    _srt_cli_increase_verbosity (SRT_LOG_FLAGS_DEBUG);
 
   g_return_val_if_fail (argc >= 1, EX_USAGE);
   g_return_val_if_fail (argv[argc] == NULL, EX_USAGE);
 
-  if (!g_option_context_parse (context, &argc, &argv, error))
+  if (!_srt_cli_option_context_parse (context, -1, &argc, &argv, error))
     {
       server->exit_status = EX_USAGE;
       goto out;
@@ -1623,31 +1620,13 @@ main (int argc,
   if (argc > 1)
     wrapped_command = server->wrapped_command = &argv[1];
 
-  if (opt_version)
-    {
-      g_print ("%s:\n"
-               " Package: pressure-vessel\n"
-               " Version: %s\n",
-               g_get_prgname (), VERSION);
-      server->exit_status = 0;
-      goto out;
-    }
-
-  if (opt_verbose)
-    {
-      if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                           SRT_LOG_FLAGS_DEBUG,
-                                           NULL, NULL, error))
-        goto out;
-    }
-
   /* Must be before pv_launcher_server_connect_to_signals() which partially
    * undoes this */
   _srt_unblock_signals ();
 
   server->purpose = opt_purpose;
 
-  if (_srt_util_is_debugging () || opt_hint)
+  if (_srt_cli_is_debugging () || opt_hint)
     server->flags |= PV_LAUNCHER_SERVER_FLAGS_HINT;
 
   if (opt_stop_on_exit)

@@ -33,7 +33,7 @@
 #include <glib.h>
 #include <glib-object.h>
 
-#include <steam-runtime-tools/log-internal.h>
+#include <steam-runtime-tools/cli-internal.h>
 #include <steam-runtime-tools/utils-internal.h>
 
 int
@@ -43,10 +43,9 @@ main (int argc,
   static const char *default_argv[] = {"steam", "-foreground", NULL};
   g_autoptr(GError) error = NULL;
 
-  _srt_util_set_glib_log_handler ("steam-runtime-steam-remote",
-                                  G_LOG_DOMAIN,
-                                  SRT_LOG_FLAGS_OPTIONALLY_JOURNAL,
-                                  NULL, NULL, NULL);
+  _srt_cli_init ("steam-runtime-steam-remote", G_LOG_DOMAIN,
+                 SRT_LOG_FLAGS_OPTIONALLY_JOURNAL,
+                 NULL, NULL, NULL);
 
   _srt_setenv_disable_gio_modules ();
   _srt_unblock_signals ();
@@ -61,7 +60,7 @@ main (int argc,
 
   if (!_srt_steam_command_via_pipe (argv + 1, argc - 1, &error))
     {
-      g_printerr ("steam-runtime-steam-remote: %s\n", error->message);
+      _srt_log_failure ("%s", error->message);
       return EXIT_FAILURE;
     }
 

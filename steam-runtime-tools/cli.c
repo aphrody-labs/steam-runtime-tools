@@ -23,12 +23,13 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "steam-runtime-tools/log-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 
 #include <dlfcn.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <syslog.h>
+#include <sysexits.h>
 #include <unistd.h>
 
 #include <libglnx.h>
@@ -44,10 +45,10 @@
  * open a file that does not exist.
  *
  * Only use this in programs that have called
- * _srt_util_set_glib_log_handler().
+ * _srt_cli_init().
  *
  * This is functionally equivalent to %G_LOG_LEVEL_MESSAGE, but
- * the handler set up by _srt_util_set_glib_log_handler() prints it
+ * the handler set up by _srt_cli_init() prints it
  * as though it was a fatal error. Use it in command-line utilities
  * to log a GError that will cause program termination.
  *
@@ -62,10 +63,10 @@
  * error.
  *
  * Only use this in programs that have called
- * _srt_util_set_glib_log_handler().
+ * _srt_cli_init().
  *
  * This is functionally equivalent to %G_LOG_LEVEL_MESSAGE, but
- * the handler set up by _srt_util_set_glib_log_handler() prints it
+ * the handler set up by _srt_cli_init() prints it
  * as though it was a warning.
  * Use to log a warning that should not cause program termination,
  * even during unit testing or under `G_DEBUG=fatal-warnings`.
@@ -76,8 +77,7 @@
  * @...: format string and arguments, as for g_message()
  *
  * Convenience macro to log at level %SRT_LOG_LEVEL_FAILURE.
- * Only use this in programs that have called
- * _srt_util_set_glib_log_handler().
+ * Only use this in programs that have called _srt_cli_init().
  *
  * This is functionally equivalent to g_message(),
  * but with a different log level so that it is logged like a fatal error.
@@ -90,8 +90,7 @@
  * @...: format string and arguments, as for g_message()
  *
  * Convenience macro to log at level %SRT_LOG_LEVEL_WARNING.
- * Only use this in programs that have called
- * _srt_util_set_glib_log_handler().
+ * Only use this in programs that have called _srt_cli_init().
  *
  * This is functionally equivalent to g_message(),
  * but with a different log level so that it is logged like a g_warning().
@@ -240,8 +239,10 @@ static struct
   type_of_sd_journal_send journal_send;
   /* \r\n or \n */
   const char *newline;
+  GQuark app_log_domain;
 } log_settings =
 {
+  .app_log_domain = 0,
   .pid = -1,
   .newline = "\n",
 };
@@ -401,7 +402,7 @@ log_handler (const gchar *log_domain,
  *  standard error, to avoid unstructured diagnostics like g_debug()
  *  being written to the original standard output
  *  (use this in conjunction with the @original_stdout_out parameter of
- *  _srt_util_set_glib_log_handler())
+ *  _srt_cli_init())
  * @SRT_LOG_FLAGS_OPTIONALLY_JOURNAL: If standard output or standard error
  *  is /dev/null or an invalid file descriptor, or if the user requests
  *  logging to the Journal via environment variables, automatically
@@ -439,25 +440,39 @@ static const GDebugKey log_enable[] =
    * via $SRT_LOG: this flag indicates whether the application relies on
    * timing/profiling messages to indicate progress while debugging. */
 
-  /* Order matters: _srt_util_set_glib_log_handler() relies on this being
+  /* Order matters: _srt_cli_set_glib_log_handler() relies on this being
    * the last one, so that it can be disabled in the absence of
    * SRT_LOG_FLAGS_OPTIONALLY_JOURNAL */
   { "journal", SRT_LOG_FLAGS_JOURNAL },
 };
 
 /*
- * ensure_fd_not_cloexec:
+ * initialize_stdio_fd:
+ * @fd: `STDIN_FILENO`, `STDOUT_FILENO` or `STDERR_FILENO`
+ * @save_original: (out): If not %NULL, duplicate the original fd here
  *
  * Ensure that @fd is open and not marked for close-on-execute, to avoid
  * weird side-effects if opening an unrelated file descriptor ends up as
  * one of the three standard fds, either in this process or a subprocess.
  */
 static gboolean
-ensure_fd_not_cloexec (int fd,
-                       GError **error)
+initialize_stdio_fd (int fd,
+                     int *save_original,
+                     GError **error)
 {
   int flags;
   int errsv;
+
+  if (save_original != NULL)
+    {
+      *save_original = TEMP_FAILURE_RETRY (fcntl (fd, F_DUPFD_CLOEXEC, 3));
+
+      /* Ignore EBADF because there's no guarantee that the standard fds
+       * are open yet */
+      if (*save_original < 0 && errno != EBADF)
+        return glnx_throw_errno_prefix (error,
+                                        "Unable to duplicate fd %d", fd);
+    }
 
   flags = fcntl (fd, F_GETFD, 0);
 
@@ -512,30 +527,12 @@ ensure_fd_not_cloexec (int fd,
 /*
  * set_up_output:
  * @fd: `STDOUT_FILENO` or `STDERR_FILENO`
- * @save_original: (out): If not %NULL, duplicate the original stdout/stderr
- *  here
  */
-static gboolean
-set_up_output (int fd,
-               int *save_original,
-               GError **error)
+static void
+set_up_output (int fd)
 {
   SrtLogFlags required_flags;
   gboolean use_journal = FALSE;
-
-  if (save_original != NULL)
-    {
-      *save_original = TEMP_FAILURE_RETRY (fcntl (fd, F_DUPFD_CLOEXEC, 3));
-
-      /* Ignore EBADF because there's no guarantee that the standard fds
-       * are open yet */
-      if (*save_original < 0 && errno != EBADF)
-        return glnx_throw_errno_prefix (error,
-                                        "Unable to duplicate fd %d", fd);
-    }
-
-  if (!ensure_fd_not_cloexec (fd, error))
-    return FALSE;
 
   if (fd == STDOUT_FILENO)
     required_flags = SRT_LOG_FLAGS_JOURNAL | SRT_LOG_FLAGS_DIVERT_STDOUT;
@@ -614,14 +611,12 @@ set_up_output (int fd,
           g_clear_error (&local_error);
         }
     }
-
-  return TRUE;
 }
 
 gboolean
-_srt_util_restore_saved_fd (int saved_fd,
-                            int target_fd,
-                            GError **error)
+_srt_cli_restore_saved_fd (int saved_fd,
+                           int target_fd,
+                           GError **error)
 {
   g_return_val_if_fail (saved_fd >= 0, FALSE);
 
@@ -648,47 +643,42 @@ _srt_util_restore_saved_fd (int saved_fd,
   return TRUE;
 }
 
-/*
- * _srt_util_set_glib_log_handler:
- * @prgname: (nullable): Passed to g_set_prgname() if not %NULL
- * @extra_log_domain: (nullable): A log domain, usually %G_LOG_DOMAIN
- * @flags: Flags affecting logging
- *
- * Configure GLib to log to stderr with a message format suitable for
- * command-line programs, for example
- *
- * ```
- * my-program[123]: W: Resonance cascade scenario occurred
- * ```
- *
- * The chosen message format is used for @extra_log_domain, and also
- * for the `steam-runtime-tools` log domain used by the
- * steam-runtime-tools library.
- *
- * Logging can be configured by the `SRT_LOG` environment variable,
- * which is a sequence of tokens separated by colons, spaces or commas
- * matching the nicknames of #SrtLogFlags members. See
- * g_parse_debug_string().
- */
-gboolean
-_srt_util_set_glib_log_handler (const char *prgname,
-                                const char *extra_log_domain,
-                                SrtLogFlags flags,
-                                int *original_stdout_out,
-                                int *original_stderr_out,
-                                GError **error)
+static void
+apply_glib_log_handler (GLogLevelFlags log_levels)
 {
-  GLogLevelFlags log_levels = (G_LOG_LEVEL_ERROR
-                               | G_LOG_LEVEL_CRITICAL
-                               | SRT_LOG_LEVEL_FAILURE
-                               | SRT_LOG_LEVEL_WARNING
-                               | G_LOG_LEVEL_WARNING
-                               | G_LOG_LEVEL_MESSAGE);
+  if (log_levels != 0)
+    {
+      g_log_set_handler (g_quark_to_string (log_settings.app_log_domain),
+                         log_levels, log_handler, NULL);
+      g_log_set_handler (G_LOG_DOMAIN, log_levels, log_handler, NULL);
+    }
+}
+
+static void
+update_verbose_log_handlers (void)
+{
+  GLogLevelFlags log_levels = 0;
+
+  /* This function only covers the configurable log levels: info and debug.
+   * Higher log levels are done in _srt_cli_init() */
+  if (log_settings.flags & (SRT_LOG_FLAGS_INFO | SRT_LOG_FLAGS_DEBUG))
+    log_levels |= G_LOG_LEVEL_INFO;
+
+  if (log_settings.flags & SRT_LOG_FLAGS_DEBUG)
+    log_levels |= G_LOG_LEVEL_DEBUG | G_LOG_LEVEL_INFO;
+
+  apply_glib_log_handler (log_levels);
+}
+
+static gboolean
+configure_logging (SrtLogFlags flags,
+                   GError **error)
+{
   const char *log_env = g_getenv ("SRT_LOG");
   gsize log_env_n_keys = G_N_ELEMENTS (log_enable);
 
-  if (prgname != NULL)
-    g_set_prgname (prgname);
+  /* _srt_cli_init() should have been called first */
+  g_return_val_if_fail (log_settings.prgname != NULL, FALSE);
 
   if (flags & SRT_LOG_FLAGS_OPTIONALLY_JOURNAL)
     {
@@ -723,7 +713,6 @@ _srt_util_set_glib_log_handler (const char *prgname,
     flags |= SRT_LOG_FLAGS_INFO;
 
   log_settings.flags = flags;
-  log_settings.prgname = g_get_prgname ();
 
   if ((flags & SRT_LOG_FLAGS_PID)
       || !(flags & SRT_LOG_FLAGS_DIFFABLE))
@@ -731,14 +720,7 @@ _srt_util_set_glib_log_handler (const char *prgname,
   else
     log_settings.pid = 0;
 
-  if (flags & SRT_LOG_FLAGS_INFO)
-    log_levels |= G_LOG_LEVEL_INFO;
-
-  if (flags & SRT_LOG_FLAGS_DEBUG)
-    log_levels |= G_LOG_LEVEL_DEBUG | G_LOG_LEVEL_INFO;
-
-  g_log_set_handler (extra_log_domain, log_levels, log_handler, NULL);
-  g_log_set_handler (G_LOG_DOMAIN, log_levels, log_handler, NULL);
+  update_verbose_log_handlers ();
 
   if (flags & SRT_LOG_FLAGS_TIMING)
     _srt_profiling_enable (G_LOG_LEVEL_MESSAGE);
@@ -747,12 +729,8 @@ _srt_util_set_glib_log_handler (const char *prgname,
            && !(flags & SRT_LOG_FLAGS_DIFFABLE))
     _srt_profiling_enable (G_LOG_LEVEL_DEBUG);
 
-  /* We ensure stdin is open first, because otherwise any fd we open is
-   * likely to become unintentionally the new stdin. */
-  if (!ensure_fd_not_cloexec (STDIN_FILENO, error)
-      || !set_up_output (STDOUT_FILENO, original_stdout_out, error)
-      || !set_up_output (STDERR_FILENO, original_stderr_out, error))
-    return FALSE;
+  set_up_output (STDOUT_FILENO);
+  set_up_output (STDERR_FILENO);
 
   /* Avoid "stairstep" effect when using SrtPtyBridge, by sending CRLF
    * at the end of diagnostic messages */
@@ -771,20 +749,243 @@ _srt_util_set_glib_log_handler (const char *prgname,
   return TRUE;
 }
 
+/*
+ * _srt_cli_init:
+ * @prgname: Passed to g_set_prgname()
+ * @app_log_domain: (nullable): A log domain, usually %G_LOG_DOMAIN
+ * @flags: Flags affecting logging
+ *
+ * Configure GLib to log to stderr with a message format suitable for
+ * command-line programs, for example
+ *
+ * ```
+ * my-program[123]: W: Resonance cascade scenario occurred
+ * ```
+ *
+ * The chosen message format is used for @extra_log_domain, and also
+ * for the `steam-runtime-tools` log domain used by the
+ * steam-runtime-tools library.
+ *
+ * Logging can be configured by the `SRT_LOG` environment variable,
+ * which is a sequence of tokens separated by colons, spaces or commas
+ * matching the nicknames of #SrtLogFlags members. See
+ * g_parse_debug_string().
+ */
 gboolean
-_srt_util_is_verbose (void)
+_srt_cli_init (const char *prgname,
+               const char *app_log_domain,
+               SrtLogFlags flags,
+               int *original_stdout_out,
+               int *original_stderr_out,
+               GError **error)
+{
+  g_return_val_if_fail (prgname != NULL, FALSE);
+  /* Can only be called once */
+  g_return_val_if_fail (log_settings.prgname == NULL, FALSE);
+
+  g_set_prgname (prgname);
+  log_settings.prgname = g_get_prgname ();
+  g_assert (log_settings.prgname != NULL);
+
+  log_settings.app_log_domain = g_quark_from_string (app_log_domain);
+
+  /* Set these up as early as we reasonably can,
+   * so that any errors after this point come out in the expected format.
+   * These are only the non-optional log levels:
+   * configure_logging() handles the optional ones (info and debug). */
+  apply_glib_log_handler (G_LOG_LEVEL_ERROR
+                          | G_LOG_LEVEL_CRITICAL
+                          | SRT_LOG_LEVEL_FAILURE
+                          | SRT_LOG_LEVEL_WARNING
+                          | G_LOG_LEVEL_WARNING
+                          | G_LOG_LEVEL_MESSAGE);
+
+  /* We ensure stdin is open first, because otherwise any fd we open is
+   * likely to become unintentionally the new stdin. */
+  if (!initialize_stdio_fd (STDIN_FILENO, NULL, error)
+      || !initialize_stdio_fd (STDOUT_FILENO, original_stdout_out, error)
+      || !initialize_stdio_fd (STDERR_FILENO, original_stderr_out, error))
+    return FALSE;
+
+  return configure_logging (flags, error);
+}
+
+gboolean
+_srt_cli_is_verbose (void)
 {
   return !!(log_settings.flags & (SRT_LOG_FLAGS_INFO | SRT_LOG_FLAGS_DEBUG));
 }
 
 gboolean
-_srt_util_is_debugging (void)
+_srt_cli_is_debugging (void)
 {
   return !!(log_settings.flags & SRT_LOG_FLAGS_DEBUG);
 }
 
 SrtLogFlags
-_srt_util_get_log_flags (void)
+_srt_cli_get_log_flags (void)
 {
   return log_settings.flags;
+}
+
+static int original_stdout_during_option_parsing = -1;
+
+static void
+print_to_original_stdout (const char *string)
+{
+  int fd = original_stdout_during_option_parsing;
+
+  if (fd < 0)
+    fd = STDOUT_FILENO;
+
+  glnx_loop_write (fd, string, strlen (string));
+}
+
+gboolean
+_srt_cli_option_context_parse (GOptionContext *context,
+                               int original_stdout_fd,
+                               int *argc,
+                               char ***argv,
+                               GError **error)
+{
+  GPrintFunc previous_print_handler;
+  gboolean ret;
+
+  original_stdout_during_option_parsing = original_stdout_fd;
+  previous_print_handler = g_set_print_handler (print_to_original_stdout);
+
+  ret = g_option_context_parse (context, argc, argv, error);
+
+  previous_print_handler = g_set_print_handler (previous_print_handler);
+  g_assert (previous_print_handler == print_to_original_stdout);
+  original_stdout_during_option_parsing = -1;
+
+  return ret;
+}
+
+void
+_srt_cli_increase_verbosity (SrtLogFlags flags)
+{
+  g_return_if_fail (log_settings.prgname != NULL);
+  g_return_if_fail (flags == (flags & SRT_LOG_FLAGS_VERBOSITY_MASK));
+  log_settings.flags |= flags;
+  update_verbose_log_handlers ();
+}
+
+void
+_srt_cli_set_diffable (void)
+{
+  g_return_if_fail (log_settings.prgname != NULL);
+  log_settings.flags |= SRT_LOG_FLAGS_DIFFABLE;
+
+  /* PID is documented to override DIFFABLE */
+  if (!(log_settings.flags & SRT_LOG_FLAGS_PID))
+    log_settings.pid = 0;
+}
+
+/*
+ * SRT_CLI_OPTION_ENTRY_VERBOSE:
+ *
+ * A #GOptionEntry that configures `--verbose`, `-v` to provide 2-level
+ * verbosity similar to Flatpak:
+ * `-v` enables INFO-level logging,
+ * `-vv` enables INFO- and DEBUG-level logging.
+ *
+ * This assumes that _srt_cli_init() has been called before parsing
+ * command-line options.
+ */
+
+/*
+ * _srt_cli_option_arg_func_verbose:
+ *
+ * Implementation of `--verbose`, `-v`:
+ * enable INFO-level logging, or if INFO-level logging was already enabled,
+ * enable DEBUG-level logging as well.
+ * This is a #GOptionArgFunc.
+ *
+ * Returns: %TRUE
+ */
+gboolean
+_srt_cli_option_arg_func_verbose (G_GNUC_UNUSED const char *name,
+                                  G_GNUC_UNUSED const char *value,
+                                  G_GNUC_UNUSED void *data,
+                                  G_GNUC_UNUSED GError **error)
+{
+  SrtLogFlags old = log_settings.flags;
+
+  g_return_val_if_fail (log_settings.prgname != NULL, FALSE);
+
+  if (old & SRT_LOG_FLAGS_INFO)
+    log_settings.flags |= SRT_LOG_FLAGS_DEBUG;
+  else
+    log_settings.flags |= SRT_LOG_FLAGS_INFO;
+
+  update_verbose_log_handlers ();
+  return TRUE;
+}
+
+/*
+ * SRT_CLI_OPTION_ENTRY_VERSION:
+ *
+ * A #GOptionEntry that configures `--version` to print version details
+ * and exit with status 0.
+ *
+ * This assumes that if g_set_prgname() will be called,
+ * then it has been called before parsing command-line options.
+ */
+
+/*
+ * _srt_cli_option_arg_func_version:
+ *
+ * Implementation of `--version`.
+ * This is a #GOptionArgFunc.
+ *
+ * Returns: %TRUE
+ */
+gboolean
+_srt_cli_option_arg_func_version (const char *name,
+                                  const char *value,
+                                  void *data,
+                                  GError **error)
+{
+  /* Output version number as YAML for machine-readability,
+   * inspired by `ostree --version` and `docker version` */
+  g_print ("%s:\n"
+           " Package: steam-runtime-tools\n"
+           " Version: %s\n",
+           g_get_prgname (),
+           VERSION);
+  exit (EXIT_SUCCESS);
+}
+
+/*
+ * SRT_CLI_OPTION_ENTRY_VERSION_ONLY:
+ *
+ * A #GOptionEntry that configures `--version-only` to print the
+ * version number (only) and exit with status 0.
+ */
+
+/*
+ * SRT_CLI_OPTION_ENTRY_VERSION_IS_VERSION_ONLY:
+ *
+ * A #GOptionEntry that configures `--version` to print the
+ * version number (only) and exit with status 0.
+ */
+
+/*
+ * _srt_cli_option_arg_func_version_only:
+ *
+ * Implementation of `--version` or `--version-only`.
+ * This is a #GOptionArgFunc.
+ *
+ * Returns: %TRUE
+ */
+gboolean
+_srt_cli_option_arg_func_version_only (const char *name,
+                                       const char *value,
+                                       void *data,
+                                       GError **error)
+{
+  g_print ("%s\n", VERSION);
+  exit (EXIT_SUCCESS);
 }

@@ -13,7 +13,7 @@
 #include "libglnx.h"
 
 #include "steam-runtime-tools/glib-backports-internal.h"
-#include "steam-runtime-tools/log-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 #include "mtree.h"
@@ -21,8 +21,6 @@
 static gboolean opt_minimized_runtime = FALSE;
 static gchar *opt_mtree = NULL;
 static gboolean opt_quiet = FALSE;
-static gboolean opt_verbose = FALSE;
-static gboolean opt_version = FALSE;
 
 static GOptionEntry options[] =
 {
@@ -35,13 +33,10 @@ static GOptionEntry options[] =
   { "quiet", '\0',
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_quiet,
     "Be less verbose.", NULL },
-  { "verbose", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
-    "Be more verbose.", NULL },
-  { "version", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_version,
-    "Print version number and exit.", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 static void
@@ -61,37 +56,23 @@ run (int argc,
   g_autofree gchar *mtree = NULL;
   g_autofree gchar *top = NULL;
   glnx_autofd int top_fd = -1;
+  glnx_autofd int original_stdout = -1;
   PvMtreeApplyFlags flags = PV_MTREE_APPLY_FLAGS_GZIP;
 
   setlocale (LC_ALL, "");
 
-  if (!_srt_util_set_glib_log_handler ("pv-verify",
-                                       G_LOG_DOMAIN,
-                                       (SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
-                                        | SRT_LOG_FLAGS_DIVERT_STDOUT),
-                                       NULL, NULL, error))
+  if (!_srt_cli_init ("pv-verify", G_LOG_DOMAIN,
+                      (SRT_LOG_FLAGS_DIVERT_STDOUT
+                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL),
+                      &original_stdout, NULL, error))
     return FALSE;
 
   context = g_option_context_new ("DIRECTORY\n"
                                   "DIRECTORY is SteamLinuxRuntime_sniper or similar.\n");
   g_option_context_add_main_entries (context, options, NULL);
 
-  if (!g_option_context_parse (context, &argc, &argv, error))
-    return FALSE;
-
-  if (opt_version)
-    {
-      g_print ("%s:\n"
-               " Package: steam-runtime-tools\n"
-               " Version: %s\n",
-               g_get_prgname (), VERSION);
-      return TRUE;
-    }
-
-  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                       (SRT_LOG_FLAGS_OPTIONALLY_JOURNAL |
-                                        (opt_verbose ? SRT_LOG_FLAGS_DEBUG : 0)),
-                                       NULL, NULL, error))
+  if (!_srt_cli_option_context_parse (context, original_stdout,
+                                      &argc, &argv, error))
     return FALSE;
 
   if (opt_quiet)

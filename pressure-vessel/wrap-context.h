@@ -139,9 +139,6 @@ typedef struct
   gboolean single_thread;
   gboolean systemd_scope;
   gboolean test;
-  gboolean verbose;
-  gboolean version;
-  gboolean version_only;
 } PvWrapOptions;
 
 struct _PvWrapContext
@@ -195,11 +192,13 @@ gboolean pv_wrap_options_parse_environment (PvWrapOptions *self,
                                             GError **error);
 
 gboolean pv_wrap_context_parse_argv (PvWrapContext *self,
+                                     int original_stdout,
                                      int *argcp,
                                      char ***argvp,
                                      GError **error);
 
 gboolean pv_wrap_options_parse_argv (PvWrapOptions *self,
+                                     int original_stdout,
                                      int *argcp,
                                      char ***argvp,
                                      GError **error);

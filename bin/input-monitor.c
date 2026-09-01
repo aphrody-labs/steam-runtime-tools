@@ -28,6 +28,7 @@
 #include <steam-runtime-tools/steam-runtime-tools.h>
 
 #include "steam-runtime-tools/glib-backports-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/input-device-internal.h"
 #include "steam-runtime-tools/json-glib-backports-internal.h"
 #include "steam-runtime-tools/json-utils-internal.h"
@@ -834,7 +835,6 @@ static SrtInputDeviceMonitorFlags opt_mode = SRT_INPUT_DEVICE_MONITOR_FLAGS_NONE
 static SrtInputDeviceMonitorFlags opt_flags = SRT_INPUT_DEVICE_MONITOR_FLAGS_NONE;
 static gboolean opt_evdev = FALSE;
 static gboolean opt_hidraw = FALSE;
-static gboolean opt_print_version = FALSE;
 
 static gboolean
 opt_once_cb (const gchar *option_name,
@@ -886,11 +886,14 @@ static const GOptionEntry option_entries[] =
     NULL },
   { "udev", 0, G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, opt_udev_cb,
     "Find devices using udev", NULL },
+  /* Intentionally not SRT_CLI_OPTION_ENTRY_VERBOSE:
+   * this option affects the JSON output on stdout,
+   * not just the diagnostic messages on stderr. */
   { "verbose", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
     "Be more verbose", NULL },
-  { "version", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_print_version,
-    "Print version number and exit", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 static gboolean
@@ -900,14 +903,21 @@ run (int argc,
 {
   g_autoptr(GOptionContext) option_context = NULL;
   g_autoptr(SrtInputDeviceMonitor) monitor = NULL;
+  glnx_autofd int original_stdout_fd = -1;
   guint int_handler;
 
   _srt_setenv_disable_gio_modules ();
 
+  if (!_srt_cli_init ("steam-runtime-input-monitor", G_LOG_DOMAIN,
+                      SRT_LOG_FLAGS_DIVERT_STDOUT,
+                      &original_stdout_fd, NULL, error))
+    return FALSE;
+
   option_context = g_option_context_new ("");
   g_option_context_add_main_entries (option_context, option_entries, NULL);
 
-  if (!g_option_context_parse (option_context, &argc, &argv, error))
+  if (!_srt_cli_option_context_parse (option_context, original_stdout_fd,
+                                      &argc, &argv, error))
     return FALSE;
 
   if (ignoring_initial_devices
@@ -918,23 +928,7 @@ run (int argc,
       return FALSE;
     }
 
-  if (opt_print_version)
-    {
-      /* Output version number as YAML for machine-readability,
-       * inspired by `ostree --version` and `docker version` */
-      g_print (
-          "%s:\n"
-          " Package: steam-runtime-tools\n"
-          " Version: %s\n",
-          g_get_prgname (), VERSION);
-      return TRUE;
-    }
-
-  /* stdout is reserved for machine-readable output, so avoid having
-   * things like g_debug() pollute it. */
-  original_stdout = _srt_divert_stdout_to_stderr (error);
-
-  if (original_stdout == NULL)
+  if (!_srt_fdopen_take (&original_stdout_fd, "w", &original_stdout, error))
     return FALSE;
 
   _srt_unblock_signals ();

@@ -8,8 +8,8 @@
 #include "steam-runtime-tools/glib-backports-internal.h"
 
 #include <steam-runtime-tools/steam-runtime-tools.h>
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/launcher-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/logger-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
@@ -38,25 +38,11 @@ static int opt_file_level = SRT_SYSLOG_LEVEL_DEFAULT_FILE;
 static int opt_journal_level = SRT_SYSLOG_LEVEL_DEFAULT_JOURNAL;
 static int opt_terminal_level = SRT_SYSLOG_LEVEL_DEFAULT_TERMINAL;
 static int opt_default_line_level = SRT_SYSLOG_LEVEL_DEFAULT_LINE;
-static unsigned opt_verbose = 0;
-static gboolean opt_version = FALSE;
 
 const char opt_file_level_name[] = "file-level";
 const char opt_journal_level_name[] = "journal-level";
 const char opt_terminal_level_name[] = "terminal-level";
 const char opt_default_line_level_name[] = "default-level";
-
-static gboolean
-opt_verbose_cb (const char *name,
-                const char *value,
-                gpointer data,
-                GError **error)
-{
-  if (opt_verbose < 2)
-    opt_verbose++;
-
-  return TRUE;
-}
 
 static gboolean
 opt_rotate_cb (const char *name,
@@ -199,13 +185,10 @@ static const GOptionEntry option_entries[] =
     G_OPTION_FLAG_NONE, G_OPTION_ARG_CALLBACK, &opt_level_cb,
     "Only log lines with at least the given importance to the terminal",
     "LEVEL" },
-  { "verbose", 'v',
-    G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, &opt_verbose_cb,
-    "Be more verbose. If given twice, log debug messages too.", NULL },
-  { "version", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_version,
-    "Print version number and exit.", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 static GSpawnError
@@ -256,9 +239,10 @@ run (int argc,
   subproc_environ = g_get_environ ();
   _srt_setenv_disable_gio_modules ();
 
-  if (!_srt_util_set_glib_log_handler (THIS_PROGRAM,
-                                       G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
-                                       NULL, NULL, error))
+  if (!_srt_cli_init (THIS_PROGRAM, G_LOG_DOMAIN,
+                      (SRT_LOG_FLAGS_DIVERT_STDOUT
+                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL),
+                      &original_stdout, &original_stderr, error))
     return FALSE;
 
   if (!_srt_check_not_setuid ())
@@ -272,30 +256,12 @@ run (int argc,
   if (_srt_boolean_environment ("SRT_LOGGER_USE_JOURNAL", FALSE))
     opt_use_journal = TRUE;
 
-  if (!g_option_context_parse (option_context, &argc, &argv, error))
+  if (!_srt_cli_option_context_parse (option_context, original_stdout,
+                                      &argc, &argv, error))
     return FALSE;
 
   if (!_srt_boolean_environment ("SRT_LOG_ROTATION", TRUE))
     opt_max_bytes = 0;
-
-  if (opt_version)
-    {
-      g_print (
-          "%s:\n"
-          " Package: steam-runtime-tools\n"
-          " Version: %s\n",
-          THIS_PROGRAM, VERSION);
-      return TRUE;
-    }
-
-  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                       (SRT_LOG_FLAGS_DIVERT_STDOUT
-                                        | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
-                                        | (opt_verbose >= 2 ? SRT_LOG_FLAGS_DEBUG : 0)
-                                        | (opt_verbose ? SRT_LOG_FLAGS_INFO : 0)),
-                                       &original_stdout, &original_stderr,
-                                       error))
-    return FALSE;
 
   _srt_unblock_signals ();
 

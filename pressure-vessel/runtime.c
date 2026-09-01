@@ -32,12 +32,12 @@
 #include <steam-runtime-tools/steam-runtime-tools.h>
 
 #include "steam-runtime-tools/architecture-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/elf-utils-internal.h"
 #include "steam-runtime-tools/file-lock-internal.h"
 #include "steam-runtime-tools/graphics-internal.h"
 #include "steam-runtime-tools/graphics-drivers-json-based-internal.h"
 #include "steam-runtime-tools/libdl-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/profiling-internal.h"
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
 #include "steam-runtime-tools/system-info-internal.h"
@@ -2591,7 +2591,7 @@ pv_runtime_get_capsule_capture_libs (PvRuntime *self,
   for (size_t i = 0; i < arch->capsule_capture_libs->len; i++)
     flatpak_bwrap_add_arg (ret, g_ptr_array_index (arch->capsule_capture_libs, i));
 
-  if (_srt_util_get_log_flags () & SRT_LOG_FLAGS_LEVEL)
+  if (_srt_cli_get_log_flags () & SRT_LOG_FLAGS_LEVEL)
     flatpak_bwrap_add_arg (ret, "--level-prefix");
 
   fallbacks =

@@ -1300,7 +1300,6 @@ test_logging (Fixture *f,
                                      "debug,info,timestamp,timing,journal",
                                      TRUE);
             argv[argc++] = "--divert-stdout";
-            argv[argc++] = "--keep-prgname";
             child_setup_data.close_stdin = TRUE;
             title = "Various flags set";
             break;
@@ -1388,8 +1387,8 @@ test_logging (Fixture *f,
             break;
 
           case LOGGING_TEST_FLAGS:
-            /* We're using timestamps and didn't reset the g_set_prgname() */
-            g_assert_nonnull (strstr (err, ": logging-helper["));
+            /* We're using timestamps */
+            g_assert_nonnull (strstr (err, ": srt-tests-logging-helper["));
             /* We enabled profiling */
             g_assert_nonnull (strstr (err, "]: N: Enabled profiling"));
             g_assert_nonnull (strstr (err, "]: N: Various flags set"));

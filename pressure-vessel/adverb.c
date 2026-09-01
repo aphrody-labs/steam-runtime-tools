@@ -34,11 +34,11 @@
 #include <glib/gstdio.h>
 #include <gio/gio.h>
 
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/env-overlay-internal.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/file-lock-internal.h"
 #include "steam-runtime-tools/launcher-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/process-manager-internal.h"
 #include "steam-runtime-tools/profiling-internal.h"
 #include "steam-runtime-tools/steam-runtime-tools.h"
@@ -70,8 +70,6 @@ static gchar *opt_set_ld_library_path = NULL;
 static double opt_terminate_idle_timeout = 0.0;
 static double opt_terminate_timeout = DEFAULT_TERMINATE_TIMEOUT;
 static gboolean opt_terminate_with_main = FALSE;
-static gboolean opt_verbose = FALSE;
-static gboolean opt_version = FALSE;
 static gboolean opt_wait = FALSE;
 static gboolean opt_write = FALSE;
 
@@ -372,7 +370,7 @@ regenerate_ld_so_cache (SrtSubprocessRunner *runner,
   g_ptr_array_add (argv, new_path);
   g_ptr_array_add (argv, (char *) "-X");    /* Don't update symlinks */
 
-  if (_srt_util_is_debugging ())
+  if (_srt_cli_is_debugging ())
     g_ptr_array_add (argv, (char *) "-v");
 
   g_ptr_array_add (argv, NULL);
@@ -412,7 +410,7 @@ regenerate_ld_so_cache (SrtSubprocessRunner *runner,
     return glnx_prefix_error (error, "Cannot move %s to %s",
                               new_path, replace_path);
 
-  if (_srt_util_is_debugging ())
+  if (_srt_cli_is_debugging ())
     {
       const char * const read_back_argv[] =
       {
@@ -677,13 +675,9 @@ static GOptionEntry options[] =
     "[Default: " G_STRINGIFY (DEFAULT_TERMINATE_TIMEOUT) "]",
     "SECONDS" },
 
-  { "verbose", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
-    "Be more verbose.", NULL },
-  { "version", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_version,
-    "Print version number and exit.", NULL },
-  { NULL }
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 int
@@ -710,8 +704,6 @@ main (int argc,
   g_autoptr(GArray) tuples = NULL;
   g_autoptr(SrtSubprocessRunner) runner = NULL;
   g_autoptr(SrtSystemInfo) info = NULL;
-  SrtLogFlags log_flags = (SRT_LOG_FLAGS_DEBUG_IMPLIES_TIMING
-                           | SRT_LOG_FLAGS_DIVERT_STDOUT);
   const char *ldlp;
 
   setlocale (LC_ALL, "");
@@ -723,10 +715,11 @@ main (int argc,
   ld_so_conf_entries = g_ptr_array_new_with_free_func (g_free);
   global_ld_so_conf_entries = ld_so_conf_entries;
 
-  /* Set up the initial base logging */
-  if (!_srt_util_set_glib_log_handler ("pv-adverb", G_LOG_DOMAIN, log_flags,
-                                       &original_stdout, &original_stderr,
-                                       error))
+  if (!_srt_cli_init ("pv-adverb", G_LOG_DOMAIN,
+                      (SRT_LOG_FLAGS_DEBUG_IMPLIES_TIMING
+                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
+                       | SRT_LOG_FLAGS_DIVERT_STDOUT),
+                      &original_stdout, &original_stderr, error))
     {
       ret = EX_UNAVAILABLE;
       goto out;
@@ -749,9 +742,11 @@ main (int argc,
   g_option_context_add_group (context,
                               _srt_env_overlay_create_option_group (env_overlay));
 
-  opt_verbose = _srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE", FALSE);
+  if (_srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE", FALSE))
+    _srt_cli_increase_verbosity (SRT_LOG_FLAGS_DEBUG);
 
-  if (!g_option_context_parse (context, &argc, &argv, error))
+  if (!_srt_cli_option_context_parse (context, original_stdout,
+                                      &argc, &argv, error))
     {
       if (g_error_matches (local_error, G_IO_ERROR, G_IO_ERROR_BUSY))
         ret = EX_TEMPFAIL;
@@ -764,28 +759,6 @@ main (int argc,
     }
 
   g_clear_pointer (&context, g_option_context_free);
-
-  if (opt_version)
-    {
-      g_print ("%s:\n"
-               " Package: pressure-vessel\n"
-               " Version: %s\n",
-               argv[0], VERSION);
-      ret = 0;
-      goto out;
-    }
-
-  log_flags |= SRT_LOG_FLAGS_OPTIONALLY_JOURNAL;
-
-  if (opt_verbose)
-    log_flags |= SRT_LOG_FLAGS_DEBUG;
-
-  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN, log_flags,
-                                       NULL, NULL, error))
-    {
-      ret = 1;
-      goto out;
-    }
 
   /* Must be called before we start any threads, but after we set up
    * logging */
@@ -805,9 +778,8 @@ main (int argc,
 
   if (argc < 2)
     {
-      g_printerr ("%s: Usage: %s [OPTIONS] COMMAND [ARG...]\n",
-                  g_get_prgname (),
-                  g_get_prgname ());
+      _srt_log_failure ("Usage: %s [OPTIONS] COMMAND [ARG...]",
+                        g_get_prgname ());
       goto out;
     }
 

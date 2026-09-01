@@ -612,11 +612,11 @@ unpacked or copied. It will be created automatically if necessary.
 </dd>
 <dt>
 
-**--verbose**
+**--verbose**, **-v**
 
 </dt><dd>
 
-Be more verbose.
+Be more verbose. If used twice, debug messages are shown.
 
 </dd>
 <dt>
@@ -1047,7 +1047,7 @@ Equivalent to `--variable-dir="$PRESSURE_VESSEL_VARIABLE_DIR"`.
 
 </dt><dd>
 
-If set to `1`, equivalent to `--verbose`.
+If set to `1`, equivalent to `--verbose --verbose`.
 
 </dd>
 <dt>

@@ -10,8 +10,8 @@
 #include <glib-unix.h>
 #include <gio/gio.h>
 
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/launcher-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/runtime-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
@@ -19,26 +19,10 @@
 
 #define THIS_PROGRAM "srt-run-outside-ldlp"
 
-static unsigned opt_verbose = 0;
-
-static gboolean
-opt_verbose_cb (const char *name,
-                const char *value,
-                gpointer data,
-                GError **error)
-{
-  if (opt_verbose < 2)
-    opt_verbose++;
-
-  return TRUE;
-}
-
 static const GOptionEntry option_entries[] =
 {
-  { "verbose", 'v',
-    G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, &opt_verbose_cb,
-    "Be more verbose. If given twice, log debug messages too.", NULL },
-  { NULL }
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
+  G_OPTION_ENTRY_NULL
 };
 
 static gboolean
@@ -55,9 +39,10 @@ run (int argc,
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
 
-  if (!_srt_util_set_glib_log_handler (THIS_PROGRAM,
-                                       G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
-                                       NULL, NULL, error))
+  if (!_srt_cli_init (THIS_PROGRAM, G_LOG_DOMAIN,
+                      (SRT_LOG_FLAGS_DIVERT_STDOUT
+                       | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL),
+                      &original_stdout, &original_stderr, error))
     return FALSE;
 
   exe_name = glnx_basename (argv[0]);
@@ -66,7 +51,8 @@ run (int argc,
       option_context = g_option_context_new ("COMMAND [ARGUMENTS...]");
       g_option_context_add_main_entries (option_context, option_entries, NULL);
 
-      if (!g_option_context_parse (option_context, &argc, &argv, error))
+      if (!_srt_cli_option_context_parse (option_context, original_stdout,
+                                          &argc, &argv, error))
         return FALSE;
 
       if (argc >= 2 && strcmp (argv[1], "--") == 0)
@@ -88,15 +74,6 @@ run (int argc,
       exe_name = argv[1];
       invocation_argv = argv + 1;
     }
-
-  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                       (SRT_LOG_FLAGS_DIVERT_STDOUT
-                                        | SRT_LOG_FLAGS_OPTIONALLY_JOURNAL
-                                        | (opt_verbose >= 2 ? SRT_LOG_FLAGS_DEBUG : 0)
-                                        | (opt_verbose ? SRT_LOG_FLAGS_INFO : 0)),
-                                       &original_stdout, &original_stderr,
-                                       error))
-    return FALSE;
 
   if (strchr (exe_name, '/') != NULL)
     return glnx_throw (error,
@@ -130,9 +107,9 @@ run (int argc,
     return FALSE;
 
   if ((original_stdout >= 0
-       && !_srt_util_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
+       && !_srt_cli_restore_saved_fd (original_stdout, STDOUT_FILENO, error))
       || (original_stderr >= 0
-          && !_srt_util_restore_saved_fd (original_stderr, STDERR_FILENO, error)))
+          && !_srt_cli_restore_saved_fd (original_stderr, STDERR_FILENO, error)))
     return FALSE;
 
   execve (invocation_target, invocation_argv, env);

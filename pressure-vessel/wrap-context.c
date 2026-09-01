@@ -7,9 +7,9 @@
 #include "pressure-vessel/wrap-context.h"
 
 #include "steam-runtime-tools/architecture-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/launcher-interface-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 #include "pressure-vessel/bwrap.h"
@@ -84,9 +84,6 @@ pv_wrap_options_init (PvWrapOptions *self)
   self->terminate_timeout = -1.0;
   self->test = FALSE;
   self->variable_dir = NULL;
-  self->verbose = FALSE;
-  self->version = FALSE;
-  self->version_only = FALSE;
   self->write_final_argv = NULL;
 }
 
@@ -889,8 +886,9 @@ pv_wrap_options_parse_environment (PvWrapOptions *self,
                                               self->share_pid);
   self->single_thread = _srt_boolean_environment ("PRESSURE_VESSEL_SINGLE_THREAD",
                                                 self->single_thread);
-  self->verbose = _srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE",
-                                            self->verbose);
+
+  if (_srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE", FALSE))
+    _srt_cli_increase_verbosity (SRT_LOG_FLAGS_DEBUG);
 
   if (!opt_shell_cb ("$PRESSURE_VESSEL_SHELL",
                      g_getenv ("PRESSURE_VESSEL_SHELL"), self, error))
@@ -905,6 +903,7 @@ pv_wrap_options_parse_environment (PvWrapOptions *self,
 
 gboolean
 pv_wrap_options_parse_argv (PvWrapOptions *self,
+                            int original_stdout,
                             int *argcp,
                             char ***argvp,
                             GError **error)
@@ -1188,15 +1187,6 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
       G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME, &self->variable_dir,
       "If a runtime needs to be unpacked or copied, put it in DIR.",
       "DIR" },
-    { "verbose", '\0',
-      G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &self->verbose,
-      "Be more verbose.", NULL },
-    { "version", '\0',
-      G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &self->version,
-      "Print version number and exit.", NULL },
-    { "version-only", '\0',
-      G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_NONE, &self->version_only,
-      "Print version number (no other information) and exit.", NULL },
     { "with-host-graphics", '\0',
       G_OPTION_FLAG_NO_ARG | G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_CALLBACK,
       opt_with_host_graphics_cb,
@@ -1216,7 +1206,11 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
     { "only-prepare", '\0',
       G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &self->only_prepare,
       "Prepare runtime, but do not actually run anything.", NULL },
-    { NULL }
+
+    SRT_CLI_OPTION_ENTRY_VERBOSE,
+    SRT_CLI_OPTION_ENTRY_VERSION,
+    SRT_CLI_OPTION_ENTRY_VERSION_ONLY,
+    G_OPTION_ENTRY_NULL
   };
 
   context = g_option_context_new ("[--] COMMAND [ARGS]\n"
@@ -1229,7 +1223,8 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
   g_option_group_add_entries (main_group, options);
   g_option_context_set_main_group (context, g_steal_pointer (&main_group));
 
-  if (!g_option_context_parse (context, argcp, argvp, error))
+  if (!_srt_cli_option_context_parse (context, original_stdout,
+                                      argcp, argvp, error))
     return FALSE;
 
   return TRUE;
@@ -1237,6 +1232,7 @@ pv_wrap_options_parse_argv (PvWrapOptions *self,
 
 gboolean
 pv_wrap_context_parse_argv (PvWrapContext *self,
+                            int original_stdout,
                             int *argcp,
                             char ***argvp,
                             GError **error)
@@ -1252,7 +1248,8 @@ pv_wrap_context_parse_argv (PvWrapContext *self,
   for (i = 0; i < argc; i++)
     self->original_argv[i] = g_strdup (argv[i]);
 
-  return pv_wrap_options_parse_argv (&self->options, argcp, argvp, error);
+  return pv_wrap_options_parse_argv (&self->options, original_stdout,
+                                     argcp, argvp, error);
 }
 
 gboolean
@@ -1850,8 +1847,10 @@ pv_wrap_context_maybe_wrap_in_launcher (PvWrapContext *self,
                                 pv_wrap_context_get_helpers_dir_in_container (self),
                                 helper_tuple);
 
-  if (_srt_util_is_debugging ())
-    flatpak_bwrap_add_arg (payload_command, "--verbose");
+  if (_srt_cli_is_debugging ())
+    flatpak_bwrap_add_arg (payload_command, "-vv");
+  else if (_srt_cli_is_verbose ())
+    flatpak_bwrap_add_arg (payload_command, "-v");
 
   flatpak_bwrap_append_argsv (payload_command, (char **) options, (int) n_options);
   flatpak_bwrap_add_arg (payload_command, "--");
@@ -1943,8 +1942,10 @@ pv_wrap_context_append_payload_command (PvWrapContext *self,
       g_debug ("Adding steam-runtime-launcher-service '%s'...", launcher_service);
       flatpak_bwrap_add_arg (launcher_argv, launcher_service);
 
-      if (_srt_util_is_debugging ())
-        flatpak_bwrap_add_arg (launcher_argv, "--verbose");
+      if (_srt_cli_is_debugging ())
+        flatpak_bwrap_add_arg (launcher_argv, "-vv");
+      else if (_srt_cli_is_verbose ())
+        flatpak_bwrap_add_arg (launcher_argv, "-v");
 
       /* In --launcher mode, arguments after the "--" separator are
        * passed to the launcher */

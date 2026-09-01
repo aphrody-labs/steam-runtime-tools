@@ -142,8 +142,6 @@ libsteamrt_internals = enums_internal_headers + [
     'libdl.c',
     'library-internal.h',
     'locale-internal.h',
-    'log-internal.h',
-    'log.c',
     'os-internal.h',
     'profiling-internal.h',
     'profiling.c',
@@ -165,6 +163,8 @@ libsteamrt_internals = enums_internal_headers + [
 # Modules that are needed by bin/ or pressure-vessel/ but not by the
 # library API
 libsteamrt_static_extras = [
+    'cli-internal.h',
+    'cli.c',
     'emulator-json.c',
     'file-lock.c',
     'file-lock-internal.h',

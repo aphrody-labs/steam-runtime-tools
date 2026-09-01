@@ -36,6 +36,7 @@
 
 #include <steam-runtime-tools/architecture.h>
 #include <steam-runtime-tools/architecture-internal.h>
+#include <steam-runtime-tools/cli-internal.h>
 #include <steam-runtime-tools/glib-backports-internal.h>
 #include <steam-runtime-tools/utils-internal.h>
 
@@ -48,7 +49,6 @@ static gboolean opt_ldconfig = FALSE;
 static gboolean opt_ldconfig_paths = FALSE;
 static gboolean opt_one_line = FALSE;
 static gboolean opt_print0 = FALSE;
-static gboolean opt_print_version = FALSE;
 static gboolean opt_quiet = FALSE;
 static gboolean opt_skip_unversioned = FALSE;
 
@@ -71,9 +71,10 @@ static const GOptionEntry option_entries[] =
   { "skip-unversioned", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE,
     &opt_skip_unversioned, "Skip the libraries that have a filename that end with "
     "just \".so\"", NULL },
-  { "version", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_print_version,
-    "Print version number and exit", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 static gint
@@ -212,20 +213,13 @@ run_ldconfig (const char *ldconfig,
 }
 
 static gboolean
-run (int argc,
+run (FILE *original_stdout,
+     int argc,
      char **argv,
      GError **error)
 {
-  g_autoptr(FILE) original_stdout = NULL;
   gsize i;
   char separator = '\n';
-
-  /* stdout is reserved for machine-readable output, so avoid having
-   * things like g_debug() pollute it. */
-  original_stdout = _srt_divert_stdout_to_stderr (error);
-
-  if (original_stdout == NULL)
-    return FALSE;
 
   _srt_unblock_signals ();
 
@@ -287,29 +281,29 @@ int
 main (int argc,
       char **argv)
 {
+  g_autoptr(FILE) original_stdout = NULL;
   g_autoptr(GOptionContext) option_context = NULL;
   g_autoptr(GError) error = NULL;
+  glnx_autofd int original_stdout_fd = -1;
   int status = EXIT_SUCCESS;
 
   _srt_setenv_disable_gio_modules ();
 
-  option_context = g_option_context_new ("");
-  g_option_context_add_main_entries (option_context, option_entries, NULL);
-
-  if (!g_option_context_parse (option_context, &argc, &argv, &error))
+  if (!_srt_cli_init ("steam-runtime-identify-library-abi", G_LOG_DOMAIN,
+                      SRT_LOG_FLAGS_DIVERT_STDOUT,
+                      &original_stdout_fd, NULL, &error))
     {
-      status = EX_USAGE;
+      status = EX_OSERR;
       goto out;
     }
 
-  if (opt_print_version)
+  option_context = g_option_context_new ("");
+  g_option_context_add_main_entries (option_context, option_entries, NULL);
+
+  if (!_srt_cli_option_context_parse (option_context, original_stdout_fd,
+                                      &argc, &argv, &error))
     {
-      /* Output version number as YAML for machine-readability,
-       * inspired by `ostree --version` and `docker version` */
-      g_print ("%s:\n"
-               " Package: steam-runtime-tools\n"
-               " Version: %s\n",
-               g_get_prgname (), VERSION);
+      status = EX_USAGE;
       goto out;
     }
 
@@ -337,7 +331,13 @@ main (int argc,
         }
     }
 
-  if (!run (argc, argv, &error))
+  if (!_srt_fdopen_take (&original_stdout_fd, "w", &original_stdout, &error))
+    {
+      status = EX_OSERR;
+      goto out;
+    }
+
+  if (!run (original_stdout, argc, argv, &error))
     status = EXIT_FAILURE;
 
 out:

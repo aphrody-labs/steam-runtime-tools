@@ -53,6 +53,31 @@ class MyCompletedProcess:
             )
 
 
+@contextlib.contextmanager
+def ensure_terminated(proc):
+    try:
+        yield proc
+    finally:
+        logger.debug('Cleaning up subprocess if necessary')
+
+        with proc:
+            for fh in proc.stdin, proc.stdout, proc.stderr:
+                if fh is not None:
+                    fh.close()
+
+            if proc.returncode is None:
+                logger.debug('Subprocess still running')
+                proc.terminate()
+
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    logger.debug('Waiting for subprocess timed out')
+                    proc.kill()
+            else:
+                logger.debug('Subprocess already exited %d', proc.returncode)
+
+
 def run_subprocess(
     args,           # type: typing.Union[typing.List[str], str]
     check=False,

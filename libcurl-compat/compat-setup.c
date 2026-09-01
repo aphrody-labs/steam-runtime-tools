@@ -16,7 +16,7 @@
 #include <gio/gio.h>
 #include <steam-runtime-tools/steam-runtime-tools.h>
 #include "steam-runtime-tools/glib-backports-internal.h"
-#include "steam-runtime-tools/log-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 static void
@@ -427,9 +427,7 @@ run (gboolean runtime_optional,
   return TRUE;
 }
 
-static gboolean opt_print_version = FALSE;
 static gboolean opt_runtime_optional = FALSE;
-static gboolean opt_verbose = FALSE;
 
 static const GOptionEntry option_entries[] =
 {
@@ -437,11 +435,10 @@ static const GOptionEntry option_entries[] =
     &opt_runtime_optional,
     "Set up compatibility shim in a separate directory so it can be "
     "enabled or disabled by run.sh", NULL },
-  { "verbose", '\0', G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
-    "Be more verbose", NULL },
-  { "version", '\0', G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_print_version,
-    "Print version number and exit", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 int
@@ -450,12 +447,14 @@ main (int argc,
 {
   g_autoptr(GOptionContext) option_context = NULL;
   g_autoptr(GError) error = NULL;
+  glnx_autofd int original_stdout = -1;
   int status = EXIT_SUCCESS;
 
   setlocale (LC_ALL, "");
-  if (!_srt_util_set_glib_log_handler ("steam-runtime-libcurl-compat-setup",
-                                       G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
-                                       NULL, NULL, &error))
+
+  if (!_srt_cli_init ("steam-runtime-libcurl-compat-setup", G_LOG_DOMAIN,
+                      SRT_LOG_FLAGS_DIVERT_STDOUT,
+                      &original_stdout, NULL, &error))
     {
       status = EX_UNAVAILABLE;
       goto out;
@@ -464,27 +463,10 @@ main (int argc,
   option_context = g_option_context_new ("$STEAM_RUNTIME");
   g_option_context_add_main_entries (option_context, option_entries, NULL);
 
-  if (!g_option_context_parse (option_context, &argc, &argv, &error))
+  if (!_srt_cli_option_context_parse (option_context, original_stdout,
+                                      &argc, &argv, &error))
     {
       status = EX_USAGE;
-      goto out;
-    }
-
-  if (opt_print_version)
-    {
-      g_print ("%s:\n"
-               " Package: steam-runtime-tools\n"
-               " Version: %s\n",
-               g_get_prgname (), VERSION);
-      goto out;
-    }
-
-  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                       (SRT_LOG_FLAGS_DIVERT_STDOUT |
-                                        (opt_verbose ? SRT_LOG_FLAGS_DEBUG : 0)),
-                                       NULL, NULL, &error))
-    {
-      status = EX_UNAVAILABLE;
       goto out;
     }
 
@@ -501,7 +483,7 @@ main (int argc,
 
 out:
   if (status != EXIT_SUCCESS)
-    g_printerr ("%s: %s\n", g_get_prgname (), error->message);
+    _srt_log_failure ("%s", error->message);
 
   g_clear_error (&error);
   g_clear_pointer (&option_context, g_option_context_free);

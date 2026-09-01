@@ -39,10 +39,10 @@
 #include <gio/gio.h>
 #include <gio/gunixfdlist.h>
 
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/env-overlay-internal.h"
 #include "steam-runtime-tools/glib-backports-internal.h"
 #include "steam-runtime-tools/launcher-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/pty-bridge-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 #include "libglnx.h"
@@ -767,8 +767,6 @@ static gchar *opt_socket = NULL;
 static gboolean opt_share_pids = FALSE;
 static gboolean opt_terminate = FALSE;
 static gchar *opt_usr_path = NULL;
-static gboolean opt_verbose = FALSE;
-static gboolean opt_version = FALSE;
 
 static gboolean
 opt_pass_env_cb (const char *option_name,
@@ -945,13 +943,10 @@ static const GOptionEntry options[] =
     G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_terminate,
     "Terminate the Launcher server after the COMMAND (if any) has run.",
     NULL },
-  { "verbose", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_verbose,
-    "Be more verbose.", NULL },
-  { "version", '\0',
-    G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_version,
-    "Print version number and exit.", NULL },
-  { NULL }
+
+  SRT_CLI_OPTION_ENTRY_VERBOSE,
+  SRT_CLI_OPTION_ENTRY_VERSION,
+  G_OPTION_ENTRY_NULL
 };
 
 int
@@ -1015,28 +1010,12 @@ main (int argc,
   global_original_environ = (const char * const *) original_environ;
 
   /* Set up the initial base logging */
-  if (!_srt_util_set_glib_log_handler ("steam-runtime-launch-client",
-                                       G_LOG_DOMAIN,
-                                       SRT_LOG_FLAGS_DIVERT_STDOUT,
-                                       &original_stdout_fd, NULL, error))
+  if (!_srt_cli_init ("steam-runtime-launch-client", G_LOG_DOMAIN,
+                      SRT_LOG_FLAGS_DIVERT_STDOUT,
+                      &original_stdout_fd, NULL, error))
     {
       launch_exit_status = LAUNCH_EX_FAILED;
       goto out;
-    }
-
-  original_stdout = fdopen (original_stdout_fd, "w");
-
-  if (original_stdout == NULL)
-    {
-      glnx_throw_errno_prefix (error,
-                               "Unable to create a stdio wrapper for fd %d",
-                               original_stdout_fd);
-      launch_exit_status = LAUNCH_EX_FAILED;
-      goto out;
-    }
-  else
-    {
-      original_stdout_fd = -1;    /* ownership taken, do not close */
     }
 
   context = g_option_context_new ("COMMAND [ARG...]");
@@ -1053,7 +1032,9 @@ main (int argc,
   /* Guess we might need up to 4 names + NULL, which is enough for
    * "--alongside-steam --host" without reallocation */
   opt_bus_names = g_ptr_array_new_full (5, g_free);
-  opt_verbose = _srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE", FALSE);
+
+  if (_srt_boolean_environment ("PRESSURE_VESSEL_VERBOSE", FALSE))
+    _srt_cli_increase_verbosity (SRT_LOG_FLAGS_DEBUG);
 
   for (i = 0; i <= 2; i++)
     {
@@ -1066,23 +1047,10 @@ main (int argc,
         }
     }
 
-  if (!g_option_context_parse (context, &argc, &argv, error))
+  if (!_srt_cli_option_context_parse (context, original_stdout_fd, &argc, &argv, error))
     goto out;
 
-  if (opt_version)
-    {
-      fprintf (original_stdout,
-               "%s:\n"
-               " Package: pressure-vessel\n"
-               " Version: %s\n",
-               g_get_prgname (), VERSION);
-      launch_exit_status = 0;
-      goto out;
-    }
-
-  if (!_srt_util_set_glib_log_handler (NULL, G_LOG_DOMAIN,
-                                       (opt_verbose ? SRT_LOG_FLAGS_DEBUG : 0),
-                                       NULL, NULL, error))
+  if (!_srt_fdopen_take (&original_stdout_fd, "w", &original_stdout, error))
     {
       launch_exit_status = LAUNCH_EX_FAILED;
       goto out;

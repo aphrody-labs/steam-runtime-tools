@@ -8,9 +8,9 @@
 
 #include <steam-runtime-tools/steam-runtime-tools.h>
 
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/graphics-drivers-internal.h"
 #include "steam-runtime-tools/graphics-drivers-json-based-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/profiling-internal.h"
 
 const char *

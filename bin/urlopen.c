@@ -37,8 +37,8 @@
 #include <gio/gunixfdlist.h>
 
 #include <stdlib.h>
+#include <steam-runtime-tools/cli-internal.h>
 #include <steam-runtime-tools/container-internal.h>
-#include <steam-runtime-tools/log-internal.h>
 #include <steam-runtime-tools/runtime-internal.h>
 #include <steam-runtime-tools/utils-internal.h>
 #include <sys/wait.h>
@@ -50,18 +50,18 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(AutoUnixFDList, g_object_unref)
 
 static gchar **uris = NULL;
 static gboolean opt_print_help = FALSE;
-static gboolean opt_print_version = FALSE;
 
 static const GOptionEntry option_entries[] =
 {
   /* Imitate the allowed options of the real 'xdg-open' */
   { "manual", 0, G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_NONE, &opt_print_help,
     NULL, NULL },
-  { "version", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, &opt_print_version,
-    "Print version number and exit", NULL },
   { G_OPTION_REMAINING, 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_FILENAME_ARRAY,
     &uris, NULL, NULL },
-  { NULL }
+
+  /* Simply print the version number, similarly to the real xdg-open */
+  SRT_CLI_OPTION_ENTRY_VERSION_IS_VERSION_ONLY,
+  G_OPTION_ENTRY_NULL
 };
 
 static gboolean
@@ -228,29 +228,21 @@ main (int argc,
   g_autoptr(GError) error = NULL;
   gboolean prefer_steam;
 
-  _srt_util_set_glib_log_handler (THIS_PROGRAM,
-                                  G_LOG_DOMAIN,
-                                  SRT_LOG_FLAGS_OPTIONALLY_JOURNAL,
-                                  NULL, NULL, NULL);
+  _srt_cli_init (THIS_PROGRAM, G_LOG_DOMAIN,
+                 SRT_LOG_FLAGS_OPTIONALLY_JOURNAL,
+                 NULL, NULL, NULL);
 
   option_context = g_option_context_new ("{ file | URL }");
   g_option_context_add_main_entries (option_context, option_entries, NULL);
 
-  if (!g_option_context_parse (option_context, &argc, &argv, &error))
+  if (!_srt_cli_option_context_parse (option_context, -1, &argc, &argv, &error))
     {
-      g_printerr ("%s: %s\n", g_get_prgname (), error->message);
+      _srt_log_failure ("%s", error->message);
       return 1;
     }
 
   _srt_setenv_disable_gio_modules ();
   _srt_unblock_signals ();
-
-  if (opt_print_version)
-    {
-      /* Simply print the version number, similarly to the real xdg-open */
-      g_print ("%s\n", VERSION);
-      return EXIT_SUCCESS;
-    }
 
   if (uris == NULL || g_strv_length (uris) > 1)
     {

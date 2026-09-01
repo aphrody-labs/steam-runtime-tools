@@ -17,6 +17,7 @@ import uuid
 
 from testutils import (
     BaseTest,
+    ensure_terminated,
     run_subprocess,
     test_main,
 )
@@ -34,31 +35,6 @@ DBUS_PATH_DBUS = "/org/freedesktop/DBus"
 EX_USAGE = 64
 EX_UNAVAILABLE = 69
 EX_OSERR = 71
-
-
-@contextlib.contextmanager
-def ensure_terminated(proc):
-    try:
-        yield proc
-    finally:
-        logger.debug('Cleaning up subprocess if necessary')
-
-        with proc:
-            for fh in proc.stdin, proc.stdout, proc.stderr:
-                if fh is not None:
-                    fh.close()
-
-            if proc.returncode is None:
-                logger.debug('Subprocess still running')
-                proc.terminate()
-
-                try:
-                    proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    logger.debug('Waiting for subprocess timed out')
-                    proc.kill()
-            else:
-                logger.debug('Subprocess already exited %d', proc.returncode)
 
 
 class TestLauncher(BaseTest):

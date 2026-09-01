@@ -23,7 +23,7 @@ steam-runtime-launcher-service - server to launch processes in a container
 [**--replace**]
 [**--[no-]stop-on-exit**]
 [**--[no-]stop-on-name-loss**]
-[**--verbose**]
+[**--verbose** [**--verbose**]]
 {**--session**|**--bus-name** *NAME*...|**--socket** *SOCKET*|**--socket-directory** *PATH*}
 [**--** *COMMAND* *ARGUMENTS*]
 
@@ -273,11 +273,11 @@ This is the default.
 </dd>
 <dt>
 
-**--verbose**
+**--verbose**, **-v**
 
 </dt><dd>
 
-Be more verbose.
+Be more verbose. If used twice, debug messages are shown.
 
 </dd>
 </dl>

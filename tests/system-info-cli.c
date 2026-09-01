@@ -866,7 +866,7 @@ test_help_and_version (Fixture *f,
   g_test_message ("%s: s-r-s-i output:\n%s\n", G_STRFUNC, output);
   g_test_message ("%s: s-r-s-i diagnostics:\n%s\n", G_STRFUNC, diagnostics);
 
-  g_assert_nonnull (strstr (output, "OPTIONS"));
+  g_assert_nonnull (strstr (output, "--help"));
 }
 
 /*

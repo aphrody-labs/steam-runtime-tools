@@ -27,7 +27,6 @@
 #include "utils.h"
 
 #include "steam-runtime-tools/resolve-in-sysroot-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
 /**

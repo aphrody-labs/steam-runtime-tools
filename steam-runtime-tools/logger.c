@@ -13,8 +13,8 @@
 #include "libglnx.h"
 
 #include "steam-runtime-tools/glib-backports-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/launcher-internal.h"
-#include "steam-runtime-tools/log-internal.h"
 #include "steam-runtime-tools/missing-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 
@@ -826,10 +826,10 @@ _srt_logger_run_subprocess (SrtLogger *self,
                      g_strdup_printf ("--terminal-level=%s",
                                       syslog_level_names[self->terminal_level][0]));
 
-  if (_srt_util_is_verbose ())
+  if (_srt_cli_is_verbose ())
     g_ptr_array_add (logger_argv, g_strdup ("-v"));
 
-  if (_srt_util_is_debugging ())
+  if (_srt_cli_is_debugging ())
     g_ptr_array_add (logger_argv, g_strdup ("-v"));
 
   g_ptr_array_add (logger_argv, NULL);
@@ -889,7 +889,7 @@ _srt_logger_run_subprocess (SrtLogger *self,
   if (strlen (status->str) != status->len)
     return glnx_throw (error, "Status from srt-logger subprocess contains \\0");
 
-  if (self->background && _srt_util_is_debugging ())
+  if (self->background && _srt_cli_is_debugging ())
     show_daemonized_logger_pid (status);
 
   if (!_srt_string_ends_with (status, READY_MESSAGE))

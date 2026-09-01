@@ -515,6 +515,7 @@ test_scripts = [
 
 if get_option('bin')
   test_scripts += [
+    {'name': 'test-invocation.py'},
     {'name': 'test-launcher.py', 'dbus': true, 'timeout': 90},
     {'name': 'test-launcher.py', 'dbus': true, 'full_python': true, 'timeout': 90},
     {'name': 'test-logger.py'},

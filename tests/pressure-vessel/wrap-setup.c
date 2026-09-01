@@ -31,6 +31,7 @@
 #include <glib/gstdio.h>
 
 #include "steam-runtime-tools/glib-backports-internal.h"
+#include "steam-runtime-tools/cli-internal.h"
 #include "steam-runtime-tools/architecture-internal.h"
 #include "steam-runtime-tools/launcher-interface-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
@@ -1366,11 +1367,9 @@ test_options_defaults (Fixture *f,
       g_assert_cmpint (options->single_thread, ==, FALSE);
       g_assert_cmpint (options->systemd_scope, ==, FALSE);
       g_assert_cmpint (options->test, ==, FALSE);
-      g_assert_cmpint (options->verbose, ==, FALSE);
-      g_assert_cmpint (options->version, ==, FALSE);
-      g_assert_cmpint (options->version_only, ==, FALSE);
 
-      ok = pv_wrap_context_parse_argv (f->context, &argc, &argv, &local_error);
+      ok = pv_wrap_context_parse_argv (f->context, STDERR_FILENO,
+                                       &argc, &argv, &local_error);
       g_assert_no_error (local_error);
       g_assert_true (ok);
 
@@ -1441,7 +1440,8 @@ test_options_false (Fixture *f,
   const char *steam_app_id = NULL;
   gboolean ok;
 
-  ok = pv_wrap_context_parse_argv (f->context, &argc, &argv, &local_error);
+  ok = pv_wrap_context_parse_argv (f->context, STDERR_FILENO,
+                                   &argc, &argv, &local_error);
   g_assert_no_error (local_error);
   g_assert_true (ok);
 
@@ -1499,9 +1499,6 @@ test_options_false (Fixture *f,
   g_assert_cmpint (options->single_thread, ==, FALSE);
   g_assert_cmpint (options->systemd_scope, ==, FALSE);
   g_assert_cmpint (options->test, ==, FALSE);
-  g_assert_cmpint (options->verbose, ==, FALSE);
-  g_assert_cmpint (options->version, ==, FALSE);
-  g_assert_cmpint (options->version_only, ==, FALSE);
 }
 
 /*
@@ -1563,7 +1560,7 @@ test_options_invalid (Fixture *f,
       modifiable_argv = g_memdup2 (argv->pdata, argv->len * sizeof (char *));
 
       fixture_recreate_context (f);
-      ok = pv_wrap_context_parse_argv (f->context,
+      ok = pv_wrap_context_parse_argv (f->context, STDERR_FILENO,
                                        &argc, &modifiable_argv,
                                        &local_error);
 
@@ -1618,7 +1615,8 @@ test_options_steam_client (Fixture *f,
   gboolean ok;
   guint n;
 
-  ok = pv_wrap_context_parse_argv (f->context, &argc, &modifiable_argv,
+  ok = pv_wrap_context_parse_argv (f->context, STDERR_FILENO,
+                                   &argc, &modifiable_argv,
                                    &local_error);
   g_assert_no_error (local_error);
   g_assert_true (ok);
@@ -1715,8 +1713,7 @@ test_options_true (Fixture *f,
     "--test",
     "--variable-dir=/runtimes/var",
     "--verbose",
-    "--version",
-    "--version-only",
+    "--verbose",
     "--write-final-argv=/dev/null",
     NULL
   };
@@ -1762,7 +1759,8 @@ test_options_true (Fixture *f,
   gboolean ok;
   guint n;
 
-  ok = pv_wrap_context_parse_argv (f->context, &argc, &argv, &local_error);
+  ok = pv_wrap_context_parse_argv (f->context, STDERR_FILENO,
+                                   &argc, &argv, &local_error);
   g_assert_no_error (local_error);
   g_assert_true (ok);
 
@@ -1844,9 +1842,9 @@ test_options_true (Fixture *f,
   g_assert_cmpint (options->single_thread, ==, TRUE);
   g_assert_cmpint (options->systemd_scope, ==, TRUE);
   g_assert_cmpint (options->test, ==, TRUE);
-  g_assert_cmpint (options->verbose, ==, TRUE);
-  g_assert_cmpint (options->version, ==, TRUE);
-  g_assert_cmpint (options->version_only, ==, TRUE);
+
+  g_assert_true (_srt_cli_is_debugging ());
+  g_assert_true (_srt_cli_is_verbose ());
 
   i = 0;
 
@@ -2660,8 +2658,10 @@ test_payload_command (Fixture *f,
 
       arg = g_ptr_array_index (argv_in_container->argv, offset);
 
-      if (g_str_equal (arg, "--verbose"))
-        offset++;
+      while (g_str_equal (arg, "--verbose")
+             || g_str_equal (arg, "-v")
+             || g_str_equal (arg, "-vv"))
+        arg = g_ptr_array_index (argv_in_container->argv, ++offset);
     }
 
   if (test->emulated)
@@ -2726,8 +2726,10 @@ test_payload_command (Fixture *f,
 
       arg = g_ptr_array_index (argv_in_container->argv, offset);
 
-      if (g_str_equal (arg, "--verbose"))
-        offset++;
+      while (g_str_equal (arg, "--verbose")
+             || g_str_equal (arg, "-v")
+             || g_str_equal (arg, "-vv"))
+        arg = g_ptr_array_index (argv_in_container->argv, ++offset);
 
       for (size_t j = 0; j < G_N_ELEMENTS (expected_options); j++)
         {
@@ -3520,9 +3522,16 @@ int
 main (int argc,
       char **argv)
 {
+  g_autoptr(GError) local_error = NULL;
   Config payload_command_configs[G_N_ELEMENTS (payload_command_tests)];
 
   _srt_setenv_disable_gio_modules ();
+
+  /* We need to initialize logging because PvWrapContext relies on
+   * SRT_CLI_OPTION_ENTRY_VERBOSE */
+  _srt_cli_init ("test-wrap-setup", G_LOG_DOMAIN, SRT_LOG_FLAGS_NONE,
+                 NULL, NULL, &local_error);
+  g_assert_no_error (local_error);
 
   _srt_tests_init (&argc, &argv, NULL);
 

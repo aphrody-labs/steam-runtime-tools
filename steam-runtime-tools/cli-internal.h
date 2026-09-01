@@ -67,8 +67,6 @@ gboolean _srt_cli_init (const char *prgname,
                         int *original_stdout_out,
                         int *original_stderr_out,
                         GError **error);
-gboolean _srt_cli_update_log_flags (SrtLogFlags flags,
-                                    GError **error);
 gboolean _srt_cli_restore_saved_fd (int saved_fd,
                                     int target_fd,
                                     GError **error);

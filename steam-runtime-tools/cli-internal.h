@@ -67,14 +67,23 @@ gboolean _srt_cli_init (const char *prgname,
                         int *original_stdout_out,
                         int *original_stderr_out,
                         GError **error);
-gboolean _srt_cli_update_log_flags (SrtLogFlags flags,
-                                    GError **error);
 gboolean _srt_cli_restore_saved_fd (int saved_fd,
                                     int target_fd,
                                     GError **error);
-gboolean _srt_cli_is_verbose (void);
-gboolean _srt_cli_is_debugging (void);
 SrtLogFlags _srt_cli_get_log_flags (void);
+
+static inline gboolean
+_srt_cli_is_verbose (void)
+{
+  return (_srt_cli_get_log_flags () & (SRT_LOG_FLAGS_INFO | SRT_LOG_FLAGS_DEBUG)) != 0;
+}
+
+static inline gboolean
+_srt_cli_is_debugging (void)
+{
+  return (_srt_cli_get_log_flags () & SRT_LOG_FLAGS_DEBUG) != 0;
+}
+
 void _srt_cli_increase_verbosity (SrtLogFlags flags);
 void _srt_cli_set_diffable (void);
 

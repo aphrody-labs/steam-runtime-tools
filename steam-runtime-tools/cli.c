@@ -810,18 +810,6 @@ _srt_cli_init (const char *prgname,
   return configure_logging (flags, error);
 }
 
-gboolean
-_srt_cli_is_verbose (void)
-{
-  return !!(log_settings.flags & (SRT_LOG_FLAGS_INFO | SRT_LOG_FLAGS_DEBUG));
-}
-
-gboolean
-_srt_cli_is_debugging (void)
-{
-  return !!(log_settings.flags & SRT_LOG_FLAGS_DEBUG);
-}
-
 SrtLogFlags
 _srt_cli_get_log_flags (void)
 {

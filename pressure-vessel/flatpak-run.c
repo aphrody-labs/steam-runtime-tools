@@ -1,6 +1,6 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  * Cut-down version of common/flatpak-run.c from Flatpak
- * Last updated: Flatpak 1.18.1
+ * Last updated: Flatpak 1.18.2
  *
  * Copyright © 2017-2024 Collabora Ltd.
  * Copyright © 2014-2024 Red Hat, Inc

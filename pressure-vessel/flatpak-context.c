@@ -1,7 +1,7 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  *
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.1
+ * Last updated: Flatpak 1.18.2
  *
  * Copyright © 2014-2018 Red Hat, Inc
  * Copyright © 2024 GNOME Foundation, Inc.
@@ -1899,8 +1899,7 @@ flatpak_context_parse_filesystem (const char             *filesystem_and_mode,
     }
 
   if (g_strv_contains (flatpak_context_special_filesystems, filesystem) ||
-#if 0
-      /* We don't support xdg-data/foo, etc. in pressure-vessel */
+#if 0 /* pressure-vessel: We don't support xdg-data/foo, etc. */
       get_xdg_user_dir_from_string (filesystem, NULL, NULL, NULL) ||
 #endif
       g_str_has_prefix (filesystem, "~/") ||
@@ -1929,9 +1928,11 @@ flatpak_context_parse_filesystem (const char             *filesystem_and_mode,
     }
 
   g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,
-               /* pressure-vessel change: we don't support xdg-data/foo,
-                * etc. and we also don't use _() */
+#if 0 /* pressure-vessel: we don't support xdg-data/foo, etc. and don't use _() */
+               _("Unknown filesystem location %s, valid locations are: host, host-os, host-etc, host-root, home, xdg-*[/…], ~/dir, /dir"), filesystem);
+#else
                "Unknown filesystem location %s, valid locations are: host, host-os, host-etc, host-root, ~/dir, /dir", filesystem);
+#endif
   return FALSE;
 }
 
@@ -4464,8 +4465,7 @@ FlatpakContextSockets
 flatpak_context_compute_allowed_sockets (FlatpakContext                   *context,
                                          FlatpakContextConditionEvaluator  evaluator)
 {
-  g_autoptr(GHashTable) permissions =
-    g_hash_table_new_similar (context->socket_permissions);
+  g_autoptr(GHashTable) permissions = flatpak_permissions_new ();
   GHashTableIter iter;
   gpointer key, value;
   FlatpakPermission *fallback_x11;

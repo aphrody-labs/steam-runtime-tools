@@ -1,6 +1,6 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.1
+ * Last updated: Flatpak 1.18.2
  * Copyright © 2014-2019 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -331,7 +331,11 @@ flatpak_run_add_wayland_args (FlatpakBwrap *bwrap,
       flatpak_bwrap_set_env (bwrap, "WAYLAND_DISPLAY", wayland_display, TRUE);
     }
 
+#if 0 /* pressure-vessel-specific: different /run subdir */
+  sandbox_wayland_socket = g_strdup_printf ("/run/flatpak/%s", wayland_display);
+#else
   sandbox_wayland_socket = g_strdup_printf ("/run/pressure-vessel/%s", wayland_display);
+#endif
 
   if (stat (wayland_socket, &statbuf) == 0 &&
       (statbuf.st_mode & S_IFMT) == S_IFSOCK)

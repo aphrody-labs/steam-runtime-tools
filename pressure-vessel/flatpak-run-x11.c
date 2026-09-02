@@ -1,6 +1,6 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.1
+ * Last updated: Flatpak 1.18.2
  * Copyright © 2014-2019 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -313,7 +313,11 @@ flatpak_run_add_x11_args (FlatpakBwrap         *bwrap,
               int tmp_fd = dup (g_steal_fd (&xauth_tmpf.fd));
               if (tmp_fd != -1)
                 {
+#if 0 /* pressure-vessel-specific: We use a different /run subdirectory */
+                  static const char dest[] = "/run/flatpak/Xauthority";
+#else
                   static const char dest[] = "/run/pressure-vessel/Xauthority";
+#endif
 
                   write_xauth (family, remote_host, display_nr, output);
                   flatpak_bwrap_add_args_data_fd (bwrap, "--ro-bind-data", tmp_fd, dest);

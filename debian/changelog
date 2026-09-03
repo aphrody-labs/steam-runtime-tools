@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260902.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260903.0) UNRELEASED; urgency=medium
 
   * s-r-launcher-service:
     - When debug logging is enabled, log MAINPID and PWD environment
@@ -17,6 +17,8 @@ steam-runtime-tools (0.20260902.0) UNRELEASED; urgency=medium
     - Always output --help and --version on original standard output
       (steamrt/tasks#1079)
     - Make --version output more consistent (steamrt/tasks#1079)
+  * pressure-vessel:
+    - Update Flatpak-derived code from 1.18.2
   * Update bubblewrap subproject to v0.12.0.
     This includes the fix for security vulnerability GHSA-pxhw-h44j-8pfx,
     but is not a security-sensitive change for steam-runtime-tools
@@ -33,7 +35,7 @@ steam-runtime-tools (0.20260902.0) UNRELEASED; urgency=medium
   * Tests/CI:
     - Report lint warnings as allowed failures (steamrt/tasks#1069)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 02 Sep 2026 11:38:27 +0100
+ -- Simon McVittie <smcv@collabora.com>  Thu, 03 Sep 2026 12:51:01 +0100
 
 steam-runtime-tools (0.20260824.0) steamrt; urgency=medium
 

@@ -1,5 +1,6 @@
-steam-runtime-tools (0.20260903.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260903.0) steamrt; urgency=medium
 
+  [ Simon McVittie ]
   * s-r-launcher-service:
     - When debug logging is enabled, log MAINPID and PWD environment
       variable changes (steamrt/tasks#1078)
@@ -35,7 +36,7 @@ steam-runtime-tools (0.20260903.0) UNRELEASED; urgency=medium
   * Tests/CI:
     - Report lint warnings as allowed failures (steamrt/tasks#1069)
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 03 Sep 2026 12:51:01 +0100
+ -- Simon McVittie <smcv@collabora.com>  Thu, 03 Sep 2026 12:51:41 +0100
 
 steam-runtime-tools (0.20260824.0) steamrt; urgency=medium
 

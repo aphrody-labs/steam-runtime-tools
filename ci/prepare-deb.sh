@@ -110,6 +110,26 @@ case "$suite" in
         ;;
 esac
 
+case "$suite" in
+    (sniper | steamrt3c | bullseye)
+        # Workaround for https://bugs.debian.org/1147093
+        # Ideally we'd use archive.debian.org,
+        # but we can't do that until https://bugs.debian.org/1147150
+        # is solved
+        sed -i -e '/bullseye-security/d' /etc/apt/sources.list
+        for t in deb deb-src; do
+            echo "$t" \
+                "[" \
+                "signed-by=/usr/share/keyrings/debian-archive-keyring.gpg" \
+                "check-valid-until=no" \
+                "]" \
+                "http://snapshot.debian.org/archive/debian-security/20260903T220410Z" \
+                "bullseye-security main" \
+                >> /etc/apt/sources.list
+        done
+        ;;
+esac
+
 # Because we're using beta Docker images, we won't necessarily be able to
 # install build-dependencies without multiarch skew unless we add the beta
 # apt sources as well
@@ -139,6 +159,7 @@ if [ -n "$steamrt_n" ] && [ -n "${STEAMRT_CI_APT_PGP_TRUSTED_FILE}" ]; then
 fi
 
 apt-get -y update
+apt-get -y upgrade
 
 apt-get install -y --no-install-recommends \
     ca-certificates \

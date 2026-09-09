@@ -139,6 +139,7 @@ if [ -n "$steamrt_n" ] && [ -n "${STEAMRT_CI_APT_PGP_TRUSTED_FILE}" ]; then
 fi
 
 apt-get -y update
+apt-get -y upgrade
 
 apt-get install -y --no-install-recommends \
     ca-certificates \

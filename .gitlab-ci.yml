@@ -515,8 +515,6 @@ relocatable-install:x86-steamrt3c:
             set -eux
 
             dpkg --add-architecture i386
-            apt-get -y update
-            apt-get -y upgrade
 
             ./ci/prepare-deb.sh \
                 libc6-i386 \

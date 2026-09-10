@@ -67,6 +67,15 @@ static const GDebugKey pv_debug_keys[] =
   { "container", PV_WRAP_LOG_FLAGS_CONTAINER },
 };
 
+static gboolean
+is_ldlp_runtime (void)
+{
+  const char *runtime;
+
+  runtime = g_getenv ("STEAM_RUNTIME");
+  return (runtime != NULL && runtime[0] == '/');
+}
+
 int
 main (int argc,
       char *argv[])
@@ -119,7 +128,7 @@ main (int argc,
 
   g_info ("pressure-vessel version %s", VERSION);
 
-  if (g_getenv ("STEAM_RUNTIME") != NULL)
+  if (is_ldlp_runtime ())
     {
       usage_error (error,
                    "This program should not be run in the Steam Runtime. "

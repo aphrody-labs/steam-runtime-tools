@@ -1116,6 +1116,7 @@ pv_runtime_maybe_garbage_collect_subdir (const char *description,
     {
       g_debug ("Unable to delete %s/%s: %s",
                parent, member, local_error->message);
+      g_clear_error (&local_error);
     }
 }
 
@@ -1590,10 +1591,15 @@ pv_runtime_initable_init (GInitable *initable,
                                           &local_error);
 
       if (mutable_lock == NULL)
-        g_debug ("Unable to take an exclusive lock, skipping GC: %s",
-                 local_error->message);
+        {
+          g_debug ("Unable to take an exclusive lock, skipping GC: %s",
+                   local_error->message);
+          g_clear_error (&local_error);
+        }
       else if (!pv_runtime_garbage_collect (self, mutable_lock, error))
-        return FALSE;
+        {
+          return FALSE;
+        }
     }
 
   /* Always copy the runtime into var/ before applying a manifest. */
@@ -1807,6 +1813,7 @@ pv_runtime_cleanup (PvRuntime *self)
     {
       g_warning ("Unable to delete temporary directory: %s",
                  local_error->message);
+      g_clear_error (&local_error);
     }
 
   g_clear_pointer (&self->overrides, g_free);
@@ -3137,13 +3144,18 @@ bind_icds (PvRuntime *self,
            * not any other sort of file, and their target should be
            * an absolute path. */
           if (target == NULL)
-            g_warning ("Cannot read target of \"%s/%s/%s\": %s",
-                       self->overrides, dest_relative_to_overrides, base,
-                       local_error->message);
+            {
+              g_warning ("Cannot read target of \"%s/%s/%s\": %s",
+                         self->overrides, dest_relative_to_overrides, base,
+                         local_error->message);
+              g_clear_error (&local_error);
+            }
           else if (target[0] != '/')
-            g_warning ("Target of \"%s/%s/%s\" is relative: \"%s\"",
-                       self->overrides, dest_relative_to_overrides, base,
-                       target);
+            {
+              g_warning ("Target of \"%s/%s/%s\" is relative: \"%s\"",
+                         self->overrides, dest_relative_to_overrides, base,
+                         target);
+            }
         }
 
       /* Only add the numbered subdirectories to the search path. Their
@@ -3334,6 +3346,7 @@ pv_runtime_import_ca_certs (PvRuntime *self,
           if (fd < 0)
             {
               g_warning ("%s", local_error->message);
+              g_clear_error (&local_error);
               continue;
             }
 
@@ -3502,7 +3515,10 @@ bind_runtime_base (PvRuntime *self,
                                                  "/overrides",
                                                  PV_RUNTIME_EMULATION_ROOTS_INTERPRETER_ONLY,
                                                  &local_error))
-        g_warning ("%s", local_error->message);
+        {
+          g_warning ("%s", local_error->message);
+          g_clear_error (&local_error);
+        }
 
       /* Also make a matching symbolic link on disk, to make it easier
        * to inspect the sysroot. */
@@ -3773,6 +3789,8 @@ bind_runtime_base (PvRuntime *self,
                 g_debug ("Cannot resolve \"%s\" in \"%s\": %s",
                          item, provider->in_current_ns->path,
                          local_error->message);
+
+              g_clear_error (&local_error);
             }
 
           if (provider_index >= self->providers->len)
@@ -3789,10 +3807,15 @@ bind_runtime_base (PvRuntime *self,
       ca_args = pv_runtime_import_ca_certs (self, &local_error);
 
       if (ca_args != NULL)
-        flatpak_bwrap_append_bwrap (bwrap, ca_args);
+        {
+          flatpak_bwrap_append_bwrap (bwrap, ca_args);
+        }
       else
-        g_warning ("Not importing host CA certificates: %s",
-                   local_error->message);
+        {
+          g_warning ("Not importing host CA certificates: %s",
+                     local_error->message);
+          g_clear_error (&local_error);
+        }
     }
 
   return TRUE;
@@ -3860,7 +3883,10 @@ symlink_each_ld_so_file (PvRuntime *self,
                                                  path,
                                                  PV_RUNTIME_EMULATION_ROOTS_INTERPRETER_ONLY,
                                                  &local_error))
-        _srt_log_warning ("%s", local_error->message);
+        {
+          _srt_log_warning ("%s", local_error->message);
+          g_clear_error (&local_error);
+        }
     }
 }
 
@@ -4655,6 +4681,7 @@ pv_runtime_take_any_from_provider (PvRuntime *self,
                          provider->in_current_ns->path,
                          source_in_provider, local_error->message);
 
+              g_clear_error (&local_error);
               continue;
             }
 
@@ -6138,8 +6165,11 @@ pv_runtime_capture_relatives (PvRuntime *self,
                                      family->soname,
                                      family->relatives, n,
                                      &local_error))
-    g_warning ("Unable to collect libraries related to %s: %s",
-               family->soname, local_error->message);
+    {
+      g_warning ("Unable to collect libraries related to %s: %s",
+                 family->soname, local_error->message);
+      g_clear_error (&local_error);
+    }
 
 out:
   if (soname_symlink_out != NULL)
@@ -8252,6 +8282,7 @@ pv_runtime_use_provider_graphics_stack (PvRuntime *self,
       else
         {
           _srt_log_warning ("%s", local_error->message);
+          g_clear_error (&local_error);
         }
 
       g_clear_pointer (&part_timer, _srt_profiling_end);

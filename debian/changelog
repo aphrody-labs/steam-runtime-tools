@@ -4,13 +4,16 @@ steam-runtime-tools (0.20260911.0) UNRELEASED; urgency=medium
     - Fix startup of experimental steamrt3c client if launched with
       STEAM_RUNTIME=1 in the environment, for example by Gentoo's
       steam-overlay (steamrt/tasks#1134, steam-for-linux#13597)
+    - Fix error handling during initialization if another process
+      has locked var/.ref (steamrt/tasks#1137)
+    - Make error handling more consistent
   * Diagnostic tools:
     - s-r-launch-options: Fix startup of wrapped game when G_MESSAGES_DEBUG
       is in the environment (steamrt/tasks#1104)
   * Tests/CI:
     - Work around Debian infrastructure issues (steamrt/tasks#1132)
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 11 Sep 2026 11:59:21 +0100
+ -- Simon McVittie <smcv@collabora.com>  Fri, 11 Sep 2026 16:47:58 +0100
 
 steam-runtime-tools (0.20260903.0) steamrt; urgency=medium
 

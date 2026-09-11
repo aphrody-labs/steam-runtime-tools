@@ -37,7 +37,15 @@ try:
 except ImportError:
     pass
 
-import gi
+# Avoid unstructured diagnostic messages from GLib-based libraries to stdout
+STDOUT_FILENO = 1
+STDERR_FILENO = 2
+original_stdout = os.dup(STDOUT_FILENO)
+os.dup2(STDERR_FILENO, STDOUT_FILENO)
+
+# Ignore E402: import not at top of file.
+# We want to protect stdout before loading anything GLib-related
+import gi                           # noqa: E402
 gi.require_version('Gdk', '3.0')
 gi.require_version('Gtk', '3.0')
 
@@ -1048,6 +1056,9 @@ class Gui:
 
         self.command_line_fd = args.command_line_fd
 
+        if self.command_line_fd == STDOUT_FILENO:
+            self.command_line_fd = original_stdout
+
         for token in args.steam_runtime_env:
             if '=' not in token:
                 parser.error('--steam-runtime-env requires VAR=VALUE argument')
@@ -1928,6 +1939,8 @@ class Gui:
 
             Gtk.main_quit()
         else:
+            os.dup2(original_stdout, STDOUT_FILENO)
+
             try:
                 os.execvpe(argv[0], argv, environ)
             except OSError:

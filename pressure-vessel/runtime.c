@@ -1590,10 +1590,15 @@ pv_runtime_initable_init (GInitable *initable,
                                           &local_error);
 
       if (mutable_lock == NULL)
-        g_debug ("Unable to take an exclusive lock, skipping GC: %s",
-                 local_error->message);
+        {
+          g_debug ("Unable to take an exclusive lock, skipping GC: %s",
+                   local_error->message);
+          g_clear_error (&local_error);
+        }
       else if (!pv_runtime_garbage_collect (self, mutable_lock, error))
-        return FALSE;
+        {
+          return FALSE;
+        }
     }
 
   /* Always copy the runtime into var/ before applying a manifest. */

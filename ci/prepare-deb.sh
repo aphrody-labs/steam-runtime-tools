@@ -117,6 +117,9 @@ case "$suite" in
         # but we can't do that until https://bugs.debian.org/1147150
         # is solved
         sed -i -e '/bullseye-security/d' /etc/apt/sources.list
+        # If the file contents came from a CI variable,
+        # it might not end with a newline
+        echo >> /etc/apt/sources.list
         for t in deb deb-src; do
             echo "$t" \
                 "[" \

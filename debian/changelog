@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260911.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260914.0) steamrt; urgency=medium
 
   * pressure-vessel:
     - Fix startup of experimental steamrt3c client if launched with
@@ -13,7 +13,7 @@ steam-runtime-tools (0.20260911.0) UNRELEASED; urgency=medium
   * Tests/CI:
     - Work around Debian infrastructure issues (steamrt/tasks#1132)
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 11 Sep 2026 16:47:58 +0100
+ -- Simon McVittie <smcv@collabora.com>  Mon, 14 Sep 2026 13:15:32 +0100
 
 steam-runtime-tools (0.20260903.0) steamrt; urgency=medium
 

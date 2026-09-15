@@ -130,6 +130,8 @@ pv_get_workarounds (SrtBwrapFlags bwrap_flags,
     { PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS,
       { "limit-shared-dirs", "limit-shared-directories",
         "steam-for-linux#10571", "steamforlinux10571" } },
+    { PV_WORKAROUND_FLAGS_AVOID_PROVIDER_LIB_LOCALE,
+      { "avoid-provider-lib-locale", "avoid-host-lib-locale" } },
   };
   PvWorkaroundFlags flags = PV_WORKAROUND_FLAGS_NONE;
   const char *value;

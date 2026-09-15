@@ -7257,8 +7257,25 @@ pv_runtime_finish_libc_family (PvRuntime *self,
                  "cross-architecture files.");
     }
 
-  if (self->any_libc_from_provider)
+  if (self->workarounds & PV_WORKAROUND_FLAGS_AVOID_PROVIDER_LIB_LOCALE)
     {
+      _srt_log_warning ("Not using provider lib/locale due to workaround flag");
+    }
+  else
+    {
+      /*
+       * We do this even if the provider glibc is older than the container's,
+       * because we expect that in practice the container's glibc can
+       * read older versions of the precompiled locales from the provider,
+       * and this is the only way we can get the locales for the user's
+       * language without spending ~ 10 seconds compiling them from first
+       * principles.
+       *
+       * We don't include every supported language in the Platform
+       * container, because that would be a ~ 35% size increase -
+       * the compiled locales in lib/locale are much larger than their
+       * source in share/i18n.
+       */
       g_debug ("Making provider lib/locale visible in container");
 
       if (!pv_runtime_take_any_from_provider (self, bwrap, lib_locale_path,
@@ -7267,10 +7284,6 @@ pv_runtime_finish_libc_family (PvRuntime *self,
                                                | TAKE_FROM_PROVIDER_FLAGS_LOCALES),
                                               error))
         return FALSE;
-    }
-  else
-    {
-      g_debug ("Using lib/locale from container");
     }
 
   if (self->any_libc_from_provider)

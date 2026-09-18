@@ -1,9 +1,19 @@
-steam-runtime-tools (0.20260914.1) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260918.0) UNRELEASED; urgency=medium
 
+  * pressure-vessel:
+    - Use graphics stack provider's lib/locale by default.
+      This avoids slow container startup when in SteamLinuxRuntime
+      containers that are strictly newer than the host OS, for example
+      running steamrt4 on Linux Mint 22.x.
+      (steamrt/tasks#1131, steam-runtime#848)
+    - `PRESSURE_VESSEL_WORKAROUNDS=avoid-provider-lib-locale`
+       can be used to disable use of graphics stack provider's lib/locale
+       if it becomes incompatible with the container's glibc
+  * Update libglnx subproject to 2026-09-18
   * Tests/CI:
     - CI pipeline fixes
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 14 Sep 2026 14:42:53 +0100
+ -- Simon McVittie <smcv@collabora.com>  Fri, 18 Sep 2026 16:27:08 +0100
 
 steam-runtime-tools (0.20260914.0) steamrt; urgency=medium
 

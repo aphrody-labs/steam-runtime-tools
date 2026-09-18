@@ -72,6 +72,7 @@ static double opt_terminate_timeout = DEFAULT_TERMINATE_TIMEOUT;
 static gboolean opt_terminate_with_main = FALSE;
 static gboolean opt_wait = FALSE;
 static gboolean opt_write = FALSE;
+static PvWorkaroundFlags workarounds = PV_WORKAROUND_FLAGS_NONE;
 
 /* (element-type PvAdverbPreloadModule) */
 static GArray *opt_preload_modules = NULL;
@@ -499,7 +500,11 @@ generate_locales (SrtSubprocessRunner *runner,
        * missing locales at OS level. This is not an error, but deserves
        * a warning, since it costs around 10 seconds even on a fast SSD. */
       g_printerr ("%s", child_stderr);
-      g_warning ("Container startup will be faster if missing locales are created at OS level");
+
+      /* Only emit the warning here if we didn't already emit a warning
+       * in pv-wrap */
+      if (!(workarounds & PV_WORKAROUND_FLAGS_AVOID_PROVIDER_LIB_LOCALE))
+        g_warning ("Container startup will be faster if missing locales are created at OS level");
     }
   else if (!g_spawn_check_wait_status (wait_status, error))
     {
@@ -759,6 +764,13 @@ main (int argc,
     }
 
   g_clear_pointer (&context, g_option_context_free);
+
+  /* At this point we're running inside the srt-bwrap container,
+   * so it's definitely too late to apply bwrap-related workarounds,
+   * so we don't need to detect the state of bwrap here
+   * or take it into account */
+  workarounds = pv_get_workarounds (SRT_BWRAP_FLAGS_NONE,
+                                    _srt_const_strv (envp));
 
   /* Must be called before we start any threads, but after we set up
    * logging */

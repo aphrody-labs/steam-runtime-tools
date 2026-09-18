@@ -51,6 +51,9 @@ typedef enum
   PV_WORKAROUND_FLAGS_STEAMSNAP_397 = (1 << 6),
   /* https://github.com/ValveSoftware/steam-for-linux/issues/10571 */
   PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS = (1 << 7),
+  /* In case an updated container's glibc doesn't work with an
+   * old provider glibc's lib/locale */
+  PV_WORKAROUND_FLAGS_AVOID_PROVIDER_LIB_LOCALE = (1 << 8),
   PV_WORKAROUND_FLAGS_NONE = 0
 } PvWorkaroundFlags;
 
@@ -63,6 +66,7 @@ typedef enum
    | PV_WORKAROUND_FLAGS_STEAMSNAP_370 \
    | PV_WORKAROUND_FLAGS_STEAMSNAP_397 \
    | PV_WORKAROUND_FLAGS_LIMIT_SHARED_DIRS \
+   | PV_WORKAROUND_FLAGS_AVOID_PROVIDER_LIB_LOCALE \
    | PV_WORKAROUND_FLAGS_NONE)
 
 PvWorkaroundFlags pv_get_workarounds (SrtBwrapFlags bwrap_flags,

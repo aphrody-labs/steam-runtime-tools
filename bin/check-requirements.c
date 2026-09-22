@@ -68,6 +68,14 @@ static const char has_elevated_privileges[] =
 "such as setuid, setgid or setcap.\n"
 ;
 
+static const char simulated_failure[] =
+"steam-runtime-check-requirements has been asked to fail for\n"
+"testing purposes.\n"
+"\n"
+"If you didn't do this intentionally, set the environment variable\n"
+"SRT_CHECK_REQUIREMENTS_FAIL to 0, or unset it.\n"
+;
+
 static const char need_unprivileged_userns_clone[] =
 "Steam now requires user namespaces to be enabled.\n"
 "\n"
@@ -218,6 +226,13 @@ main (int argc,
   if (!_srt_check_not_setuid ())
     {
       output = has_elevated_privileges;
+      exit_code = EX_OSERR;
+      goto out;
+    }
+
+  if (_srt_boolean_environment ("SRT_CHECK_REQUIREMENTS_FAIL", FALSE))
+    {
+      output = simulated_failure;
       exit_code = EX_OSERR;
       goto out;
     }

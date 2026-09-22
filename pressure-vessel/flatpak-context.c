@@ -1,7 +1,7 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  *
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.2
+ * Last updated: Flatpak 1.18.3
  *
  * Copyright © 2014-2018 Red Hat, Inc
  * Copyright © 2024 GNOME Foundation, Inc.
@@ -1253,6 +1253,30 @@ flatpak_policy_to_string (FlatpakPolicy policy)
     return "own";
 
   return "none";
+}
+
+/* Returns the command-line option that gives a name the given @policy on
+ * the session bus. The system bus equivalent is the same option with a
+ * "system-" prefix. There is no option for FLATPAK_POLICY_SEE, which like
+ * FLATPAK_POLICY_NONE does not let the app talk to the name. */
+static const char *
+flatpak_policy_to_name_option (FlatpakPolicy policy)
+{
+  switch (policy)
+    {
+    case FLATPAK_POLICY_TALK:
+      return "talk-name";
+
+    case FLATPAK_POLICY_OWN:
+      return "own-name";
+
+    case FLATPAK_POLICY_NONE:
+    case FLATPAK_POLICY_SEE:
+      return "no-talk-name";
+
+    default:
+      g_return_val_if_reached ("no-talk-name");
+    }
 }
 
 static gboolean
@@ -3528,8 +3552,9 @@ flatpak_context_to_args (FlatpakContext *context,
     {
       const char *name = key;
       FlatpakPolicy policy = GPOINTER_TO_INT (value);
+      const char *option = flatpak_policy_to_name_option (policy);
 
-      g_ptr_array_add (args, g_strdup_printf ("--%s-name=%s", flatpak_policy_to_string (policy), name));
+      g_ptr_array_add (args, g_strdup_printf ("--%s=%s", option, name));
     }
 
   g_hash_table_iter_init (&iter, context->system_bus_policy);
@@ -3537,8 +3562,9 @@ flatpak_context_to_args (FlatpakContext *context,
     {
       const char *name = key;
       FlatpakPolicy policy = GPOINTER_TO_INT (value);
+      const char *option = flatpak_policy_to_name_option (policy);
 
-      g_ptr_array_add (args, g_strdup_printf ("--system-%s-name=%s", flatpak_policy_to_string (policy), name));
+      g_ptr_array_add (args, g_strdup_printf ("--system-%s=%s", option, name));
     }
 
   /* Serialize host-reset first, because order can matter in

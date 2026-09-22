@@ -1,7 +1,7 @@
 project(
   'bubblewrap',
   'c',
-  version : '0.12.0',
+  version : '0.13.0',
   meson_version : '>=0.49.0',
   default_options : [
     'warning_level=2',
@@ -85,6 +85,10 @@ if selinux_dep.found()
   if selinux_dep.version().version_compare('>=2.3')
     cdata.set('HAVE_SELINUX_2_3', 1)
   endif
+endif
+
+if get_option('debug_logging')
+  cdata.set('BWRAP_DEBUG', 1)
 endif
 
 assume_kernel = get_option('assume_kernel')

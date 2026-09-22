@@ -28,11 +28,19 @@
 #include <selinux/selinux.h>
 #endif
 
+#ifndef __NR_pivot_root
+#error Linux kernel headers with __NR_pivot_root are required
+#endif
+
 #ifndef HAVE_SELINUX_2_3
 /* libselinux older than 2.3 weren't const-correct */
 #define setexeccon(x) setexeccon ((security_context_t) x)
 #define setfscreatecon(x) setfscreatecon ((security_context_t) x)
 #define security_check_context(x) security_check_context ((security_context_t) x)
+#endif
+
+#ifdef BWRAP_DEBUG
+bool bwrap_is_debugging = false;
 #endif
 
 bool bwrap_level_prefix = false;
@@ -44,6 +52,11 @@ bwrap_logv (int severity,
             va_list args,
             const char *detail)
 {
+#ifdef BWRAP_DEBUG
+  if (severity == LOG_DEBUG && !bwrap_is_debugging)
+    return;
+#endif
+
   if (bwrap_level_prefix)
     fprintf (stderr, "<%d>", severity);
 
@@ -900,12 +913,7 @@ raw_clone (unsigned long flags,
 int
 pivot_root (const char * new_root, const char * put_old)
 {
-#ifdef __NR_pivot_root
   return syscall (__NR_pivot_root, new_root, put_old);
-#else
-  errno = ENOSYS;
-  return -1;
-#endif
 }
 
 char *
@@ -1095,4 +1103,35 @@ strappend_escape_for_mount_options (StringBuilder *dest, const char *src)
         }
       src++;
     }
+}
+
+
+/* Enable mount_setattr for systems where the kernel is new enough but
+ * the glibc may lag behind, like it might happen with the Steam runtime.
+ *
+ * This could be expanded for other architectures, but these seem like
+ * the most likely to be backported to old LTS operating systems */
+#ifndef __NR_mount_setattr
+# if (defined(__x86_64__) && defined(__LP64__)) \
+     || defined(__i386__) \
+     || (defined(__aarch64__) && defined(__LP64__))
+#   define __NR_mount_setattr 442
+# endif
+#endif
+
+int
+mount_setattr_wrapper (int dirfd, const char *path, unsigned int flags,
+                       struct mount_attr *attr, size_t size)
+{
+#ifdef __NR_mount_setattr
+  return syscall (__NR_mount_setattr, dirfd, path, flags, attr, size);
+#else
+  (void) dirfd;
+  (void) path;
+  (void) flags;
+  (void) attr;
+  (void) size;
+  errno = ENOSYS;
+  return -1;
+#endif
 }

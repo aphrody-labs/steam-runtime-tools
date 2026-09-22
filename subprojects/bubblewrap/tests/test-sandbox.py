@@ -26,6 +26,7 @@ _spec.loader.exec_module(_helper)
 
 BWRAP = _helper.BWRAP
 can_run_bwrap = _helper.can_run_bwrap
+get_assumed_kernel = _helper.get_assumed_kernel
 in_sandbox = _helper.in_sandbox
 list_mounts = _helper.list_mounts
 DataFd = _helper.DataFd
@@ -137,7 +138,15 @@ class TestSandbox(unittest.TestCase):
                             f'expected bwrap to fail, stderr: {result.stderr!r}')
 
     def assertMountFlags(self, path, expected, unexpected):
-        flags = os.statvfs(path).f_flag
+        try:
+            flags = os.statvfs(path).f_flag
+        except PermissionError:
+            if path.endswith('/doc'):
+                # https://github.com/flatpak/xdg-desktop-portal/issues/553
+                return
+            else:
+                raise
+
         for f in expected:
             self.assertTrue(flags & f, f'{path}: expected flag {f:#x} not set')
         for f in unexpected:
@@ -308,13 +317,35 @@ class TestSandbox(unittest.TestCase):
 
     @in_sandbox()
     def test_ro_bind_root_is_recursive(self):
+        self._test_ro_bind_root_is_recursive()
+
+    @in_sandbox('--debug-opt=force-mount-setattr-fallback')
+    def _test_ro_bind_root_is_recursive_fallback(self):
+        self._test_ro_bind_root_is_recursive()
+
+    def test_ro_bind_root_is_recursive_fallback(self):
+        if get_assumed_kernel() >= (5, 12, 0):
+            self.skipTest('mount_setattr() fallback not compiled')
+        else:
+            self._test_ro_bind_root_is_recursive_fallback()
+
+    def _test_ro_bind_root_is_recursive(self):
         """The base --ro-bind / / should apply read-only to sub-mounts."""
         skip_prefixes = ('/dev', '/proc', '/sys', '/tmp')
         for mountpoint in list_mounts():
             if any(mountpoint == p or mountpoint.startswith(p + '/')
                    for p in skip_prefixes):
                 continue
-            flags = os.statvfs(mountpoint).f_flag
+
+            try:
+                flags = os.statvfs(mountpoint).f_flag
+            except PermissionError:
+                if mountpoint.endswith('/doc'):
+                    # https://github.com/flatpak/xdg-desktop-portal/issues/553
+                    return
+                else:
+                    raise
+
             self.assertTrue(
                 flags & os.ST_RDONLY,
                 f'{mountpoint} is not read-only',
@@ -481,7 +512,7 @@ class TestSandbox(unittest.TestCase):
 
     def test_hostname(self):
         result = run_bwrap('--unshare-uts', '--hostname', 'testhost',
-                           'hostname')
+                           'uname', '-n')
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), b'testhost')
 

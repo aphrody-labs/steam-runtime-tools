@@ -21,6 +21,7 @@
 
 #include <poll.h>
 #include <sched.h>
+#include <limits.h>
 #include <pwd.h>
 #include <grp.h>
 #include <ctype.h>
@@ -1707,6 +1708,20 @@ warn_only_last_option (const char *name)
   warn ("Only the last %s option will take effect", name);
 }
 
+/* Path arguments are turned into real filenames by concatenating them onto
+   "/oldroot/" or "/newroot/", so an empty path would silently be taken to
+   mean the root directory. That is never what the caller meant, so treat it
+   as a usage error. */
+static const char *
+path_argument (const char *option,
+               const char *path)
+{
+  if (path[0] == '\0')
+    die ("%s does not take an empty path argument", option);
+
+  return path;
+}
+
 static void
 make_setup_overlay_src_ops (const char *const *const argv)
 {
@@ -1728,7 +1743,7 @@ make_setup_overlay_src_ops (const char *const *const argv)
   for (i = 1; i <= next_overlay_src_count; i++)
     {
       op = setup_op_new (SETUP_OVERLAY_SRC);
-      op->source = argv[1 - 2 * i];
+      op->source = path_argument ("--overlay-src", argv[1 - 2 * i]);
     }
   next_overlay_src_count = 0;
 }
@@ -1906,7 +1921,7 @@ parse_args_recurse (int          *argcp,
           if (opt_chdir_path != NULL)
             warn_only_last_option ("--chdir");
 
-          opt_chdir_path = argv[1];
+          opt_chdir_path = path_argument (arg, argv[1]);
           argv++;
           argc--;
         }
@@ -1924,7 +1939,7 @@ parse_args_recurse (int          *argcp,
             die ("--remount-ro takes one argument");
 
           op = setup_op_new (SETUP_REMOUNT_RO_NO_RECURSIVE);
-          op->dest = argv[1];
+          op->dest = path_argument (arg, argv[1]);
 
           argv++;
           argc--;
@@ -1936,8 +1951,8 @@ parse_args_recurse (int          *argcp,
             die ("%s takes two arguments", arg);
 
           op = setup_op_new (SETUP_BIND_MOUNT);
-          op->source = argv[1];
-          op->dest = argv[2];
+          op->source = path_argument (arg, argv[1]);
+          op->dest = path_argument (arg, argv[2]);
           if (strcmp(arg, "--bind-try") == 0)
             op->flags = ALLOW_NOTEXIST;
 
@@ -1951,8 +1966,8 @@ parse_args_recurse (int          *argcp,
             die ("%s takes two arguments", arg);
 
           op = setup_op_new (SETUP_RO_BIND_MOUNT);
-          op->source = argv[1];
-          op->dest = argv[2];
+          op->source = path_argument (arg, argv[1]);
+          op->dest = path_argument (arg, argv[2]);
           if (strcmp(arg, "--ro-bind-try") == 0)
             op->flags = ALLOW_NOTEXIST;
 
@@ -1966,8 +1981,8 @@ parse_args_recurse (int          *argcp,
             die ("%s takes two arguments", arg);
 
           op = setup_op_new (SETUP_DEV_BIND_MOUNT);
-          op->source = argv[1];
-          op->dest = argv[2];
+          op->source = path_argument (arg, argv[1]);
+          op->dest = path_argument (arg, argv[2]);
           if (strcmp(arg, "--dev-bind-try") == 0)
             op->flags = ALLOW_NOTEXIST;
 
@@ -1993,7 +2008,7 @@ parse_args_recurse (int          *argcp,
             op = setup_op_new (SETUP_BIND_MOUNT);
           op->source = xasprintf ("/proc/self/fd/%d", src_fd);
           op->fd = src_fd;
-          op->dest = argv[2];
+          op->dest = path_argument (arg, argv[2]);
 
           argv += 2;
           argc -= 2;
@@ -2016,10 +2031,10 @@ parse_args_recurse (int          *argcp,
             die ("--overlay requires at least one --overlay-src");
 
           op = setup_op_new (SETUP_OVERLAY_MOUNT);
-          op->source = argv[1];
+          op->source = path_argument (arg, argv[1]);
           workdir_op = setup_op_new (SETUP_OVERLAY_SRC);
-          workdir_op->source = argv[2];
-          op->dest = argv[3];
+          workdir_op->source = path_argument (arg, argv[2]);
+          op->dest = path_argument (arg, argv[3]);
           make_setup_overlay_src_ops (argv);
 
           argv += 3;
@@ -2034,7 +2049,7 @@ parse_args_recurse (int          *argcp,
             die ("--tmp-overlay requires at least one --overlay-src");
 
           op = setup_op_new (SETUP_TMP_OVERLAY_MOUNT);
-          op->dest = argv[1];
+          op->dest = path_argument (arg, argv[1]);
           make_setup_overlay_src_ops (argv);
           opt_tmp_overlay_count++;
 
@@ -2050,7 +2065,7 @@ parse_args_recurse (int          *argcp,
             die ("--ro-overlay requires at least two --overlay-src");
 
           op = setup_op_new (SETUP_RO_OVERLAY_MOUNT);
-          op->dest = argv[1];
+          op->dest = path_argument (arg, argv[1]);
           make_setup_overlay_src_ops (argv);
 
           argv += 1;
@@ -2062,7 +2077,7 @@ parse_args_recurse (int          *argcp,
             die ("--proc takes an argument");
 
           op = setup_op_new (SETUP_MOUNT_PROC);
-          op->dest = argv[1];
+          op->dest = path_argument (arg, argv[1]);
 
           argv += 1;
           argc -= 1;
@@ -2103,7 +2118,7 @@ parse_args_recurse (int          *argcp,
             die ("--dev takes an argument");
 
           op = setup_op_new (SETUP_MOUNT_DEV);
-          op->dest = argv[1];
+          op->dest = path_argument (arg, argv[1]);
           opt_needs_devpts = true;
 
           argv += 1;
@@ -2115,7 +2130,7 @@ parse_args_recurse (int          *argcp,
             die ("--tmpfs takes an argument");
 
           op = setup_op_new (SETUP_MOUNT_TMPFS);
-          op->dest = argv[1];
+          op->dest = path_argument (arg, argv[1]);
 
           /* We historically hard-coded the mode of a tmpfs as 0755. */
           if (next_perms >= 0)
@@ -2140,7 +2155,7 @@ parse_args_recurse (int          *argcp,
             die ("--mqueue takes an argument");
 
           op = setup_op_new (SETUP_MOUNT_MQUEUE);
-          op->dest = argv[1];
+          op->dest = path_argument (arg, argv[1]);
 
           argv += 1;
           argc -= 1;
@@ -2151,7 +2166,7 @@ parse_args_recurse (int          *argcp,
             die ("--dir takes an argument");
 
           op = setup_op_new (SETUP_MAKE_DIR);
-          op->dest = argv[1];
+          op->dest = path_argument (arg, argv[1]);
 
           /* We historically hard-coded the mode of a --dir as 0755. */
           if (next_perms >= 0)
@@ -2177,7 +2192,7 @@ parse_args_recurse (int          *argcp,
 
           op = setup_op_new (SETUP_MAKE_FILE);
           op->fd = file_fd;
-          op->dest = argv[2];
+          op->dest = path_argument (arg, argv[2]);
 
           /* We historically hard-coded the mode of a --file as 0666. */
           if (next_perms >= 0)
@@ -2203,7 +2218,7 @@ parse_args_recurse (int          *argcp,
 
           op = setup_op_new (SETUP_MAKE_BIND_FILE);
           op->fd = file_fd;
-          op->dest = argv[2];
+          op->dest = path_argument (arg, argv[2]);
 
           /* This is consistent with previous bubblewrap behaviour:
            * before implementing --perms, we took the permissions
@@ -2231,7 +2246,7 @@ parse_args_recurse (int          *argcp,
 
           op = setup_op_new (SETUP_MAKE_RO_BIND_FILE);
           op->fd = file_fd;
-          op->dest = argv[2];
+          op->dest = path_argument (arg, argv[2]);
 
           /* This is consistent with previous bubblewrap behaviour:
            * before implementing --perms, we took the permissions
@@ -2251,8 +2266,8 @@ parse_args_recurse (int          *argcp,
             die ("--symlink takes two arguments");
 
           op = setup_op_new (SETUP_MAKE_SYMLINK);
-          op->source = argv[1];
-          op->dest = argv[2];
+          op->source = path_argument (arg, argv[1]);
+          op->dest = path_argument (arg, argv[2]);
 
           argv += 2;
           argc -= 2;
@@ -2262,7 +2277,7 @@ parse_args_recurse (int          *argcp,
           if (argc < 2)
             die ("--lock-file takes an argument");
 
-          (void) lock_file_new (argv[1]);
+          (void) lock_file_new (path_argument (arg, argv[1]));
 
           argv += 1;
           argc -= 1;
@@ -2692,7 +2707,7 @@ parse_args_recurse (int          *argcp,
           op = setup_op_new (SETUP_CHMOD);
           op->flags = NO_CREATE_DEST;
           op->perms = (int) perms;
-          op->dest = argv[2];
+          op->dest = path_argument (arg, argv[2]);
 
           argv += 2;
           argc -= 2;
@@ -2704,10 +2719,31 @@ parse_args_recurse (int          *argcp,
       else if (has_prefix (arg, "--debug-opt="))
         {
           const char *val = arg + strlen ("--debug-opt=");
+
           if (strcmp (val, "force-openat-fallback") == 0)
-            opt_force_openat_fallback = true;
+            {
+              opt_force_openat_fallback = true;
+            }
+          else if (strcmp (val, "force-mount-setattr-fallback") == 0)
+            {
+              opt_force_mount_setattr_fallback = true;
+            }
+          else if (strcmp (val, "print-assumed-kernel") == 0)
+            {
+#ifdef HAVE_ASSUMED_KERNEL
+              printf ("%u.%u.%u\n",
+                      ASSUMED_KERNEL_MAJOR,
+                      ASSUMED_KERNEL_MINOR,
+                      ASSUMED_KERNEL_PATCH);
+#else
+              printf ("0.0.0\n");
+#endif
+              exit (0);
+            }
           else
-            die ("Unknown --debug-opt value: %s", val);
+            {
+              die ("Unknown --debug-opt value: %s", val);
+            }
         }
       else if (strcmp (arg, "--") == 0)
         {
@@ -2872,7 +2908,7 @@ main (int    argc,
   if (argc == 2 && (strcmp (argv[1], "--version") == 0))
     print_version_and_exit ();
 
-  /* Reset SIGCHILD to SIG_DFL allowing signalfd working propertly
+  /* Reset SIGCHILD to SIG_DFL allowing signalfd working properly
    * if the parent process had set SIGCHLD to SIG_IGN. */
   sigemptyset (&sa.sa_mask);
   sa.sa_handler = SIG_DFL;
@@ -2883,6 +2919,11 @@ main (int    argc,
 
   /* Get the (optional) privileges we need */
   acquire_privs ();
+
+#ifdef BWRAP_DEBUG
+  if (getenv ("DEBUG_INVOCATION") != NULL)
+    bwrap_is_debugging = true;
+#endif
 
   /* Never gain any more privs during exec */
   if (prctl (PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) < 0)

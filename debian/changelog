@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260918.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260922.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
     - Use graphics stack provider's lib/locale by default.
@@ -9,11 +9,18 @@ steam-runtime-tools (0.20260918.0) UNRELEASED; urgency=medium
     - `PRESSURE_VESSEL_WORKAROUNDS=avoid-provider-lib-locale`
        can be used to disable use of graphics stack provider's lib/locale
        if it becomes incompatible with the container's glibc
+    - Update Flatpak-derived code to 1.18.3 (no functional change)
+  * Update bubblewrap subproject to 0.13.0
+    - When running on Linux kernel v5.2 or later (recommended),
+      in scenarios that involve automount points for unreachable networked
+      filesystems or detached external drives (not recommended),
+      pressure-vessel container startup is more reliable and less slow
+      (steamrt/tasks#1006)
   * Update libglnx subproject to 2026-09-18
   * Tests/CI:
     - CI pipeline fixes
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 18 Sep 2026 16:27:08 +0100
+ -- Simon McVittie <smcv@collabora.com>  Tue, 22 Sep 2026 17:30:33 +0100
 
 steam-runtime-tools (0.20260914.0) steamrt; urgency=medium
 

@@ -1,7 +1,7 @@
 project(
   'bubblewrap',
   'c',
-  version : '0.12.0',
+  version : '0.13.0',
   meson_version : '>=0.49.0',
   default_options : [
     'warning_level=2',
@@ -87,7 +87,7 @@ if selinux_dep.found()
   endif
 endif
 
-if get_option('debug')
+if get_option('debug_logging')
   cdata.set('BWRAP_DEBUG', 1)
 endif
 

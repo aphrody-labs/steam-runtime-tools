@@ -149,6 +149,8 @@ fedora/usr/lib64/vdpau
 fedora/usr/share/vulkan/implicit_layer.d
 fedora/run/systemd
 fedora/sys/class/dmi/id
+gentoo/usr/lib/va/drivers
+gentoo/usr/lib64/va/drivers
 flatpak-example/usr/lib/dri
 flatpak-example/usr/lib/gbm
 flatpak-example/usr/lib/x86_64-mock-abi/GL/lib/dri
@@ -283,6 +285,10 @@ fedora/usr/lib64/libva.so.2
 fedora/usr/lib64/libvdpau.so.1
 fedora/usr/lib64/vdpau/libvdpau_r300.so
 fedora/usr/lib64/vdpau/libvdpau_radeonsi.so
+gentoo/usr/lib/libva.so.2
+gentoo/usr/lib/va/drivers/gentoo_drv_video.so
+gentoo/usr/lib64/libva.so.2
+gentoo/usr/lib64/va/drivers/gentoo_drv_video.so
 flatpak-example/usr/lib/dri/r300_dri.so
 flatpak-example/usr/lib/dri/r600_drv_video.so
 flatpak-example/usr/lib/gbm/dri_gbm.so

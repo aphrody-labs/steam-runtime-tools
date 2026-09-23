@@ -47,6 +47,7 @@ main (int argc,
       g_strstr_len (real_path, -1, "/lib32/gbm/") != NULL ||
       g_strstr_len (real_path, -1, "/lib/dri/") != NULL ||
       g_strstr_len (real_path, -1, "/lib/gbm/") != NULL ||
+      g_strstr_len (real_path, -1, "/lib/va/drivers/") != NULL ||
       g_strstr_len (real_path, -1, "/lib/vdpau/") != NULL ||
       g_strstr_len (real_path, -1, "/another_custom_path/") != NULL ||
       g_strstr_len (real_path, -1, "/custom_path32/") != NULL ||

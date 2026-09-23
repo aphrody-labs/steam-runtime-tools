@@ -4239,6 +4239,55 @@ test_dri_fedora (Fixture *f,
 }
 
 static void
+test_dri_gentoo (Fixture *f,
+                 const void *context)
+{
+  /* We reuse the mock inspect-library implementations that pretend to be
+   * Fedora, rather than building a separate one just to
+   * pretend to be Gentoo; both OSs use i386 -> lib, x86_64 -> lib64 */
+  const gchar *multiarch_tuples[] = {"i386-mock-fedora", "x86_64-mock-fedora", NULL};
+  g_autoptr(SrtSystemInfo) info = NULL;
+  g_auto(GStrv) envp = NULL;
+  g_autofree gchar *sysroot = NULL;
+  g_autoptr(SrtObjectList) va_api_32 = NULL;
+  g_autoptr(SrtObjectList) va_api_64 = NULL;
+  const gchar *va_api_suffixes_32[] = {"/usr/lib/va/drivers/gentoo_drv_video.so",
+                                       NULL};
+  const gchar *va_api_suffixes_64[] = {"/usr/lib64/va/drivers/gentoo_drv_video.so",
+                                       NULL};
+
+  g_test_message ("Entering %s", G_STRFUNC);
+
+  sysroot = g_build_filename (f->sysroots, "gentoo", NULL);
+  envp = g_get_environ ();
+  envp = g_environ_setenv (envp, "SRT_TEST_SYSROOT", sysroot, TRUE);
+  envp = g_environ_unsetenv (envp, "LIBGL_DRIVERS_PATH");
+  envp = g_environ_unsetenv (envp, "LIBVA_DRIVERS_PATH");
+
+  info = srt_system_info_new (NULL);
+  srt_system_info_set_environ (info, envp);
+  srt_system_info_set_sysroot (info, sysroot);
+  srt_system_info_set_helpers_path (info, f->builddir);
+  /* This test assumes that the results of inspect-library on the host
+   * are valid in the sysroot, as above */
+  srt_system_info_set_test_flags (info, SRT_TEST_FLAGS_HELPERS_WORK_IN_SYSROOT);
+
+  g_test_message ("i386 VA-API drivers...");
+  va_api_32 = srt_system_info_list_va_api_drivers (info,
+                                                   multiarch_tuples[0],
+                                                   SRT_DRIVER_FLAGS_NONE);
+  assert_va_api_drivers (va_api_32);
+  check_list_suffixes (va_api_32, va_api_suffixes_32, SRT_GRAPHICS_VAAPI_MODULE);
+
+  g_test_message ("x86_64 VA-API drivers...");
+  va_api_64 = srt_system_info_list_va_api_drivers (info,
+                                                   multiarch_tuples[1],
+                                                   SRT_DRIVER_FLAGS_NONE);
+  assert_va_api_drivers (va_api_64);
+  check_list_suffixes (va_api_64, va_api_suffixes_64, SRT_GRAPHICS_VAAPI_MODULE);
+}
+
+static void
 test_dri_ubuntu16 (Fixture *f,
                    gconstpointer context)
 {
@@ -5579,6 +5628,8 @@ main (int argc,
               setup, test_dri_debian10, teardown);
   g_test_add ("/graphics/dri/fedora", Fixture, NULL,
               setup, test_dri_fedora, teardown);
+  g_test_add ("/graphics/dri/gentoo", Fixture, NULL,
+              setup, test_dri_gentoo, teardown);
   g_test_add ("/graphics/dri/ubuntu16", Fixture, NULL,
               setup, test_dri_ubuntu16, teardown);
   g_test_add ("/graphics/dri/with_env", Fixture, NULL,

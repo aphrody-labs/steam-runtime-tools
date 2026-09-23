@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260922.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260923.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
     - Use graphics stack provider's lib/locale by default.
@@ -9,6 +9,11 @@ steam-runtime-tools (0.20260922.0) UNRELEASED; urgency=medium
     - `PRESSURE_VESSEL_WORKAROUNDS=avoid-provider-lib-locale`
        can be used to disable use of graphics stack provider's lib/locale
        if it becomes incompatible with the container's glibc
+    - When used to run the experimental steamrt3c Steam Client,
+      terminate when the main process terminates. This ensures that if
+      the containerized Steam Client crashes or is killed by an uncaught
+      signal, the rest of its process hierarchy will be cleaned up.
+      (steamrt/tasks#1099)
     - Update Flatpak-derived code to 1.18.3 (no functional change)
   * Update bubblewrap subproject to 0.13.0
     - When running on Linux kernel v5.2 or later (recommended),
@@ -20,7 +25,7 @@ steam-runtime-tools (0.20260922.0) UNRELEASED; urgency=medium
   * Tests/CI:
     - CI pipeline fixes
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 22 Sep 2026 17:30:33 +0100
+ -- Simon McVittie <smcv@collabora.com>  Wed, 23 Sep 2026 12:42:24 +0100
 
 steam-runtime-tools (0.20260914.0) steamrt; urgency=medium
 

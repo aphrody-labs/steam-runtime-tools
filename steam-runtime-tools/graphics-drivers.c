@@ -1003,9 +1003,30 @@ _srt_get_modules_from_loader_library (SrtSysroot *sysroot,
                                       GHashTable *drivers_set,
                                       GList **drivers_out)
 {
+  static const struct
+    {
+      SrtGraphicsModule module;
+      const char *suffix;
+    }
+  libdir_suffixes[] =
+    {
+        { SRT_GRAPHICS_DRI_MODULE, "dri" },
+        /* Used on Slackware according to
+         * https://github.com/ValveSoftware/steam-runtime/issues/318 */
+        { SRT_GRAPHICS_DRI_MODULE, "xorg/modules/dri" },
+
+        { SRT_GRAPHICS_GBM_MODULE, "gbm" },
+
+        { SRT_GRAPHICS_VAAPI_MODULE, "dri" },
+        /* Original path before 2009, still used on Gentoo according to
+         * https://github.com/ValveSoftware/steam-for-linux/issues/13554 */
+        { SRT_GRAPHICS_VAAPI_MODULE, "va/drivers" },
+
+        { SRT_GRAPHICS_VDPAU_MODULE, "vdpau" },
+    };
   g_autofree gchar *libdir = NULL;
-  g_autofree gchar *libdir_driver = NULL;
   const char * const *envp;
+  gboolean known_module_type = FALSE;
 
   g_return_if_fail (SRT_IS_SYSROOT (sysroot));
   g_return_if_fail (loader_path != NULL);
@@ -1015,60 +1036,32 @@ _srt_get_modules_from_loader_library (SrtSysroot *sysroot,
   libdir = g_path_get_dirname (loader_path);
   envp = _srt_subprocess_runner_get_environ (runner);
 
-  if (module == SRT_GRAPHICS_VDPAU_MODULE)
-    libdir_driver = g_build_filename (libdir, "vdpau", NULL);
-  else if (module == SRT_GRAPHICS_GBM_MODULE)
-    libdir_driver = g_build_filename (libdir, "gbm", NULL);
-  else
-    libdir_driver = g_build_filename (libdir, "dri", NULL);
-
-  if (!g_hash_table_contains (drivers_set, libdir_driver))
+  for (size_t i = 0; i < G_N_ELEMENTS (libdir_suffixes); i++)
     {
-      g_hash_table_add (drivers_set, g_strdup (libdir_driver));
-      _srt_get_modules_from_path (sysroot, runner,
-                                  arch_quark,
-                                  known_arch,
-                                  check_flags, libdir_driver, is_extra, module,
-                                  drivers_out);
-    }
-
-  if (module == SRT_GRAPHICS_DRI_MODULE)
-    {
-      /* Used on Slackware according to
-       * https://github.com/ValveSoftware/steam-runtime/issues/318 */
-      g_autofree gchar *slackware = g_build_filename (libdir, "xorg",
-                                                      "modules", "dri",
-                                                      NULL);
-
-      if (!g_hash_table_contains (drivers_set, slackware))
+      if (module == libdir_suffixes[i].module)
         {
-          _srt_get_modules_from_path (sysroot, runner,
-                                      arch_quark,
-                                      known_arch,
-                                      check_flags, slackware,
-                                      is_extra, module, drivers_out);
-          g_hash_table_add (drivers_set, g_steal_pointer (&slackware));
+          g_autofree gchar *libdir_driver = g_build_filename (libdir,
+                                                              libdir_suffixes[i].suffix,
+                                                              NULL);
+
+          if (!g_hash_table_contains (drivers_set, libdir_driver))
+            {
+              _srt_get_modules_from_path (sysroot, runner,
+                                          arch_quark,
+                                          known_arch,
+                                          check_flags,
+                                          libdir_driver,
+                                          is_extra,
+                                          module,
+                                          drivers_out);
+              g_hash_table_add (drivers_set, g_steal_pointer (&libdir_driver));
+            }
+
+          known_module_type = TRUE;
         }
     }
 
-  if (module == SRT_GRAPHICS_VAAPI_MODULE)
-    {
-      /* Used on Gentoo according to
-       * https://github.com/ValveSoftware/steam-for-linux/issues/13554 */
-      g_autofree gchar *gentoo = g_build_filename (libdir,
-                                                   "va", "drivers",
-                                                   NULL);
-
-      if (!g_hash_table_contains (drivers_set, gentoo))
-        {
-          _srt_get_modules_from_path (sysroot, runner,
-                                      arch_quark,
-                                      known_arch,
-                                      check_flags, gentoo,
-                                      is_extra, module, drivers_out);
-          g_hash_table_add (drivers_set, g_steal_pointer (&gentoo));
-        }
-    }
+  g_return_if_fail (known_module_type);
 
   if (!(check_flags & SRT_CHECK_FLAGS_SKIP_EXTRAS))
     {

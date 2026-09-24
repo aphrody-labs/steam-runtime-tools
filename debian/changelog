@@ -1,6 +1,11 @@
-steam-runtime-tools (0.20260923.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260924.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
+    - Fix capture of VA-API drivers in OS distributions that continued
+      to use the pre-2011 default directory, such as Gentoo
+      (steamrt/tasks#1143, steam-for-linux#13554)
+    - Capture more NGX libraries for the Nvidia proprietary driver
+      (steamrt/tasks#1136)
     - Use graphics stack provider's lib/locale by default.
       This avoids slow container startup when in SteamLinuxRuntime
       containers that are strictly newer than the host OS, for example
@@ -25,7 +30,7 @@ steam-runtime-tools (0.20260923.0) UNRELEASED; urgency=medium
   * Tests/CI:
     - CI pipeline fixes
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 23 Sep 2026 12:42:24 +0100
+ -- Simon McVittie <smcv@collabora.com>  Thu, 24 Sep 2026 16:54:25 +0100
 
 steam-runtime-tools (0.20260914.0) steamrt; urgency=medium
 

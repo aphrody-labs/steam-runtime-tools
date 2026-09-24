@@ -1051,6 +1051,25 @@ _srt_get_modules_from_loader_library (SrtSysroot *sysroot,
         }
     }
 
+  if (module == SRT_GRAPHICS_VAAPI_MODULE)
+    {
+      /* Used on Gentoo according to
+       * https://github.com/ValveSoftware/steam-for-linux/issues/13554 */
+      g_autofree gchar *gentoo = g_build_filename (libdir,
+                                                   "va", "drivers",
+                                                   NULL);
+
+      if (!g_hash_table_contains (drivers_set, gentoo))
+        {
+          _srt_get_modules_from_path (sysroot, runner,
+                                      arch_quark,
+                                      known_arch,
+                                      check_flags, gentoo,
+                                      is_extra, module, drivers_out);
+          g_hash_table_add (drivers_set, g_steal_pointer (&gentoo));
+        }
+    }
+
   if (!(check_flags & SRT_CHECK_FLAGS_SKIP_EXTRAS))
     {
       const GList *this_extra_path;

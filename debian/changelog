@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260924.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260925.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
     - Fix capture of VA-API drivers in OS distributions that continued
@@ -14,12 +14,17 @@ steam-runtime-tools (0.20260924.0) UNRELEASED; urgency=medium
     - `PRESSURE_VESSEL_WORKAROUNDS=avoid-provider-lib-locale`
        can be used to disable use of graphics stack provider's lib/locale
        if it becomes incompatible with the container's glibc
+    - Fix a regression introduced in 0.20260903.0 for users of pam_tmpdir
+      or pam_mktemp
+      (steamrt/tasks#1144, steam-runtime#855)
     - When used to run the experimental steamrt3c Steam Client,
       terminate when the main process terminates. This ensures that if
       the containerized Steam Client crashes or is killed by an uncaught
       signal, the rest of its process hierarchy will be cleaned up.
       (steamrt/tasks#1099)
     - Update Flatpak-derived code to 1.18.3 (no functional change)
+  * s-r-check-requirements:
+    - Add a mode to simulate failure (steamrt/tasks#1016)
   * Update bubblewrap subproject to 0.13.0
     - When running on Linux kernel v5.2 or later (recommended),
       in scenarios that involve automount points for unreachable networked
@@ -30,7 +35,7 @@ steam-runtime-tools (0.20260924.0) UNRELEASED; urgency=medium
   * Tests/CI:
     - CI pipeline fixes
 
- -- Simon McVittie <smcv@collabora.com>  Thu, 24 Sep 2026 16:54:25 +0100
+ -- Simon McVittie <smcv@collabora.com>  Fri, 25 Sep 2026 15:06:23 +0100
 
 steam-runtime-tools (0.20260914.0) steamrt; urgency=medium
 

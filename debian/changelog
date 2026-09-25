@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20260925.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20260925.0) steamrt; urgency=medium
 
   * pressure-vessel:
     - Fix capture of VA-API drivers in OS distributions that continued
@@ -35,7 +35,7 @@ steam-runtime-tools (0.20260925.0) UNRELEASED; urgency=medium
   * Tests/CI:
     - CI pipeline fixes
 
- -- Simon McVittie <smcv@collabora.com>  Fri, 25 Sep 2026 15:18:26 +0100
+ -- Simon McVittie <smcv@collabora.com>  Fri, 25 Sep 2026 15:19:17 +0100
 
 steam-runtime-tools (0.20260914.0) steamrt; urgency=medium
 

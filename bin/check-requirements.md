@@ -28,6 +28,20 @@ steam-runtime-check-requirements - perform checks to ensure that the Steam clien
 :   Instead of performing the checks, write in output the version number as
     YAML.
 
+# ENVIRONMENT
+
+<dl>
+<dt>
+
+`SRT_CHECK_REQUIREMENTS_FAIL` (boolean)
+
+</dt><dd>
+
+If set to 1, pretend that the Steam Client requirements are not met.
+
+</dd>
+</dl>
+
 # OUTPUT
 
 If all the Steam client requirements are met the output on standard output

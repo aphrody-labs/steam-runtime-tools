@@ -1537,12 +1537,14 @@ main (int argc,
         }
     }
 
-  env_edits = g_variant_ref_sink (g_variant_new_variant (g_variant_builder_end (&edit_env_builder)));
+  env_edits = g_variant_ref_sink (g_variant_builder_end (&edit_env_builder));
+
   if (g_variant_n_children (env_edits) > 0)
     {
       if (api == &launcher_api)
         {
-          g_variant_builder_add (&options_builder, "{s@v}", "edit-env", env_edits);
+          g_variant_builder_add (&options_builder, "{s@v}",
+                                 "edit-env", g_variant_new_variant (env_edits));
         }
       else
         {

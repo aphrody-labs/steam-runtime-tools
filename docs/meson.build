@@ -3,6 +3,7 @@
 
 man5 = [
   'steam-runtime-emulator.json',
+  'steam-runtime-graphics-provider.json',
 ]
 
 if build_gtk_doc

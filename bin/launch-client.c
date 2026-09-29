@@ -1359,7 +1359,9 @@ main (int argc,
           else
             {
               g_autofree gchar *record = g_strdup_printf ("set=%s=%s", (char *)key, (char *)value);
+              g_autofree gchar *escaped = g_strescape (record, NULL);
 
+              g_debug ("Converting non-UTF-8 key or value into an edit: %s", escaped);
               g_variant_builder_add (&edit_env_builder, "^ay", record);
             }
         }
@@ -1464,7 +1466,9 @@ main (int argc,
                   else
                     {
                       g_autofree gchar *record = g_strdup_printf ("unset=%s", (char *)key);
+                      g_autofree gchar *escaped = g_strescape (record, NULL);
 
+                      g_debug ("Converting non-UTF-8 unset into an edit: %s", escaped);
                       g_variant_builder_add (&edit_env_builder, "^ay", record);
                     }
                 }
@@ -1516,25 +1520,31 @@ main (int argc,
           if (edit->prepend != NULL)
             {
               g_autofree gchar *record = g_strdup_printf ("prepend=%s=%s", var, edit->prepend);
+              g_autofree gchar *escaped = g_strescape (record, NULL);
 
+              g_debug ("Will edit environment: %s", escaped);
               g_variant_builder_add (&edit_env_builder, "^ay", record);
             }
 
           if (edit->append != NULL)
             {
               g_autofree gchar *record = g_strdup_printf ("append=%s=%s", var, edit->append);
+              g_autofree gchar *escaped = g_strescape (record, NULL);
 
+              g_debug ("Will edit environment: %s", escaped);
               g_variant_builder_add (&edit_env_builder, "^ay", record);
             }
         }
     }
 
-  env_edits = g_variant_ref_sink (g_variant_new_variant (g_variant_builder_end (&edit_env_builder)));
+  env_edits = g_variant_ref_sink (g_variant_builder_end (&edit_env_builder));
+
   if (g_variant_n_children (env_edits) > 0)
     {
       if (api == &launcher_api)
         {
-          g_variant_builder_add (&options_builder, "{s@v}", "edit-env", env_edits);
+          g_variant_builder_add (&options_builder, "{s@v}",
+                                 "edit-env", g_variant_new_variant (env_edits));
         }
       else
         {

@@ -25,11 +25,14 @@ There are two main components involved in providing libraries to Steam and
 Steam games:
 
 - The [traditional Steam Runtime][ldlp],
-    implemented in terms of `LD_LIBRARY_PATH`.
-    In a working Steam installation,
-    `~/.steam/root/ubuntu12_32/steam-runtime` provides
-    [Steam Runtime 1 'scout'][scout],
-    based on Ubuntu 12.04, as a `LD_LIBRARY_PATH` runtime.
+    implemented in terms of `LD_LIBRARY_PATH`,
+    is only used for [Steam Runtime 1 'scout'][scout].
+    The [Legacy Steam Runtime][] packages this as a compatibility tool,
+    found in `.../steamapps/common/LegacySteamRuntime`,
+    with the actual `LD_LIBRARY_PATH` runtime in
+    found in `.../steamapps/common/LegacySteamRuntime/steam-runtime`.
+    In the default 32-bit Steam Client,
+    `~/.steam/root/ubuntu12_32/steam-runtime` is another copy of scout.
 
 - The [container runtime framework][container runtime],
     implemented in terms of containers launched by the pressure-vessel tool.
@@ -680,6 +683,7 @@ container runtime on a new distribution, in particular:
 [EGL ICD enumeration]: https://github.com/NVIDIA/libglvnd/blob/v1.4.0/src/EGL/icd_enumeration.md
 [FHS]: https://en.wikipedia.org/wiki/Filesystem_Hierarchy_Standard
 [Floating Point]: https://store.steampowered.com/app/302380/Floating_Point/
+[Legacy Steam Runtime]: legacy-steam-runtime.md
 [Life is Strange]: https://store.steampowered.com/app/319630/Life_is_Strange__Episode_1/
 [Proton documentation]: https://github.com/ValveSoftware/Proton/
 [Reporting SteamLinuxRuntime bugs]: https://github.com/ValveSoftware/steam-runtime/blob/master/doc/reporting-steamlinuxruntime-bugs.md

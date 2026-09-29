@@ -24,16 +24,6 @@ available to use as a reference for how it normally fits together.
 There are two main components involved in providing libraries to Steam and
 Steam games:
 
-- The [traditional Steam Runtime][ldlp],
-    implemented in terms of `LD_LIBRARY_PATH`,
-    is only used for [Steam Runtime 1 'scout'][scout].
-    The [Legacy Steam Runtime][] packages this as a compatibility tool,
-    found in `.../steamapps/common/LegacySteamRuntime`,
-    with the actual `LD_LIBRARY_PATH` runtime in
-    found in `.../steamapps/common/LegacySteamRuntime/steam-runtime`.
-    In the default 32-bit Steam Client,
-    `~/.steam/root/ubuntu12_32/steam-runtime` is another copy of scout.
-
 - The [container runtime framework][container runtime],
     implemented in terms of containers launched by the pressure-vessel tool.
     Instances of this can be found in
@@ -51,6 +41,16 @@ Steam games:
     [Steam Runtime 3c][steamrt3c],
     installed in
     `~/.steam/root/steamrt64/pv-runtime/steam-runtime-steamrt`.
+
+- The [traditional Steam Runtime][ldlp],
+    implemented in terms of `LD_LIBRARY_PATH`,
+    is only used for [Steam Runtime 1 'scout'][scout].
+    The [Legacy Steam Runtime][] packages this as a compatibility tool,
+    found in `.../steamapps/common/LegacySteamRuntime`,
+    with the actual `LD_LIBRARY_PATH` runtime in
+    found in `.../steamapps/common/LegacySteamRuntime/steam-runtime`.
+    In the default 32-bit Steam Client,
+    `~/.steam/root/ubuntu12_32/steam-runtime` is another copy of scout.
 
 To improve long-term compatibility with older native Linux games, there
 is also a special container runtime

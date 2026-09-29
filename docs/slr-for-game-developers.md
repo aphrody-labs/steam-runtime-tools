@@ -217,8 +217,8 @@ It is sometimes useful to try beta versions of the various compatibility
 tools.
 This is the same as [switching a game to a beta branch][], except that
 instead of accessing the properties of the game, you would access the
-properties of a compatibility tool such as *Steam Linux Runtime 2.0 (soldier)*
-or *Proton 6.3*.
+properties of a compatibility tool such as *Steam Linux Runtime 4.0*
+or *Proton 11*.
 
 ## Launching Steam games in a Steam Linux Runtime container
 
@@ -228,7 +228,17 @@ To run Windows games using Proton in a Steam Linux Runtime container:
   * Select `Force the use of a specific Steam Play compatibility tool`
   * Select Proton 5.13 or later
 
-To run Linux games in a *Steam Linux Runtime 1.0 (scout)* container:
+Newer Linux games automatically run in a Steam Linux Runtime container
+of the appropriate major version,
+but this can be forced by following these steps:
+
+  * Edit the Properties of the game in the Steam client
+  * Select `Force the use of a specific Steam Play compatibility tool`
+  * Select the appropriate `Steam Linux Runtime` major version
+
+Running older Linux games in a *Steam Linux Runtime 1.0 (scout)* container
+is the default,
+but it can be forced by following these steps:
 
   * Edit the Properties of the game in the Steam client
   * Select `Force the use of a specific Steam Play compatibility tool`
@@ -237,7 +247,7 @@ To run Linux games in a *Steam Linux Runtime 1.0 (scout)* container:
 This will automatically download *Steam Linux Runtime 2.0 (soldier)*,
 *Steam Linux Runtime 3.0 (sniper)* or
 *Steam Linux Runtime 4.0*,
-together with Proton and/or *Steam Linux Runtime 1.0 (scout)*,
+together with Proton and/or *Steam Linux Runtime 1.0 (scout)* if used,
 into your default Steam library.
 
 ## <a name="s-r-launch-options"></a>Using steam-runtime-launch-options

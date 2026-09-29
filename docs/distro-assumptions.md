@@ -393,6 +393,8 @@ must provide these.
 Libraries that are tightly coupled to the graphics drivers, such as
 Mesa's `libgbm.so.1`, must also be provided by the host operating system.
 
+Both 32-bit and 64-bit graphics drivers are required.
+
 The operating system needs to provide GLX drivers, for which a GLVND-based
 driver stack is recommended.
 For a GLVND-based driver stack, the driver libraries `libGLX_*.so.0`

@@ -318,6 +318,25 @@ Some environment variables are set by Steam, including:
 
     Used to load the Steam Overlay.
 
+* `PATH`:
+
+    In the experimental 64-bit/steamrt3c branch of the Steam Client,
+    a directory containing basic Steam Runtime executables is
+    prepended to the `PATH`.
+    These executables may be assumed to be present:
+
+    * [**srt-logger**(1)][srt-logger]
+    * [**steam-runtime-launch-client**(1)][steam-runtime-launch-client]
+    * [**steam-runtime-launch-options**(1)][steam-runtime-launch-options]
+    * [**steam-runtime-steam-remote**(1)][steam-runtime-steam-remote]
+    * [**steam-runtime-supervisor**(1)][steam-runtime-supervisor]
+
+    Other executables may be added in future Steam releases.
+
+    In the legacy [scout `LD_LIBRARY_PATH` runtime][ldlp],
+    a different directory containing at least the same executables
+    is prepended to the `PATH`.
+
 * `STEAM_COMPAT_APP_ID`:
 
     The decimal app-ID of the game, for example 440 for Team Fortress 2.
@@ -804,7 +823,11 @@ unless this is set to the game's top-level directory.
 [sdl2-compat]: https://github.com/libsdl-org/sdl2-compat/
 [sniper]: container-runtime.md#sniper
 [soldier]: container-runtime.md#soldier
+[srt-logger]: ../bin/logger.md
 [steamrt4]: container-runtime.md#steamrt4
 [steam-runtime-emulator.json(5)]: steam-runtime-emulator.json.5.md
 [steam-runtime-graphics-provider.json(5)]: steam-runtime-graphics-provider.json.5.md
+[steam-runtime-launch-client]: ../bin/launch-client.md
 [steam-runtime-launch-options]: ../bin/launch-options.md
+[steam-runtime-steam-remote]: ../bin/steam-remote.md
+[steam-runtime-supervisor]: ../bin/supervisor.md

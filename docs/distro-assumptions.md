@@ -34,13 +34,20 @@ Steam games:
 - The [container runtime framework][container runtime],
     implemented in terms of containers launched by the pressure-vessel tool.
     Instances of this can be found in
-    `.../steamapps/common/SteamLinuxRuntime_soldier`,
+    `.../steamapps/common/SteamLinuxRuntime_4`,
     `.../steamapps/common/SteamLinuxRuntime_sniper` and/or
-    `~/.steam/root/ubuntu12_64/steam-runtime-sniper`.
-    [Steam Linux Runtime 2.0 'soldier'][soldier]
-    is based on Debian 10.
+    `.../steamapps/common/SteamLinuxRuntime_soldier`.
+    [Steam Linux Runtime 4.0][steamrt4]
+    is based on Debian 13.
     [Steam Linux Runtime 3.0 'sniper'][sniper]
     is based on Debian 11.
+    [Steam Linux Runtime 2.0 'soldier'][soldier]
+    is based on Debian 10.
+    There is also a special-purpose container runtime used by the
+    Steam Client itself,
+    [Steam Runtime 3c][steamrt3c],
+    installed in
+    `~/.steam/root/steamrt64/pv-runtime/steam-runtime-steamrt`.
 
 To improve long-term compatibility with older native Linux games, there
 is also a special container runtime
@@ -694,6 +701,8 @@ container runtime on a new distribution, in particular:
 [scout]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/scout/README.md
 [sniper]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/sniper/README.md
 [soldier]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/soldier/README.md
+[steamrt3c]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/steamrt3c/README.md
+[steamrt4]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/steamrt4/README.md
 [steam-runtime#791]: https://github.com/ValveSoftware/steam-runtime/issues/791
 [systemd]: https://systemd.io/
 [user namespace requirements]: https://github.com/flatpak/flatpak/wiki/User-namespace-requirements

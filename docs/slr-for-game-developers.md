@@ -844,7 +844,7 @@ for full details.
 
 ### Private home directory
 
-The Steam Linux Runtime has experimental support for giving each game
+The Steam Linux Runtime has an experimental feature that gives each game
 a private (virtualized) home directory.
 In this mode, the user's real home directory is *not* shared with the game.
 Instead, a directory on the host system is used as a "fake" home directory

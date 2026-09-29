@@ -44,12 +44,17 @@ Each compatibility tool can have these fields:
 * `from_oslist`:
 
     Operating system(s?) whose executables can be run by this
-    compatibility tool, for example `windows` for Proton
+    compatibility tool.
+    For example,
+    Proton runs Windows PE executables,
+    so it sets this field to `windows`.
 
 * `to_oslist`:
 
-    Operating system(s?) that can run this compatibility tool,
-    for example `linux` for Proton
+    Operating system(s?) that can run this compatibility tool.
+    For example,
+    Proton runs on Linux as an ELF executable,
+    so it sets this field to `linux`.
 
 For the compatibility tools provided by Steam itself, such as
 Steam Linux Runtime and Proton, the equivalent of this information is

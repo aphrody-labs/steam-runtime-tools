@@ -1546,10 +1546,11 @@ of this file.
 When running under the `pressure-vessel` container manager used by the
 Steam Linux Runtime, the file `/run/host/container-manager` will contain
 `pressure-vessel` followed by a newline.
-The same file can be used to detect Flatpak ≥ 1.10.x, which
-are identified as `flatpak` followed by a newline.
-To support Flatpak 1.8.x or older, check whether the file `/.flatpak-info`
-exists.
+The same file can be used to detect Flatpak,
+which is identified as `flatpak` followed by a newline.
+
+A Flatpak container can also be identified by the existence of
+a file named `/.flatpak-info` in the root directory.
 
 ### Input devices
 

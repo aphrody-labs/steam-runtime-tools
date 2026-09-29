@@ -1557,8 +1557,9 @@ a file named `/.flatpak-info` in the root directory.
 *Linux-native only*
 
 For best results, either use the [Steam Input][] APIs, or use a
-middleware library with container support (such as SDL 2) to access
-input devices more directly.
+middleware library with container support
+(such as SDL 2 or later)
+to access input devices more directly.
 This ensures that your game will automatically detect new hotplugged
 controllers, even across a container boundary.
 

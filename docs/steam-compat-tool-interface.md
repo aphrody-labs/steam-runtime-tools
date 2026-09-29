@@ -577,9 +577,16 @@ pointing to mixed host and soldier libraries.
 
 This is the simplest situation and can be considered to be the baseline.
 
-In recent versions of Steam, the game process is wrapped in a `reaper`
-process which sets itself as a subreaper using `PR_SET_CHILD_SUBREAPER`
-(see [**prctl**(2)][prctl] for details).
+The game process is wrapped in a `steam-launch-wrapper` process,
+which sets up various aspects of the execution environment,
+such as closing inherited file descriptors.
+This process uses **execve**(2) to replace itself with the next process
+in the launch pipeline.
+
+Next,
+the game process is wrapped in a `reaper` process,
+which sets itself as a subreaper using
+[**PR_SET_CHILD_SUBREAPER**(2)][PR_SET_CHILD_SUBREAPER].
 
 Version 1 compat tools are not invoked specially.
 
@@ -618,8 +625,10 @@ The [launch options](#launch-options) are used.
 
 Some Windows games, such as Soldat (638490), do not have an
 "install script" in their metadata. Running these games behaves much the
-same as a native Linux game: it is wrapped in a subreaper, version 1
-compat tools are not invoked specially, and version 2 compat tools
+same as a native Linux game:
+it is wrapped in `steam-launch-wrapper` and a subreaper,
+version 1 compat tools are not invoked specially,
+and version 2 compat tools
 are invoked with a `%verb%` in the `commandline` (if any) replaced by
 `waitforexitandrun`.
 
@@ -742,6 +751,9 @@ to run before it could be launched. They were invoked like this:
 
 ## Non-Steam games
 
+Non-Steam game shortcuts are wrapped in `steam-launch-wrapper` and `reaper`
+in the same way as Steam games.
+
 Version 1 compat tools are not invoked specially.
 
 Version 2 compat tools are invoked with a `%verb%` in the `commandline`
@@ -776,6 +788,7 @@ unless this is set to the game's top-level directory.
 
 [FEX]: https://github.com/FEX-Emu/FEX
 [Legacy Steam Runtime]: legacy-steam-runtime.md
+[PR_SET_CHILD_SUBREAPER]: https://manpages.debian.org/unstable/manpages-dev/PR_SET_CHILD_SUBREAPER.2const.en.html
 [SDL_DYNAMIC_API]: https://github.com/libsdl-org/SDL/blob/SDL2/docs/README-dynapi.md
 [SDL3_DYNAMIC_API]: https://github.com/libsdl-org/SDL/blob/main/docs/README-dynapi.md
 [Steamworks launch options]: https://partner.steamgames.com/doc/sdk/uploading
@@ -787,7 +800,6 @@ unless this is set to the game's top-level directory.
 [install scripts]: https://partner.steamgames.com/doc/sdk/installscripts
 [ldlp]: ld-library-path-runtime.md
 [multiarch tuples]: https://wiki.debian.org/Multiarch/Tuples
-[prctl]: https://manpages.debian.org/unstable/manpages-dev/prctl.2.en.html
 [scout-on-soldier]: container-runtime.md#steam-linux-runtime-scout-on-soldier
 [sdl2-compat]: https://github.com/libsdl-org/sdl2-compat/
 [sniper]: container-runtime.md#sniper

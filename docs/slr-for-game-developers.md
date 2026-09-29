@@ -514,11 +514,9 @@ to request it.
 The scope cgroup will typically have a name like
 `app-steam-app975370-12345.scope`.
 
-This is not currently effective for non-Steam games (shortcuts).
-If a non-Steam game is run under a container runtime,
-then setting `PRESSURE_VESSEL_SYSTEMD_SCOPE=1` has a similar effect.
-In this case the scope cgroup will typically have a name like
-`app-steam-unknown-12345.scope`.
+For non-Steam games (shortcuts),
+because the Steam app-ID is undefined,
+instead the scope cgroup will have a name like `app-steam-app0-12345.scope`.
 
 ## <a name="shell"></a>Running in an interactive shell
 

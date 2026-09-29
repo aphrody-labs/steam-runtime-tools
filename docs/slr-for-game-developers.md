@@ -202,6 +202,8 @@ Proton versions 8 to 10 use a
 and Proton versions 5.13 to 7.0 use a
 *Steam Linux Runtime 2.0 (soldier)* container.
 
+Very old versions of Proton used the equivalent of the *Legacy Steam Runtime*.
+
 ## Suggested Steam configuration
 
 You can move compatibility tools between Steam libraries through
@@ -215,8 +217,8 @@ It is sometimes useful to try beta versions of the various compatibility
 tools.
 This is the same as [switching a game to a beta branch][], except that
 instead of accessing the properties of the game, you would access the
-properties of a compatibility tool such as *Steam Linux Runtime 2.0 (soldier)*
-or *Proton 6.3*.
+properties of a compatibility tool such as *Steam Linux Runtime 4.0*
+or *Proton 11*.
 
 ## Launching Steam games in a Steam Linux Runtime container
 
@@ -226,7 +228,17 @@ To run Windows games using Proton in a Steam Linux Runtime container:
   * Select `Force the use of a specific Steam Play compatibility tool`
   * Select Proton 5.13 or later
 
-To run Linux games in a *Steam Linux Runtime 1.0 (scout)* container:
+Newer Linux games automatically run in a Steam Linux Runtime container
+of the appropriate major version,
+but this can be forced by following these steps:
+
+  * Edit the Properties of the game in the Steam client
+  * Select `Force the use of a specific Steam Play compatibility tool`
+  * Select the appropriate `Steam Linux Runtime` major version
+
+Running older Linux games in a *Steam Linux Runtime 1.0 (scout)* container
+is the default,
+but it can be forced by following these steps:
 
   * Edit the Properties of the game in the Steam client
   * Select `Force the use of a specific Steam Play compatibility tool`
@@ -235,7 +247,7 @@ To run Linux games in a *Steam Linux Runtime 1.0 (scout)* container:
 This will automatically download *Steam Linux Runtime 2.0 (soldier)*,
 *Steam Linux Runtime 3.0 (sniper)* or
 *Steam Linux Runtime 4.0*,
-together with Proton and/or *Steam Linux Runtime 1.0 (scout)*,
+together with Proton and/or *Steam Linux Runtime 1.0 (scout)* if used,
 into your default Steam library.
 
 ## <a name="s-r-launch-options"></a>Using steam-runtime-launch-options
@@ -286,7 +298,7 @@ an easy way to test that the compatibility tool is working correctly.
 
 For a more scriptable version of this, run one of these commands:
 
-  * Steam Linux Runtime 4.0: `steam steam://install/4183110`
+  * Steam Linux Runtime 4.0 for x86: `steam steam://install/4183110`
   * Steam Linux Runtime 4.0 for arm64: `steam steam://install/4185400`
   * Steam Linux Runtime 3.0 (sniper): `steam steam://install/1628350`
   * Steam Linux Runtime 2.0 (soldier): `steam steam://install/1391110`
@@ -502,11 +514,9 @@ to request it.
 The scope cgroup will typically have a name like
 `app-steam-app975370-12345.scope`.
 
-This is not currently effective for non-Steam games (shortcuts).
-If a non-Steam game is run under a container runtime,
-then setting `PRESSURE_VESSEL_SYSTEMD_SCOPE=1` has a similar effect.
-In this case the scope cgroup will typically have a name like
-`app-steam-unknown-12345.scope`.
+For non-Steam games (shortcuts),
+because the Steam app-ID is undefined,
+instead the scope cgroup will have a name like `app-steam-app0-12345.scope`.
 
 ## <a name="shell"></a>Running in an interactive shell
 
@@ -832,7 +842,7 @@ for full details.
 
 ### Private home directory
 
-The Steam Linux Runtime has experimental support for giving each game
+The Steam Linux Runtime has an experimental feature that gives each game
 a private (virtualized) home directory.
 In this mode, the user's real home directory is *not* shared with the game.
 Instead, a directory on the host system is used as a "fake" home directory
@@ -1534,18 +1544,20 @@ of this file.
 When running under the `pressure-vessel` container manager used by the
 Steam Linux Runtime, the file `/run/host/container-manager` will contain
 `pressure-vessel` followed by a newline.
-The same file can be used to detect Flatpak ≥ 1.10.x, which
-are identified as `flatpak` followed by a newline.
-To support Flatpak 1.8.x or older, check whether the file `/.flatpak-info`
-exists.
+The same file can be used to detect Flatpak,
+which is identified as `flatpak` followed by a newline.
+
+A Flatpak container can also be identified by the existence of
+a file named `/.flatpak-info` in the root directory.
 
 ### Input devices
 
 *Linux-native only*
 
 For best results, either use the [Steam Input][] APIs, or use a
-middleware library with container support (such as SDL 2) to access
-input devices more directly.
+middleware library with container support
+(such as SDL 2 or later)
+to access input devices more directly.
 This ensures that your game will automatically detect new hotplugged
 controllers, even across a container boundary.
 

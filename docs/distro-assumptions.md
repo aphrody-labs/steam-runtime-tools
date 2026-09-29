@@ -24,23 +24,33 @@ available to use as a reference for how it normally fits together.
 There are two main components involved in providing libraries to Steam and
 Steam games:
 
-- The [traditional Steam Runtime][ldlp],
-    implemented in terms of `LD_LIBRARY_PATH`.
-    In a working Steam installation,
-    `~/.steam/root/ubuntu12_32/steam-runtime` provides
-    [Steam Runtime 1 'scout'][scout],
-    based on Ubuntu 12.04, as a `LD_LIBRARY_PATH` runtime.
-
 - The [container runtime framework][container runtime],
     implemented in terms of containers launched by the pressure-vessel tool.
     Instances of this can be found in
-    `.../steamapps/common/SteamLinuxRuntime_soldier`,
+    `.../steamapps/common/SteamLinuxRuntime_4`,
     `.../steamapps/common/SteamLinuxRuntime_sniper` and/or
-    `~/.steam/root/ubuntu12_64/steam-runtime-sniper`.
-    [Steam Linux Runtime 2.0 'soldier'][soldier]
-    is based on Debian 10.
+    `.../steamapps/common/SteamLinuxRuntime_soldier`.
+    [Steam Linux Runtime 4.0][steamrt4]
+    is based on Debian 13.
     [Steam Linux Runtime 3.0 'sniper'][sniper]
     is based on Debian 11.
+    [Steam Linux Runtime 2.0 'soldier'][soldier]
+    is based on Debian 10.
+    There is also a special-purpose container runtime used by the
+    Steam Client itself,
+    [Steam Runtime 3c][steamrt3c],
+    installed in
+    `~/.steam/root/steamrt64/pv-runtime/steam-runtime-steamrt`.
+
+- The [traditional Steam Runtime][ldlp],
+    implemented in terms of `LD_LIBRARY_PATH`,
+    is only used for [Steam Runtime 1 'scout'][scout].
+    The [Legacy Steam Runtime][] packages this as a compatibility tool,
+    found in `.../steamapps/common/LegacySteamRuntime`,
+    with the actual `LD_LIBRARY_PATH` runtime in
+    found in `.../steamapps/common/LegacySteamRuntime/steam-runtime`.
+    In the default 32-bit Steam Client,
+    `~/.steam/root/ubuntu12_32/steam-runtime` is another copy of scout.
 
 To improve long-term compatibility with older native Linux games, there
 is also a special container runtime
@@ -383,6 +393,8 @@ must provide these.
 Libraries that are tightly coupled to the graphics drivers, such as
 Mesa's `libgbm.so.1`, must also be provided by the host operating system.
 
+Both 32-bit and 64-bit graphics drivers are required.
+
 The operating system needs to provide GLX drivers, for which a GLVND-based
 driver stack is recommended.
 For a GLVND-based driver stack, the driver libraries `libGLX_*.so.0`
@@ -673,6 +685,7 @@ container runtime on a new distribution, in particular:
 [EGL ICD enumeration]: https://github.com/NVIDIA/libglvnd/blob/v1.4.0/src/EGL/icd_enumeration.md
 [FHS]: https://en.wikipedia.org/wiki/Filesystem_Hierarchy_Standard
 [Floating Point]: https://store.steampowered.com/app/302380/Floating_Point/
+[Legacy Steam Runtime]: legacy-steam-runtime.md
 [Life is Strange]: https://store.steampowered.com/app/319630/Life_is_Strange__Episode_1/
 [Proton documentation]: https://github.com/ValveSoftware/Proton/
 [Reporting SteamLinuxRuntime bugs]: https://github.com/ValveSoftware/steam-runtime/blob/master/doc/reporting-steamlinuxruntime-bugs.md
@@ -694,6 +707,8 @@ container runtime on a new distribution, in particular:
 [scout]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/scout/README.md
 [sniper]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/sniper/README.md
 [soldier]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/soldier/README.md
+[steamrt3c]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/steamrt3c/README.md
+[steamrt4]: https://gitlab.steamos.cloud/steamrt/steamrt/-/blob/steamrt/steamrt4/README.md
 [steam-runtime#791]: https://github.com/ValveSoftware/steam-runtime/issues/791
 [systemd]: https://systemd.io/
 [user namespace requirements]: https://github.com/flatpak/flatpak/wiki/User-namespace-requirements

@@ -26,8 +26,6 @@ Each library is provided as both a 64-bit build and a 32-bit build.
 The Steam client itself is run in an environment that adds the shared
 libraries to the library loading path, using the `LD_LIBRARY_PATH`
 environment variable.
-Games that do not use a [container runtime][]
-are also run in this environment.
 Here's a diagram of the situation:
 
     |----------------------------
@@ -36,17 +34,21 @@ Here's a diagram of the situation:
     |    |
     |    \- steam.sh
     |         |
-    |      .- \-run.sh- - - - - - - - - -
+    |      .- \-run.sh- - - - - - - - - - - - - - - -
     |      .    |            steam-runtime (scout)
     |      .    |
     |      .    \- steam binary
     |      .         |
-    |      .         \- The game
+    |      .      .- \- A compatibility tool- - - - -
+    |      .      .      |
+    |      .      .      \- The game
 
-Outside the Steam Runtime (outside the dotted line), all libraries come
+Outside the Steam Runtime
+(outside the outer dotted line),
+all libraries come
 from the operating system or from user configuration.
 
-In the Steam Runtime environment (inside the dotted line), each library
+In the Steam Runtime environment (inside the outer dotted line), each library
 required by a game or application is chosen like this:
 
   * If the library is not provided by the Steam Runtime, then the version
@@ -96,6 +98,13 @@ required by a game or application is chosen like this:
 Documentation in the `steamrt` "metapackage" provides
 [more information about scout][scout].
 
+Historically,
+Steam games were also run in the same `LD_LIBRARY_PATH`-based environment.
+Each Steam game is now run wrapped in a separate compatibility tool,
+which can either be a [container runtime][],
+the [Legacy Steam Runtime][],
+or a more complex compatibility tool such as Proton.
+
 More technical background on the Steam Runtime is available in a talk
 recorded at FOSDEM 2020: [Containers and Steam][].
 
@@ -131,6 +140,7 @@ See the copyright information included in the Steam Runtime for details.
 
 [Containers and Steam]: https://archive.fosdem.org/2020/schedule/event/containers_steam/
 [Debian]: https://www.debian.org/
+[Legacy Steam Runtime]: legacy-steam-runtime.md
 [Steam Linux Runtime]: container-runtime.md
 [Steam Runtime issues]: https://github.com/ValveSoftware/steam-runtime/issues
 [Ubuntu]: https://ubuntu.com/

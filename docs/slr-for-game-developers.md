@@ -202,6 +202,8 @@ Proton versions 8 to 10 use a
 and Proton versions 5.13 to 7.0 use a
 *Steam Linux Runtime 2.0 (soldier)* container.
 
+Very old versions of Proton used the equivalent of the *Legacy Steam Runtime*.
+
 ## Suggested Steam configuration
 
 You can move compatibility tools between Steam libraries through

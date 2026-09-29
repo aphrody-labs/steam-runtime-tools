@@ -133,6 +133,7 @@ is a [VDF][] text file with one top-level entry, `manifest`.
     is offered.
     Larger positive numbers are interpreted as higher-priority.
     This allows Steam to offer only "Steam Linux Runtime 1.0 (scout)"
+    and "Legacy Steam Runtime" as valid choices
     for historical native Linux games (which require/assume the scout ABI),
     while keeping later SLR branches available internally.
     Games' metadata can override this field to select a different
@@ -145,9 +146,18 @@ is a [VDF][] text file with one top-level entry, `manifest`.
 * `require_tool_appid`:
 
     If set, this compatibility tool needs to be wrapped in another
-    compatibility tool, specified by its numeric Steam app ID. For
-    example, Proton 5.13 needs to be wrapped by
-    "Steam Linux Runtime 2.0 (soldier)", so it sets this field to `1391110`.
+    compatibility tool, specified by its numeric Steam app ID.
+
+    For example,
+    Proton 5.13 needs to be wrapped by "Steam Linux Runtime 2.0 (soldier)",
+    so it sets this field to `1391110`.
+
+    Some very old compatibility tools,
+    such as Proton 5.0 or older,
+    expect to be run in an environment compatible with the
+    Steam Runtime 1 'scout' [`LD_LIBRARY_PATH` runtime][ldlp].
+    These compatibility tools can set this field to `4690330`,
+    the app-ID of the [Legacy Steam Runtime][].
 
 * `unlisted`:
 
@@ -170,10 +180,17 @@ is a [VDF][] text file with one top-level entry, `manifest`.
 
 ## The legacy `LD_LIBRARY_PATH` Steam Runtime
 
-Older native Linux games on desktop systems (but usually not on Steam Deck)
-are run in the [scout `LD_LIBRARY_PATH` runtime][ldlp].
-This is an older mechanism than the compatibility tool interface, and does
-not have a tool manifest or a compatibility tool declaration.
+Games can be configured to run under the `Legacy Steam Runtime`
+compatibility tool,
+app-ID 4690330.
+This tool provides the [scout `LD_LIBRARY_PATH` runtime][ldlp].
+
+Historically,
+games with no special configuration would be run under the `LD_LIBRARY_PATH`
+runtime without going through any particular compatibility tool layers,
+but this is no longer done:
+older native Linux games are now run under
+[Steam Linux Runtime 1.0 (scout)][scout-on-soldier] by default.
 
 ## Command-line
 
@@ -205,7 +222,26 @@ look something like this:
 (In reality it would all be one line, rather than having escaped newlines
 as shown here.)
 
-For historical reasons, this command-line is normally run in the
+In the experimental 64-bit/steamrt3c branch of the Steam Client,
+the launch command-line is run in an environment that resembles
+the host system,
+and does not implicitly provide additional libraries or compatibility layers.
+Compatibility tools that do not already depend on another compatibility
+tool must be prepared to operate correctly in this situation.
+
+Similarly,
+for non-Steam game shortcuts,
+this command-line is normally run in an execution environment resembling
+the host operating system environment
+(even in the 32-bit/scout branch of the Steam Client).
+
+If a compatibility tool requires the
+[scout `LD_LIBRARY_PATH` runtime][ldlp] environment,
+it should now declare a dependency on the [Legacy Steam Runtime][],
+app-ID `4690330`.
+
+For Steam games in the 32-bit/scout branch of the Steam Client,
+for historical reasons this command-line is normally run in the
 [scout `LD_LIBRARY_PATH` runtime][ldlp] environment.
 Most compatibility tools that do not already depend on another
 compatibility tool will want to start by "escaping" from the scout
@@ -215,12 +251,6 @@ command wrapped with
 `"$STEAM_RUNTIME/scripts/switch-runtime.sh" --runtime="" --`.
 See the `undo_steamrt` function in that script for more details of what
 that means in practice.
-
-Conversely, for non-Steam game shortcuts, this command-line is normally
-run in an execution environment resembling the host operating system
-environment.
-Compatibility tools that do not already depend on another compatibility
-tool should be prepared to operate correctly in this situation.
 
 ## Launch options
 
@@ -254,8 +284,24 @@ Please note that not all invocations of compatibility tools take the
 user-specified launch options into account: they are used when running
 the actual game, but they are not used for install scripts.
 
-Because the launch options are part of the command-line, they are run
-in the [scout `LD_LIBRARY_PATH` runtime][ldlp] environment.
+In the experimental 64-bit/steamrt3c branch of the Steam Client,
+or when launching a non-Steam game shortcut,
+the launch options are run in an environment that resembles
+the host system.
+A directory containing basic Steam Runtime executables is prepended
+to the `PATH`:
+in particular,
+this ensures that it is valid to set the Launch Options to
+[`steam-runtime-launch-options -- %command%`][steam-runtime-launch-options].
+
+For Steam games in the 32-bit/scout branch of the Steam Client,
+because the launch options are part of the command-line,
+for historical reasons they are run in the
+[scout `LD_LIBRARY_PATH` runtime][ldlp] environment.
+Again,
+this means that they can find Steam Runtime executables such as
+[**steam-runtime-launch-options**(1)][steam-runtime-launch-options]
+via `PATH` search.
 
 ## Environment
 
@@ -520,7 +566,8 @@ which can change them if required before it invokes the "innermost" tool
 (although most should not be changed).
 
 For example, when using Proton with "Steam Linux Runtime 2.0 (soldier)", the
-"outer" compatibility tool "Steam Linux Runtime 2.0 (soldier)" is run with
+"outer" compatibility tool "Steam Linux Runtime 2.0 (soldier)"
+was historically run with
 `LD_LIBRARY_PATH` set by the Steam Runtime to point to mixed host and
 scout libraries. After setting up the container, it runs the "inner"
 compatibility tool (Proton) with an entirely new `LD_LIBRARY_PATH`
@@ -728,6 +775,7 @@ unless this is set to the game's top-level directory.
 <!-- References: -->
 
 [FEX]: https://github.com/FEX-Emu/FEX
+[Legacy Steam Runtime]: legacy-steam-runtime.md
 [SDL_DYNAMIC_API]: https://github.com/libsdl-org/SDL/blob/SDL2/docs/README-dynapi.md
 [SDL3_DYNAMIC_API]: https://github.com/libsdl-org/SDL/blob/main/docs/README-dynapi.md
 [Steamworks launch options]: https://partner.steamgames.com/doc/sdk/uploading
@@ -747,3 +795,4 @@ unless this is set to the game's top-level directory.
 [steamrt4]: container-runtime.md#steamrt4
 [steam-runtime-emulator.json(5)]: steam-runtime-emulator.json.5.md
 [steam-runtime-graphics-provider.json(5)]: steam-runtime-graphics-provider.json.5.md
+[steam-runtime-launch-options]: ../bin/launch-options.md

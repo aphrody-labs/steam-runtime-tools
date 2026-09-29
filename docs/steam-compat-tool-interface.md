@@ -60,7 +60,7 @@ For the compatibility tools provided by Steam itself, such as
 Steam Linux Runtime and Proton, the equivalent of this information is
 downloaded out-of-band and stored in `~/.steam/root/appcache/appinfo.vdf`,
 so the depot downloaded into the Steam library will not contain this file.
-As of early 2024, details of these built-in compatibility tools
+Details of these built-in compatibility tools
 can be viewed on the third-party SteamDB site as part of
 [the app info of app 891390 "SteamPlay 2.0 Manifests][app891390-info].
 

@@ -1,3 +1,12 @@
+steam-runtime-tools (0.20260929.0) UNRELEASED; urgency=medium
+
+  * s-r-launch-client:
+    - Fix a spurious warning "Some environment variable edits cannot be
+      represented when communicating with Flatpak" when running Steam
+      from the unofficial Flatpak app (steam-runtime-tools!1068)
+
+ -- Simon McVittie <smcv@collabora.com>  Tue, 29 Sep 2026 11:08:57 +0100
+
 steam-runtime-tools (0.20260925.0) steamrt; urgency=medium
 
   * pressure-vessel:

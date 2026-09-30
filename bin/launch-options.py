@@ -1659,9 +1659,7 @@ class Gui:
 
             for path in os.getenv('STEAM_COMPAT_LIBRARY_PATHS', '').split(':'):
                 if path:
-                    search_path.append(
-                        os.path.join(path, 'steamapps', 'common'),
-                    )
+                    search_path.append(os.path.join(path, 'common'))
 
             search_path.append(
                 os.path.expanduser('~/.steam/steam/steamapps/common')

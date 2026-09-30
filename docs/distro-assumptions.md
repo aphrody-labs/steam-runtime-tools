@@ -440,8 +440,10 @@ environment variable set appropriately.
 
 If the graphics drivers are based on Mesa, then the DRI drivers such
 as `swrast_dri.so` are assumed to be available in the search path
-defined by `LIBGL_DRIVERS_PATH`, or in a `dri` subdirectory of the
-directory containing the loader library `libGLX_mesa.so.0`,
+defined by `LIBGL_DRIVERS_PATH`,
+or in a `dri`
+or `xorg/modules/dri`
+subdirectory of the directory containing the loader library `libGLX_mesa.so.0`,
 `libEGL_mesa.so.0` or `libGL.so.1`.
 Some special cases for the Flatpak freedesktop.org SDK are also checked
 (see steam-runtime-tools source code for details).

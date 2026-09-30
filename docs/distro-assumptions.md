@@ -410,8 +410,9 @@ If the `libgbm.so.1` library is required, then the GBM backends such
 as `dri_gbm.so` are assumed to be available in the search path
 defined by `GBM_BACKENDS_PATH`, or in a `gbm` subdirectory of the
 directory containing the loader library `libgbm.so.1`.
-Some special cases for the Flatpak freedesktop.org SDK are also checked
-(see steam-runtime-tools source code for details).
+When running under Flatpak,
+`/usr/lib/${multiarch_tuple}/GL/lib/gbm`
+is searched instead.
 If the operating system needs a non-standard search path to be used,
 then Steam should be run with the `GBM_BACKENDS_PATH` environment variable
 set appropriately.
@@ -445,8 +446,9 @@ or in a `dri`
 or `xorg/modules/dri`
 subdirectory of the directory containing the loader library `libGLX_mesa.so.0`,
 `libEGL_mesa.so.0` or `libGL.so.1`.
-Some special cases for the Flatpak freedesktop.org SDK are also checked
-(see steam-runtime-tools source code for details).
+When running under Flatpak,
+`/usr/lib/${multiarch_tuple}/GL/lib/dri`
+is searched instead.
 If the operating system needs a non-standard search path to be used,
 then Steam should be run with the `LIBGL_DRIVERS_PATH` environment variable
 set appropriately.
@@ -458,8 +460,11 @@ a `dri`
 or `va/drivers`
 subdirectory of the directory containing the loader library
 `libva.so.2`.
-Some special cases for the Flatpak freedesktop.org SDK are also checked
-(see steam-runtime-tools source code for details).
+When running under Flatpak,
+`/usr/lib/${multiarch_tuple}/dri`,
+`/usr/lib/${multiarch_tuple}/dri/intel-vaapi-driver`
+and `/usr/lib/${multiarch_tuple}/GL/lib/dri`
+are searched instead.
 If the operating system needs a non-standard search path to be used,
 then Steam should be run with the `LIBGL_DRIVER_PATH` environment variable
 set appropriately.
@@ -469,8 +474,6 @@ If present, they are assumed to be available in either the search path
 defined by `VDPAU_DRIVER_PATH`, or a `vdpau` subdirectory of the directory
 containing the loader library `libvdpau.so.1`, or the `ld.so` cache,
 or the `LD_LIBRARY_PATH`.
-Some special cases for the Flatpak freedesktop.org SDK are also checked
-(see steam-runtime-tools source code for details).
 If the operating system needs a non-standard search path to be used,
 then Steam should be run with the `VDPAU_DRIVER_PATH` environment variable
 set appropriately.

@@ -452,7 +452,9 @@ set appropriately.
 VA-API drivers are optional.
 If present, they are assumed to be compatible with `libva.so.2`, and
 available in either the search path defined by `LIBVA_DRIVERS_PATH`, or
-a `dri` subdirectory of the directory containing the loader library
+a `dri`
+or `va/drivers`
+subdirectory of the directory containing the loader library
 `libva.so.2`.
 Some special cases for the Flatpak freedesktop.org SDK are also checked
 (see steam-runtime-tools source code for details).

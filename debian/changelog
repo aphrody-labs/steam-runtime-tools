@@ -1,13 +1,18 @@
-steam-runtime-tools (0.20260930.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20261005.0) UNRELEASED; urgency=medium
 
   * s-r-launch-client:
     - Fix a spurious warning "Some environment variable edits cannot be
       represented when communicating with Flatpak" when running Steam
       from the unofficial Flatpak app (steam-runtime-tools!1068)
+  * s-r-launch-options:
+    - Fix guessing likely locations for runtimes and Proton from items in
+      STEAM_COMPAT_LIBRARY_PATHS by only appending /common, not
+      /steamapps/common (steam-runtime#856)
   * Documentation updates
-    (steamrt/tasks#1055, steamrt/tasks#1056, steamrt/tasks#1143)
+    (steamrt/tasks#1055, steamrt/tasks#1056, steamrt/tasks#1143,
+    steam-runtime#856)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 30 Sep 2026 16:28:12 +0100
+ -- Simon McVittie <smcv@collabora.com>  Mon, 05 Oct 2026 15:46:30 +0100
 
 steam-runtime-tools (0.20260925.0) steamrt; urgency=medium
 

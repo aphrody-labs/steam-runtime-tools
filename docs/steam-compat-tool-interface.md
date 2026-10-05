@@ -497,6 +497,14 @@ Some environment variables are set by Steam, including:
     the game, the compatibility tools  if  any,  and any  other resources
     that the game will need, such as DirectX installers.
 
+    The paths used here include the `/steamapps` that is created inside
+    the user-specified Steam Library directory:
+    for example,
+    a typical value might look like
+    `/home/me/.local/share/Steam/steamapps:/srv/bigdisk/SteamLibrary/steamapps`
+    if the user has chosen to create a secondary Steam Library in
+    `/srv/bigdisk/SteamLibrary`.
+
     In the legacy [scout `LD_LIBRARY_PATH` runtime][ldlp], this variable
     is not set.
 

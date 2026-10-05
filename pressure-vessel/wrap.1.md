@@ -1271,6 +1271,11 @@ the game, the compatibility tools if any, and any other resources
 that the game will need, such as DirectX installers.
 Each is currently made available read/write in the container.
 
+The paths used by Steam in this list include the `/steamapps` subdirectory
+that is created inside the user-specified Steam Library directory,
+so the `libraryfolder.vdf` file that appears alongside this directory
+will often *not* be visible inside the container.
+
 </dd>
 <dt>
 

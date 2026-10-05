@@ -429,7 +429,7 @@ $ gameid=123            # replace with your numeric Steam app ID
 $ export STEAM_COMPAT_CLIENT_INSTALL_PATH=$(readlink -f "$HOME/.steam/root")
 $ export STEAM_COMPAT_DATA_PATH="/path/to/steamlibrary/compatdata/$gameid"
 $ export STEAM_COMPAT_INSTALL_PATH=$(pwd)
-$ export STEAM_COMPAT_LIBRARY_PATHS=/path/to/steamlibrary:/path/to/otherlibrary
+$ export STEAM_COMPAT_LIBRARY_PATHS=/path/to/steamlibrary/steamapps:/path/to/other/steamapps
 $ cd /builds/my-game
 $ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_4/run \
     $pressure_vessel_options \
@@ -651,7 +651,7 @@ $ export STEAM_COMPAT_LAUNCHER_SERVICE=proton
 $ export STEAM_COMPAT_CLIENT_INSTALL_PATH=$(readlink -f "$HOME/.steam/root")
 $ export STEAM_COMPAT_DATA_PATH="/path/to/steamlibrary/compatdata/$gameid"
 $ export STEAM_COMPAT_INSTALL_PATH=$(pwd)
-$ export STEAM_COMPAT_LIBRARY_PATHS=/path/to/steamlibrary:/path/to/otherlibrary
+$ export STEAM_COMPAT_LIBRARY_PATHS=/path/to/steamlibrary/steamapps:/path/to/other/steamapps
 $ /path/to/steamlibrary/steamapps/common/SteamLinuxRuntime_soldier/run \
     $pressure_vessel_options \
     -- \

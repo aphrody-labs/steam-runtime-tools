@@ -113,9 +113,6 @@ esac
 case "$suite" in
     (sniper | steamrt3c | bullseye)
         # Workaround for https://bugs.debian.org/1147093
-        # Ideally we'd use archive.debian.org,
-        # but we can't do that until https://bugs.debian.org/1147150
-        # is solved
         sed -i -e '/bullseye-security/d' /etc/apt/sources.list
         # If the file contents came from a CI variable,
         # it might not end with a newline
@@ -124,9 +121,8 @@ case "$suite" in
             echo "$t" \
                 "[" \
                 "signed-by=/usr/share/keyrings/debian-archive-keyring.gpg" \
-                "check-valid-until=no" \
                 "]" \
-                "http://snapshot.debian.org/archive/debian-security/20260903T220410Z" \
+                "http://archive.debian.org/debian-security" \
                 "bullseye-security main" \
                 >> /etc/apt/sources.list
         done

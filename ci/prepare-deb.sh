@@ -111,7 +111,7 @@ case "$suite" in
 esac
 
 case "$suite" in
-    (sniper | steamrt3c | bullseye)
+    (steamrt3c)
         # Workaround for https://bugs.debian.org/1147093
         sed -i -e '/bullseye-security/d' /etc/apt/sources.list
         # If the file contents came from a CI variable,

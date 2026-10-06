@@ -22,6 +22,9 @@ srt-logger - record logs
 **source "${STEAM_RUNTIME_SCOUT}/usr/libexec/steam-runtime-tools-0/logger-0.bash"**
 [*OPTIONS*]
 
+**source srt-logger-0.bash**
+[*OPTIONS*]
+
 **srt-logger --mkfifo**
 
 # DESCRIPTION
@@ -51,7 +54,8 @@ it will not be killed by commands like **pkill steam**, allowing any
 final log messages during shutdown to be recorded.
 
 The convenience shell script fragment
-**usr/libexec/steam-runtime-tools-0/logger-0.bash**
+**usr/libexec/steam-runtime-tools-0/logger-0.bash**,
+available in the **PATH** as **srt-logger-0.bash** in some contexts,
 sets up a **srt-logger** instance to absorb log messages from a **bash**(1)
 script as a background subprocess, and sets appropriate environment variables
 for the rest of the script.

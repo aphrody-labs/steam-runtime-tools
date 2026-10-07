@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20261005.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20261007.0) UNRELEASED; urgency=medium
 
   * s-r-launch-client:
     - Fix a spurious warning "Some environment variable edits cannot be
@@ -8,11 +8,18 @@ steam-runtime-tools (0.20261005.0) UNRELEASED; urgency=medium
     - Fix guessing likely locations for runtimes and Proton from items in
       STEAM_COMPAT_LIBRARY_PATHS by only appending /common, not
       /steamapps/common (steam-runtime#856)
+  * srt-logger-0.bash:
+    - Provide a symlink to logger-0.bash in the PATH, so that it can be
+      included via "source srt-logger-0.bash"
+      (steamrt/tasks#1064)
+    - If made executable, show an error message if run as a script
   * Documentation updates
     (steamrt/tasks#1055, steamrt/tasks#1056, steamrt/tasks#1143,
     steam-runtime#856)
+  * Tests/CI:
+    - Use archive.debian.org for bullseye-security (steamrt/tasks#1154)
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 05 Oct 2026 15:46:30 +0100
+ -- Simon McVittie <smcv@collabora.com>  Wed, 07 Oct 2026 19:24:23 +0100
 
 steam-runtime-tools (0.20260925.0) steamrt; urgency=medium
 

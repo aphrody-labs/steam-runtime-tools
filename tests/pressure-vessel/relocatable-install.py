@@ -26,6 +26,7 @@ import argparse
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 try:
     import typing
@@ -335,6 +336,37 @@ def main():
             test.ok('{} --help'.format(path))
         else:
             test.not_ok('{} --help'.format(path))
+
+    logger_script_in_bin = Path(
+        relocatable_install, 'bin', 'srt-logger-0.bash',
+    )
+    logger_script_in_libexec = Path(
+        relocatable_install,
+        'libexec',
+        'steam-runtime-tools-0',
+        'logger-0.bash',
+    )
+
+    if logger_script_in_libexec.is_file():
+        test.ok('{} is a regular file'.format(logger_script_in_libexec))
+    else:
+        test.not_ok('{} not a regular file'.format(logger_script_in_libexec))
+
+    if logger_script_in_bin.is_symlink():
+        test.ok('{} is a symlink'.format(logger_script_in_bin))
+    else:
+        test.not_ok('{} not a symlink'.format(logger_script_in_bin))
+
+    if logger_script_in_bin.samefile(logger_script_in_libexec):
+        test.ok('{} is same file as {}'.format(
+            logger_script_in_bin,
+            logger_script_in_libexec,
+        ))
+    else:
+        test.ok('{} not same file as {}'.format(
+            logger_script_in_bin,
+            logger_script_in_libexec,
+        ))
 
     test.done_testing()
 

@@ -505,6 +505,15 @@ def main():
                 os.path.join(inst_pkglibexecdir, data),
             )
 
+            if data in (
+                'logger-0.bash',
+            ):
+                # Where to install the symlink
+                dest = os.path.join(installation, 'bin', 'srt-' + data)
+                # Relative path from dest to the real shell snippet
+                rel = '../libexec/steam-runtime-tools-0/' + data
+                symlink_force(rel, dest)
+
         for arch in architectures:
             path = os.path.join(
                 args.prefix, 'libexec', 'steam-runtime-tools-0',

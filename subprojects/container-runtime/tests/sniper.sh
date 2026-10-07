@@ -183,6 +183,18 @@ for depot_id in "${depot_ids[@]}"; do
             echo "Bail out! depot_build_$depot_id.vdf lacks $path"
             exit 1
         fi
+
+        if [ "$path" = bin ]; then
+            in_bin=depots/test-sniper-${mode}/${path_prefix}bin/srt-logger-0.bash
+            in_libexec=depots/test-sniper-${mode}/${path_prefix}pressure-vessel/libexec/steam-runtime-tools-0/logger-0.bash
+
+            if [ -L "$in_bin" ] && [ "$(realpath "$in_bin")" = "$(realpath "$in_libexec")" ]; then
+                echo "# $in_bin is a symlink to the same file as $in_libexec"
+            else
+                echo "Bail out! $in_bin not as expected"
+                exit 1
+            fi
+        fi
     done
 
     rm -fr "depots/test-sniper-${mode}-merged"

@@ -105,6 +105,19 @@ foreach file : libexec_data
   )
 endforeach
 
+# Note that this doesn't work in scout because its meson is too old:
+# we fix that up in debian/rules
+if meson.version().version_compare('>=0.61')
+  install_symlink(
+    'srt-logger-0.bash',
+    install_dir : get_option('bindir'),
+    # This assumes that bindir is a single path component and
+    # pkglibexecdir is a relative path, but we already make similar
+    # assumptions about RPATHs
+    pointing_to : '..' / pkglibexecdir / 'logger-0.bash',
+  )
+endif
+
 libexec_scripts = [
   'launch-options.py',
 ]

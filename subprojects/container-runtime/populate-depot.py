@@ -1142,6 +1142,7 @@ class Main:
             # instead of a list.
             pv_libexec_executables = {
                 'srt-logger': 'srt-logger',
+                'srt-logger-0.bash': 'logger-0.bash',
                 'steam-runtime-launcher-service':
                     "{}-srt-launcher-service".format(tuples[0]),
             }

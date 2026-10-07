@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20261007.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20261007.0) steamrt; urgency=medium
 
   * s-r-launch-client:
     - Fix a spurious warning "Some environment variable edits cannot be
@@ -19,7 +19,7 @@ steam-runtime-tools (0.20261007.0) UNRELEASED; urgency=medium
   * Tests/CI:
     - Use archive.debian.org for bullseye-security (steamrt/tasks#1154)
 
- -- Simon McVittie <smcv@collabora.com>  Wed, 07 Oct 2026 19:24:23 +0100
+ -- Simon McVittie <smcv@collabora.com>  Wed, 07 Oct 2026 19:27:49 +0100
 
 steam-runtime-tools (0.20260925.0) steamrt; urgency=medium
 

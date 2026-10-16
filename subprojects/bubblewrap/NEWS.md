@@ -1,3 +1,20 @@
+bubblewrap 0.13.1
+=================
+
+Released: 2026-10-14
+
+Enhancements:
+
+  * bwrap now accepts multiple --sync-fd arguments and will handle
+    all of the fds.
+
+Bug fixes:
+
+  * O_PATH is used when opening parent directories in the new root,
+    fixing an error when read permission is missing. (#806, #855).
+
+Thanks: smcv, swick
+
 bubblewrap 0.13.0
 =================
 
@@ -42,6 +59,8 @@ Bug fixes:
 
   * Fix test failure on systems with a mount point containing a backslash
     (#778)
+
+  * Fix test failure on systems with older xdg-desktop-portal (#794)
 
   * Don't leave a temporary file behind after running the test suite (#775)
 

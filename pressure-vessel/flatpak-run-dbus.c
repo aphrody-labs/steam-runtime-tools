@@ -251,8 +251,9 @@ flatpak_run_add_session_dbus_args (FlatpakBwrap   *app_bwrap)
 #else
   gboolean unrestricted;
 #endif
-  const char *dbus_address = g_getenv ("DBUS_SESSION_BUS_ADDRESS");
+  g_autofree char *dbus_address = NULL;
   g_autofree char *dbus_session_socket = NULL;
+  g_autoptr(GError) local_error = NULL;
 
 #if 0
   unrestricted = (sockets & FLATPAK_CONTEXT_SOCKET_SESSION_BUS) != 0;
@@ -260,21 +261,18 @@ flatpak_run_add_session_dbus_args (FlatpakBwrap   *app_bwrap)
   unrestricted = TRUE;
 #endif
 
+  dbus_address = g_dbus_address_get_for_bus_sync (G_BUS_TYPE_SESSION, NULL,
+                                                  &local_error);
+
   if (dbus_address != NULL)
     {
       dbus_session_socket = extract_unix_path_from_dbus_address (dbus_address);
     }
   else
     {
-      g_autofree char *user_runtime_dir = flatpak_get_real_xdg_runtime_dir ();
-      struct stat statbuf;
-
-      dbus_session_socket = g_build_filename (user_runtime_dir, "bus", NULL);
-
-      if (stat (dbus_session_socket, &statbuf) < 0
-          || (statbuf.st_mode & S_IFMT) != S_IFSOCK
-          || statbuf.st_uid != getuid ())
-        return FALSE;
+      g_info ("Unable to find D-Bus session bus address: %s",
+              local_error->message);
+      return FALSE;
     }
 
   if (unrestricted)

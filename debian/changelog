@@ -1,3 +1,9 @@
+steam-runtime-tools (0.20261020.0) UNRELEASED; urgency=medium
+
+  * Update bubblewrap subproject to v0.13.1
+
+ -- Simon McVittie <smcv@collabora.com>  Tue, 20 Oct 2026 14:23:37 +0100
+
 steam-runtime-tools (0.20261007.0) steamrt; urgency=medium
 
   * s-r-launch-client:

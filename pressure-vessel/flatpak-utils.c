@@ -1,6 +1,6 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.3
+ * Last updated: Flatpak 1.18.4
  *
  * Copyright © 1995-1998 Free Software Foundation, Inc.
  * Copyright © 2014-2019 Red Hat, Inc
@@ -1847,7 +1847,7 @@ flatpak_allocate_tmpdir (int           tmpdir_dfd,
       g_auto(GLnxTmpDir) new_tmpdir = { 0, };
       /* No existing tmpdir found, create a new */
 
-      if (!glnx_mkdtempat (dfd_iter.fd, tmpdir_name_template, 0777,
+      if (!glnx_mkdtempat (dfd_iter.fd, tmpdir_name_template, 0755,
                            &new_tmpdir, error))
         return FALSE;
 

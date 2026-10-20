@@ -1,6 +1,6 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.3
+ * Last updated: Flatpak 1.18.4
  *
  * Copyright © 2014-2018 Red Hat, Inc
  * SPDX-License-Identifier: LGPL-2.1-or-later
@@ -534,6 +534,15 @@ flatpak_bwrap_child_setup (GArray *fd_array,
                            gboolean close_fd_workaround)
 {
   int i;
+
+#if 0 /* pressure-vessel-specific: we do not aim to be a security boundary */
+  /* If possible, start a new process group for the child.
+   * This avoids a sandboxed process being able to call kill (0, SIGNAL)
+   * and have it affect processes outside the sandbox.
+   * If this fails because we are already a process group leader, ignore:
+   * presumably in that case there is nothing else in our process group. */
+  setpgid (0, 0);
+#endif
 
   /* There is a dead-lock in glib versions before 2.60 when it closes
    * the fds. See:  https://gitlab.gnome.org/GNOME/glib/merge_requests/490

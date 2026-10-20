@@ -1,7 +1,7 @@
 /* vi:set et sw=2 sts=2 cin cino=t0,f0,(0,{s,>2s,n-s,^-s,e-s:
  *
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.3
+ * Last updated: Flatpak 1.18.4
  *
  * Copyright © 2014-2018 Red Hat, Inc
  * Copyright © 2024 GNOME Foundation, Inc.

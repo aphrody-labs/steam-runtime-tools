@@ -1,5 +1,10 @@
 steam-runtime-tools (0.20261020.0) UNRELEASED; urgency=medium
 
+  * pressure-vessel:
+    - Compatibility with environments that rely on X11 autolaunching to
+      start the D-Bus session bus
+      (steamrt/tasks#1177, steam-for-linux#13767)
+    - Update Flatpak-derived code to 1.18.4 (no functional change)
   * Update bubblewrap subproject to v0.13.1
 
  -- Simon McVittie <smcv@collabora.com>  Tue, 20 Oct 2026 14:23:37 +0100

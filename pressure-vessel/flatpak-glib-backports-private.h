@@ -1,6 +1,6 @@
 /*
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.3
+ * Last updated: Flatpak 1.18.4
  *
  * Copyright 2013 Allison Karlitskaya
  * Copyright 2013 Collabora Ltd.

@@ -1,6 +1,6 @@
 /*
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.3
+ * Last updated: Flatpak 1.18.4
  *
  * Copyright © 2014-2018 Red Hat, Inc
  * Copyright © 2024 GNOME Foundation, Inc.

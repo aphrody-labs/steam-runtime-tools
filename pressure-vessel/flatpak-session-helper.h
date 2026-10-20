@@ -1,6 +1,6 @@
 /*
  * Taken from Flatpak
- * Last updated: Flatpak 1.18.3
+ * Last updated: Flatpak 1.18.4
  *
  * Copyright © 2021 Collabora Ltd.
  * SPDX-License-Identifier: LGPL-2.1-or-later

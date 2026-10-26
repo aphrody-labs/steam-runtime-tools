@@ -984,6 +984,10 @@ class TestInsideRuntime(BaseTest):
                 paths = [os.environ[var]]
 
             for path in paths:
+                if var == 'STEAM_COMPAT_LIBRARY_PATHS':
+                    basename = os.path.basename(path)
+                    self.assertEqual(basename, 'steamapps')
+
                 self.assertIn(path, mount_points)
 
 

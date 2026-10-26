@@ -212,7 +212,17 @@ class BaseContainersTest(BaseTest):
             for name in names:
                 path = os.path.join(cls.tmpdir.name, name)
                 os.makedirs(path, exist_ok=True)
-                paths.append(path)
+
+                if var.name == "STEAM_COMPAT_LIBRARY_PATHS":
+                    # For STEAM_COMPAT_APP_LIBRARY_PATHS
+                    # add the `/steamapps` subdir
+                    # to the entries in the env variable,
+                    # to reflect more closely what the Steam client does
+                    steamapps_path = os.path.join(path, 'steamapps')
+                    os.makedirs(steamapps_path, exist_ok=True)
+                    paths.append(steamapps_path)
+                else:
+                    paths.append(path)
 
             os.environ[var.name] = ':'.join(paths)
 

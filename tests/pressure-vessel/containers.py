@@ -209,7 +209,7 @@ class BaseContainersTest(BaseTest):
                 # to check that we handle those correctly
                 names = [var.name + ': .d']
 
-            for name in names:
+            for i, name in enumerate(names):
                 path = os.path.join(cls.tmpdir.name, name)
                 os.makedirs(path, exist_ok=True)
 
@@ -220,6 +220,17 @@ class BaseContainersTest(BaseTest):
                     # to reflect more closely what the Steam client does
                     steamapps_path = os.path.join(path, 'steamapps')
                     os.makedirs(steamapps_path, exist_ok=True)
+
+                    # Test also the case where 'libraryfolder.vdf' exists
+                    if i == 0:
+                        file_path = os.path.join(path, 'libraryfolder.vdf')
+                        with open(file_path, 'a'):
+                            pass
+
+                    # However note that
+                    # even when the parent path is supposed to be shared,
+                    # the env variable will still contain
+                    # the path with the `/steamapps` suffix.
                     paths.append(steamapps_path)
                 else:
                     paths.append(path)
@@ -890,6 +901,13 @@ class BaseContainersTest(BaseTest):
                         bind_mode = 'bind'
 
                     for path in paths:
+                        if var.name == "STEAM_COMPAT_LIBRARY_PATHS":
+                            parent_path = os.path.dirname(path)
+                            vdf_file = os.path.join(parent_path,
+                                                    'libraryfolder.vdf')
+                            if os.path.exists(vdf_file):
+                                path = parent_path
+
                         self.assertIn(
                             "\0--{}\0{}\0{}".format(bind_mode, path, path),
                             final_argv,

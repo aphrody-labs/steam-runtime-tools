@@ -1052,9 +1052,6 @@ main (int argc,
             goto out;
         }
 
-      if (self->options.for_steam_client)
-        flatpak_bwrap_add_arg (adverb_argv, "--terminate-with-main");
-
       if (self->options.terminate_timeout >= 0.0)
         {
           char idle_buf[G_ASCII_DTOSTR_BUF_SIZE] = {};

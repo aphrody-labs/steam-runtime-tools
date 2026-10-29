@@ -779,6 +779,7 @@ bind_and_propagate_from_environ (PvWrapContext *self,
   for (i = 0; values[i] != NULL; i++)
     {
       g_autofree gchar *value_host = NULL;
+      g_autofree gchar *value_host_exported = NULL;
       g_autofree gchar *canon = NULL;
 
       if (values[i][0] == '\0')
@@ -792,12 +793,43 @@ bind_and_propagate_from_environ (PvWrapContext *self,
         }
 
       canon = g_canonicalize_filename (values[i], NULL);
+
       value_host = pv_current_namespace_path_to_host_path (canon);
+      value_host_exported = g_strdup (value_host);
+
+      /* We need a special case here for STEAM_COMPAT_LIBRARY_PATHS,
+       * which lists $library/steamapps for each Steam Library folder,
+       * not $library itself. */
+      if (g_str_equal (variable, "STEAM_COMPAT_LIBRARY_PATHS"))
+       {
+         g_autofree gchar *canon_parent = NULL;
+         g_autofree gchar *vdf_file = NULL;
+
+         canon_parent = g_path_get_dirname (canon);
+         vdf_file = g_build_filename (canon_parent, "/libraryfolder.vdf", NULL);
+
+         if (g_file_test (vdf_file, G_FILE_TEST_IS_REGULAR))
+          {
+            /* Pass the parent $library (in two different forms) to
+             * pv_wrap_context_export_if_allowed(),
+             * instead of $library/steamapps, making libraryfolder.vdf
+             * visible to the game.
+             *
+             * But note that we don't modify value_host here,
+             * so that we still have value_host = $library/steamapps
+             * to write back into the environment variable. */
+            g_clear_pointer (&canon, g_free);
+            canon = g_steal_pointer (&canon_parent);
+
+            g_clear_pointer (&value_host_exported, g_free);
+            value_host_exported = pv_current_namespace_path_to_host_path (canon);
+          }
+       }
 
       if (!pv_wrap_context_export_if_allowed (self,
                                               mode,
                                               canon,
-                                              value_host,
+                                              value_host_exported,
                                               variable,
                                               before,
                                               after,

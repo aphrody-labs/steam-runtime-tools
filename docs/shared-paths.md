@@ -105,6 +105,10 @@ with the game's container:
 * `STEAM_COMPAT_LIBRARY_PATHS` (RW):
     Set internally by Steam. All the Steam libraries containing
     compat tools that are active in this stack.
+
+    For each path,
+    if the parent directory contains the `libraryfolder.vdf` file
+    the parent is shared instead of the full `.../steamapps` path.
 * `STEAM_COMPAT_MOUNTS` (RW):
     TODO: is this meant to be set by users, or used
     internally by Steam, or a mixture of both?

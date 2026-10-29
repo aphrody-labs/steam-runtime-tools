@@ -936,7 +936,8 @@ In particular,
 the paths used inside the container for
 the game itself (`$STEAM_COMPAT_INSTALL_PATH`),
 the Steam client (`$STEAM_COMPAT_CLIENT_INSTALL_PATH`),
-and the user's Steam libraries (`$STEAM_COMPAT_LIBRARY_PATHS`)
+and the user's Steam libraries
+(paths in `$STEAM_COMPAT_LIBRARY_PATHS` or their parents)
 will normally be equally valid outside the container.
 
 Various options can be placed before the `--` separator,

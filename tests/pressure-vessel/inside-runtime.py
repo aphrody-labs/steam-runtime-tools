@@ -984,7 +984,17 @@ class TestInsideRuntime(BaseTest):
                 paths = [os.environ[var]]
 
             for path in paths:
-                self.assertIn(path, mount_points)
+                if var == 'STEAM_COMPAT_LIBRARY_PATHS':
+                    basename = os.path.basename(path)
+                    self.assertEqual(basename, 'steamapps')
+
+                    # Paths in STEAM_COMPAT_LIBRARY_PATHS could be shared
+                    # either with or without the `/steamapps` suffix.
+                    parent_path = os.path.dirname(path)
+                    assert_paths = [path, parent_path]
+                    self.assertAnyIn(assert_paths, mount_points)
+                else:
+                    self.assertIn(path, mount_points)
 
 
 if __name__ == '__main__':

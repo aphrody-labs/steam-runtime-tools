@@ -259,6 +259,26 @@ class BaseTest(unittest.TestCase):
         else:
             self.command_prefix = []
 
+    def assertAnyIn(
+        self,
+        items,      # type: typing.List[typing.Any]
+        container,  # type: typing.Container[typing.Any]
+        msg=None,   # type: typing.Optional[str]
+    ):
+        # type: (...) -> None
+        '''
+        Assert that at least one element in `items` is in `container`.
+        '''
+        if any(item in container for item in items):
+            return
+
+        from unittest.util import safe_repr
+        standard_msg = 'None of %s found in %s' % (safe_repr(items),
+                                                   safe_repr(container))
+
+        full_msg = self._formatMessage(msg, standard_msg)
+        raise self.failureException(full_msg)
+
     def assertFile(
         self,
         path,

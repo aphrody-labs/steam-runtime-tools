@@ -214,7 +214,7 @@ Steam Linux Runtime 1.0 (scout) container via *Properties* → *Compatibility*.
 
 Steam client runtime 3 (`steamrt3c`) is a miniaturized version of [sniper][],
 used internally by components of the Steam client.
-It is installed in `~/.steam/root/steamrt64/steam-runtime-steamrt`.
+It is installed in `~/.steam/root/steamrt64/pv-runtime/steam-runtime-steamrt`.
 Older versions of the Steam client used sniper for this purpose.
 
 Documentation in the `steamrt` "metapackage" provides

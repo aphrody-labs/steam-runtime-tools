@@ -1,13 +1,18 @@
-steam-runtime-tools (0.20261020.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20261029.0) UNRELEASED; urgency=medium
 
   * pressure-vessel:
     - Compatibility with environments that rely on X11 autolaunching to
       start the D-Bus session bus
       (steamrt/tasks#1177, steam-for-linux#13767)
+    - When used to run the experimental steamrt3c Steam Client,
+      don't terminate when the main process terminates.
+      This interfered with crash-report uploading if the containerized
+      Steam Client crashes.
+      (steamrt/tasks#1186)
     - Update Flatpak-derived code to 1.18.4 (no functional change)
   * Update bubblewrap subproject to v0.13.1
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 20 Oct 2026 14:23:37 +0100
+ -- Simon McVittie <smcv@collabora.com>  Thu, 29 Oct 2026 11:35:08 +0000
 
 steam-runtime-tools (0.20261007.0) steamrt; urgency=medium
 

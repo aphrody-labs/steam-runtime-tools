@@ -222,7 +222,8 @@ look something like this:
 (In reality it would all be one line, rather than having escaped newlines
 as shown here.)
 
-In the experimental 64-bit/steamrt3c branch of the Steam Client,
+In the 64-bit/steamrt3c branch of the Steam Client
+(default for the Steam Client public beta since October 2026),
 the launch command-line is run in an environment that resembles
 the host system,
 and does not implicitly provide additional libraries or compatibility layers.

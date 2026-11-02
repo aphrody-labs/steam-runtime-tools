@@ -394,11 +394,52 @@ typedef struct
 
 typedef struct
 {
+  const char *prgname;
   FdMapEntry *fd_map;
   int         fd_map_len;
   gboolean    keep_tty_session;
 } ChildSetupData;
 
+/*
+ * This function needs to be async-signal safe: see signal-safety(7)
+ */
+static void
+dup2_or_die (const char *prgname,
+             int from,
+             int to)
+{
+  if (dup2 (from, to) >= 0)
+    return;
+
+  /* We can't use strerror() here because that wouldn't be async-signal safe,
+   * and similarly we can't use printf-style functions to substitute
+   * `from` or `to` into the message because none of those are
+   * async-signal safe. */
+
+  switch (errno)
+    {
+      case EBADF:
+        _srt_async_signal_safe_error (prgname,
+                                      "Unable to set up file descriptors: Bad file descriptor",
+                                      LAUNCH_EX_FAILED);
+        break;    /* not reached */
+
+      case EMFILE:
+        _srt_async_signal_safe_error (prgname,
+                                      "Unable to set up file descriptors: Too many open files",
+                                      LAUNCH_EX_FAILED);
+        break;    /* not reached */
+
+      default:
+        _srt_async_signal_safe_error (prgname,
+                                      "Unable to set up file descriptors",
+                                      LAUNCH_EX_FAILED);
+    }
+}
+
+/*
+ * This function needs to be async-signal safe: see signal-safety(7)
+ */
 static void
 child_setup_func (gpointer user_data)
 {
@@ -415,7 +456,7 @@ child_setup_func (gpointer user_data)
     {
       if (fd_map[i].from != fd_map[i].to)
         {
-          dup2 (fd_map[i].from, fd_map[i].to);
+          dup2_or_die (data->prgname, fd_map[i].from, fd_map[i].to);
           close (fd_map[i].from);
         }
     }
@@ -425,7 +466,7 @@ child_setup_func (gpointer user_data)
     {
       if (fd_map[i].to != fd_map[i].final)
         {
-          dup2 (fd_map[i].to, fd_map[i].final);
+          dup2_or_die (data->prgname, fd_map[i].to, fd_map[i].final);
           close (fd_map[i].to);
         }
 
@@ -508,6 +549,7 @@ handle_launch (PvLauncher1           *object,
     n_fds = g_variant_n_children (arg_fds);
   fd_map = g_new0 (FdMapEntry, n_fds);
 
+  child_setup_data.prgname = g_get_prgname ();
   child_setup_data.fd_map = fd_map;
   child_setup_data.fd_map_len = n_fds;
 
@@ -944,6 +986,7 @@ pv_launcher_server_finish_startup (PvLauncherServer *self,
 
       g_debug ("Map stdout %d -> %d -> %d",
                fd_map[0].from, fd_map[0].to, fd_map[0].final);
+      child_setup_data.prgname = g_get_prgname ();
       child_setup_data.fd_map = fd_map;
       child_setup_data.fd_map_len = 1;
       child_setup_data.keep_tty_session = TRUE;

@@ -836,6 +836,71 @@ class TestLauncher(BaseTest):
             self.assertEqual('wrapped printf', output)
             self.assertEqual('', more_output)
 
+    def test_wrap_forward_fd(self) -> None:
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(
+                self.show_location('test_wrap_forward_fd')
+            )
+            temp = stack.enter_context(
+                tempfile.TemporaryDirectory(prefix='test-'),
+            )
+            socket = os.path.join(temp, 'socket')
+
+            proc = subprocess.Popen(
+                self.clean_up_env + self.launcher + [
+                    '--socket', socket,
+                    '--no-stop-on-exit',
+                ],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=2,
+                universal_newlines=False,
+            )
+            stack.enter_context(ensure_terminated(proc))
+
+            stdout = proc.stdout
+            assert stdout is not None
+            output = stdout.read()
+
+            read_end, write_end = os.pipe2(os.O_CLOEXEC)
+
+            cat = subprocess.Popen(
+                self.clean_up_env + self.launch + [
+                    '--forward-fd', '%d' % read_end,
+                    '--socket', socket,
+                    '--',
+                    'cat', '/proc/self/fd/%d' % read_end,
+                ],
+                pass_fds=[read_end],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=2,
+            )
+            stack.enter_context(ensure_terminated(cat))
+
+            os.close(read_end)
+
+            with open(write_end, 'wb') as writer:
+                writer.write(b'hello\n')
+
+            output, _ = cat.communicate(input=b'', timeout=10)
+            self.assertEqual(cat.returncode, 0)
+            self.assertEqual(b'hello\n', output)
+
+            run_subprocess(
+                self.clean_up_env + self.launch + [
+                    '--socket', socket,
+                    '--terminate',
+                    '--',
+                ],
+                check=True,
+                stdin=subprocess.DEVNULL,
+                stdout=2,
+                stderr=2,
+            )
+            proc.wait(timeout=10)
+            self.assertEqual(proc.returncode, 0)
+
     def test_wrap_info_fd(self) -> None:
         with contextlib.ExitStack() as stack:
             stack.enter_context(self.show_location('test_wrap_info_fd'))

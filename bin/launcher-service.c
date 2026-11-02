@@ -1760,10 +1760,6 @@ main (int argc,
       && !_srt_raise_on_parent_death (SIGTERM, error))
     goto out;
 
-  if ((result = _srt_set_compatible_resource_limits (0)) < 0)
-    g_warning ("Unable to set normal resource limits: %s",
-               g_strerror (-result));
-
   if (opt_exec_fallback && wrapped_command == NULL)
     {
       g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,
@@ -2035,6 +2031,10 @@ out:
           data.fd_map = &fd_map;
           data.fd_map_len = 1;
         }
+
+      if ((result = _srt_set_compatible_resource_limits (0)) < 0)
+        g_warning ("Unable to set normal resource limits: %s",
+                   g_strerror (-result));
 
       /* Replace current process with the wrapped command */
       child_setup_func (&data);

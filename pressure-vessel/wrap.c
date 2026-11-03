@@ -268,6 +268,12 @@ main (int argc,
                                                 error))
     goto out;
 
+  if (_srt_maximize_fd_limit (0, &local_error) < 0)
+    {
+      g_warning ("%s", local_error->message);
+      g_clear_error (&local_error);
+    }
+
   if (self->options.terminal != PV_TERMINAL_TTY && !self->options.devel)
     {
       int fd;

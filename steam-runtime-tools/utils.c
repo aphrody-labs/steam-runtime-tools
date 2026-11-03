@@ -1247,6 +1247,72 @@ describe_rlim (rlim_t value)
 }
 
 /*
+ * _srt_maximize_fd_limit:
+ * @pid: A process ID, or 0 to act on the current process
+ * @error: Set on failure. Note that this function is certainly not
+ *  async-signal-safe if this parameter is non-%NULL.
+ *
+ * Attempt to set the `RLIMIT_NOFILE` resource limits
+ * (see `getrlimit(3)`)
+ * for the given process to its highest possible value.
+ *
+ * This function is technically not async-signal-safe
+ * (see `signal-safety(7)`), but in practice can probably be called
+ * safely after `fork()` on glibc systems if @error is %NULL.
+ * (See https://sourceware.org/bugzilla/show_bug.cgi?id=34941)
+ *
+ * Returns: 0 on success, `-errno` on failure
+ */
+int
+_srt_maximize_fd_limit (pid_t pid,
+                        GError **error)
+{
+  struct rlimit old_rlim = { 0, 0 };
+
+  if (prlimit (pid, RLIMIT_NOFILE, NULL, &old_rlim) < 0)
+    {
+      int saved_errno = errno;
+
+      if (error != NULL)
+        glnx_throw_errno_prefix (error,
+                                 "Unable to discover file descriptor resource limit");
+
+      errno = saved_errno;
+      return -saved_errno;
+    }
+
+  if (old_rlim.rlim_cur != old_rlim.rlim_max
+      && (old_rlim.rlim_max == RLIM_INFINITY
+          || old_rlim.rlim_max > old_rlim.rlim_cur))
+    {
+      struct rlimit new_rlim = old_rlim;
+
+      new_rlim.rlim_cur = old_rlim.rlim_max;
+
+      if (prlimit (pid, RLIMIT_NOFILE, &new_rlim, NULL) < 0)
+        {
+          int saved_errno = errno;
+
+          if (error != NULL)
+            {
+              g_autofree gchar *old_desc = describe_rlim (old_rlim.rlim_cur);
+              g_autofree gchar *new_desc = describe_rlim (new_rlim.rlim_cur);
+              g_autofree gchar *hard_desc = describe_rlim (old_rlim.rlim_max);
+
+              glnx_throw_errno_prefix (error,
+                                       "Unable to raise file descriptor resource limit from %s to %s (hard limit is %s)",
+                                       old_desc, new_desc, hard_desc);
+            }
+
+          errno = saved_errno;
+          return -saved_errno;
+        }
+    }
+
+  return 0;
+}
+
+/*
  * _srt_set_compatible_resource_limits:
  * @pid: A process ID, or 0 to act on the current process
  * @error: Set on failure. Note that this function is certainly not

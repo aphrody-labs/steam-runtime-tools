@@ -53,6 +53,27 @@ run (int argc,
              (uintmax_t) rlim.rlim_cur,
              (uintmax_t) rlim.rlim_max);
 
+  result = _srt_maximize_fd_limit (0, &local_error);
+  saved_errno = errno;
+
+  if (result == 0)
+    {
+      g_assert_no_error (local_error);
+      g_message ("set maximum fd limit => success");
+    }
+  else
+    {
+      g_assert_nonnull (local_error);
+      g_assert_cmpint (result, ==, -saved_errno);
+      g_message ("set maximum fd limit => %s", local_error->message);
+      g_clear_error (&local_error);
+    }
+
+  g_assert_no_errno (prlimit (0, RLIMIT_NOFILE, NULL, &rlim));
+  g_message ("RLIMIT_NOFILE soft=%ju, hard=%ju",
+             (uintmax_t) rlim.rlim_cur,
+             (uintmax_t) rlim.rlim_max);
+
   return TRUE;
 }
 

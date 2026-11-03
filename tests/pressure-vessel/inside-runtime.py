@@ -31,6 +31,16 @@ logger = logging.getLogger('test-inside-runtime')
 typing  # noqa
 
 
+def do_once_actions():
+    pass_fd_write = os.environ.get('TEST_INSIDE_RUNTIME_PASS_FD_WRITE')
+
+    if pass_fd_write is not None:
+        fd, rest = pass_fd_write.split(':', 1)
+
+        with open(int(fd), 'w') as writer:
+            writer.write(rest)
+
+
 class HostInfo:
     def __init__(self) -> None:
         self.path = Path('/run/host')
@@ -1017,6 +1027,7 @@ class TestInsideRuntime(BaseTest):
 if __name__ == '__main__':
     assert sys.version_info >= (3, 5), 'Python 3.5+ is required'
 
+    do_once_actions()
     test_main()
 
 # vi: set sw=4 sts=4 et:

@@ -775,12 +775,15 @@ class BaseContainersTest(BaseTest):
 
             env['PRESSURE_VESSEL_WORKAROUNDS'] = ' '.join(workarounds)
 
+        pass_fd_read_end, pass_fd_write_end = os.pipe2(os.O_CLOEXEC)
+
         argv = [
             self.pv_wrap,
             '--verbose',
             '--write-final-argv', final_argv_path,
             '--filesystem', self.artifacts,
             '--runtime', runtime,
+            '--pass-fd', '%d' % pass_fd_write_end,
         ]
 
         var_dir = os.path.join(self.containers_dir, 'var')
@@ -850,6 +853,10 @@ class BaseContainersTest(BaseTest):
                         '1' if is_soldier else ''
                     ),
                     'TEST_INSIDE_RUNTIME_LOCALES=' + ('1' if locales else ''),
+                    'TEST_INSIDE_RUNTIME_PASS_FD_WRITE=%d:%s' % (
+                        pass_fd_write_end,
+                        'hello, world!',
+                    ),
                     python,
                     os.path.join(self.artifacts, 'tmp', 'inside-runtime.py'),
                 ])
@@ -895,11 +902,14 @@ class BaseContainersTest(BaseTest):
                     argv,
                     cwd=self.artifacts,
                     env=env,
+                    pass_fds=[pass_fd_write_end],
                     stdout=log,
                     stderr=log,
                     universal_newlines=True,
                 )
                 self.assertEqual(completed.returncode, 0)
+
+            os.close(pass_fd_write_end)
 
             with open(final_argv_path, 'r') as reader:
                 final_argv = reader.read()
@@ -972,6 +982,13 @@ class BaseContainersTest(BaseTest):
                             final_argv,
                         )
                     )
+
+                with open(pass_fd_read_end, 'r') as reader:
+                    self.assertEqual(reader.read(), '')
+
+            else:   # not only_prepare
+                with open(pass_fd_read_end, 'r') as reader:
+                    self.assertEqual(reader.read(), 'hello, world!')
 
             if fake_home:
                 members = set(os.listdir(fake_home_temp))

@@ -744,7 +744,11 @@ handle_launch (PvLauncher1           *object,
   /* Wrap it with the exec helper to set a widely compatible fd limit.
    * We don't do this in the child_setup_func because prlimit() is
    * technically not listed as an async-signal-safe function,
-   * although in practice it almost certainly is. */
+   * although in practice it almost certainly is.
+   * TODO: If glibc re-documents prlimit() as async-signal-safe as suggested
+   * in https://sourceware.org/bugzilla/show_bug.cgi?id=34941,
+   * then we can move prlimit() into the child_setup_func and not need
+   * this extra layer in the exec chain. */
   argv = pv_launcher_server_wrap_with_exec (self, arg_argv);
   g_ptr_array_add (argv, NULL);
 

@@ -2021,9 +2021,11 @@ out:
           data.fd_map_len = 1;
         }
 
-      if ((result = _srt_set_compatible_resource_limits (0)) < 0)
-        g_warning ("Unable to set normal resource limits: %s",
-                   g_strerror (-result));
+      if (_srt_set_compatible_resource_limits (0, &local_error) < 0)
+        {
+          g_warning ("%s", local_error->message);
+          g_clear_error (&local_error);
+        }
 
       /* Replace current process with the wrapped command */
       child_setup_func (&data);

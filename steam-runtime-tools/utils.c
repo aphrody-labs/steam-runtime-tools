@@ -1237,9 +1237,20 @@ _srt_get_path_after (const char *str,
     }
 }
 
+static gchar *
+describe_rlim (rlim_t value)
+{
+  if (value == RLIM_INFINITY)
+    return g_strdup ("infinity");
+  else
+    return g_strdup_printf ("%ju", (uintmax_t) value);
+}
+
 /*
  * _srt_set_compatible_resource_limits:
  * @pid: A process ID, or 0 to act on the current process
+ * @error: Set on failure. Note that this function is certainly not
+ *  async-signal-safe if this parameter is non-%NULL.
  *
  * Attempt to set resource limits (see `getrlimit(3)`) for the given
  * process to have reasonable values that are compatible with the
@@ -1263,13 +1274,15 @@ _srt_get_path_after (const char *str,
  *
  * This function is technically not async-signal-safe
  * (see `signal-safety(7)`), but in practice can probably be called
- * safely after `fork()` on glibc systems.
+ * safely after `fork()` on glibc systems if @error is %NULL.
+ * (See https://sourceware.org/bugzilla/show_bug.cgi?id=34941)
  *
  * Returns: 0 on success, or a negative errno value such as `-EINVAL`
- *  on failure, with errno set.
+ *  on failure, with `errno` and @error set
  */
 int
-_srt_set_compatible_resource_limits (pid_t pid)
+_srt_set_compatible_resource_limits (pid_t pid,
+                                     GError **error)
 {
   struct rlimit rlim = { 0, 0 };
   int ret;
@@ -1277,17 +1290,44 @@ _srt_set_compatible_resource_limits (pid_t pid)
   ret = prlimit (pid, RLIMIT_NOFILE, NULL, &rlim);
 
   if (ret < 0)
-    return -errno;
+    {
+      int saved_errno = errno;
+
+      if (error != NULL)
+        glnx_throw_errno_prefix (error,
+                                 "Unable to discover file descriptor resource limit");
+
+      errno = saved_errno;
+      return -saved_errno;
+    }
 
   if (rlim.rlim_cur != FD_SETSIZE
       && (rlim.rlim_max >= FD_SETSIZE
           || rlim.rlim_max == RLIM_INFINITY))
     {
-      rlim.rlim_cur = FD_SETSIZE;
-      ret = prlimit (pid, RLIMIT_NOFILE, &rlim, NULL);
+      struct rlimit new_rlim = rlim;
+
+      new_rlim.rlim_cur = FD_SETSIZE;
+      ret = prlimit (pid, RLIMIT_NOFILE, &new_rlim, NULL);
 
       if (ret < 0)
-        return -errno;
+        {
+          int saved_errno = errno;
+
+          if (error != NULL)
+            {
+              g_autofree gchar *old_desc = describe_rlim (rlim.rlim_cur);
+              g_autofree gchar *new_desc = describe_rlim (new_rlim.rlim_cur);
+              g_autofree gchar *hard_desc = describe_rlim (rlim.rlim_max);
+
+              glnx_throw_errno_prefix (error,
+                                       "Unable to lower file descriptor resource limit from %s to %s (hard limit is %s)",
+                                       old_desc, new_desc, hard_desc);
+            }
+
+          errno = saved_errno;
+          return -saved_errno;
+        }
     }
 
   return 0;

@@ -138,11 +138,14 @@ pv_get_workarounds (SrtBwrapFlags bwrap_flags,
 
   value = _srt_environ_getenv (envp, "PRESSURE_VESSEL_WORKAROUNDS");
 
-  if (!(bwrap_flags & SRT_BWRAP_FLAGS_HAS_PERMS))
-    flags |= PV_WORKAROUND_FLAGS_BWRAP_NO_PERMS;
+  if (!(bwrap_flags & SRT_BWRAP_FLAGS_NOT_TESTED))
+    {
+      if (!(bwrap_flags & SRT_BWRAP_FLAGS_HAS_PERMS))
+        flags |= PV_WORKAROUND_FLAGS_BWRAP_NO_PERMS;
 
-  if (bwrap_flags & SRT_BWRAP_FLAGS_SETUID)
-    flags |= PV_WORKAROUND_FLAGS_BWRAP_SETUID;
+      if (bwrap_flags & SRT_BWRAP_FLAGS_SETUID)
+        flags |= PV_WORKAROUND_FLAGS_BWRAP_SETUID;
+    }
 
   if (_srt_environ_getenv (envp, "SNAP") != NULL
       && _srt_environ_getenv (envp, "SNAP_NAME") != NULL

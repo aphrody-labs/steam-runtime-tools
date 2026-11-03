@@ -132,7 +132,7 @@ pv_wrap_context_init (PvWrapContext *self)
   self->is_flatpak_env = g_file_test ("/.flatpak-info", G_FILE_TEST_IS_REGULAR);
   self->original_environ = g_get_environ ();
   self->current_home_fd = -1;
-  self->bwrap_flags = SRT_BWRAP_FLAGS_NONE;
+  self->bwrap_flags = SRT_BWRAP_FLAGS_NOT_TESTED;
   self->workarounds = PV_WORKAROUND_FLAGS_NONE;
 
   pv_wrap_options_init (&self->options);
@@ -1581,6 +1581,8 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
   else if (self->is_flatpak_env)
     {
       /* If we are in a Flatpak environment we can't use bwrap directly */
+      self->bwrap_flags = SRT_BWRAP_FLAGS_NOT_TESTED;
+
       if (!pv_wrap_check_flatpak (bindir, &self->flatpak_subsandbox, error))
         return FALSE;
     }
@@ -1588,6 +1590,7 @@ pv_wrap_context_after_parsing_arguments (PvWrapContext *self,
     {
       g_debug ("Checking for bwrap...");
 
+      self->bwrap_flags = SRT_BWRAP_FLAGS_NONE;
       self->bwrap_executable = pv_wrap_check_bwrap (self->run_in_current_context,
                                                     self->options.only_prepare,
                                                     &self->bwrap_flags,

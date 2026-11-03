@@ -682,6 +682,8 @@ test_workarounds (Fixture *f,
     "PRESSURE_VESSEL_WORKAROUNDS=steam-snap#356 +steamsnap369 -steamsnap356 +steam-for-linux#10571", NULL
   };
 
+  g_assert_cmpint (pv_get_workarounds (SRT_BWRAP_FLAGS_NOT_TESTED, NULL),
+                   ==, PV_WORKAROUND_FLAGS_NONE);
   g_assert_cmpint (pv_get_workarounds (SRT_BWRAP_FLAGS_HAS_PERMS, NULL),
                    ==, PV_WORKAROUND_FLAGS_NONE);
   g_assert_cmpint (pv_get_workarounds (SRT_BWRAP_FLAGS_NONE, NULL),

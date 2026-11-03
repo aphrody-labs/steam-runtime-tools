@@ -769,7 +769,7 @@ main (int argc,
    * so it's definitely too late to apply bwrap-related workarounds,
    * so we don't need to detect the state of bwrap here
    * or take it into account */
-  workarounds = pv_get_workarounds (SRT_BWRAP_FLAGS_NONE,
+  workarounds = pv_get_workarounds (SRT_BWRAP_FLAGS_NOT_TESTED,
                                     _srt_const_strv (envp));
 
   /* Must be called before we start any threads, but after we set up

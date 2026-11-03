@@ -526,6 +526,37 @@ generate_locales (SrtSubprocessRunner *runner,
 }
 
 static gboolean
+pv_adverb_add_exec_helper (SrtSubprocessRunner *runner,
+                           GPtrArray *command_argv,
+                           GError **error)
+{
+#ifdef _SRT_MULTIARCH
+  g_autoptr(GPtrArray) exec_helper = NULL;
+
+  exec_helper = _srt_subprocess_runner_get_helper (runner,
+                                                   _SRT_MULTIARCH,
+                                                   NULL,
+                                                   "exec",
+                                                   SRT_HELPER_FLAGS_NONE,
+                                                   error);
+
+  if (exec_helper == NULL)
+    return FALSE;
+
+  for (size_t i = 0; i < exec_helper->len; i++)
+    g_ptr_array_add (command_argv, g_strdup (g_ptr_array_index (exec_helper, i)));
+
+  g_ptr_array_add (command_argv, g_strdup ("--compatible-rlimit"));
+  g_ptr_array_add (command_argv, g_strdup ("--"));
+  return TRUE;
+#else
+  g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+               "Multiarch tuple not known at compile-time");
+  return FALSE;
+#endif
+}
+
+static gboolean
 opt_ignored_cb (const char *option_name,
                 const char *value,
                 void *data,
@@ -875,6 +906,21 @@ main (int argc,
   g_clear_pointer (&env_overlay, _srt_env_overlay_unref);
 
   command_argv = g_ptr_array_new_full (argc, g_free);
+
+  /* Wrap it with the exec helper to set a widely compatible fd limit.
+   * We don't do this in the child_setup_func because prlimit() is
+   * technically not listed as an async-signal-safe function,
+   * although in practice it almost certainly is.
+   * TODO: If glibc re-documents prlimit() as async-signal-safe as suggested
+   * in https://sourceware.org/bugzilla/show_bug.cgi?id=34941,
+   * then we can move prlimit() into the child_setup_func and not need
+   * this extra layer in the exec chain. */
+  if (!pv_adverb_add_exec_helper (runner, command_argv, &local_error))
+    {
+      _srt_log_warning ("%s", local_error->message);
+      g_clear_error (&local_error);
+      g_ptr_array_set_size (command_argv, 0);
+    }
 
   for (int i = 1; i < argc; i++)
     g_ptr_array_add (command_argv, g_strdup (argv[i]));

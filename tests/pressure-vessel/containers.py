@@ -777,6 +777,14 @@ class BaseContainersTest(BaseTest):
 
         pass_fd_read_end, pass_fd_write_end = os.pipe2(os.O_CLOEXEC)
 
+        if self.new_fd_limit[0] > 1024:
+            logger.debug('Using high fd to test --pass-fd')
+            duplicate = fcntl.fcntl(pass_fd_write_end, fcntl.F_DUPFD, 1024)
+            os.close(pass_fd_write_end)
+            pass_fd_write_end = duplicate
+        else:
+            logger.debug('RLIMIT_NOFILE too low to test high --pass-fd')
+
         argv = [
             self.pv_wrap,
             '--verbose',

@@ -4,8 +4,10 @@
 # SPDX-License-Identifier: MIT
 
 import contextlib
+import fcntl
 import logging
 import os
+import resource
 import shutil
 import signal
 import subprocess
@@ -40,6 +42,22 @@ EX_OSERR = 71
 class TestLauncher(BaseTest):
     def setUp(self) -> None:
         super().setUp()
+
+        self.original_fd_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
+        self.new_fd_limit = self.original_fd_limit
+        original_soft_limit, original_hard_limit = self.original_fd_limit
+
+        if (
+            original_hard_limit == resource.RLIM_INFINITY
+            or original_hard_limit > original_soft_limit
+        ):
+            if original_hard_limit == resource.RLIM_INFINITY:
+                new_soft_limit = 65536
+            else:
+                new_soft_limit = original_hard_limit
+
+            self.new_fd_limit = (new_soft_limit, original_hard_limit)
+            resource.setrlimit(resource.RLIMIT_NOFILE, self.new_fd_limit)
 
         # We assume these environment variables are unset, except for when
         # we specifically set them ourselves
@@ -835,6 +853,94 @@ class TestLauncher(BaseTest):
             # extraneous output on stdout
             self.assertEqual('wrapped printf', output)
             self.assertEqual('', more_output)
+
+    def test_wrap_forward_fd(self) -> None:
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(
+                self.show_location('test_wrap_forward_fd')
+            )
+            temp = stack.enter_context(
+                tempfile.TemporaryDirectory(prefix='test-'),
+            )
+            socket = os.path.join(temp, 'socket')
+
+            proc = subprocess.Popen(
+                self.clean_up_env + self.launcher + [
+                    '--socket', socket,
+                    '--no-stop-on-exit',
+                ],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=2,
+                universal_newlines=False,
+            )
+            stack.enter_context(ensure_terminated(proc))
+
+            stdout = proc.stdout
+            assert stdout is not None
+            output = stdout.read()
+
+            read_end, write_end = os.pipe2(os.O_CLOEXEC)
+
+            if self.new_fd_limit[0] > 1024:
+                logger.debug('Using high fd to test --forward-fd')
+                duplicate = fcntl.fcntl(read_end, fcntl.F_DUPFD, 1024)
+                os.close(read_end)
+                read_end = duplicate
+            else:
+                logger.debug('RLIMIT_NOFILE too low to test high --forward-fd')
+
+            cat = subprocess.Popen(
+                self.clean_up_env + self.launch + [
+                    '--forward-fd', '%d' % read_end,
+                    '--socket', socket,
+                    '--',
+                    'cat', '/proc/self/fd/%d' % read_end,
+                ],
+                pass_fds=[read_end],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=2,
+            )
+            stack.enter_context(ensure_terminated(cat))
+
+            os.close(read_end)
+
+            with open(write_end, 'wb') as writer:
+                writer.write(b'hello\n')
+
+            output, _ = cat.communicate(input=b'', timeout=10)
+            self.assertEqual(cat.returncode, 0)
+            self.assertEqual(b'hello\n', output)
+
+            # We don't actually parse the output of this, just send it to
+            # the debug log, to avoid being dependent on the precise format
+            # of human-readable text provided by the kernel.
+            # A manual test is that it should say "Max open files 1024 ...".
+            run_subprocess(
+                self.clean_up_env + self.launch + [
+                    '--socket', socket,
+                    '--',
+                    'cat', '/proc/self/limits',
+                ],
+                stdin=subprocess.DEVNULL,
+                stdout=2,
+                stderr=2,
+            )
+
+            run_subprocess(
+                self.clean_up_env + self.launch + [
+                    '--socket', socket,
+                    '--terminate',
+                    '--',
+                ],
+                check=True,
+                stdin=subprocess.DEVNULL,
+                stdout=2,
+                stderr=2,
+            )
+            proc.wait(timeout=10)
+            self.assertEqual(proc.returncode, 0)
 
     def test_wrap_info_fd(self) -> None:
         with contextlib.ExitStack() as stack:

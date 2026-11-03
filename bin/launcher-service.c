@@ -46,6 +46,7 @@
 #include "steam-runtime-tools/launcher-internal.h"
 #include "steam-runtime-tools/portal-listener-internal.h"
 #include "steam-runtime-tools/runtime-internal.h"
+#include "steam-runtime-tools/subprocess-internal.h"
 #include "steam-runtime-tools/utils-internal.h"
 #include "libglnx.h"
 
@@ -103,6 +104,7 @@ typedef struct
   gchar *original_cwd_l;
   GHashTable *client_pid_data_hash;
   PvLauncher1 *launcher;
+  GPtrArray *exec_helper;
   char **wrapped_command;
   /* Non-NULL if and only if the main PID is still running */
   char *main_pid_str;
@@ -146,6 +148,42 @@ pv_launcher_server_init (PvLauncherServer *self)
   _srt_get_current_dirs (NULL, &self->original_cwd_l);
 }
 
+static void
+pv_launcher_server_set_up_exec_helper (PvLauncherServer *self)
+{
+  g_autoptr(GError) local_error = NULL;
+#ifdef _SRT_MULTIARCH
+  g_autoptr(SrtSubprocessRunner) runner = NULL;
+#endif
+
+  g_return_if_fail (PV_IS_LAUNCHER_SERVER (self));
+  g_return_if_fail (self->exec_helper == NULL);
+
+#ifdef _SRT_MULTIARCH
+  runner = _srt_subprocess_runner_new ();
+  self->exec_helper = _srt_subprocess_runner_get_helper (runner,
+                                                         _SRT_MULTIARCH,
+                                                         NULL,
+                                                         "exec",
+                                                         SRT_HELPER_FLAGS_NONE,
+                                                         &local_error);
+#else
+  g_set_error (&local_error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+               "Multiarch tuple not known at compile-time");
+#endif
+
+  if (self->exec_helper != NULL)
+    {
+      g_ptr_array_add (self->exec_helper, g_strdup ("--compatible-rlimit"));
+      g_ptr_array_add (self->exec_helper, g_strdup ("--"));
+    }
+  else
+    {
+      _srt_log_warning ("%s", local_error->message);
+      self->exec_helper = g_ptr_array_new ();
+    }
+}
+
 static gboolean
 pv_launcher_server_still_alive (PvLauncherServer *self)
 {
@@ -184,6 +222,7 @@ pv_launcher_server_dispose (GObject *object)
   pv_launcher_server_cancel_event_sources (self);
   g_clear_object (&self->listener);
   g_clear_pointer (&self->client_pid_data_hash, g_hash_table_unref);
+  g_clear_pointer (&self->exec_helper, g_ptr_array_unref);
   g_clear_object (&self->launcher);
 
   G_OBJECT_CLASS (pv_launcher_server_parent_class)->dispose (object);
@@ -394,11 +433,52 @@ typedef struct
 
 typedef struct
 {
+  const char *prgname;
   FdMapEntry *fd_map;
   int         fd_map_len;
   gboolean    keep_tty_session;
 } ChildSetupData;
 
+/*
+ * This function needs to be async-signal safe: see signal-safety(7)
+ */
+static void
+dup2_or_die (const char *prgname,
+             int from,
+             int to)
+{
+  if (dup2 (from, to) >= 0)
+    return;
+
+  /* We can't use strerror() here because that wouldn't be async-signal safe,
+   * and similarly we can't use printf-style functions to substitute
+   * `from` or `to` into the message because none of those are
+   * async-signal safe. */
+
+  switch (errno)
+    {
+      case EBADF:
+        _srt_async_signal_safe_error (prgname,
+                                      "Unable to set up file descriptors: Bad file descriptor",
+                                      LAUNCH_EX_FAILED);
+        break;    /* not reached */
+
+      case EMFILE:
+        _srt_async_signal_safe_error (prgname,
+                                      "Unable to set up file descriptors: Too many open files",
+                                      LAUNCH_EX_FAILED);
+        break;    /* not reached */
+
+      default:
+        _srt_async_signal_safe_error (prgname,
+                                      "Unable to set up file descriptors",
+                                      LAUNCH_EX_FAILED);
+    }
+}
+
+/*
+ * This function needs to be async-signal safe: see signal-safety(7)
+ */
 static void
 child_setup_func (gpointer user_data)
 {
@@ -415,7 +495,7 @@ child_setup_func (gpointer user_data)
     {
       if (fd_map[i].from != fd_map[i].to)
         {
-          dup2 (fd_map[i].from, fd_map[i].to);
+          dup2_or_die (data->prgname, fd_map[i].from, fd_map[i].to);
           close (fd_map[i].from);
         }
     }
@@ -425,7 +505,7 @@ child_setup_func (gpointer user_data)
     {
       if (fd_map[i].to != fd_map[i].final)
         {
-          dup2 (fd_map[i].to, fd_map[i].final);
+          dup2_or_die (data->prgname, fd_map[i].to, fd_map[i].final);
           close (fd_map[i].to);
         }
 
@@ -450,6 +530,25 @@ child_setup_func (gpointer user_data)
     }
 }
 
+static GPtrArray *
+pv_launcher_server_wrap_with_exec (PvLauncherServer *self,
+                                   const char * const *argv)
+{
+  g_autoptr(GPtrArray) ret = NULL;
+
+  ret = g_ptr_array_new_full (_srt_strv_length (argv)
+                              + self->exec_helper->len,
+                              g_free);
+
+  for (size_t i = 0; i < self->exec_helper->len; i++)
+    g_ptr_array_add (ret, g_strdup (g_ptr_array_index (self->exec_helper, i)));
+
+  for (size_t i = 0; argv[i] != NULL; i++)
+    g_ptr_array_add (ret, g_strdup (argv[i]));
+
+  return g_steal_pointer (&ret);
+}
+
 static gboolean
 handle_launch (PvLauncher1           *object,
                GDBusMethodInvocation *invocation,
@@ -463,6 +562,7 @@ handle_launch (PvLauncher1           *object,
                PvLauncherServer      *self)
 {
   g_autoptr(GError) error = NULL;
+  g_autoptr(GPtrArray) argv = NULL;
   ChildSetupData child_setup_data = { NULL };
   GPid pid;
   PidData *pid_data;
@@ -508,6 +608,7 @@ handle_launch (PvLauncher1           *object,
     n_fds = g_variant_n_children (arg_fds);
   fd_map = g_new0 (FdMapEntry, n_fds);
 
+  child_setup_data.prgname = g_get_prgname ();
   child_setup_data.fd_map = fd_map;
   child_setup_data.fd_map_len = n_fds;
 
@@ -652,10 +753,17 @@ handle_launch (PvLauncher1           *object,
       env = g_environ_setenv (env, "PWD", arg_cwd_path, TRUE);
     }
 
+  /* Wrap it with the exec helper to set a widely compatible fd limit.
+   * We don't do this in the child_setup_func because prlimit() is
+   * technically not listed as an async-signal-safe function,
+   * although in practice it almost certainly is. */
+  argv = pv_launcher_server_wrap_with_exec (self, arg_argv);
+  g_ptr_array_add (argv, NULL);
+
   /* We use LEAVE_DESCRIPTORS_OPEN and set CLOEXEC in the child_setup,
    * to work around a deadlock in GLib < 2.60 */
   if (!g_spawn_async_with_pipes (arg_cwd_path,
-                                 (gchar **) arg_argv,
+                                 (gchar **) argv->pdata,
                                  env,
                                  G_SPAWN_SEARCH_PATH | G_SPAWN_DO_NOT_REAP_CHILD | G_SPAWN_LEAVE_DESCRIPTORS_OPEN,
                                  child_setup_func, &child_setup_data,
@@ -929,12 +1037,19 @@ pv_launcher_server_finish_startup (PvLauncherServer *self,
   if (self->wrapped_command != NULL)
     {
       ChildSetupData child_setup_data = { NULL };
+      g_autoptr(GPtrArray) argv = NULL;
       g_autofree FdMapEntry *fd_map = NULL;
       GPid pid = -1;
       PidData *pid_data;
 
       g_warn_if_fail (self->main_pid == 0);
       g_warn_if_fail (self->main_pid_str == NULL);
+
+      /* As with the Launch method, we don't rely on the child_setup
+       * to set a widely compatible fd limit because prlimit() is
+       * not documented to be async-signal-safe. */
+      argv = pv_launcher_server_wrap_with_exec (self, _srt_const_strv (self->wrapped_command));
+      g_ptr_array_add (argv, NULL);
 
       /* Map our original stdout back to the child */
       fd_map = g_new0 (FdMapEntry, 1);
@@ -944,6 +1059,7 @@ pv_launcher_server_finish_startup (PvLauncherServer *self,
 
       g_debug ("Map stdout %d -> %d -> %d",
                fd_map[0].from, fd_map[0].to, fd_map[0].final);
+      child_setup_data.prgname = g_get_prgname ();
       child_setup_data.fd_map = fd_map;
       child_setup_data.fd_map_len = 1;
       child_setup_data.keep_tty_session = TRUE;
@@ -951,7 +1067,7 @@ pv_launcher_server_finish_startup (PvLauncherServer *self,
       /* We use LEAVE_DESCRIPTORS_OPEN and set CLOEXEC in the child_setup,
        * to work around a deadlock in GLib < 2.60 */
       if (!g_spawn_async_with_pipes (NULL,
-                                     self->wrapped_command,
+                                     (char **) argv->pdata,
                                      NULL,
                                      (G_SPAWN_SEARCH_PATH
                                       | G_SPAWN_DO_NOT_REAP_CHILD
@@ -1644,10 +1760,6 @@ main (int argc,
       && !_srt_raise_on_parent_death (SIGTERM, error))
     goto out;
 
-  if ((result = _srt_set_compatible_resource_limits (0)) < 0)
-    g_warning ("Unable to set normal resource limits: %s",
-               g_strerror (-result));
-
   if (opt_exec_fallback && wrapped_command == NULL)
     {
       g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_FAILED,
@@ -1686,6 +1798,9 @@ main (int argc,
    * (meaning do not use) if there is a command */
   if (server->wrapped_command == NULL && opt_info_fd < 0)
     opt_info_fd = STDOUT_FILENO;
+
+  pv_launcher_server_set_up_exec_helper (server);
+  g_assert (server->exec_helper != NULL);
 
   if (!_srt_portal_listener_set_up_info_fd (server->listener,
                                             opt_info_fd,
@@ -1916,6 +2031,10 @@ out:
           data.fd_map = &fd_map;
           data.fd_map_len = 1;
         }
+
+      if ((result = _srt_set_compatible_resource_limits (0)) < 0)
+        g_warning ("Unable to set normal resource limits: %s",
+                   g_strerror (-result));
 
       /* Replace current process with the wrapped command */
       child_setup_func (&data);

@@ -1745,6 +1745,12 @@ main (int argc,
   else
     server->listener->flags |= SRT_PORTAL_LISTENER_FLAGS_PREFER_UNIQUE_NAME;
 
+  if (_srt_maximize_fd_limit (0, &local_error) < 0)
+    {
+      g_warning ("%s", local_error->message);
+      g_clear_error (&local_error);
+    }
+
   if (opt_stop_on_parent_exit
       && !_srt_raise_on_parent_death (SIGTERM, error))
     goto out;

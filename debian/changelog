@@ -1,4 +1,4 @@
-steam-runtime-tools (0.20261103.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20261103.0) steamrt; urgency=medium
 
   [ Antonio Ospite ]
   * pressure-vessel:
@@ -23,7 +23,7 @@ steam-runtime-tools (0.20261103.0) UNRELEASED; urgency=medium
   * Tests/CI:
     - Improve coverage (steamrt/tasks#1191)
 
- -- Simon McVittie <smcv@collabora.com>  Tue, 03 Nov 2026 15:38:02 +0000
+ -- Simon McVittie <smcv@collabora.com>  Tue, 03 Nov 2026 15:43:49 +0000
 
 steam-runtime-tools (0.20261029.1) steamrt; urgency=medium
 

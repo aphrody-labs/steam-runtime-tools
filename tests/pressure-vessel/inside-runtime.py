@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import resource
 import shlex
 import subprocess
 import sys
@@ -142,6 +143,22 @@ class TestInsideRuntime(BaseTest):
                     logger.error('%r', diagnostic)
 
                 raise
+
+    def test_resource_limits(self) -> None:
+        """
+        Assert that inside the container, the RLIMIT_NOFILE resource
+        limit has been set to an interoperable value,
+        for best possible compatibility with games' assumptions
+        """
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+
+        # Soft limit should be <= FD_SETSIZE, otherwise games can't
+        # rely on being able to use select()
+        self.assertLessEqual(soft, 1024)
+
+        # If hard limit allows it, then soft limit should be maximized
+        if hard == resource.RLIM_INFINITY or hard >= 1024:
+            self.assertEqual(soft, 1024)
 
     def test_os_release(self) -> None:
         """

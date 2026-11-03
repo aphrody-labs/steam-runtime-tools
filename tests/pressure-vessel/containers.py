@@ -94,6 +94,7 @@ import glob
 import json
 import logging
 import os
+import resource
 import shutil
 import struct
 import sys
@@ -158,6 +159,8 @@ class BaseContainersTest(BaseTest):
     containers_dir = ''
     host_srsi = None        # type: typing.Optional[str]
     host_srsi_parsed = {}   # type: typing.Dict[str, typing.Any]
+    new_fd_limit = (0, 0)   # type: typing.Tuple[int, int]
+    original_fd_limit = (0, 0)      # type: typing.Tuple[int, int]
     pv_dir = ''
     pv_wrap = ''
     runtime_is_sdk = False
@@ -175,6 +178,22 @@ class BaseContainersTest(BaseTest):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
+
+        cls.original_fd_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
+        cls.new_fd_limit = cls.original_fd_limit
+        original_soft_limit, original_hard_limit = cls.original_fd_limit
+
+        if (
+            original_hard_limit == resource.RLIM_INFINITY
+            or original_hard_limit > original_soft_limit
+        ):
+            if original_hard_limit == resource.RLIM_INFINITY:
+                new_soft_limit = 65536
+            else:
+                new_soft_limit = original_hard_limit
+
+            cls.new_fd_limit = (new_soft_limit, original_hard_limit)
+            resource.setrlimit(resource.RLIMIT_NOFILE, cls.new_fd_limit)
 
         cls.run_inside_runtime = False
 
@@ -556,6 +575,8 @@ class BaseContainersTest(BaseTest):
         self.containers_dir = cls.containers_dir
         self.host_srsi = cls.host_srsi
         self.host_srsi_parsed = cls.host_srsi_parsed
+        self.new_fd_limit = cls.new_fd_limit
+        self.original_fd_limit = cls.original_fd_limit
         self.pv_dir = cls.pv_dir
         self.pv_wrap = cls.pv_wrap
         self.runtime_is_sdk = cls.runtime_is_sdk

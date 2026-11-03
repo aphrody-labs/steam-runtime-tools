@@ -172,7 +172,7 @@ do_one_preload_module (const PvAdverbPreloadModule *module,
 }
 
 gboolean
-pv_adverb_set_up_preload_modules (FlatpakBwrap *wrapped_command,
+pv_adverb_set_up_preload_modules (GStrv *envpp,
                                   const GQuark *archs,
                                   gsize n_archs,
                                   PvPerArchDirs *lib_temp_dirs,
@@ -182,6 +182,8 @@ pv_adverb_set_up_preload_modules (FlatpakBwrap *wrapped_command,
 {
   GPtrArray *preload_search_paths[G_N_ELEMENTS (pv_preload_variables)] = { NULL };
   gsize i;
+
+  g_return_val_if_fail (envpp != NULL, FALSE);
 
   /* Iterate through all modules, populating preload_search_paths */
   for (i = 0; i < n_preload_modules; i++)
@@ -211,7 +213,7 @@ pv_adverb_set_up_preload_modules (FlatpakBwrap *wrapped_command,
         g_ptr_array_foreach (search_path, (GFunc) append_to_search_path, buffer);
 
       if (buffer->len != 0)
-        flatpak_bwrap_set_env (wrapped_command, variable, buffer->str, TRUE);
+        *envpp = g_environ_setenv (*envpp, variable, buffer->str, TRUE);
 
       g_clear_pointer (&preload_search_paths[i], g_ptr_array_unref);
     }

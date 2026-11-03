@@ -9,7 +9,6 @@
 
 #include <glib.h>
 
-#include "flatpak-bwrap-private.h"
 #include "per-arch-dirs.h"
 
 typedef enum
@@ -64,7 +63,7 @@ gboolean pv_adverb_preload_module_parse_adverb_cli (PvAdverbPreloadModule *self,
                                                     const char *value,
                                                     GError **error);
 
-gboolean pv_adverb_set_up_preload_modules (FlatpakBwrap *wrapped_command,
+gboolean pv_adverb_set_up_preload_modules (GStrv *envpp,
                                            const GQuark *archs,
                                            gsize n_archs,
                                            PvPerArchDirs *lib_temp_dirs,

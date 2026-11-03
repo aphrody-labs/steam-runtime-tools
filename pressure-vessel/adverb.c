@@ -931,13 +931,13 @@ main (int argc,
     }
 
   compat_flags = _srt_steam_get_compat_flags (_srt_const_strv (envp));
-  pv_adverb_set_up_dynamic_sdls (wrapped_command,
+  pv_adverb_set_up_dynamic_sdls (&wrapped_command->envp,
                                  (const GQuark *) tuples->data, tuples->len,
                                  lib_temp_dirs,
                                  "/usr", opt_overrides, compat_flags);
 
   if (opt_overrides != NULL
-      && !pv_adverb_set_up_overrides (wrapped_command,
+      && !pv_adverb_set_up_overrides (&wrapped_command->envp,
                                       (const GQuark *) tuples->data, tuples->len,
                                       lib_temp_dirs,
                                       opt_overrides,
@@ -948,7 +948,7 @@ main (int argc,
     }
 
   if (opt_preload_modules != NULL
-      && !pv_adverb_set_up_preload_modules (wrapped_command,
+      && !pv_adverb_set_up_preload_modules (&wrapped_command->envp,
                                             (const GQuark *) tuples->data, tuples->len,
                                             lib_temp_dirs,
                                             (const PvAdverbPreloadModule *) opt_preload_modules->data,

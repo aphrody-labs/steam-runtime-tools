@@ -23,7 +23,6 @@
 #include "libglnx.h"
 
 #include "steam-runtime-tools/system-info.h"
-#include "flatpak-bwrap-private.h"
 
 /*
  * PvPerArchDirs:
@@ -55,7 +54,7 @@ pv_per_arch_dirs_get_abi_path (PvPerArchDirs *self,
   return g_hash_table_lookup (self->abi_paths, GUINT_TO_POINTER (architecture));
 }
 
-gboolean pv_adverb_set_up_overrides (FlatpakBwrap *wrapped_command,
+gboolean pv_adverb_set_up_overrides (GStrv *envpp,
                                      const GQuark *archs,
                                      gsize n_archs,
                                      PvPerArchDirs *lib_temp_dirs,

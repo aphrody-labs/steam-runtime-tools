@@ -10,6 +10,7 @@
 #include "libglnx.h"
 
 #include "adverb-preload.h"
+#include "flatpak-bwrap-private.h"
 #include "flatpak-utils-base-private.h"
 #include "supported-architectures.h"
 #include "tests/test-utils.h"
@@ -241,7 +242,7 @@ test_basic (Fixture *f,
   n_modules = preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
                                          modules, G_N_ELEMENTS (modules));
   g_assert_cmpuint (n_modules, <=, G_N_ELEMENTS (modules));
-  ret = pv_adverb_set_up_preload_modules (f->bwrap,
+  ret = pv_adverb_set_up_preload_modules (&f->bwrap->envp,
                                           (const GQuark *) f->archs->data,
                                           f->archs->len,
                                           f->lib_temp_dirs,
@@ -364,7 +365,7 @@ test_biarch (Fixture *f,
   n_modules = preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
                                          modules, G_N_ELEMENTS (modules));
   g_assert_cmpuint (n_modules, <=, G_N_ELEMENTS (modules));
-  ret = pv_adverb_set_up_preload_modules (f->bwrap,
+  ret = pv_adverb_set_up_preload_modules (&f->bwrap->envp,
                                           (const GQuark *) f->archs->data,
                                           f->archs->len,
                                           f->lib_temp_dirs,
@@ -635,7 +636,7 @@ test_gameoverlayrenderer (Fixture *f,
   n_modules = preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
                                          modules, G_N_ELEMENTS (modules));
   g_assert_cmpuint (n_modules, ==, G_N_ELEMENTS (modules));
-  ret = pv_adverb_set_up_preload_modules (f->bwrap,
+  ret = pv_adverb_set_up_preload_modules (&f->bwrap->envp,
                                           (const GQuark *) f->archs->data,
                                           f->archs->len,
                                           f->lib_temp_dirs,
@@ -798,7 +799,7 @@ test_repetition (Fixture *f,
   n_modules = preload_inputs_to_modules (f, inputs, G_N_ELEMENTS (inputs),
                                          modules, G_N_ELEMENTS (modules));
   g_assert_cmpuint (n_modules, <=, G_N_ELEMENTS (modules));
-  ret = pv_adverb_set_up_preload_modules (f->bwrap,
+  ret = pv_adverb_set_up_preload_modules (&f->bwrap->envp,
                                           (const GQuark *) f->archs->data,
                                           f->archs->len,
                                           f->lib_temp_dirs,

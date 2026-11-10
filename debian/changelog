@@ -1,11 +1,11 @@
-steam-runtime-tools (0.20261109.0) UNRELEASED; urgency=medium
+steam-runtime-tools (0.20261110.0) steamrt; urgency=medium
 
   * s-r-launcher-service:
-    - Fix startup of the beta steamrt3c Steam Client when the D-Bus
-      session bus is filtered by xdg-dbus-proxy
+    - Fix startup of the steamrt3c Steam Client when the D-Bus session
+      bus is being filtered by xdg-dbus-proxy
       (steamrt/tasks#1193, steam-for-linux#13863)
 
- -- Simon McVittie <smcv@collabora.com>  Mon, 09 Nov 2026 19:02:09 +0000
+ -- Simon McVittie <smcv@collabora.com>  Tue, 10 Nov 2026 11:17:19 +0000
 
 steam-runtime-tools (0.20261103.0) steamrt; urgency=medium
 

@@ -398,7 +398,12 @@ engines include:
     Normally we copy the top changelog entry as the tag message
     (see any earlier tag as an example).
 
-* Push the annotated tag.
+* Push the `main` branch and the annotated tag:
+
+    ```
+    git push --atomic origin main v$VERSION
+    ```
+
     The CI will automatically build a new version and upload it to
     <https://repo.steampowered.com/pressure-vessel/snapshots/latest/>.
     You can find source code in

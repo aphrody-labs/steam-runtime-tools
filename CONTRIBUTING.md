@@ -456,3 +456,123 @@ engines include:
         * *Type*: **Package**
 
 [deb-build-snapshot]: https://gitlab.collabora.com/smcv/deb-build-snapshot
+
+### Releasing hotfixes
+
+Normally we use the newest available version of steam-runtime-tools
+to build all Steam Runtime suites,
+but sometimes we will want to do a hotfix for a time-sensitive issue
+without taking the regression risk of incorporating newer changes.
+For example we did this in the past for v0.20231013.1,
+which was a hotfix for v0.20231013.0.
+
+There are two versions of steam-runtime-tools that are relevant for each
+Steam Runtime suite:
+
+  * The version that is built in OBS for each suite gets installed into
+    the Platform and SDK containers,
+    and the `./*_platform_*/` subdirectory of the Steam Linux Runtime depot.
+    This will be used to provide tools in the `$PATH` for processes
+    running inside the container,
+    for example `steam-runtime-launch-client` and `steam-runtime-system-info`.
+
+  * The relocatable version that is uploaded to
+    <https://repo.steampowered.com/pressure-vessel/snapshots/>
+    gets installed into the `./pressure-vessel*/` subdirectories
+    of the Steam Linux Runtime depot,
+    and is used to build the depot and provide scripts such as `./run`
+    at the root of the depot.
+    This is used to provide the entry point to the container as a
+    Steam compatibility tool.
+    For the `steamrt3c` suite,
+    this copy of steam-runtime-tools is also responsible for providing
+    the components that are run by Steam outside the container:
+    [`srt-client-container`](bin/client-container.md),
+    [`srt-logger`](bin/logger.md),
+    [`steam-runtime-launch-options`](bin/launch-options.md)
+    and so on.
+
+Normally these two versions are kept the same,
+and normally they are both the newest release,
+but we are able to control them individually.
+
+For example,
+imagine that one of the released Steam Runtime suites currently contains
+pressure-vessel version 0.20231013.0,
+and we have subsequently merged a change that is believed to be ready
+for release but does come with some regression risk.
+We might have already released a new pressure-vessel,
+let's say version 0.20231107.0,
+or we might only have unreleased changes in `main` that are unsuitable
+for a hotfix.
+Now we want to make a smaller change based on 0.20231013.0 and rebuild the
+released Steam Runtimes.
+
+To do this,
+first we would create a new git branch:
+
+```
+git checkout -b v0.20231013.x v0.20231013.0
+```
+
+Apply or cherry-pick the targeted bug fix to that branch,
+and push it to `origin`:
+
+```
+git push --atomic origin v0.20231013.x v0.20231013.0
+```
+
+Do a release as usual,
+but instead of releasing from `main`,
+do the release from the `v0.20231013.x` branch.
+The new version number should be `0.20231013.1`,
+`0.20231013.2` and so on,
+even if today's date is no longer 2023-10-13.
+
+Push the tag as usual.
+The CI system will produce binaries and source code in
+<https://repo.steampowered.com/pressure-vessel/snapshots/> as usual,
+As currently implemented,
+<https://repo.steampowered.com/pressure-vessel/snapshots/latest.txt>
+will be updated to point to the new hotfix,
+meaning that new automatic builds of any Steam Runtime suite will use the
+new hotfix to provide `./pressure-vessel*/` and scripts such as `./run`,
+even if its version number is lower than a previous release!
+If this is not what is wanted,
+then we can tag a new release on `main` which will supersede the hotfix by
+overwriting `latest.txt`
+(if no code changes are required,
+simply updating `debian/changelog` and `meson.build` and then creating a
+new tag is enough).
+
+While there is more than one interesting version in use,
+each new build of any Steam Runtime suite should explicitly specify the
+desired version of pressure-vessel,
+by setting the `PARAM_PRESSURE_VESSEL_VERSION` CI variable
+to a value such as `0.20231013.1` or `0.20231107.0`.
+This will be used to build the container
+(with `subprojects/container-runtime/populate-depot.py`),
+and will provide `./pressure-vessel*/` and the scripts in the root of
+the depot.
+For `steamrt3c`,
+it also provides `./bin/`.
+
+For the steam-runtime-tools executables that exist inside the container,
+we can either upload the new version to OBS for the relevant suite,
+or avoid uploading it and leave OBS providing an older version,
+whichever is more appropriate at the time.
+
+To return to the normal state of things,
+merge the hotfix branch into `main`:
+
+```
+git checkout main
+git merge v0.20231013.x
+# fix conflicts and commit
+git push --atomic origin main
+```
+
+Then release a new version from `main` with a higher date-based
+version number.
+This will overwrite `latest.txt` and therefore will become the new default
+for all suites.

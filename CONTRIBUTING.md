@@ -405,9 +405,9 @@ engines include:
     ```
 
     The CI will automatically build a new version and upload it to
-    <https://repo.steampowered.com/pressure-vessel/snapshots/latest/>.
-    You can find source code in
-    <https://repo.steampowered.com/pressure-vessel/snapshots/latest/sources/>
+    <https://repo.steampowered.com/pressure-vessel/snapshots/>,
+    in a version-numbered directory whose name appears in `latest.txt`.
+    You can find source code in `…/snapshots/$VERSION/sources/`
     (`steam-runtime-tools_$VERSION.dsc`
     and `steam-runtime-tools_$VERSION.tar.xz`); download those.
 

@@ -94,6 +94,7 @@ import glob
 import json
 import logging
 import os
+import resource
 import shutil
 import struct
 import sys
@@ -158,6 +159,8 @@ class BaseContainersTest(BaseTest):
     containers_dir = ''
     host_srsi = None        # type: typing.Optional[str]
     host_srsi_parsed = {}   # type: typing.Dict[str, typing.Any]
+    new_fd_limit = (0, 0)   # type: typing.Tuple[int, int]
+    original_fd_limit = (0, 0)      # type: typing.Tuple[int, int]
     pv_dir = ''
     pv_wrap = ''
     runtime_is_sdk = False
@@ -175,6 +178,22 @@ class BaseContainersTest(BaseTest):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
+
+        cls.original_fd_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
+        cls.new_fd_limit = cls.original_fd_limit
+        original_soft_limit, original_hard_limit = cls.original_fd_limit
+
+        if (
+            original_hard_limit == resource.RLIM_INFINITY
+            or original_hard_limit > original_soft_limit
+        ):
+            if original_hard_limit == resource.RLIM_INFINITY:
+                new_soft_limit = 65536
+            else:
+                new_soft_limit = original_hard_limit
+
+            cls.new_fd_limit = (new_soft_limit, original_hard_limit)
+            resource.setrlimit(resource.RLIMIT_NOFILE, cls.new_fd_limit)
 
         cls.run_inside_runtime = False
 
@@ -556,6 +575,8 @@ class BaseContainersTest(BaseTest):
         self.containers_dir = cls.containers_dir
         self.host_srsi = cls.host_srsi
         self.host_srsi_parsed = cls.host_srsi_parsed
+        self.new_fd_limit = cls.new_fd_limit
+        self.original_fd_limit = cls.original_fd_limit
         self.pv_dir = cls.pv_dir
         self.pv_wrap = cls.pv_wrap
         self.runtime_is_sdk = cls.runtime_is_sdk
@@ -754,12 +775,23 @@ class BaseContainersTest(BaseTest):
 
             env['PRESSURE_VESSEL_WORKAROUNDS'] = ' '.join(workarounds)
 
+        pass_fd_read_end, pass_fd_write_end = os.pipe2(os.O_CLOEXEC)
+
+        if self.new_fd_limit[0] > 1024:
+            logger.debug('Using high fd to test --pass-fd')
+            duplicate = fcntl.fcntl(pass_fd_write_end, fcntl.F_DUPFD, 1024)
+            os.close(pass_fd_write_end)
+            pass_fd_write_end = duplicate
+        else:
+            logger.debug('RLIMIT_NOFILE too low to test high --pass-fd')
+
         argv = [
             self.pv_wrap,
             '--verbose',
             '--write-final-argv', final_argv_path,
             '--filesystem', self.artifacts,
             '--runtime', runtime,
+            '--pass-fd', '%d' % pass_fd_write_end,
         ]
 
         var_dir = os.path.join(self.containers_dir, 'var')
@@ -829,6 +861,10 @@ class BaseContainersTest(BaseTest):
                         '1' if is_soldier else ''
                     ),
                     'TEST_INSIDE_RUNTIME_LOCALES=' + ('1' if locales else ''),
+                    'TEST_INSIDE_RUNTIME_PASS_FD_WRITE=%d:%s' % (
+                        pass_fd_write_end,
+                        'hello, world!',
+                    ),
                     python,
                     os.path.join(self.artifacts, 'tmp', 'inside-runtime.py'),
                 ])
@@ -874,11 +910,14 @@ class BaseContainersTest(BaseTest):
                     argv,
                     cwd=self.artifacts,
                     env=env,
+                    pass_fds=[pass_fd_write_end],
                     stdout=log,
                     stderr=log,
                     universal_newlines=True,
                 )
                 self.assertEqual(completed.returncode, 0)
+
+            os.close(pass_fd_write_end)
 
             with open(final_argv_path, 'r') as reader:
                 final_argv = reader.read()
@@ -951,6 +990,13 @@ class BaseContainersTest(BaseTest):
                             final_argv,
                         )
                     )
+
+                with open(pass_fd_read_end, 'r') as reader:
+                    self.assertEqual(reader.read(), '')
+
+            else:   # not only_prepare
+                with open(pass_fd_read_end, 'r') as reader:
+                    self.assertEqual(reader.read(), 'hello, world!')
 
             if fake_home:
                 members = set(os.listdir(fake_home_temp))

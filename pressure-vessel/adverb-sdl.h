@@ -11,10 +11,9 @@
 
 #include "steam-runtime-tools/steam-internal.h"
 
-#include "flatpak-bwrap-private.h"
 #include "per-arch-dirs.h"
 
-gboolean pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
+gboolean pv_adverb_set_up_dynamic_sdl (GStrv *envpp,
                                        const GQuark *archs,
                                        gsize n_archs,
                                        PvPerArchDirs *lib_temp_dirs,
@@ -24,7 +23,7 @@ gboolean pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
                                        const char *soname,
                                        GError **error);
 
-void pv_adverb_set_up_dynamic_sdls (FlatpakBwrap *wrapped_command,
+void pv_adverb_set_up_dynamic_sdls (GStrv *envpp,
                                     const GQuark *archs,
                                     gsize n_archs,
                                     PvPerArchDirs *lib_temp_dirs,

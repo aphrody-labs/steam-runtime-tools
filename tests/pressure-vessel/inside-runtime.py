@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import resource
 import shlex
 import subprocess
 import sys
@@ -28,6 +29,16 @@ to assert that everything is as it should be.
 
 logger = logging.getLogger('test-inside-runtime')
 typing  # noqa
+
+
+def do_once_actions():
+    pass_fd_write = os.environ.get('TEST_INSIDE_RUNTIME_PASS_FD_WRITE')
+
+    if pass_fd_write is not None:
+        fd, rest = pass_fd_write.split(':', 1)
+
+        with open(int(fd), 'w') as writer:
+            writer.write(rest)
 
 
 class HostInfo:
@@ -142,6 +153,22 @@ class TestInsideRuntime(BaseTest):
                     logger.error('%r', diagnostic)
 
                 raise
+
+    def test_resource_limits(self) -> None:
+        """
+        Assert that inside the container, the RLIMIT_NOFILE resource
+        limit has been set to an interoperable value,
+        for best possible compatibility with games' assumptions
+        """
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+
+        # Soft limit should be <= FD_SETSIZE, otherwise games can't
+        # rely on being able to use select()
+        self.assertLessEqual(soft, 1024)
+
+        # If hard limit allows it, then soft limit should be maximized
+        if hard == resource.RLIM_INFINITY or hard >= 1024:
+            self.assertEqual(soft, 1024)
 
     def test_os_release(self) -> None:
         """
@@ -1000,6 +1027,7 @@ class TestInsideRuntime(BaseTest):
 if __name__ == '__main__':
     assert sys.version_info >= (3, 5), 'Python 3.5+ is required'
 
+    do_once_actions()
     test_main()
 
 # vi: set sw=4 sts=4 et:

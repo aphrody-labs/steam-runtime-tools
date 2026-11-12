@@ -744,7 +744,11 @@ handle_launch (PvLauncher1           *object,
   /* Wrap it with the exec helper to set a widely compatible fd limit.
    * We don't do this in the child_setup_func because prlimit() is
    * technically not listed as an async-signal-safe function,
-   * although in practice it almost certainly is. */
+   * although in practice it almost certainly is.
+   * TODO: If glibc re-documents prlimit() as async-signal-safe as suggested
+   * in https://sourceware.org/bugzilla/show_bug.cgi?id=34941,
+   * then we can move prlimit() into the child_setup_func and not need
+   * this extra layer in the exec chain. */
   argv = pv_launcher_server_wrap_with_exec (self, arg_argv);
   g_ptr_array_add (argv, NULL);
 
@@ -1741,6 +1745,12 @@ main (int argc,
   else
     server->listener->flags |= SRT_PORTAL_LISTENER_FLAGS_PREFER_UNIQUE_NAME;
 
+  if (_srt_maximize_fd_limit (0, &local_error) < 0)
+    {
+      g_warning ("%s", local_error->message);
+      g_clear_error (&local_error);
+    }
+
   if (opt_stop_on_parent_exit
       && !_srt_raise_on_parent_death (SIGTERM, error))
     goto out;
@@ -2017,9 +2027,11 @@ out:
           data.fd_map_len = 1;
         }
 
-      if ((result = _srt_set_compatible_resource_limits (0)) < 0)
-        g_warning ("Unable to set normal resource limits: %s",
-                   g_strerror (-result));
+      if (_srt_set_compatible_resource_limits (0, &local_error) < 0)
+        {
+          g_warning ("%s", local_error->message);
+          g_clear_error (&local_error);
+        }
 
       /* Replace current process with the wrapped command */
       child_setup_func (&data);

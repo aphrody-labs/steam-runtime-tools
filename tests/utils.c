@@ -1613,7 +1613,7 @@ test_rlimit (Fixture *f,
   adjusted = original;
   adjusted.rlim_cur = 2048;
   g_assert_no_errno (setrlimit (RLIMIT_NOFILE, &adjusted));
-  g_assert_cmpint (_srt_set_compatible_resource_limits (0), ==, 0);
+  g_assert_cmpint (_srt_set_compatible_resource_limits (0, NULL), ==, 0);
   g_assert_no_errno (getrlimit (RLIMIT_NOFILE, &adjusted));
   g_assert_cmpint (adjusted.rlim_cur, ==, 1024);
   g_assert_cmpint (adjusted.rlim_max, ==, original.rlim_max);
@@ -1621,7 +1621,7 @@ test_rlimit (Fixture *f,
   adjusted = original;
   adjusted.rlim_cur = 512;
   g_assert_no_errno (setrlimit (RLIMIT_NOFILE, &adjusted));
-  g_assert_cmpint (_srt_set_compatible_resource_limits (getpid ()), ==, 0);
+  g_assert_cmpint (_srt_set_compatible_resource_limits (getpid (), NULL), ==, 0);
   g_assert_no_errno (getrlimit (RLIMIT_NOFILE, &adjusted));
   g_assert_cmpint (adjusted.rlim_cur, ==, 1024);
   g_assert_cmpint (adjusted.rlim_max, ==, original.rlim_max);
@@ -1629,9 +1629,17 @@ test_rlimit (Fixture *f,
   adjusted = original;
   adjusted.rlim_cur = 1024;
   g_assert_no_errno (setrlimit (RLIMIT_NOFILE, &adjusted));
-  g_assert_cmpint (_srt_set_compatible_resource_limits (0), ==, 0);
+  g_assert_cmpint (_srt_set_compatible_resource_limits (0, NULL), ==, 0);
   g_assert_no_errno (getrlimit (RLIMIT_NOFILE, &adjusted));
   g_assert_cmpint (adjusted.rlim_cur, ==, 1024);
+  g_assert_cmpint (adjusted.rlim_max, ==, original.rlim_max);
+
+  adjusted = original;
+  adjusted.rlim_cur = 1024;
+  g_assert_no_errno (setrlimit (RLIMIT_NOFILE, &adjusted));
+  g_assert_cmpint (_srt_maximize_fd_limit (0, NULL), ==, 0);
+  g_assert_no_errno (getrlimit (RLIMIT_NOFILE, &adjusted));
+  g_assert_cmpint (adjusted.rlim_cur, ==, original.rlim_max);
   g_assert_cmpint (adjusted.rlim_max, ==, original.rlim_max);
 }
 

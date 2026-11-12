@@ -240,7 +240,7 @@ pv_per_arch_dirs_new (SrtSystemInfo *info,
 }
 
 gboolean
-pv_adverb_set_up_overrides (FlatpakBwrap *wrapped_command,
+pv_adverb_set_up_overrides (GStrv *envpp,
                             const GQuark *archs,
                             gsize n_archs,
                             PvPerArchDirs *lib_temp_dirs,
@@ -250,7 +250,7 @@ pv_adverb_set_up_overrides (FlatpakBwrap *wrapped_command,
   g_autofree gchar *value = NULL;
   gsize abi;
 
-  g_return_val_if_fail (wrapped_command != NULL, FALSE);
+  g_return_val_if_fail (envpp != NULL, FALSE);
 
   if (lib_temp_dirs == NULL)
     return glnx_throw (error, "Unable to set up VDPAU driver search path");
@@ -279,6 +279,6 @@ pv_adverb_set_up_overrides (FlatpakBwrap *wrapped_command,
 
   value = g_build_filename (lib_temp_dirs->libdl_token_path, "vdpau", NULL);
   g_debug ("Setting VDPAU_DRIVER_PATH=\"%s\"", value);
-  flatpak_bwrap_set_env (wrapped_command, "VDPAU_DRIVER_PATH", value, TRUE);
+  *envpp = g_environ_setenv (*envpp, "VDPAU_DRIVER_PATH", value, TRUE);
   return TRUE;
 }

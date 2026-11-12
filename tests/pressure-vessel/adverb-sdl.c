@@ -10,6 +10,7 @@
 #include "libglnx.h"
 
 #include "adverb-sdl.h"
+#include "flatpak-bwrap-private.h"
 #include "supported-architectures.h"
 #include "tests/test-utils.h"
 
@@ -226,7 +227,7 @@ test_basic (Fixture *f,
          SDL3_SONAME, NULL);
 
   g_test_message ("With no flags, not setup is done...");
-  pv_adverb_set_up_dynamic_sdls (f->bwrap,
+  pv_adverb_set_up_dynamic_sdls (&f->bwrap->envp,
                                  (const GQuark *) f->archs->data,
                                  f->archs->len,
                                  f->lib_temp_dirs,
@@ -240,7 +241,7 @@ test_basic (Fixture *f,
   assert_env (f->bwrap->envp, SDL3_DYNAMIC_API, NULL, NULL);
 
   g_test_message ("SDL2 flag sets up SDL2...");
-  pv_adverb_set_up_dynamic_sdls (f->bwrap,
+  pv_adverb_set_up_dynamic_sdls (&f->bwrap->envp,
                                  (const GQuark *) f->archs->data,
                                  f->archs->len,
                                  f->lib_temp_dirs,
@@ -254,7 +255,7 @@ test_basic (Fixture *f,
   assert_env (f->bwrap->envp, SDL3_DYNAMIC_API, NULL, NULL);
 
   g_test_message ("SDL3 flag additionally sets up SDL3...");
-  pv_adverb_set_up_dynamic_sdls (f->bwrap,
+  pv_adverb_set_up_dynamic_sdls (&f->bwrap->envp,
                                  (const GQuark *) f->archs->data,
                                  f->archs->len,
                                  f->lib_temp_dirs,
@@ -274,7 +275,7 @@ test_basic (Fixture *f,
   g_clear_pointer (&sdl2_symlink, g_free);
 
   g_test_message ("sdl2-compat flag sets up sdl2-compat...");
-  pv_adverb_set_up_dynamic_sdls (f->bwrap,
+  pv_adverb_set_up_dynamic_sdls (&f->bwrap->envp,
                                  (const GQuark *) f->archs->data,
                                  f->archs->len,
                                  f->lib_temp_dirs,
@@ -291,7 +292,7 @@ test_basic (Fixture *f,
   g_clear_pointer (&sdl2_symlink, g_free);
 
   g_test_message ("classic flag sets up classic SDL2...");
-  pv_adverb_set_up_dynamic_sdls (f->bwrap,
+  pv_adverb_set_up_dynamic_sdls (&f->bwrap->envp,
                                  (const GQuark *) f->archs->data,
                                  f->archs->len,
                                  f->lib_temp_dirs,
@@ -323,7 +324,7 @@ test_cannot_symlink (Fixture *f,
   touch (NULL, f->primary_arch_path, SDL2_SONAME, NULL);
 
   g_test_summary ("If we can't create the symlink, setup fails");
-  res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+  res = pv_adverb_set_up_dynamic_sdl (&f->bwrap->envp,
                                       (const GQuark *) f->archs->data,
                                       f->archs->len,
                                       f->lib_temp_dirs,
@@ -354,7 +355,7 @@ test_impossible (Fixture *f,
 
   g_test_summary ("If we don't know the $LIB or $PLATFORM, nothing happens, "
                   "with a warning");
-  res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+  res = pv_adverb_set_up_dynamic_sdl (&f->bwrap->envp,
                                       (const GQuark *) f->archs->data,
                                       f->archs->len,
                                       NULL,
@@ -397,7 +398,7 @@ test_in_gfx_stack (Fixture *f,
          SDL2_SONAME, NULL);
 
   g_test_summary ("We prefer SDL from the graphics provider if present");
-  res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+  res = pv_adverb_set_up_dynamic_sdl (&f->bwrap->envp,
                                       (const GQuark *) f->archs->data,
                                       f->archs->len,
                                       f->lib_temp_dirs,
@@ -432,7 +433,7 @@ test_in_gfx_stack_only (Fixture *f,
          SDL2_SONAME, NULL);
 
   g_test_summary ("We use SDL from the graphics provider if necessary");
-  res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+  res = pv_adverb_set_up_dynamic_sdl (&f->bwrap->envp,
                                       (const GQuark *) f->archs->data,
                                       f->archs->len,
                                       f->lib_temp_dirs,
@@ -462,7 +463,7 @@ test_missing (Fixture *f,
     }
 
   g_test_summary ("If SDL is missing, nothing happens, with a warning");
-  res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+  res = pv_adverb_set_up_dynamic_sdl (&f->bwrap->envp,
                                       (const GQuark *) f->archs->data,
                                       f->archs->len,
                                       f->lib_temp_dirs,
@@ -494,7 +495,7 @@ test_overridden (Fixture *f,
 
   g_test_summary ("Setting " SDL_DYNAMIC_API " takes precedence");
   flatpak_bwrap_set_env (f->bwrap, SDL_DYNAMIC_API, "/whatever", TRUE);
-  res = pv_adverb_set_up_dynamic_sdl (f->bwrap,
+  res = pv_adverb_set_up_dynamic_sdl (&f->bwrap->envp,
                                       (const GQuark *) f->archs->data,
                                       f->archs->len,
                                       f->lib_temp_dirs,

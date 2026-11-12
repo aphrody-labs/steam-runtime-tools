@@ -184,7 +184,10 @@ _srt_is_same_file (const gchar *a,
                                     AT_FDCWD, b);
 }
 
-int _srt_set_compatible_resource_limits (pid_t pid);
+int _srt_set_compatible_resource_limits (pid_t pid,
+                                         GError **error);
+int _srt_maximize_fd_limit (pid_t pid,
+                            GError **error);
 
 gboolean _srt_boolean_environment (const gchar *name,
                                    gboolean def);

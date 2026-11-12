@@ -526,6 +526,37 @@ generate_locales (SrtSubprocessRunner *runner,
 }
 
 static gboolean
+pv_adverb_add_exec_helper (SrtSubprocessRunner *runner,
+                           GPtrArray *command_argv,
+                           GError **error)
+{
+#ifdef _SRT_MULTIARCH
+  g_autoptr(GPtrArray) exec_helper = NULL;
+
+  exec_helper = _srt_subprocess_runner_get_helper (runner,
+                                                   _SRT_MULTIARCH,
+                                                   NULL,
+                                                   "exec",
+                                                   SRT_HELPER_FLAGS_NONE,
+                                                   error);
+
+  if (exec_helper == NULL)
+    return FALSE;
+
+  for (size_t i = 0; i < exec_helper->len; i++)
+    g_ptr_array_add (command_argv, g_strdup (g_ptr_array_index (exec_helper, i)));
+
+  g_ptr_array_add (command_argv, g_strdup ("--compatible-rlimit"));
+  g_ptr_array_add (command_argv, g_strdup ("--"));
+  return TRUE;
+#else
+  g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+               "Multiarch tuple not known at compile-time");
+  return FALSE;
+#endif
+}
+
+static gboolean
 opt_ignored_cb (const char *option_name,
                 const char *value,
                 void *data,
@@ -703,7 +734,8 @@ main (int argc,
   g_autofree gchar *pkglibexecdir = NULL;
   glnx_autofd int original_stdout = -1;
   glnx_autofd int original_stderr = -1;
-  g_autoptr(FlatpakBwrap) wrapped_command = NULL;
+  g_autoptr(GPtrArray) command_argv = NULL;
+  g_auto(GStrv) command_envp = NULL;
   g_autoptr(PvPerArchDirs) lib_temp_dirs = NULL;
   SrtSteamCompatFlags compat_flags;
   g_autoptr(GArray) tuples = NULL;
@@ -861,21 +893,39 @@ main (int argc,
                                             SRT_TEST_FLAGS_NONE,
                                             NULL);  /* cwd */
 
-  if (opt_clear_env)
+  if (opt_clear_env || envp == NULL)
     {
-      wrapped_command = flatpak_bwrap_new (flatpak_bwrap_empty_env);
-      wrapped_command->envp = _srt_env_overlay_apply (env_overlay,
-                                                      wrapped_command->envp);
+      command_envp = g_strdupv (flatpak_bwrap_empty_env);
+      command_envp = _srt_env_overlay_apply (env_overlay, command_envp);
     }
   else
     {
-      wrapped_command = flatpak_bwrap_new (envp);
+      command_envp = g_strdupv (envp);
     }
 
   g_clear_pointer (&env_overlay, _srt_env_overlay_unref);
 
-  flatpak_bwrap_append_argsv (wrapped_command, &argv[1], argc - 1);
-  flatpak_bwrap_finish (wrapped_command);
+  command_argv = g_ptr_array_new_full (argc, g_free);
+
+  /* Wrap it with the exec helper to set a widely compatible fd limit.
+   * We don't do this in the child_setup_func because prlimit() is
+   * technically not listed as an async-signal-safe function,
+   * although in practice it almost certainly is.
+   * TODO: If glibc re-documents prlimit() as async-signal-safe as suggested
+   * in https://sourceware.org/bugzilla/show_bug.cgi?id=34941,
+   * then we can move prlimit() into the child_setup_func and not need
+   * this extra layer in the exec chain. */
+  if (!pv_adverb_add_exec_helper (runner, command_argv, &local_error))
+    {
+      _srt_log_warning ("%s", local_error->message);
+      g_clear_error (&local_error);
+      g_ptr_array_set_size (command_argv, 0);
+    }
+
+  for (int i = 1; i < argc; i++)
+    g_ptr_array_add (command_argv, g_strdup (argv[i]));
+
+  g_ptr_array_add (command_argv, NULL);
 
   if (opt_regenerate_ld_so_cache != NULL
       && opt_regenerate_ld_so_cache[0] != '\0')
@@ -895,8 +945,8 @@ main (int argc,
           else
             {
               g_debug ("Setting LD_LIBRARY_PATH to \"%s\"", opt_set_ld_library_path);
-              flatpak_bwrap_set_env (wrapped_command, "LD_LIBRARY_PATH",
-                                     opt_set_ld_library_path, TRUE);
+              command_envp = g_environ_setenv (command_envp, "LD_LIBRARY_PATH",
+                                               opt_set_ld_library_path, TRUE);
             }
         }
       else
@@ -915,8 +965,8 @@ main (int argc,
   else if (opt_set_ld_library_path != NULL)
     {
       g_debug ("Setting LD_LIBRARY_PATH to \"%s\"", opt_set_ld_library_path);
-      flatpak_bwrap_set_env (wrapped_command, "LD_LIBRARY_PATH",
-                             opt_set_ld_library_path, TRUE);
+      command_envp = g_environ_setenv (command_envp, "LD_LIBRARY_PATH",
+                                       opt_set_ld_library_path, TRUE);
     }
 
   info = srt_system_info_new (NULL);
@@ -931,13 +981,13 @@ main (int argc,
     }
 
   compat_flags = _srt_steam_get_compat_flags (_srt_const_strv (envp));
-  pv_adverb_set_up_dynamic_sdls (wrapped_command,
+  pv_adverb_set_up_dynamic_sdls (&command_envp,
                                  (const GQuark *) tuples->data, tuples->len,
                                  lib_temp_dirs,
                                  "/usr", opt_overrides, compat_flags);
 
   if (opt_overrides != NULL
-      && !pv_adverb_set_up_overrides (wrapped_command,
+      && !pv_adverb_set_up_overrides (&command_envp,
                                       (const GQuark *) tuples->data, tuples->len,
                                       lib_temp_dirs,
                                       opt_overrides,
@@ -948,7 +998,7 @@ main (int argc,
     }
 
   if (opt_preload_modules != NULL
-      && !pv_adverb_set_up_preload_modules (wrapped_command,
+      && !pv_adverb_set_up_preload_modules (&command_envp,
                                             (const GQuark *) tuples->data, tuples->len,
                                             lib_temp_dirs,
                                             (const PvAdverbPreloadModule *) opt_preload_modules->data,
@@ -983,7 +1033,8 @@ main (int argc,
       else if (locales_temp_dir.initialized)
         {
           g_info ("Generated locales in %s", locales_temp_dir.path);
-          flatpak_bwrap_set_env (wrapped_command, "LOCPATH", locales_temp_dir.path, TRUE);
+          command_envp = g_environ_setenv (command_envp, "LOCPATH",
+                                           locales_temp_dir.path, TRUE);
         }
       else
         {
@@ -993,8 +1044,8 @@ main (int argc,
 
   /* We take the same action whether this succeeds or fails */
   _srt_process_manager_run (process_manager,
-                            (const char * const *) wrapped_command->argv->pdata,
-                            (const char * const *) wrapped_command->envp,
+                            (const char * const *) command_argv->pdata,
+                            (const char * const *) command_envp,
                             error);
   ret = _srt_process_manager_get_exit_status (process_manager);
 

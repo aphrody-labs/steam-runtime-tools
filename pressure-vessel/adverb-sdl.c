@@ -8,7 +8,7 @@
 
 /*
  * pv_adverb_set_up_dynamic_sdl:
- * @wrapped_command: The command to run and its environment
+ * @envpp: (inout) (not nullable): The environment block for the command to run
  * @lib_temp_dirs (nullable): A set of per-architecture directories
  *  using the dynamic string tokens `${PLATFORM}` or `${LIB}`
  * @prefix: Where to find SDL, normally `/usr` unless unit-testing
@@ -20,7 +20,7 @@
  * @error: Used to report error on failure
  */
 gboolean
-pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
+pv_adverb_set_up_dynamic_sdl (GStrv *envpp,
                               const GQuark *archs,
                               gsize n_archs,
                               PvPerArchDirs *lib_temp_dirs,
@@ -36,7 +36,8 @@ pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
   size_t abi_index;
   const char *existing_value;
 
-  existing_value = g_environ_getenv (wrapped_command->envp, dynamic_var);
+  g_return_val_if_fail (envpp != NULL, FALSE);
+  existing_value = g_environ_getenv (*envpp, dynamic_var);
 
   if (existing_value != NULL)
     {
@@ -111,7 +112,7 @@ pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
 
       value = g_build_filename (lib_temp_dirs->libdl_token_path, soname, NULL);
       g_info ("Setting %s=\"%s\" to use runtime's %s", dynamic_var, soname, library);
-      flatpak_bwrap_set_env (wrapped_command, dynamic_var, value, TRUE);
+      *envpp = g_environ_setenv (*envpp, dynamic_var, value, TRUE);
     }
   else
     {
@@ -124,7 +125,7 @@ pv_adverb_set_up_dynamic_sdl (FlatpakBwrap *wrapped_command,
 }
 
 void
-pv_adverb_set_up_dynamic_sdls (FlatpakBwrap *wrapped_command,
+pv_adverb_set_up_dynamic_sdls (GStrv *envpp,
                                const GQuark *archs,
                                gsize n_archs,
                                PvPerArchDirs *lib_temp_dirs,
@@ -163,13 +164,15 @@ pv_adverb_set_up_dynamic_sdls (FlatpakBwrap *wrapped_command,
     };
   size_t i;
 
+  g_return_if_fail (envpp != NULL);
+
   for (i = 0; i < G_N_ELEMENTS (sdls); i++)
     {
       if (compat_flags & sdls[i].if_flag)
         {
           g_autoptr(GError) local_error = NULL;
 
-          if (!pv_adverb_set_up_dynamic_sdl (wrapped_command,
+          if (!pv_adverb_set_up_dynamic_sdl (envpp,
                                              archs,
                                              n_archs,
                                              lib_temp_dirs,

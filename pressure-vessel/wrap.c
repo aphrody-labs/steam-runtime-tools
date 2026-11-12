@@ -108,7 +108,6 @@ main (int argc,
   const char *steam_app_id = NULL;
   g_autoptr(GPtrArray) adverb_preload_argv = NULL;
   int real_root_fd;
-  int result;
   PvAppendPreloadFlags append_preload_flags = PV_APPEND_PRELOAD_FLAGS_NONE;
   const SrtKnownArchitecture *host_machine = NULL;
   PvWrapLogFlags pv_log_flags = PV_WRAP_LOG_FLAGS_NONE;
@@ -269,9 +268,11 @@ main (int argc,
                                                 error))
     goto out;
 
-  if ((result = _srt_set_compatible_resource_limits (0)) < 0)
-    g_warning ("Unable to set normal resource limits: %s",
-               g_strerror (-result));
+  if (_srt_maximize_fd_limit (0, &local_error) < 0)
+    {
+      g_warning ("%s", local_error->message);
+      g_clear_error (&local_error);
+    }
 
   if (self->options.terminal != PV_TERMINAL_TTY && !self->options.devel)
     {

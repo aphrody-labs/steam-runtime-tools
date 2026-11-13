@@ -1,3 +1,28 @@
+steam-runtime-tools (0.20261113.0) UNRELEASED; urgency=medium
+
+  * s-r-launcher-service:
+    - Maximize file descriptor limit for the service itself to make
+      `s-r-launch-client --forward-fd` more likely to work, lowering
+      it to a default value for the launched process for better
+      compatibility with legacy programs
+      (steamrt/tasks#1191, steam-runtime#865)
+  * pressure-vessel:
+    - Maximize file descriptor limit for pressure-vessel itself to make
+      `pv-adverb --assign-fd` more likely to work, lowering it to a
+      default value for the launched process for better compatibility
+      with legacy programs
+      (steamrt/tasks#1191, steam-runtime#865)
+    - Refactoring
+  * Library code:
+    - Improve error-reporting if unable to set reasonable resource limits
+      (steamrt/tasks#1191, steam-runtime#865)
+  * Tests/CI:
+    - Improve coverage (steamrt/tasks#1191, steam-runtime#865)
+  * Documentation updates
+    (infrastructure/tasks#479, steamrt/tasks#1198)
+
+ -- Simon McVittie <smcv@collabora.com>  Fri, 13 Nov 2026 16:20:47 +0000
+
 steam-runtime-tools (0.20261110.0) steamrt; urgency=medium
 
   * s-r-launcher-service:
